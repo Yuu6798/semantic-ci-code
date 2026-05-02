@@ -132,7 +132,13 @@ def _collect_alias_map(tree: ast.Module) -> dict[str, str]:
         if isinstance(stmt, ast.Assign):
             for target in stmt.targets:
                 shadowed |= _assign_target_names(target)
-        elif isinstance(stmt, ast.AnnAssign | ast.AugAssign):
+        elif isinstance(stmt, ast.AnnAssign):
+            # ``op: int`` (annotation only) does not rebind ``op``;
+            # only ``op: int = ...`` does. Treating annotation-only
+            # statements as shadows would suppress real effects.
+            if stmt.value is not None:
+                shadowed |= _assign_target_names(stmt.target)
+        elif isinstance(stmt, ast.AugAssign):
             shadowed |= _assign_target_names(stmt.target)
 
     for name in shadowed:

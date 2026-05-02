@@ -314,6 +314,46 @@ op.remove("a")
     assert entries[0].evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
 
 
+def test_annotation_only_does_not_shadow_alias():
+    # ``op: int`` annotates without rebinding. Suppressing detection
+    # in that case would be a false negative, so the alias survives.
+    source = """
+import os as op
+op: int
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "os.remove"
+    assert entries[0].evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_annotated_assignment_with_value_shadows_alias():
+    source = """
+import os as op
+op: int = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_aug_assign_shadows_alias():
+    source = """
+from os import remove as rm
+rm += 1
+rm("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
 def test_tuple_unpacking_at_module_level_shadows_alias():
     source = """
 from os import remove as rm

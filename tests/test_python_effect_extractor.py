@@ -19,6 +19,17 @@ def _by_fqn(entries: tuple[EffectEntry, ...]) -> dict[str, EffectEntry]:
     return {entry.fqn: entry for entry in entries}
 
 
+def _call_effects(entries: tuple[EffectEntry, ...]) -> tuple[EffectEntry, ...]:
+    """Return only call-resolved effects, dropping global_mutation entries.
+
+    Alias-shadowing assertions pre-date the global_mutation pass and
+    were written against ``entries == ()`` to mean "no call resolved".
+    Module reassignments now legitimately produce additional entries
+    on the same fixtures, so the call assertions filter through this.
+    """
+    return tuple(e for e in entries if e.effect_class is not EffectClass.GLOBAL_MUTATION)
+
+
 def test_default_python_effect_db_loads():
     signatures = default_python_effect_db()
     assert any(s.match.call == "open" for s in signatures)
@@ -266,21 +277,24 @@ remove("a.txt")
 def test_alias_shadowed_by_module_level_assignment_is_not_resolved():
     # Module-level reassignment of the alias name conservatively drops
     # the alias from resolution for the entire module, regardless of
-    # source order.
+    # source order. The reassignment itself is an independent
+    # global_mutation; this test focuses on call effects.
     source = """
 from os import remove as rm
 rm = lambda x: None
 rm("a.txt")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
 
 def test_alias_shadowed_even_for_calls_before_assignment():
-    # Brief: P1 does not track module-level statement order. A later
-    # assignment shadows the alias for earlier calls too.
+    # Brief: P1 does not track module-level statement order for alias
+    # resolution. A later assignment shadows the alias for earlier
+    # calls too. The reassignment is reported as global_mutation; this
+    # test focuses on call effects.
     source = """
 import os as op
 op.remove("first")
@@ -288,7 +302,7 @@ op = 5
 op.remove("second")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -301,7 +315,7 @@ if True:
 op.remove("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -316,7 +330,7 @@ else:
 op.remove("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -330,7 +344,7 @@ except Exception:
     pass
 op.remove("a")
 """.lstrip()
-    assert extract_python_effects(source, filename="m.py") == ()
+    assert _call_effects(extract_python_effects(source, filename="m.py")) == ()
 
     source = """
 import os as op
@@ -340,7 +354,7 @@ except Exception as op:
     pass
 op.remove("a")
 """.lstrip()
-    assert extract_python_effects(source, filename="m.py") == ()
+    assert _call_effects(extract_python_effects(source, filename="m.py")) == ()
 
 
 def test_alias_shadowed_by_for_loop_target():
@@ -364,7 +378,7 @@ for _ in [1, 2, 3]:
 op.remove("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -377,7 +391,7 @@ while False:
 op.remove("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -409,7 +423,7 @@ if True:
 op.remove("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -458,7 +472,7 @@ op: int = 5
 op.remove("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -470,7 +484,7 @@ rm += 1
 rm("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -482,7 +496,7 @@ rm, _ = (lambda x: None, None)
 rm("a")
 """.lstrip()
 
-    entries = extract_python_effects(source, filename="m.py")
+    entries = _call_effects(extract_python_effects(source, filename="m.py"))
 
     assert entries == ()
 
@@ -658,3 +672,461 @@ def test_extractor_skips_calls_only_present_in_non_python_signatures():
     entries = extract_python_effects("print('hi')\n", filename="m.py", db=foreign_only_db)
 
     assert entries == ()
+
+
+# --------------------------------------------------------------------- #
+# global_mutation extraction
+# --------------------------------------------------------------------- #
+
+
+def _global_mutations(entries: tuple[EffectEntry, ...]) -> tuple[EffectEntry, ...]:
+    return tuple(e for e in entries if e.effect_class is EffectClass.GLOBAL_MUTATION)
+
+
+def test_global_statement_in_function_body_is_detected():
+    source = """
+def f():
+    global g
+    g = 1
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "global:g"
+    assert entry.confidence == 1.0
+    assert entry.evidence == {
+        "mutation_kind": "global_declaration",
+        "target": "g",
+        "file": "m.py",
+        "line": 2,
+        "resolution_level": ResolutionLevel.STATEMENT_LEVEL.value,
+    }
+
+
+def test_global_statement_emits_one_entry_per_name():
+    source = """
+def f():
+    global a, b, c
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert {e.fqn for e in entries} == {"global:a", "global:b", "global:c"}
+    assert all(e.evidence["mutation_kind"] == "global_declaration" for e in entries)
+
+
+def test_nonlocal_statement_in_nested_function_is_detected():
+    source = """
+def outer():
+    n = 1
+    def inner():
+        nonlocal n
+        n = 2
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "nonlocal:n"
+    assert entry.evidence["mutation_kind"] == "nonlocal_declaration"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.STATEMENT_LEVEL.value
+
+
+def test_module_level_reassignment_emits_for_subsequent_bindings():
+    source = """
+x = 1
+x = 2
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "module:x"
+    assert entry.evidence["mutation_kind"] == "module_reassignment"
+    assert entry.evidence["target"] == "x"
+    assert entry.evidence["line"] == 2
+
+
+def test_module_level_aug_assign_after_initial_binding_emits():
+    source = """
+x = 1
+x += 1
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+    assert entries[0].evidence["line"] == 2
+
+
+def test_module_level_annotated_then_reassigned_emits():
+    source = """
+x: int = 1
+x = 2
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+    assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+
+
+def test_module_level_initial_binding_alone_is_not_emitted():
+    source = "CONSTANT = 1\n"
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert entries == ()
+
+
+def test_module_level_subscript_assign_is_detected():
+    source = """
+CONFIG = {}
+CONFIG["debug"] = True
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    # CONFIG = {} is the first binding (no emit), the subscript write
+    # always emits.
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "module:CONFIG"
+    assert entry.evidence["mutation_kind"] == "module_subscript_assign"
+    assert entry.evidence["target"] == "CONFIG"
+    assert entry.evidence["line"] == 2
+
+
+def test_module_level_attribute_assign_is_detected():
+    source = "settings.value = 1\n"
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "module:settings"
+    assert entry.evidence["mutation_kind"] == "module_attribute_assign"
+    assert entry.evidence["target"] == "settings"
+    assert entry.evidence["line"] == 1
+
+
+def test_method_call_mutations_are_not_detected_in_p1():
+    # ``items.append(1)`` is a method call mutation; brief defers it to P2+.
+    source = """
+items = []
+items.append(1)
+data.update({"k": "v"})
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert entries == ()
+
+
+def test_imports_alone_do_not_emit_global_mutation():
+    source = """
+import os
+from typing import Any
+from .relmod import helper
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert entries == ()
+
+
+def test_reassigning_imported_name_emits_module_reassignment():
+    source = """
+import os
+os = object()
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:os"
+    assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+
+
+def test_reassigning_relative_imported_name_emits_module_reassignment():
+    for source in (
+        """
+from .config import settings
+settings = object()
+""".lstrip(),
+        """
+from . import settings
+settings = object()
+""".lstrip(),
+    ):
+        entries = _global_mutations(extract_python_effects(source, filename="pkg/mod.py"))
+
+        assert len(entries) == 1
+        assert entries[0].fqn == "module:settings"
+        assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+
+
+def test_class_body_assignment_is_not_module_mutation():
+    source = """
+class Foo:
+    a = 1
+    a = 2
+    b: int = 3
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert entries == ()
+
+
+def test_function_local_assignment_is_not_module_mutation():
+    source = """
+def f():
+    x = 1
+    x = 2
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert entries == ()
+
+
+def test_function_body_global_with_assignment_emits_only_global_declaration():
+    source = """
+g = 0
+def f():
+    global g
+    g = 1
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert {e.fqn for e in entries} == {"global:g"}
+
+
+def test_module_reassignment_inside_if_is_detected():
+    source = """
+x = 1
+if cond:
+    x = 2
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+    assert entries[0].evidence["line"] == 3
+
+
+def test_module_reassignment_inside_for_loop_body_is_detected():
+    source = """
+x = 1
+for _ in range(3):
+    x = 2
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+
+
+def test_module_level_delete_of_name_after_binding_emits():
+    source = """
+x = 1
+del x
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "module:x"
+    assert entry.evidence["mutation_kind"] == "module_delete"
+
+
+def test_module_level_delete_of_subscript_emits():
+    source = """
+CONFIG = {}
+del CONFIG["debug"]
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "module:CONFIG"
+    assert entry.evidence["mutation_kind"] == "module_subscript_delete"
+
+
+def test_annotation_only_assignment_does_not_emit_global_mutation():
+    source = """
+x: int = 1
+y: int
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    # x: int = 1 is a first binding (no emit). y: int has no value, so it
+    # neither binds nor emits.
+    assert entries == ()
+
+
+def test_tuple_unpacking_module_reassignment_emits_per_name():
+    source = """
+x = 1
+y = 2
+x, y = 3, 4
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    fqns = {e.fqn for e in entries}
+    assert fqns == {"module:x", "module:y"}
+    assert all(e.evidence["mutation_kind"] == "module_reassignment" for e in entries)
+
+
+def test_subscript_with_non_name_root_is_not_emitted():
+    # ``factory()["x"] = 1`` — no stable base name to attribute the
+    # mutation to.
+    source = "factory()['x'] = 1\n"
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert entries == ()
+
+
+def test_global_mutation_coexists_with_call_effects():
+    source = """
+import os as op
+
+CONFIG = {}
+CONFIG["debug"] = True
+
+x = 1
+x = 2
+
+op.remove("a")
+print("hi")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+    by_class: dict[EffectClass, list[str]] = {}
+    for e in entries:
+        by_class.setdefault(e.effect_class, []).append(e.fqn)
+
+    assert set(by_class[EffectClass.GLOBAL_MUTATION]) == {"module:CONFIG", "module:x"}
+    assert "os.remove" in by_class[EffectClass.FS]
+    assert "print" in by_class[EffectClass.STDOUT]
+
+
+def test_global_mutation_results_assignable_to_code_state():
+    source = """
+def f():
+    global g
+    g = 1
+
+x = 1
+x = 2
+CONFIG = {}
+CONFIG["k"] = 1
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+    state = CodeState(effects=entries)
+
+    mutation_fqns = {e.fqn for e in state.effects if e.effect_class is EffectClass.GLOBAL_MUTATION}
+    assert mutation_fqns == {"global:g", "module:x", "module:CONFIG"}
+
+
+def test_global_mutation_existing_call_tests_unaffected_by_filter():
+    # Sanity: extracting from a source that has only call effects yields
+    # zero global_mutation entries.
+    source = "open('a')\nprint('b')\n"
+
+    mutations = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert mutations == ()
+
+
+def test_try_star_body_assignments_are_tracked():
+    # ``except*`` (PEP 654, Python 3.11+) uses ast.TryStar, not ast.Try.
+    # Both passes — module_scope shadowing for alias resolution and
+    # module_scope binding events for global_mutation — must traverse
+    # TryStar bodies the same way they traverse Try bodies.
+    source = """
+import os as op
+x = 1
+try:
+    pass
+except* ValueError:
+    x = 2
+    op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    # alias ``op`` is shadowed by the assignment inside except* body, so
+    # the call must NOT resolve as imported_alias.
+    assert _call_effects(entries) == ()
+
+    # ``x = 2`` and ``op = 5`` inside except* body are module-scope
+    # rebinds and must be reported as module_reassignment.
+    mutations = _global_mutations(entries)
+    fqns = {(e.fqn, e.evidence["mutation_kind"]) for e in mutations}
+    assert ("module:x", "module_reassignment") in fqns
+    assert ("module:op", "module_reassignment") in fqns
+
+
+def test_try_star_handler_as_binding_shadows_alias():
+    source = """
+import os as op
+try:
+    pass
+except* Exception as op:
+    pass
+op.remove("a")
+""".lstrip()
+
+    assert _call_effects(extract_python_effects(source, filename="m.py")) == ()
+
+
+def test_except_handler_as_binding_emits_module_reassignment():
+    source = """
+x = 1
+try:
+    1 / 0
+except Exception as x:
+    pass
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+    assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+    assert entries[0].evidence["line"] == 4
+
+
+def test_try_star_handler_as_binding_emits_module_reassignment():
+    source = """
+x = 1
+try:
+    pass
+except* Exception as x:
+    pass
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+    assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+    assert entries[0].evidence["line"] == 4

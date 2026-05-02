@@ -21,6 +21,7 @@ class ResolutionLevel(StrEnum):
     DIRECT_CALL = "direct_call"
     IMPORTED_ALIAS = "imported_alias"
     METHOD_NAME_ONLY = "method_name_only"
+    STATEMENT_LEVEL = "statement_level"
 
 
 Severity = Literal["low", "medium", "high"]

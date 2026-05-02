@@ -42,6 +42,7 @@ def test_resolution_level_enum_values():
         "direct_call",
         "imported_alias",
         "method_name_only",
+        "statement_level",
     }
 
 

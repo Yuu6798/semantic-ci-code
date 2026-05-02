@@ -1,0 +1,645 @@
+# Python standard library known-effect signatures (P1 seed).
+#
+# Mapped to docs/code_semantic_ci_design.md §7.4. ``global_mutation`` is
+# intentionally absent: it is a statement-level concern (``global`` /
+# ``nonlocal`` / module-level rebinding) rather than a call signature,
+# and is left to a dedicated extractor pass.
+#
+# In P1 the python_effect_extractor only resolves ``direct_call``
+# patterns (``ast.Name`` and dotted ``ast.Attribute`` chains rooted in
+# an ``ast.Name``). Entries describing method calls on instances (e.g.
+# ``pathlib.Path.read_text``) are kept here so future resolution levels
+# can reuse the same database without schema changes.
+
+effects:
+  # ---------------------------------------------------------------- fs
+  - id: builtin_open
+    language: python
+    match:
+      call: open
+    effect: fs
+    access: unknown
+    severity: medium
+
+  - id: pathlib_path_open
+    language: python
+    match:
+      call: pathlib.Path.open
+    effect: fs
+    access: unknown
+    severity: medium
+
+  - id: pathlib_path_read_text
+    language: python
+    match:
+      call: pathlib.Path.read_text
+    effect: fs
+    access: read
+    severity: medium
+
+  - id: pathlib_path_write_text
+    language: python
+    match:
+      call: pathlib.Path.write_text
+    effect: fs
+    access: write
+    severity: high
+
+  - id: os_remove
+    language: python
+    match:
+      call: os.remove
+    effect: fs
+    access: write
+    severity: high
+
+  - id: os_unlink
+    language: python
+    match:
+      call: os.unlink
+    effect: fs
+    access: write
+    severity: high
+
+  - id: os_rename
+    language: python
+    match:
+      call: os.rename
+    effect: fs
+    access: write
+    severity: high
+
+  - id: os_replace
+    language: python
+    match:
+      call: os.replace
+    effect: fs
+    access: write
+    severity: high
+
+  - id: os_mkdir
+    language: python
+    match:
+      call: os.mkdir
+    effect: fs
+    access: write
+    severity: medium
+
+  - id: os_makedirs
+    language: python
+    match:
+      call: os.makedirs
+    effect: fs
+    access: write
+    severity: medium
+
+  - id: shutil_copy
+    language: python
+    match:
+      call: shutil.copy
+    effect: fs
+    access: write
+    severity: medium
+
+  - id: shutil_copyfile
+    language: python
+    match:
+      call: shutil.copyfile
+    effect: fs
+    access: write
+    severity: medium
+
+  - id: shutil_copytree
+    language: python
+    match:
+      call: shutil.copytree
+    effect: fs
+    access: write
+    severity: medium
+
+  - id: shutil_rmtree
+    language: python
+    match:
+      call: shutil.rmtree
+    effect: fs
+    access: write
+    severity: high
+
+  - id: shutil_move
+    language: python
+    match:
+      call: shutil.move
+    effect: fs
+    access: write
+    severity: high
+
+  # --------------------------------------------------------------- net
+  - id: socket_socket
+    language: python
+    match:
+      call: socket.socket
+    effect: net
+    access: unknown
+    severity: high
+
+  - id: urllib_request_urlopen
+    language: python
+    match:
+      call: urllib.request.urlopen
+    effect: net
+    access: read
+    severity: high
+
+  - id: http_client_http_connection
+    language: python
+    match:
+      call: http.client.HTTPConnection
+    effect: net
+    access: unknown
+    severity: high
+
+  - id: http_client_https_connection
+    language: python
+    match:
+      call: http.client.HTTPSConnection
+    effect: net
+    access: unknown
+    severity: high
+
+  - id: ftplib_ftp
+    language: python
+    match:
+      call: ftplib.FTP
+    effect: net
+    access: unknown
+    severity: high
+
+  - id: smtplib_smtp
+    language: python
+    match:
+      call: smtplib.SMTP
+    effect: net
+    access: unknown
+    severity: high
+
+  - id: imaplib_imap4
+    language: python
+    match:
+      call: imaplib.IMAP4
+    effect: net
+    access: unknown
+    severity: high
+
+  - id: poplib_pop3
+    language: python
+    match:
+      call: poplib.POP3
+    effect: net
+    access: unknown
+    severity: high
+
+  - id: xmlrpc_client_server_proxy
+    language: python
+    match:
+      call: xmlrpc.client.ServerProxy
+    effect: net
+    access: unknown
+    severity: high
+
+  # ----------------------------------------------------------- process
+  - id: subprocess_run
+    language: python
+    match:
+      call: subprocess.run
+    effect: process
+    access: execute
+    severity: high
+
+  - id: subprocess_popen
+    language: python
+    match:
+      call: subprocess.Popen
+    effect: process
+    access: execute
+    severity: high
+
+  - id: subprocess_call
+    language: python
+    match:
+      call: subprocess.call
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_system
+    language: python
+    match:
+      call: os.system
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execv
+    language: python
+    match:
+      call: os.execv
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execve
+    language: python
+    match:
+      call: os.execve
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execvp
+    language: python
+    match:
+      call: os.execvp
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execvpe
+    language: python
+    match:
+      call: os.execvpe
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execl
+    language: python
+    match:
+      call: os.execl
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execle
+    language: python
+    match:
+      call: os.execle
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execlp
+    language: python
+    match:
+      call: os.execlp
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_execlpe
+    language: python
+    match:
+      call: os.execlpe
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnv
+    language: python
+    match:
+      call: os.spawnv
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnve
+    language: python
+    match:
+      call: os.spawnve
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnvp
+    language: python
+    match:
+      call: os.spawnvp
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnvpe
+    language: python
+    match:
+      call: os.spawnvpe
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnl
+    language: python
+    match:
+      call: os.spawnl
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnle
+    language: python
+    match:
+      call: os.spawnle
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnlp
+    language: python
+    match:
+      call: os.spawnlp
+    effect: process
+    access: execute
+    severity: high
+
+  - id: os_spawnlpe
+    language: python
+    match:
+      call: os.spawnlpe
+    effect: process
+    access: execute
+    severity: high
+
+  # --------------------------------------------------------------- env
+  - id: os_getenv
+    language: python
+    match:
+      call: os.getenv
+    effect: env
+    access: read
+    severity: low
+
+  - id: os_putenv
+    language: python
+    match:
+      call: os.putenv
+    effect: env
+    access: write
+    severity: medium
+
+  - id: os_unsetenv
+    language: python
+    match:
+      call: os.unsetenv
+    effect: env
+    access: write
+    severity: medium
+
+  # ------------------------------------------------------- time_random
+  - id: time_time
+    language: python
+    match:
+      call: time.time
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: datetime_datetime_now
+    language: python
+    match:
+      call: datetime.datetime.now
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: datetime_date_today
+    language: python
+    match:
+      call: datetime.date.today
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: random_random
+    language: python
+    match:
+      call: random.random
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: random_randint
+    language: python
+    match:
+      call: random.randint
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: random_choice
+    language: python
+    match:
+      call: random.choice
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: random_shuffle
+    language: python
+    match:
+      call: random.shuffle
+    effect: time_random
+    access: write
+    severity: low
+
+  - id: random_sample
+    language: python
+    match:
+      call: random.sample
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: secrets_token_bytes
+    language: python
+    match:
+      call: secrets.token_bytes
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: secrets_token_hex
+    language: python
+    match:
+      call: secrets.token_hex
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: secrets_token_urlsafe
+    language: python
+    match:
+      call: secrets.token_urlsafe
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: secrets_choice
+    language: python
+    match:
+      call: secrets.choice
+    effect: time_random
+    access: read
+    severity: low
+
+  - id: uuid_uuid4
+    language: python
+    match:
+      call: uuid.uuid4
+    effect: time_random
+    access: read
+    severity: low
+
+  # ------------------------------------------------------------ stdout
+  - id: builtin_print
+    language: python
+    match:
+      call: print
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: sys_stdout_write
+    language: python
+    match:
+      call: sys.stdout.write
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: sys_stderr_write
+    language: python
+    match:
+      call: sys.stderr.write
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: logging_debug
+    language: python
+    match:
+      call: logging.debug
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: logging_info
+    language: python
+    match:
+      call: logging.info
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: logging_warning
+    language: python
+    match:
+      call: logging.warning
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: logging_error
+    language: python
+    match:
+      call: logging.error
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: logging_critical
+    language: python
+    match:
+      call: logging.critical
+    effect: stdout
+    access: write
+    severity: low
+
+  - id: logging_log
+    language: python
+    match:
+      call: logging.log
+    effect: stdout
+    access: write
+    severity: low
+
+  # ----------------------------------------------------- dynamic_code
+  - id: builtin_eval
+    language: python
+    match:
+      call: eval
+    effect: dynamic_code
+    access: execute
+    severity: high
+
+  - id: builtin_exec
+    language: python
+    match:
+      call: exec
+    effect: dynamic_code
+    access: execute
+    severity: high
+
+  - id: builtin_compile
+    language: python
+    match:
+      call: compile
+    effect: dynamic_code
+    access: execute
+    severity: medium
+
+  - id: builtin_dunder_import
+    language: python
+    match:
+      call: __import__
+    effect: dynamic_code
+    access: execute
+    severity: high
+
+  - id: importlib_import_module
+    language: python
+    match:
+      call: importlib.import_module
+    effect: dynamic_code
+    access: execute
+    severity: high
+
+  # ------------------------------------------------ unsafe_deserialize
+  - id: pickle_load
+    language: python
+    match:
+      call: pickle.load
+    effect: unsafe_deserialize
+    access: read
+    severity: high
+
+  - id: pickle_loads
+    language: python
+    match:
+      call: pickle.loads
+    effect: unsafe_deserialize
+    access: read
+    severity: high
+
+  - id: marshal_load
+    language: python
+    match:
+      call: marshal.load
+    effect: unsafe_deserialize
+    access: read
+    severity: high
+
+  - id: marshal_loads
+    language: python
+    match:
+      call: marshal.loads
+    effect: unsafe_deserialize
+    access: read
+    severity: high

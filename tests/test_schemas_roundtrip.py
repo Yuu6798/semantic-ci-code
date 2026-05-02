@@ -16,6 +16,9 @@ TARGET_SCHEMA_PATH = REPO_ROOT / "src" / "semantic_ci_code" / "schemas" / "targe
 CODE_STATE_SCHEMA_PATH = (
     REPO_ROOT / "src" / "semantic_ci_code" / "schemas" / "code_state.schema.json"
 )
+CODE_STATE_DELTA_SCHEMA_PATH = (
+    REPO_ROOT / "src" / "semantic_ci_code" / "schemas" / "code_state_delta.schema.json"
+)
 
 FEATURE_SCHEMA_SAMPLE_YAML = """
 intent: "fetch_user_profile を追加"
@@ -36,7 +39,7 @@ constraints:
 
 
 def test_committed_json_schemas_are_valid_json_schema_documents():
-    for path in (TARGET_SCHEMA_PATH, CODE_STATE_SCHEMA_PATH):
+    for path in (TARGET_SCHEMA_PATH, CODE_STATE_SCHEMA_PATH, CODE_STATE_DELTA_SCHEMA_PATH):
         schema = json.loads(path.read_text(encoding="utf-8"))
         Draft202012Validator.check_schema(schema)
 
@@ -89,3 +92,22 @@ def test_json_schema_drift_check_passes():
         cwd=REPO_ROOT,
         check=True,
     )
+
+
+def test_json_schema_drift_check_detects_format_only_changes(tmp_path):
+    schema_dir = REPO_ROOT / "src" / "semantic_ci_code" / "schemas"
+    path = TARGET_SCHEMA_PATH
+    original = path.read_text(encoding="utf-8")
+
+    try:
+        path.write_text(json.dumps(json.loads(original), separators=(",", ":")), encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, "scripts/regen_schemas.py", "--check"],
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 1
+    finally:
+        path.write_text(original, encoding="utf-8")
+
+    assert schema_dir.exists()

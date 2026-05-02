@@ -112,6 +112,16 @@ def test_invalid_change_kind_yaml_is_rejected():
         parse_target_svp_yaml(invalid_yaml)
 
 
+def test_unknown_target_svp_field_is_rejected():
+    invalid_yaml = FEATURE_SAMPLE_YAML.replace(
+        "constraints:",
+        "unexpected_top_level: true\nconstraints:",
+    )
+
+    with pytest.raises(ValidationError):
+        parse_target_svp_yaml(invalid_yaml)
+
+
 def test_target_svp_json_round_trip():
     target_svp = parse_target_svp_yaml(FEATURE_SAMPLE_YAML)
 

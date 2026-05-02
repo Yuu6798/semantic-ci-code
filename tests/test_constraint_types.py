@@ -74,6 +74,23 @@ def test_constraint_union_rejects_unknown_operator():
         raise AssertionError("unknown operator should be rejected")
 
 
+def test_constraint_union_rejects_unknown_fields():
+    try:
+        validate_constraint(
+            {
+                "id": "bad",
+                "kind": "delta",
+                "target": "api_surface_delta.added",
+                "operator": "includes_all",
+                "unknown_policyy": "fail",
+            }
+        )
+    except ValidationError as exc:
+        assert "unknown_policyy" in str(exc)
+    else:
+        raise AssertionError("unknown fields should be rejected")
+
+
 def test_constraint_models_are_frozen():
     constraint = StateConstraint(
         id="complexity_budget",

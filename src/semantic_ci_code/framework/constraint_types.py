@@ -51,7 +51,7 @@ class UnknownPolicy(StrEnum):
 
 
 class _BaseConstraint(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     id: str
     target: str

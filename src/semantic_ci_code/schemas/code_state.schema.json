@@ -1,6 +1,7 @@
 {
   "$defs": {
     "APISurfaceEntry": {
+      "additionalProperties": false,
       "properties": {
         "fqn": {
           "title": "Fqn",
@@ -43,6 +44,7 @@
       "type": "object"
     },
     "ComplexityEntry": {
+      "additionalProperties": false,
       "properties": {
         "cognitive": {
           "anyOf": [
@@ -80,6 +82,7 @@
       "type": "object"
     },
     "ControlFlowEntry": {
+      "additionalProperties": false,
       "properties": {
         "branches": {
           "anyOf": [
@@ -141,6 +144,7 @@
       "type": "object"
     },
     "CoverageEntry": {
+      "additionalProperties": false,
       "properties": {
         "branch_coverage": {
           "anyOf": [
@@ -171,6 +175,7 @@
       "type": "object"
     },
     "DataFlowEntry": {
+      "additionalProperties": false,
       "properties": {
         "path": {
           "items": {
@@ -213,6 +218,7 @@
       "type": "string"
     },
     "EffectEntry": {
+      "additionalProperties": false,
       "properties": {
         "confidence": {
           "anyOf": [
@@ -246,6 +252,7 @@
       "type": "object"
     },
     "ImportEntry": {
+      "additionalProperties": false,
       "properties": {
         "from": {
           "anyOf": [
@@ -278,6 +285,7 @@
       "type": "object"
     },
     "ModuleGraphEntry": {
+      "additionalProperties": false,
       "properties": {
         "imported_by": {
           "items": {
@@ -305,6 +313,7 @@
       "type": "object"
     },
     "TestSurfaceEntry": {
+      "additionalProperties": false,
       "properties": {
         "asserts": {
           "anyOf": [
@@ -347,6 +356,7 @@
       "type": "object"
     },
     "TypeRelation": {
+      "additionalProperties": false,
       "properties": {
         "fqn": {
           "title": "Fqn",
@@ -384,6 +394,7 @@
       "type": "object"
     }
   },
+  "additionalProperties": false,
   "properties": {
     "api_surface": {
       "items": {

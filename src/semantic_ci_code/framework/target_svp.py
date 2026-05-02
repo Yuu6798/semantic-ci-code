@@ -10,7 +10,7 @@ from semantic_ci_code.framework.constraint_types import Constraint
 
 
 class ChangeBlock(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     primary_kind: ChangeKind
     allowed_secondary_kinds: tuple[ChangeKind, ...] = Field(default_factory=tuple)
@@ -18,7 +18,7 @@ class ChangeBlock(BaseModel):
 
 
 class TargetSVP(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     intent: str
     change: ChangeBlock

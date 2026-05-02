@@ -1,6 +1,7 @@
 {
   "$defs": {
     "ChangeBlock": {
+      "additionalProperties": false,
       "properties": {
         "allowed_secondary_kinds": {
           "items": {
@@ -40,6 +41,7 @@
       "type": "string"
     },
     "DeltaConstraint": {
+      "additionalProperties": false,
       "properties": {
         "evidence_required": {
           "default": false,
@@ -127,6 +129,7 @@
       "type": "string"
     },
     "RepairConstraint": {
+      "additionalProperties": false,
       "properties": {
         "evidence_required": {
           "default": false,
@@ -197,6 +200,7 @@
       "type": "string"
     },
     "StateConstraint": {
+      "additionalProperties": false,
       "properties": {
         "evidence_required": {
           "default": false,
@@ -268,6 +272,7 @@
       "type": "string"
     }
   },
+  "additionalProperties": false,
   "properties": {
     "change": {
       "$ref": "#/$defs/ChangeBlock"

@@ -10,7 +10,7 @@ JsonMapping: TypeAlias = dict[str, JsonValue]
 
 
 class FrozenModel(BaseModel):
-    model_config = ConfigDict(frozen=True, populate_by_name=True)
+    model_config = ConfigDict(frozen=True, populate_by_name=True, extra="forbid")
 
 
 class ChangeKind(StrEnum):

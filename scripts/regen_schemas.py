@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from semantic_ci_code.domain.state_schema import CodeState
+from semantic_ci_code.domain.state_schema import CodeState, CodeStateDelta
 from semantic_ci_code.framework.target_svp import TargetSVP
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -16,14 +16,19 @@ def schema_documents() -> dict[str, dict[str, Any]]:
     return {
         "target_svp.schema.json": TargetSVP.model_json_schema(),
         "code_state.schema.json": CodeState.model_json_schema(),
+        "code_state_delta.schema.json": CodeStateDelta.model_json_schema(),
     }
+
+
+def render_schema(schema: dict[str, Any]) -> str:
+    return json.dumps(schema, indent=2, sort_keys=True) + "\n"
 
 
 def write_schemas() -> None:
     SCHEMA_DIR.mkdir(parents=True, exist_ok=True)
     for filename, schema in schema_documents().items():
         path = SCHEMA_DIR / filename
-        path.write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        path.write_text(render_schema(schema), encoding="utf-8")
 
 
 def check_schemas() -> bool:
@@ -31,8 +36,7 @@ def check_schemas() -> bool:
         path = SCHEMA_DIR / filename
         if not path.exists():
             return False
-        committed = json.loads(path.read_text(encoding="utf-8"))
-        if committed != schema:
+        if path.read_text(encoding="utf-8") != render_schema(schema):
             return False
     return True
 

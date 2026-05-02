@@ -1,0 +1,243 @@
+{
+  "$defs": {
+    "CFGDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "new_branches": {
+          "default": 0,
+          "title": "New Branches",
+          "type": "integer"
+        },
+        "removed_branches": {
+          "default": 0,
+          "title": "Removed Branches",
+          "type": "integer"
+        }
+      },
+      "title": "CFGDelta",
+      "type": "object"
+    },
+    "ComplexityDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "cognitive": {
+          "default": 0,
+          "title": "Cognitive",
+          "type": "integer"
+        },
+        "cyclomatic": {
+          "default": 0,
+          "title": "Cyclomatic",
+          "type": "integer"
+        }
+      },
+      "title": "ComplexityDelta",
+      "type": "object"
+    },
+    "CoverageDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branch"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        }
+      },
+      "title": "CoverageDelta",
+      "type": "object"
+    },
+    "EffectChanges": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "items": {},
+          "title": "Added",
+          "type": "array"
+        },
+        "removed": {
+          "items": {},
+          "title": "Removed",
+          "type": "array"
+        }
+      },
+      "title": "EffectChanges",
+      "type": "object"
+    },
+    "ImportDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "items": {},
+          "title": "Added",
+          "type": "array"
+        },
+        "removed": {
+          "items": {},
+          "title": "Removed",
+          "type": "array"
+        }
+      },
+      "title": "ImportDelta",
+      "type": "object"
+    },
+    "LocDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "default": 0,
+          "title": "Added",
+          "type": "integer"
+        },
+        "removed": {
+          "default": 0,
+          "title": "Removed",
+          "type": "integer"
+        }
+      },
+      "title": "LocDelta",
+      "type": "object"
+    },
+    "SymbolDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "items": {},
+          "title": "Added",
+          "type": "array"
+        },
+        "changed": {
+          "items": {},
+          "title": "Changed",
+          "type": "array"
+        },
+        "removed": {
+          "items": {},
+          "title": "Removed",
+          "type": "array"
+        }
+      },
+      "title": "SymbolDelta",
+      "type": "object"
+    },
+    "TestSurfaceDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "new_cases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "New Cases",
+          "type": "array"
+        },
+        "new_files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "New Files",
+          "type": "array"
+        },
+        "removed_cases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Removed Cases",
+          "type": "array"
+        }
+      },
+      "title": "TestSurfaceDelta",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "api_surface_delta": {
+      "$ref": "#/$defs/SymbolDelta"
+    },
+    "cfg_delta": {
+      "$ref": "#/$defs/CFGDelta"
+    },
+    "complexity_delta": {
+      "$ref": "#/$defs/ComplexityDelta"
+    },
+    "coverage_delta": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CoverageDelta"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "effect_changes": {
+      "$ref": "#/$defs/EffectChanges"
+    },
+    "files_touched": {
+      "default": 0,
+      "title": "Files Touched",
+      "type": "integer"
+    },
+    "imports_delta": {
+      "$ref": "#/$defs/ImportDelta"
+    },
+    "loc_delta": {
+      "$ref": "#/$defs/LocDelta"
+    },
+    "python_specific": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Python Specific"
+    },
+    "test_surface_delta": {
+      "$ref": "#/$defs/TestSurfaceDelta"
+    },
+    "type_changes": {
+      "items": {},
+      "title": "Type Changes",
+      "type": "array"
+    },
+    "typescript_specific": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Typescript Specific"
+    }
+  },
+  "title": "CodeStateDelta",
+  "type": "object"
+}

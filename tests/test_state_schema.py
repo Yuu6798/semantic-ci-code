@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from semantic_ci_code.domain.state_schema import (
     APISurfaceEntry,
     CFGDelta,
@@ -126,3 +128,12 @@ def test_code_state_delta_exposes_all_delta_fields_and_extensions():
     }
     assert delta.files_touched == 2
     assert delta.coverage_delta is not None
+
+
+def test_code_state_rejects_unknown_fields():
+    try:
+        CodeState(unexpected_dimension=[])  # type: ignore[call-arg]
+    except ValidationError as exc:
+        assert "unexpected_dimension" in str(exc)
+    else:
+        raise AssertionError("unknown CodeState fields should be rejected")

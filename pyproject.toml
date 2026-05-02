@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "jsonschema>=4.0",
     "pytest>=7.0",
     "ruff>=0.4",
 ]
@@ -27,6 +28,9 @@ semantic-ci-code = "semantic_ci_code.__main__:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 namespaces = false
+
+[tool.setuptools.package-data]
+"semantic_ci_code.schemas" = ["*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

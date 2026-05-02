@@ -1,0 +1,506 @@
+{
+  "$defs": {
+    "APISurfaceEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "fqn": {
+          "title": "Fqn",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "signature": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signature"
+        },
+        "visibility": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visibility"
+        }
+      },
+      "required": [
+        "fqn",
+        "kind"
+      ],
+      "title": "APISurfaceEntry",
+      "type": "object"
+    },
+    "ComplexityEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "cognitive": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cognitive"
+        },
+        "cyclomatic": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cyclomatic"
+        },
+        "fqn": {
+          "title": "Fqn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fqn"
+      ],
+      "title": "ComplexityEntry",
+      "type": "object"
+    },
+    "ControlFlowEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "branches": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branches"
+        },
+        "cyclomatic": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cyclomatic"
+        },
+        "exception_paths": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exception Paths"
+        },
+        "fqn": {
+          "title": "Fqn",
+          "type": "string"
+        },
+        "loops": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Loops"
+        }
+      },
+      "required": [
+        "fqn"
+      ],
+      "title": "ControlFlowEntry",
+      "type": "object"
+    },
+    "CoverageEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "branch_coverage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branch Coverage"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "line_coverage": {
+          "title": "Line Coverage",
+          "type": "number"
+        }
+      },
+      "required": [
+        "file",
+        "line_coverage"
+      ],
+      "title": "CoverageEntry",
+      "type": "object"
+    },
+    "DataFlowEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Path",
+          "type": "array"
+        },
+        "sink": {
+          "title": "Sink",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "sink"
+      ],
+      "title": "DataFlowEntry",
+      "type": "object"
+    },
+    "EffectClass": {
+      "enum": [
+        "pure",
+        "io",
+        "net",
+        "fs",
+        "process",
+        "env",
+        "time_random",
+        "stdout",
+        "dynamic_code",
+        "unsafe_deserialize",
+        "global_mutation"
+      ],
+      "title": "EffectClass",
+      "type": "string"
+    },
+    "EffectEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "effect_class": {
+          "$ref": "#/$defs/EffectClass"
+        },
+        "evidence": {
+          "default": null,
+          "title": "Evidence"
+        },
+        "fqn": {
+          "title": "Fqn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fqn",
+        "effect_class"
+      ],
+      "title": "EffectEntry",
+      "type": "object"
+    },
+    "ImportEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From"
+        },
+        "module": {
+          "title": "Module",
+          "type": "string"
+        },
+        "symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        }
+      },
+      "required": [
+        "module"
+      ],
+      "title": "ImportEntry",
+      "type": "object"
+    },
+    "ModuleGraphEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "imported_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Imported By",
+          "type": "array"
+        },
+        "imports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Imports",
+          "type": "array"
+        },
+        "module": {
+          "title": "Module",
+          "type": "string"
+        }
+      },
+      "required": [
+        "module"
+      ],
+      "title": "ModuleGraphEntry",
+      "type": "object"
+    },
+    "TestSurfaceEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "asserts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asserts"
+        },
+        "parametrize_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parametrize Count"
+        },
+        "test_file": {
+          "title": "Test File",
+          "type": "string"
+        },
+        "test_function": {
+          "title": "Test Function",
+          "type": "string"
+        }
+      },
+      "required": [
+        "test_file",
+        "test_function"
+      ],
+      "title": "TestSurfaceEntry",
+      "type": "object"
+    },
+    "TypeRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "fqn": {
+          "title": "Fqn",
+          "type": "string"
+        },
+        "generic_params": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Generic Params",
+          "type": "array"
+        },
+        "nullable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nullable"
+        },
+        "type_expr": {
+          "title": "Type Expr",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fqn",
+        "type_expr"
+      ],
+      "title": "TypeRelation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "api_surface": {
+      "items": {
+        "$ref": "#/$defs/APISurfaceEntry"
+      },
+      "title": "Api Surface",
+      "type": "array"
+    },
+    "complexity": {
+      "items": {
+        "$ref": "#/$defs/ComplexityEntry"
+      },
+      "title": "Complexity",
+      "type": "array"
+    },
+    "control_flow": {
+      "items": {
+        "$ref": "#/$defs/ControlFlowEntry"
+      },
+      "title": "Control Flow",
+      "type": "array"
+    },
+    "coverage": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/CoverageEntry"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coverage"
+    },
+    "data_flow": {
+      "items": {
+        "$ref": "#/$defs/DataFlowEntry"
+      },
+      "title": "Data Flow",
+      "type": "array"
+    },
+    "effects": {
+      "items": {
+        "$ref": "#/$defs/EffectEntry"
+      },
+      "title": "Effects",
+      "type": "array"
+    },
+    "imports": {
+      "items": {
+        "$ref": "#/$defs/ImportEntry"
+      },
+      "title": "Imports",
+      "type": "array"
+    },
+    "module_graph": {
+      "items": {
+        "$ref": "#/$defs/ModuleGraphEntry"
+      },
+      "title": "Module Graph",
+      "type": "array"
+    },
+    "python_specific": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Python Specific"
+    },
+    "test_surface": {
+      "items": {
+        "$ref": "#/$defs/TestSurfaceEntry"
+      },
+      "title": "Test Surface",
+      "type": "array"
+    },
+    "type_relations": {
+      "items": {
+        "$ref": "#/$defs/TypeRelation"
+      },
+      "title": "Type Relations",
+      "type": "array"
+    },
+    "typescript_specific": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Typescript Specific"
+    }
+  },
+  "title": "CodeState",
+  "type": "object"
+}

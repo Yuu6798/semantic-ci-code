@@ -1,0 +1,316 @@
+{
+  "$defs": {
+    "ChangeBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_secondary_kinds": {
+          "items": {
+            "$ref": "#/$defs/ChangeKind"
+          },
+          "title": "Allowed Secondary Kinds",
+          "type": "array"
+        },
+        "primary_kind": {
+          "$ref": "#/$defs/ChangeKind"
+        },
+        "scope": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Scope",
+          "type": "object"
+        }
+      },
+      "required": [
+        "primary_kind"
+      ],
+      "title": "ChangeBlock",
+      "type": "object"
+    },
+    "ChangeKind": {
+      "enum": [
+        "feature",
+        "bugfix",
+        "refactor",
+        "test_update"
+      ],
+      "title": "ChangeKind",
+      "type": "string"
+    },
+    "DeltaConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_required": {
+          "default": false,
+          "title": "Evidence Required",
+          "type": "boolean"
+        },
+        "expected": {
+          "default": null,
+          "title": "Expected"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "delta",
+          "default": "delta",
+          "title": "Kind",
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "scope": {
+          "default": null,
+          "title": "Scope"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "hard"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "tolerance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance"
+        },
+        "unknown_policy": {
+          "$ref": "#/$defs/UnknownPolicy",
+          "default": "fail"
+        }
+      },
+      "required": [
+        "id",
+        "target",
+        "operator"
+      ],
+      "title": "DeltaConstraint",
+      "type": "object"
+    },
+    "Operator": {
+      "enum": [
+        "equals",
+        "not_equals",
+        "equals_baseline",
+        "not_equals_baseline",
+        "includes_all",
+        "includes_any",
+        "excludes_all",
+        "subset_of",
+        "superset_of",
+        "superset_of_baseline",
+        "no_new_items",
+        "no_removed_items",
+        "less_than",
+        "less_than_or_equal",
+        "greater_than",
+        "greater_than_or_equal",
+        "within_range",
+        "unchanged",
+        "changed",
+        "changed_only_in"
+      ],
+      "title": "Operator",
+      "type": "string"
+    },
+    "RepairConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_required": {
+          "default": false,
+          "title": "Evidence Required",
+          "type": "boolean"
+        },
+        "expected": {
+          "default": null,
+          "title": "Expected"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "repair",
+          "default": "repair",
+          "title": "Kind",
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "scope": {
+          "default": null,
+          "title": "Scope"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "hard"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "tolerance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance"
+        },
+        "unknown_policy": {
+          "$ref": "#/$defs/UnknownPolicy",
+          "default": "fail"
+        }
+      },
+      "required": [
+        "id",
+        "target",
+        "operator"
+      ],
+      "title": "RepairConstraint",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "hard",
+        "soft",
+        "info"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "StateConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_required": {
+          "default": false,
+          "title": "Evidence Required",
+          "type": "boolean"
+        },
+        "expected": {
+          "default": null,
+          "title": "Expected"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "state",
+          "default": "state",
+          "title": "Kind",
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "scope": {
+          "default": null,
+          "title": "Scope"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "hard"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "tolerance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance"
+        },
+        "unknown_policy": {
+          "$ref": "#/$defs/UnknownPolicy",
+          "default": "fail"
+        }
+      },
+      "required": [
+        "id",
+        "target",
+        "operator"
+      ],
+      "title": "StateConstraint",
+      "type": "object"
+    },
+    "UnknownPolicy": {
+      "enum": [
+        "fail",
+        "repair",
+        "warn",
+        "ignore"
+      ],
+      "title": "UnknownPolicy",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "change": {
+      "$ref": "#/$defs/ChangeBlock"
+    },
+    "constraints": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "delta": "#/$defs/DeltaConstraint",
+            "repair": "#/$defs/RepairConstraint",
+            "state": "#/$defs/StateConstraint"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/StateConstraint"
+          },
+          {
+            "$ref": "#/$defs/DeltaConstraint"
+          },
+          {
+            "$ref": "#/$defs/RepairConstraint"
+          }
+        ]
+      },
+      "title": "Constraints",
+      "type": "array"
+    },
+    "intent": {
+      "title": "Intent",
+      "type": "string"
+    }
+  },
+  "required": [
+    "intent",
+    "change"
+  ],
+  "title": "TargetSVP",
+  "type": "object"
+}

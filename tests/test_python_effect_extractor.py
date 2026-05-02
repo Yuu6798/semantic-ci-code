@@ -854,6 +854,24 @@ os = object()
     assert entries[0].evidence["mutation_kind"] == "module_reassignment"
 
 
+def test_reassigning_relative_imported_name_emits_module_reassignment():
+    for source in (
+        """
+from .config import settings
+settings = object()
+""".lstrip(),
+        """
+from . import settings
+settings = object()
+""".lstrip(),
+    ):
+        entries = _global_mutations(extract_python_effects(source, filename="pkg/mod.py"))
+
+        assert len(entries) == 1
+        assert entries[0].fqn == "module:settings"
+        assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+
+
 def test_class_body_assignment_is_not_module_mutation():
     source = """
 class Foo:
@@ -1078,3 +1096,37 @@ op.remove("a")
 """.lstrip()
 
     assert _call_effects(extract_python_effects(source, filename="m.py")) == ()
+
+
+def test_except_handler_as_binding_emits_module_reassignment():
+    source = """
+x = 1
+try:
+    1 / 0
+except Exception as x:
+    pass
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+    assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+    assert entries[0].evidence["line"] == 4
+
+
+def test_try_star_handler_as_binding_emits_module_reassignment():
+    source = """
+x = 1
+try:
+    pass
+except* Exception as x:
+    pass
+""".lstrip()
+
+    entries = _global_mutations(extract_python_effects(source, filename="m.py"))
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "module:x"
+    assert entries[0].evidence["mutation_kind"] == "module_reassignment"
+    assert entries[0].evidence["line"] == 4

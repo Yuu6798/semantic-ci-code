@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
 
@@ -281,18 +282,28 @@ def _extract_call_effects(
 # --------------------------------------------------------------------- #
 
 
+@dataclass(frozen=True)
+class _NameBindingEvent:
+    name: str
+    line: int
+
+
+_ModuleBindingEvent = ast.stmt | _NameBindingEvent
+
+
 def _iter_module_scope_binding_events(
     stmts: list[ast.stmt],
-) -> list[ast.stmt]:
+) -> list[_ModuleBindingEvent]:
     """Return module-scope binding-event statements in source order.
 
     Yields ``Import`` / ``ImportFrom`` / ``Assign`` / ``AnnAssign`` /
-    ``AugAssign`` / ``Delete`` statements that execute in module scope,
-    recursing into ``if`` / ``try`` / ``for`` / ``while`` / ``with`` /
-    ``match`` bodies. ``FunctionDef`` / ``AsyncFunctionDef`` /
-    ``ClassDef`` introduce new scopes and are not traversed.
+    ``AugAssign`` / ``Delete`` statements, plus ``except ... as name``
+    bindings, that execute in module scope. Recurses into ``if`` /
+    ``try`` / ``for`` / ``while`` / ``with`` / ``match`` bodies.
+    ``FunctionDef`` / ``AsyncFunctionDef`` / ``ClassDef`` introduce
+    new scopes and are not traversed.
     """
-    events: list[ast.stmt] = []
+    events: list[_ModuleBindingEvent] = []
     for stmt in stmts:
         if isinstance(stmt, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             continue
@@ -308,6 +319,8 @@ def _iter_module_scope_binding_events(
         elif isinstance(stmt, ast.Try | ast.TryStar):
             events.extend(_iter_module_scope_binding_events(stmt.body))
             for handler in stmt.handlers:
+                if handler.name is not None:
+                    events.append(_NameBindingEvent(name=handler.name, line=handler.lineno))
                 events.extend(_iter_module_scope_binding_events(handler.body))
             events.extend(_iter_module_scope_binding_events(stmt.orelse))
             events.extend(_iter_module_scope_binding_events(stmt.finalbody))
@@ -328,8 +341,10 @@ def _iter_module_scope_binding_events(
 def _import_bound_names(stmt: ast.Import | ast.ImportFrom) -> list[str]:
     """Return the local names bound by an import statement.
 
-    Star imports, relative imports, and value-less ``ImportFrom`` are
-    skipped — they do not contribute deterministic bindings here.
+    Star imports are skipped because they do not contribute deterministic
+    local binding names. Relative ``ImportFrom`` statements still bind
+    their imported local names, so they are included here even though
+    alias resolution intentionally ignores them.
     """
     bound: list[str] = []
     if isinstance(stmt, ast.Import):
@@ -338,8 +353,6 @@ def _import_bound_names(stmt: ast.Import | ast.ImportFrom) -> list[str]:
                 bound.append(alias.asname)
             else:
                 bound.append(alias.name.split(".", 1)[0])
-        return bound
-    if stmt.module is None or stmt.level > 0:
         return bound
     for alias in stmt.names:
         if alias.name == "*":
@@ -467,7 +480,23 @@ def _extract_global_mutations(tree: ast.Module, filename: str) -> list[EffectEnt
     entries: list[EffectEntry] = []
 
     seen_module_bindings: set[str] = set()
-    for stmt in _iter_module_scope_binding_events(tree.body):
+    for event in _iter_module_scope_binding_events(tree.body):
+        if isinstance(event, _NameBindingEvent):
+            if event.name in seen_module_bindings:
+                entries.append(
+                    _build_mutation_entry(
+                        fqn=f"module:{event.name}",
+                        target=event.name,
+                        mutation_kind="module_reassignment",
+                        filename=filename,
+                        line=event.line,
+                    )
+                )
+            else:
+                seen_module_bindings.add(event.name)
+            continue
+
+        stmt = event
         if isinstance(stmt, ast.Import | ast.ImportFrom):
             seen_module_bindings.update(_import_bound_names(stmt))
             continue

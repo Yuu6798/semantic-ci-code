@@ -293,6 +293,127 @@ op.remove("second")
     assert entries == ()
 
 
+def test_alias_shadowed_by_assignment_inside_if():
+    source = """
+import os as op
+if True:
+    op = lambda x: None
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_else():
+    source = """
+import os as op
+if False:
+    pass
+else:
+    op = lambda x: None
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_try_or_except():
+    source = """
+import os as op
+try:
+    op = lambda x: None
+except Exception:
+    pass
+op.remove("a")
+""".lstrip()
+    assert extract_python_effects(source, filename="m.py") == ()
+
+    source = """
+import os as op
+try:
+    pass
+except Exception as op:
+    pass
+op.remove("a")
+""".lstrip()
+    assert extract_python_effects(source, filename="m.py") == ()
+
+
+def test_alias_shadowed_by_for_loop_target():
+    source = """
+import os as op
+for op in [1, 2, 3]:
+    pass
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_for_body():
+    source = """
+import os as op
+for _ in [1, 2, 3]:
+    op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_while():
+    source = """
+import os as op
+while False:
+    op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_with_as_binding():
+    source = """
+import os as op
+with open("/tmp/x") as op:
+    pass
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    # The ``open(...)`` call inside the with-statement still produces
+    # an open() detection, so we only assert that the aliased call is
+    # gone.
+    assert all(entry.evidence["raw_call"] != "op.remove" for entry in entries)
+    assert all(entry.fqn != "os.remove" for entry in entries)
+
+
+def test_alias_shadowed_by_nested_compound_statement():
+    source = """
+import os as op
+if True:
+    if True:
+        for _ in [0]:
+            op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
 def test_function_local_assignment_does_not_shadow_module_alias():
     # Brief: only module-level simple assignments shadow. A function-
     # local rebinding of the alias name does not affect module-level

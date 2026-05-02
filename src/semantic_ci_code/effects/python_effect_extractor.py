@@ -87,17 +87,70 @@ def _assign_target_names(node: ast.AST) -> set[str]:
     return set()
 
 
+def _collect_module_scope_shadows(stmts: list[ast.stmt]) -> set[str]:
+    """Collect names rebound by statements executed in module scope.
+
+    Recurses into compound statements (``if`` / ``try`` / ``for`` /
+    ``while`` / ``with`` / ``match``) because their bodies still bind
+    in module scope. Stops at function and class definitions, which
+    introduce their own scopes — full per-scope analysis is out of P1.
+    """
+    shadowed: set[str] = set()
+    for stmt in stmts:
+        if isinstance(stmt, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            continue
+        if isinstance(stmt, ast.Assign):
+            for target in stmt.targets:
+                shadowed |= _assign_target_names(target)
+        elif isinstance(stmt, ast.AnnAssign):
+            if stmt.value is not None:
+                shadowed |= _assign_target_names(stmt.target)
+        elif isinstance(stmt, ast.AugAssign):
+            shadowed |= _assign_target_names(stmt.target)
+        elif isinstance(stmt, ast.If):
+            shadowed |= _collect_module_scope_shadows(stmt.body)
+            shadowed |= _collect_module_scope_shadows(stmt.orelse)
+        elif isinstance(stmt, ast.Try):
+            shadowed |= _collect_module_scope_shadows(stmt.body)
+            for handler in stmt.handlers:
+                if handler.name is not None:
+                    shadowed.add(handler.name)
+                shadowed |= _collect_module_scope_shadows(handler.body)
+            shadowed |= _collect_module_scope_shadows(stmt.orelse)
+            shadowed |= _collect_module_scope_shadows(stmt.finalbody)
+        elif isinstance(stmt, ast.For | ast.AsyncFor):
+            shadowed |= _assign_target_names(stmt.target)
+            shadowed |= _collect_module_scope_shadows(stmt.body)
+            shadowed |= _collect_module_scope_shadows(stmt.orelse)
+        elif isinstance(stmt, ast.While):
+            shadowed |= _collect_module_scope_shadows(stmt.body)
+            shadowed |= _collect_module_scope_shadows(stmt.orelse)
+        elif isinstance(stmt, ast.With | ast.AsyncWith):
+            for item in stmt.items:
+                if item.optional_vars is not None:
+                    shadowed |= _assign_target_names(item.optional_vars)
+            shadowed |= _collect_module_scope_shadows(stmt.body)
+        elif isinstance(stmt, ast.Match):
+            # Pattern bindings (``case [x]:``) are not analyzed here;
+            # only case bodies are recursed into. This is a conservative
+            # P1 simplification — patterns rarely shadow effect aliases.
+            for case in stmt.cases:
+                shadowed |= _collect_module_scope_shadows(case.body)
+    return shadowed
+
+
 def _collect_alias_map(tree: ast.Module) -> dict[str, str]:
     """Build a module-level alias map: ``bound_name → canonical_dotted``.
 
     Only top-level ``import`` and ``from ... import ...`` statements are
     considered. Star imports and relative imports are skipped (P1 limit).
 
-    A bound name that appears as the target of any module-level
-    ``Assign`` / ``AnnAssign`` / ``AugAssign`` is treated as shadowed and
-    dropped from the map for the entire module. This is a deliberately
-    coarse, order-insensitive rule per the brief: it favors a stable,
-    auditable behavior over partial scope analysis.
+    A bound name that is rebound anywhere in module scope — including
+    inside top-level ``if`` / ``try`` / ``for`` / ``while`` / ``with``
+    bodies — is treated as shadowed and dropped from the map for the
+    entire module. Function and class bodies are not traversed because
+    they introduce their own scopes; full per-scope analysis is out of
+    P1. The rule is intentionally order-insensitive per the brief.
     """
     alias_map: dict[str, str] = {}
 
@@ -127,20 +180,7 @@ def _collect_alias_map(tree: ast.Module) -> dict[str, str]:
                 bound = alias.asname if alias.asname is not None else alias.name
                 alias_map[bound] = f"{module}.{alias.name}"
 
-    shadowed: set[str] = set()
-    for stmt in tree.body:
-        if isinstance(stmt, ast.Assign):
-            for target in stmt.targets:
-                shadowed |= _assign_target_names(target)
-        elif isinstance(stmt, ast.AnnAssign):
-            # ``op: int`` (annotation only) does not rebind ``op``;
-            # only ``op: int = ...`` does. Treating annotation-only
-            # statements as shadows would suppress real effects.
-            if stmt.value is not None:
-                shadowed |= _assign_target_names(stmt.target)
-        elif isinstance(stmt, ast.AugAssign):
-            shadowed |= _assign_target_names(stmt.target)
-
+    shadowed = _collect_module_scope_shadows(tree.body)
     for name in shadowed:
         alias_map.pop(name, None)
 

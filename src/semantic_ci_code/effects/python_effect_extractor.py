@@ -18,6 +18,7 @@ from semantic_ci_code.effects.effect_db import (
 
 DEFAULT_DB_PACKAGE = "semantic_ci_code.effects"
 DEFAULT_DB_RESOURCE_NAME = "effect_db_python.yaml"
+PYTHON_LANGUAGE = "python"
 
 
 @lru_cache(maxsize=1)
@@ -52,8 +53,17 @@ def _resolve_dotted_name(node: ast.AST) -> str | None:
 def _build_call_index(
     signatures: tuple[EffectSignature, ...],
 ) -> dict[str, EffectSignature]:
+    """Build a call-name → signature lookup, restricted to Python entries.
+
+    A shared multi-language DB may declare a non-Python signature for
+    a call name that also exists in Python (e.g. ``print``). Filtering
+    by ``language`` here keeps the Python extractor from picking up
+    foreign entries just because they were declared first.
+    """
     index: dict[str, EffectSignature] = {}
     for signature in signatures:
+        if signature.language != PYTHON_LANGUAGE:
+            continue
         index.setdefault(signature.match.call, signature)
     return index
 

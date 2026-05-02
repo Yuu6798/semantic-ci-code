@@ -228,3 +228,49 @@ def test_nested_calls_are_each_detected():
     entries = extract_python_effects(source, filename="m.py")
     fqns = [entry.fqn for entry in entries]
     assert sorted(fqns) == ["open", "print"]
+
+
+def test_extractor_ignores_non_python_signatures():
+    # A multi-language DB may declare a foreign signature for a call name
+    # that also exists in Python. The Python extractor must skip the
+    # foreign entry even when it is declared first.
+    mixed_db = (
+        EffectSignature(
+            id="ts_console_log",
+            language="typescript",
+            match=EffectMatch(call="print"),
+            effect=EffectClass.NET,
+            access=EffectAccess.WRITE,
+            severity="high",
+        ),
+        EffectSignature(
+            id="py_print",
+            language="python",
+            match=EffectMatch(call="print"),
+            effect=EffectClass.STDOUT,
+            access=EffectAccess.WRITE,
+            severity="low",
+        ),
+    )
+
+    entries = extract_python_effects("print('hi')\n", filename="m.py", db=mixed_db)
+
+    assert len(entries) == 1
+    assert entries[0].effect_class is EffectClass.STDOUT
+
+
+def test_extractor_skips_calls_only_present_in_non_python_signatures():
+    foreign_only_db = (
+        EffectSignature(
+            id="ts_print",
+            language="typescript",
+            match=EffectMatch(call="print"),
+            effect=EffectClass.STDOUT,
+            access=EffectAccess.WRITE,
+            severity="low",
+        ),
+    )
+
+    entries = extract_python_effects("print('hi')\n", filename="m.py", db=foreign_only_db)
+
+    assert entries == ()

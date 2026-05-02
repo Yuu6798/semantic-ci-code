@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib import resources
 from pathlib import Path
 
 import pytest
@@ -14,8 +15,11 @@ from semantic_ci_code.effects.effect_db import (
     load_effect_db,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB_PATH = REPO_ROOT / "config" / "effect_db_python.yaml"
+
+def _load_default_db():
+    resource = resources.files("semantic_ci_code.effects").joinpath("effect_db_python.yaml")
+    with resources.as_file(resource) as path:
+        return load_effect_db(path)
 
 
 def _write_yaml(tmp_path: Path, body: str) -> Path:
@@ -77,7 +81,7 @@ def test_effect_match_rejects_unknown_field():
 
 
 def test_load_effect_db_reads_default_seed():
-    signatures = load_effect_db(DEFAULT_DB_PATH)
+    signatures = _load_default_db()
 
     assert len(signatures) > 0
     ids = {s.id for s in signatures}
@@ -223,6 +227,6 @@ effects:
 
 
 def test_default_seed_has_unique_ids():
-    signatures = load_effect_db(DEFAULT_DB_PATH)
+    signatures = _load_default_db()
     ids = [s.id for s in signatures]
     assert len(ids) == len(set(ids))

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from functools import lru_cache
-from pathlib import Path
+from importlib import resources
 
 from semantic_ci_code.domain.state_schema import EffectEntry
 from semantic_ci_code.effects.effect_db import (
@@ -16,25 +16,20 @@ from semantic_ci_code.effects.effect_db import (
 # ``nonlocal`` declarations and module-level rebindings) rather than a
 # call signature, and will be implemented as a dedicated extractor pass.
 
-
-def _find_default_db_path() -> Path:
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        candidate = parent / "config" / "effect_db_python.yaml"
-        if candidate.is_file():
-            return candidate
-    msg = (
-        "Default Python effect DB not found. Expected "
-        "'config/effect_db_python.yaml' in a parent of "
-        f"{here}."
-    )
-    raise FileNotFoundError(msg)
+DEFAULT_DB_PACKAGE = "semantic_ci_code.effects"
+DEFAULT_DB_RESOURCE_NAME = "effect_db_python.yaml"
 
 
 @lru_cache(maxsize=1)
 def default_python_effect_db() -> tuple[EffectSignature, ...]:
-    """Return the project-default Python effect signature database."""
-    return load_effect_db(_find_default_db_path())
+    """Return the project-default Python effect signature database.
+
+    The YAML is shipped as package data so resolution works identically
+    in editable installs, plain wheels, and zipped distributions.
+    """
+    resource = resources.files(DEFAULT_DB_PACKAGE).joinpath(DEFAULT_DB_RESOURCE_NAME)
+    with resources.as_file(resource) as path:
+        return load_effect_db(path)
 
 
 def _resolve_dotted_name(node: ast.AST) -> str | None:

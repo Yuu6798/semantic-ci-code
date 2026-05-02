@@ -68,45 +68,143 @@ def _build_call_index(
     return index
 
 
+def _assign_target_names(node: ast.AST) -> set[str]:
+    """Collect names that an assignment target binds, conservatively.
+
+    Only plain ``Name`` targets and tuple/list/starred destructurings of
+    ``Name`` targets contribute. Attribute and subscript writes (``a.x``,
+    ``a[0]``) do not rebind the local name and are ignored.
+    """
+    if isinstance(node, ast.Name):
+        return {node.id}
+    if isinstance(node, ast.Tuple | ast.List):
+        names: set[str] = set()
+        for elt in node.elts:
+            names |= _assign_target_names(elt)
+        return names
+    if isinstance(node, ast.Starred):
+        return _assign_target_names(node.value)
+    return set()
+
+
+def _collect_alias_map(tree: ast.Module) -> dict[str, str]:
+    """Build a module-level alias map: ``bound_name → canonical_dotted``.
+
+    Only top-level ``import`` and ``from ... import ...`` statements are
+    considered. Star imports and relative imports are skipped (P1 limit).
+
+    A bound name that appears as the target of any module-level
+    ``Assign`` / ``AnnAssign`` / ``AugAssign`` is treated as shadowed and
+    dropped from the map for the entire module. This is a deliberately
+    coarse, order-insensitive rule per the brief: it favors a stable,
+    auditable behavior over partial scope analysis.
+    """
+    alias_map: dict[str, str] = {}
+
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Import):
+            for alias in stmt.names:
+                if alias.asname is not None:
+                    # ``import os as op`` → op resolves to "os".
+                    alias_map[alias.asname] = alias.name
+                else:
+                    # ``import urllib.request`` binds the top-level
+                    # ``urllib`` name; the canonical head is itself, so
+                    # downstream calls resolve as direct_call.
+                    bound = alias.name.split(".", 1)[0]
+                    alias_map.setdefault(bound, bound)
+        elif isinstance(stmt, ast.ImportFrom):
+            if stmt.module is None or stmt.level > 0:
+                # Relative imports (``from . import x``) are out of scope
+                # for P1 alias resolution.
+                continue
+            module = stmt.module
+            for alias in stmt.names:
+                if alias.name == "*":
+                    # Star imports cannot be resolved without runtime
+                    # introspection of the source module.
+                    continue
+                bound = alias.asname if alias.asname is not None else alias.name
+                alias_map[bound] = f"{module}.{alias.name}"
+
+    shadowed: set[str] = set()
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Assign):
+            for target in stmt.targets:
+                shadowed |= _assign_target_names(target)
+        elif isinstance(stmt, ast.AnnAssign | ast.AugAssign):
+            shadowed |= _assign_target_names(stmt.target)
+
+    for name in shadowed:
+        alias_map.pop(name, None)
+
+    return alias_map
+
+
+def _resolve_call(raw: str, alias_map: dict[str, str]) -> tuple[str, ResolutionLevel]:
+    """Resolve a raw dotted call name through the alias map.
+
+    Returns ``(resolved_name, level)``. When the head segment is not in
+    the alias map, or maps to itself, the raw name is returned as-is
+    with ``direct_call``. Otherwise the head is rewritten to its
+    canonical dotted form and ``imported_alias`` is reported.
+    """
+    head, _, tail = raw.partition(".")
+    canonical_head = alias_map.get(head)
+    if canonical_head is None or canonical_head == head:
+        return raw, ResolutionLevel.DIRECT_CALL
+    resolved = f"{canonical_head}.{tail}" if tail else canonical_head
+    return resolved, ResolutionLevel.IMPORTED_ALIAS
+
+
 def extract_python_effects(
     source: str,
     *,
     filename: str = "<string>",
     db: tuple[EffectSignature, ...] | None = None,
 ) -> tuple[EffectEntry, ...]:
-    """Extract direct-call effects from Python ``source``.
+    """Extract direct-call and import-alias effects from Python ``source``.
 
-    Resolution is intentionally limited to P1 ``direct_call`` semantics:
-    ``ast.Name`` and chains of ``ast.Attribute`` rooted in ``ast.Name``.
-    Method calls on instances and import-alias rebinds are not resolved.
+    Resolution covers two P1 levels (see design §7.3):
 
-    A :class:`SyntaxError` from :func:`ast.parse` propagates unchanged so
-    callers can distinguish parse failures from extraction misses.
+    * ``direct_call``: ``ast.Name`` and ``ast.Attribute`` chains rooted
+      in a name that already matches a DB entry as written.
+    * ``imported_alias``: top-level ``import``/``from`` rebinds whose
+      bound name resolves to a canonical DB call after substitution.
+
+    Method calls on instances, dynamic imports, and star imports are
+    left for later phases.
+
+    A :class:`SyntaxError` from :func:`ast.parse` propagates unchanged
+    so callers can distinguish parse failures from extraction misses.
     """
     tree = ast.parse(source, filename=filename)
     signatures = db if db is not None else default_python_effect_db()
     index = _build_call_index(signatures)
+    alias_map = _collect_alias_map(tree)
 
     entries: list[EffectEntry] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        dotted = _resolve_dotted_name(node.func)
-        if dotted is None:
+        raw = _resolve_dotted_name(node.func)
+        if raw is None:
             continue
-        signature = index.get(dotted)
+        resolved, level = _resolve_call(raw, alias_map)
+        signature = index.get(resolved)
         if signature is None:
             continue
         entries.append(
             EffectEntry(
-                fqn=dotted,
+                fqn=resolved,
                 effect_class=signature.effect_class,
                 confidence=1.0,
                 evidence={
-                    "call": dotted,
+                    "raw_call": raw,
+                    "resolved_call": resolved,
                     "file": filename,
                     "line": node.lineno,
-                    "resolution_level": ResolutionLevel.DIRECT_CALL.value,
+                    "resolution_level": level.value,
                 },
             )
         )

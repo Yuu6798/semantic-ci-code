@@ -221,3 +221,10 @@ def test_entries_record_dotted_fqn_for_attribute_calls():
     by_fqn = _by_fqn(entries)
     assert "os.remove" in by_fqn
     assert by_fqn["os.remove"].evidence["resolution_level"] == "direct_call"
+
+
+def test_nested_calls_are_each_detected():
+    source = "print(open('a.txt'))\n"
+    entries = extract_python_effects(source, filename="m.py")
+    fqns = [entry.fqn for entry in entries]
+    assert sorted(fqns) == ["open", "print"]

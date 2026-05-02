@@ -4,17 +4,17 @@ import ast
 from functools import lru_cache
 from importlib import resources
 
-from semantic_ci_code.domain.state_schema import EffectEntry
+from semantic_ci_code.domain.state_schema import EffectClass, EffectEntry
 from semantic_ci_code.effects.effect_db import (
     EffectSignature,
     ResolutionLevel,
     load_effect_db,
 )
 
-# TODO(P1+): ``global_mutation`` is intentionally not represented as an
-# effect_db entry. It requires statement-level detection (``global`` /
-# ``nonlocal`` declarations and module-level rebindings) rather than a
-# call signature, and will be implemented as a dedicated extractor pass.
+# ``global_mutation`` is detected via a dedicated AST pass rather than
+# the effect signature DB: it is statement-level (``global`` /
+# ``nonlocal`` declarations, module-level rebindings, attribute /
+# subscript writes) rather than a call signature.
 
 DEFAULT_DB_PACKAGE = "semantic_ci_code.effects"
 DEFAULT_DB_RESOURCE_NAME = "effect_db_python.yaml"
@@ -209,17 +209,23 @@ def extract_python_effects(
     filename: str = "<string>",
     db: tuple[EffectSignature, ...] | None = None,
 ) -> tuple[EffectEntry, ...]:
-    """Extract direct-call and import-alias effects from Python ``source``.
+    """Extract direct-call, import-alias, and global-mutation effects.
 
-    Resolution covers two P1 levels (see design §7.3):
+    Call resolution covers two P1 levels (see design §7.3):
 
     * ``direct_call``: ``ast.Name`` and ``ast.Attribute`` chains rooted
       in a name that already matches a DB entry as written.
     * ``imported_alias``: top-level ``import``/``from`` rebinds whose
       bound name resolves to a canonical DB call after substitution.
 
-    Method calls on instances, dynamic imports, and star imports are
-    left for later phases.
+    A separate statement-level pass detects ``global_mutation`` effects:
+    function-body ``global`` / ``nonlocal`` declarations, module-scope
+    name rebindings beyond the first, and module-scope attribute /
+    subscript writes against a named base.
+
+    Method calls on instances, dynamic imports, star imports, and
+    instance-method mutations (``items.append(...)`` etc.) are out of
+    scope for P1.
 
     A :class:`SyntaxError` from :func:`ast.parse` propagates unchanged
     so callers can distinguish parse failures from extraction misses.
@@ -229,6 +235,19 @@ def extract_python_effects(
     index = _build_call_index(signatures)
     alias_map = _collect_alias_map(tree)
 
+    entries: list[EffectEntry] = []
+    entries.extend(_extract_call_effects(tree, index, alias_map, filename))
+    entries.extend(_extract_global_mutations(tree, filename))
+    return tuple(entries)
+
+
+def _extract_call_effects(
+    tree: ast.Module,
+    index: dict[str, EffectSignature],
+    alias_map: dict[str, str],
+    filename: str,
+) -> list[EffectEntry]:
+    """Detect direct_call / imported_alias effects from call sites."""
     entries: list[EffectEntry] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -254,4 +273,254 @@ def extract_python_effects(
                 },
             )
         )
-    return tuple(entries)
+    return entries
+
+
+# --------------------------------------------------------------------- #
+# global_mutation extraction
+# --------------------------------------------------------------------- #
+
+
+def _iter_module_scope_binding_events(
+    stmts: list[ast.stmt],
+) -> list[ast.stmt]:
+    """Return module-scope binding-event statements in source order.
+
+    Yields ``Import`` / ``ImportFrom`` / ``Assign`` / ``AnnAssign`` /
+    ``AugAssign`` / ``Delete`` statements that execute in module scope,
+    recursing into ``if`` / ``try`` / ``for`` / ``while`` / ``with`` /
+    ``match`` bodies. ``FunctionDef`` / ``AsyncFunctionDef`` /
+    ``ClassDef`` introduce new scopes and are not traversed.
+    """
+    events: list[ast.stmt] = []
+    for stmt in stmts:
+        if isinstance(stmt, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            continue
+        if isinstance(
+            stmt,
+            ast.Import | ast.ImportFrom | ast.Assign | ast.AnnAssign | ast.AugAssign | ast.Delete,
+        ):
+            events.append(stmt)
+            continue
+        if isinstance(stmt, ast.If):
+            events.extend(_iter_module_scope_binding_events(stmt.body))
+            events.extend(_iter_module_scope_binding_events(stmt.orelse))
+        elif isinstance(stmt, ast.Try):
+            events.extend(_iter_module_scope_binding_events(stmt.body))
+            for handler in stmt.handlers:
+                events.extend(_iter_module_scope_binding_events(handler.body))
+            events.extend(_iter_module_scope_binding_events(stmt.orelse))
+            events.extend(_iter_module_scope_binding_events(stmt.finalbody))
+        elif isinstance(stmt, ast.For | ast.AsyncFor):
+            events.extend(_iter_module_scope_binding_events(stmt.body))
+            events.extend(_iter_module_scope_binding_events(stmt.orelse))
+        elif isinstance(stmt, ast.While):
+            events.extend(_iter_module_scope_binding_events(stmt.body))
+            events.extend(_iter_module_scope_binding_events(stmt.orelse))
+        elif isinstance(stmt, ast.With | ast.AsyncWith):
+            events.extend(_iter_module_scope_binding_events(stmt.body))
+        elif isinstance(stmt, ast.Match):
+            for case in stmt.cases:
+                events.extend(_iter_module_scope_binding_events(case.body))
+    return events
+
+
+def _import_bound_names(stmt: ast.Import | ast.ImportFrom) -> list[str]:
+    """Return the local names bound by an import statement.
+
+    Star imports, relative imports, and value-less ``ImportFrom`` are
+    skipped — they do not contribute deterministic bindings here.
+    """
+    bound: list[str] = []
+    if isinstance(stmt, ast.Import):
+        for alias in stmt.names:
+            if alias.asname is not None:
+                bound.append(alias.asname)
+            else:
+                bound.append(alias.name.split(".", 1)[0])
+        return bound
+    if stmt.module is None or stmt.level > 0:
+        return bound
+    for alias in stmt.names:
+        if alias.name == "*":
+            continue
+        bound.append(alias.asname if alias.asname is not None else alias.name)
+    return bound
+
+
+def _classify_assignment_target(target: ast.AST) -> list[tuple[str, str]]:
+    """Classify an assignment target into ``(kind, base_name)`` tuples.
+
+    ``kind`` is one of ``"name"``, ``"subscript"``, ``"attribute"``.
+    Tuple / list / starred destructurings are flattened. Targets whose
+    Subscript / Attribute chain bottoms out on a non-Name (e.g. a call
+    result) are skipped — there is no stable base name to report.
+    """
+    if isinstance(target, ast.Name):
+        return [("name", target.id)]
+    if isinstance(target, ast.Subscript):
+        root = _attr_subscript_root_name(target.value)
+        return [("subscript", root)] if root is not None else []
+    if isinstance(target, ast.Attribute):
+        root = _attr_subscript_root_name(target.value)
+        return [("attribute", root)] if root is not None else []
+    if isinstance(target, ast.Tuple | ast.List):
+        results: list[tuple[str, str]] = []
+        for elt in target.elts:
+            results.extend(_classify_assignment_target(elt))
+        return results
+    if isinstance(target, ast.Starred):
+        return _classify_assignment_target(target.value)
+    return []
+
+
+def _attr_subscript_root_name(node: ast.AST) -> str | None:
+    """Walk Subscript / Attribute chains to the base ``Name`` id, if any."""
+    while isinstance(node, ast.Subscript | ast.Attribute):
+        node = node.value
+    if isinstance(node, ast.Name):
+        return node.id
+    return None
+
+
+def _statement_target_classifications(
+    stmt: ast.stmt,
+) -> list[tuple[str, str]]:
+    """Return ``(kind, base_name)`` tuples for an assignment statement.
+
+    ``AnnAssign`` without a value is intentionally returned empty: it is
+    a pure annotation and does not rebind the target.
+    """
+    if isinstance(stmt, ast.Assign):
+        results: list[tuple[str, str]] = []
+        for target in stmt.targets:
+            results.extend(_classify_assignment_target(target))
+        return results
+    if isinstance(stmt, ast.AnnAssign):
+        if stmt.value is None:
+            return []
+        return _classify_assignment_target(stmt.target)
+    if isinstance(stmt, ast.AugAssign):
+        return _classify_assignment_target(stmt.target)
+    if isinstance(stmt, ast.Delete):
+        results = []
+        for target in stmt.targets:
+            results.extend(_classify_assignment_target(target))
+        return results
+    return []
+
+
+def _mutation_kind_for(stmt: ast.stmt, kind: str) -> str:
+    """Map a (statement type, target kind) pair to a stable kind label."""
+    if isinstance(stmt, ast.Delete):
+        if kind == "name":
+            return "module_delete"
+        if kind == "subscript":
+            return "module_subscript_delete"
+        if kind == "attribute":
+            return "module_attribute_delete"
+    if kind == "name":
+        return "module_reassignment"
+    if kind == "subscript":
+        return "module_subscript_assign"
+    if kind == "attribute":
+        return "module_attribute_assign"
+    return "module_mutation"
+
+
+def _build_mutation_entry(
+    *,
+    fqn: str,
+    target: str,
+    mutation_kind: str,
+    filename: str,
+    line: int,
+) -> EffectEntry:
+    return EffectEntry(
+        fqn=fqn,
+        effect_class=EffectClass.GLOBAL_MUTATION,
+        confidence=1.0,
+        evidence={
+            "mutation_kind": mutation_kind,
+            "target": target,
+            "file": filename,
+            "line": line,
+            "resolution_level": ResolutionLevel.STATEMENT_LEVEL.value,
+        },
+    )
+
+
+def _extract_global_mutations(tree: ast.Module, filename: str) -> list[EffectEntry]:
+    """Detect statement-level global_mutation effects.
+
+    Three sub-passes:
+
+    1. Module-scope binding events in source order: imports register
+       their bound names but never emit; ``Assign`` / ``AnnAssign`` with
+       value / ``AugAssign`` / ``Delete`` against a Name target emit on
+       the second and subsequent occurrence per name; against a
+       Subscript or Attribute target rooted on a Name they emit
+       unconditionally.
+    2. ``ast.Global`` and ``ast.Nonlocal`` statements anywhere in the
+       tree emit one entry per declared name.
+    """
+    entries: list[EffectEntry] = []
+
+    seen_module_bindings: set[str] = set()
+    for stmt in _iter_module_scope_binding_events(tree.body):
+        if isinstance(stmt, ast.Import | ast.ImportFrom):
+            seen_module_bindings.update(_import_bound_names(stmt))
+            continue
+        for kind, base_name in _statement_target_classifications(stmt):
+            mutation_kind = _mutation_kind_for(stmt, kind)
+            if kind == "name":
+                if base_name in seen_module_bindings:
+                    entries.append(
+                        _build_mutation_entry(
+                            fqn=f"module:{base_name}",
+                            target=base_name,
+                            mutation_kind=mutation_kind,
+                            filename=filename,
+                            line=stmt.lineno,
+                        )
+                    )
+                else:
+                    seen_module_bindings.add(base_name)
+            else:
+                # Subscript / Attribute writes are mutations on every
+                # occurrence; there is no first-binding exemption.
+                entries.append(
+                    _build_mutation_entry(
+                        fqn=f"module:{base_name}",
+                        target=base_name,
+                        mutation_kind=mutation_kind,
+                        filename=filename,
+                        line=stmt.lineno,
+                    )
+                )
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Global):
+            for name in node.names:
+                entries.append(
+                    _build_mutation_entry(
+                        fqn=f"global:{name}",
+                        target=name,
+                        mutation_kind="global_declaration",
+                        filename=filename,
+                        line=node.lineno,
+                    )
+                )
+        elif isinstance(node, ast.Nonlocal):
+            for name in node.names:
+                entries.append(
+                    _build_mutation_entry(
+                        fqn=f"nonlocal:{name}",
+                        target=name,
+                        mutation_kind="nonlocal_declaration",
+                        filename=filename,
+                        line=node.lineno,
+                    )
+                )
+
+    return entries

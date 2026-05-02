@@ -62,7 +62,8 @@ def test_evidence_payload_is_complete():
     assert entry.confidence == 1.0
     assert entry.effect_class is EffectClass.FS
     assert entry.evidence == {
-        "call": "open",
+        "raw_call": "open",
+        "resolved_call": "open",
         "file": "sample.py",
         "line": 1,
         "resolution_level": ResolutionLevel.DIRECT_CALL.value,
@@ -109,7 +110,72 @@ p.write_text("hello")
     assert entries == ()
 
 
-def test_imported_alias_is_not_resolved_in_p1():
+def test_imported_alias_resolves_module_alias():
+    source = """
+import os as operating_system
+operating_system.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "os.remove"
+    assert entry.effect_class is EffectClass.FS
+    assert entry.evidence["raw_call"] == "operating_system.remove"
+    assert entry.evidence["resolved_call"] == "os.remove"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_imported_alias_resolves_short_module_alias():
+    source = """
+import subprocess as sp
+sp.run(["ls"])
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "subprocess.run"
+    assert entry.evidence["raw_call"] == "sp.run"
+    assert entry.evidence["resolved_call"] == "subprocess.run"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_imported_alias_resolves_dotted_module_alias():
+    source = """
+import urllib.request as request
+request.urlopen("https://example.com")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "urllib.request.urlopen"
+    assert entry.evidence["raw_call"] == "request.urlopen"
+    assert entry.evidence["resolved_call"] == "urllib.request.urlopen"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_from_import_resolves_callable_name():
+    source = """
+from os import remove
+remove("a.txt")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "os.remove"
+    assert entry.evidence["raw_call"] == "remove"
+    assert entry.evidence["resolved_call"] == "os.remove"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_from_import_resolves_aliased_callable():
     source = """
 from os import remove as rm
 rm("a.txt")
@@ -117,9 +183,327 @@ rm("a.txt")
 
     entries = extract_python_effects(source, filename="m.py")
 
-    # The DB does not contain a bare ``rm`` entry, and P1 does not perform
-    # alias resolution, so nothing is detected.
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "os.remove"
+    assert entry.evidence["raw_call"] == "rm"
+    assert entry.evidence["resolved_call"] == "os.remove"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_from_dotted_module_resolves_callable():
+    source = """
+from urllib.request import urlopen
+urlopen("https://example.com")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "urllib.request.urlopen"
+    assert entry.evidence["raw_call"] == "urlopen"
+    assert entry.evidence["resolved_call"] == "urllib.request.urlopen"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_from_dotted_module_resolves_aliased_callable():
+    source = """
+from urllib.request import urlopen as fetch
+fetch("https://example.com")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "urllib.request.urlopen"
+    assert entry.evidence["raw_call"] == "fetch"
+    assert entry.evidence["resolved_call"] == "urllib.request.urlopen"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_direct_call_after_plain_import_keeps_direct_call_level():
+    source = """
+import os
+os.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.fqn == "os.remove"
+    assert entry.evidence["raw_call"] == "os.remove"
+    assert entry.evidence["resolved_call"] == "os.remove"
+    assert entry.evidence["resolution_level"] == ResolutionLevel.DIRECT_CALL.value
+
+
+def test_star_import_is_not_resolved():
+    source = """
+from os import *
+
+remove("a.txt")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
     assert entries == ()
+
+
+def test_relative_import_is_not_resolved():
+    source = """
+from . import remove
+
+remove("a.txt")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_module_level_assignment_is_not_resolved():
+    # Module-level reassignment of the alias name conservatively drops
+    # the alias from resolution for the entire module, regardless of
+    # source order.
+    source = """
+from os import remove as rm
+rm = lambda x: None
+rm("a.txt")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_even_for_calls_before_assignment():
+    # Brief: P1 does not track module-level statement order. A later
+    # assignment shadows the alias for earlier calls too.
+    source = """
+import os as op
+op.remove("first")
+op = 5
+op.remove("second")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_if():
+    source = """
+import os as op
+if True:
+    op = lambda x: None
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_else():
+    source = """
+import os as op
+if False:
+    pass
+else:
+    op = lambda x: None
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_try_or_except():
+    source = """
+import os as op
+try:
+    op = lambda x: None
+except Exception:
+    pass
+op.remove("a")
+""".lstrip()
+    assert extract_python_effects(source, filename="m.py") == ()
+
+    source = """
+import os as op
+try:
+    pass
+except Exception as op:
+    pass
+op.remove("a")
+""".lstrip()
+    assert extract_python_effects(source, filename="m.py") == ()
+
+
+def test_alias_shadowed_by_for_loop_target():
+    source = """
+import os as op
+for op in [1, 2, 3]:
+    pass
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_for_body():
+    source = """
+import os as op
+for _ in [1, 2, 3]:
+    op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_assignment_inside_while():
+    source = """
+import os as op
+while False:
+    op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_alias_shadowed_by_with_as_binding():
+    source = """
+import os as op
+with open("/tmp/x") as op:
+    pass
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    # The ``open(...)`` call inside the with-statement still produces
+    # an open() detection, so we only assert that the aliased call is
+    # gone.
+    assert all(entry.evidence["raw_call"] != "op.remove" for entry in entries)
+    assert all(entry.fqn != "os.remove" for entry in entries)
+
+
+def test_alias_shadowed_by_nested_compound_statement():
+    source = """
+import os as op
+if True:
+    if True:
+        for _ in [0]:
+            op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_function_local_assignment_does_not_shadow_module_alias():
+    # Brief: only module-level simple assignments shadow. A function-
+    # local rebinding of the alias name does not affect module-level
+    # alias resolution.
+    source = """
+import os as op
+
+def helper():
+    op = 5
+    return op
+
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "os.remove"
+    assert entries[0].evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_annotation_only_does_not_shadow_alias():
+    # ``op: int`` annotates without rebinding. Suppressing detection
+    # in that case would be a false negative, so the alias survives.
+    source = """
+import os as op
+op: int
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "os.remove"
+    assert entries[0].evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+
+
+def test_annotated_assignment_with_value_shadows_alias():
+    source = """
+import os as op
+op: int = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_aug_assign_shadows_alias():
+    source = """
+from os import remove as rm
+rm += 1
+rm("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_tuple_unpacking_at_module_level_shadows_alias():
+    source = """
+from os import remove as rm
+rm, _ = (lambda x: None, None)
+rm("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert entries == ()
+
+
+def test_aliased_extraction_assignable_to_code_state():
+    source = """
+from os import remove as rm
+import subprocess as sp
+
+rm("a.txt")
+sp.run(["ls"])
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+    state = CodeState(effects=entries)
+
+    assert {e.fqn for e in state.effects} == {"os.remove", "subprocess.run"}
+    assert all(
+        e.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
+        for e in state.effects
+    )
 
 
 def test_syntax_error_propagates_as_syntax_error():

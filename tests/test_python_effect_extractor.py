@@ -1035,3 +1035,46 @@ def test_global_mutation_existing_call_tests_unaffected_by_filter():
     mutations = _global_mutations(extract_python_effects(source, filename="m.py"))
 
     assert mutations == ()
+
+
+def test_try_star_body_assignments_are_tracked():
+    # ``except*`` (PEP 654, Python 3.11+) uses ast.TryStar, not ast.Try.
+    # Both passes — module_scope shadowing for alias resolution and
+    # module_scope binding events for global_mutation — must traverse
+    # TryStar bodies the same way they traverse Try bodies.
+    source = """
+import os as op
+x = 1
+try:
+    pass
+except* ValueError:
+    x = 2
+    op = 5
+op.remove("a")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    # alias ``op`` is shadowed by the assignment inside except* body, so
+    # the call must NOT resolve as imported_alias.
+    assert _call_effects(entries) == ()
+
+    # ``x = 2`` and ``op = 5`` inside except* body are module-scope
+    # rebinds and must be reported as module_reassignment.
+    mutations = _global_mutations(entries)
+    fqns = {(e.fqn, e.evidence["mutation_kind"]) for e in mutations}
+    assert ("module:x", "module_reassignment") in fqns
+    assert ("module:op", "module_reassignment") in fqns
+
+
+def test_try_star_handler_as_binding_shadows_alias():
+    source = """
+import os as op
+try:
+    pass
+except* Exception as op:
+    pass
+op.remove("a")
+""".lstrip()
+
+    assert _call_effects(extract_python_effects(source, filename="m.py")) == ()

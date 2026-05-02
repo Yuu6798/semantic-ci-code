@@ -110,7 +110,7 @@ def _collect_module_scope_shadows(stmts: list[ast.stmt]) -> set[str]:
         elif isinstance(stmt, ast.If):
             shadowed |= _collect_module_scope_shadows(stmt.body)
             shadowed |= _collect_module_scope_shadows(stmt.orelse)
-        elif isinstance(stmt, ast.Try):
+        elif isinstance(stmt, ast.Try | ast.TryStar):
             shadowed |= _collect_module_scope_shadows(stmt.body)
             for handler in stmt.handlers:
                 if handler.name is not None:
@@ -305,7 +305,7 @@ def _iter_module_scope_binding_events(
         if isinstance(stmt, ast.If):
             events.extend(_iter_module_scope_binding_events(stmt.body))
             events.extend(_iter_module_scope_binding_events(stmt.orelse))
-        elif isinstance(stmt, ast.Try):
+        elif isinstance(stmt, ast.Try | ast.TryStar):
             events.extend(_iter_module_scope_binding_events(stmt.body))
             for handler in stmt.handlers:
                 events.extend(_iter_module_scope_binding_events(handler.body))

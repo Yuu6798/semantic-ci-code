@@ -100,7 +100,7 @@ def extract_python_complexity(
         elif isinstance(stmt, ast.ClassDef):
             entries.extend(_entries_for_class_methods(stmt, _join_fqn(module_fqn, stmt.name)))
 
-    return _sort_entries(entries)
+    return _stable_entries(entries)
 
 
 def extract_python_complexity_from_paths(
@@ -129,7 +129,7 @@ def extract_python_complexity_from_paths(
             )
         )
 
-    return _sort_entries(entries)
+    return _stable_entries(entries)
 
 
 def _iter_module_scope_definitions(stmts: list[ast.stmt]) -> Iterable[ast.stmt]:
@@ -299,7 +299,23 @@ class _CognitiveCounter:
         self.value += 1 + nesting
         self._visit(node.test, nesting)
         self._visit_statements(node.body, nesting=nesting + 1)
-        self._visit_statements(node.orelse, nesting=nesting + 1)
+        self._visit_if_orelse(node.orelse, parent_col_offset=node.col_offset, nesting=nesting)
+
+    def _visit_if_orelse(
+        self,
+        orelse: list[ast.stmt],
+        *,
+        parent_col_offset: int,
+        nesting: int,
+    ) -> None:
+        if (
+            len(orelse) == 1
+            and isinstance(orelse[0], ast.If)
+            and orelse[0].col_offset == parent_col_offset
+        ):
+            self._visit(orelse[0], nesting)
+            return
+        self._visit_statements(orelse, nesting=nesting + 1)
 
     def _visit_For(self, node: ast.For, nesting: int) -> None:  # noqa: N802
         self.value += 1 + nesting
@@ -381,8 +397,15 @@ class _CognitiveCounter:
             self._visit(elt, current_nesting)
 
 
-def _sort_entries(entries: Iterable[ComplexityEntry]) -> tuple[ComplexityEntry, ...]:
-    return tuple(sorted(entries, key=lambda entry: entry.fqn))
+def _stable_entries(entries: Iterable[ComplexityEntry]) -> tuple[ComplexityEntry, ...]:
+    seen: set[str] = set()
+    unique: list[ComplexityEntry] = []
+    for entry in entries:
+        if entry.fqn in seen:
+            continue
+        seen.add(entry.fqn)
+        unique.append(entry)
+    return tuple(sorted(unique, key=lambda entry: entry.fqn))
 
 
 def _join_fqn(*parts: str) -> str:

@@ -69,6 +69,39 @@ def nested(x, y):
     assert _metric(entry) == (3, 3)
 
 
+def test_elif_chain_uses_same_cognitive_nesting_level():
+    source = """
+def elif_chain(x):
+    if x == 1:
+        return 1
+    elif x == 2:
+        return 2
+    elif x == 3:
+        return 3
+    return 0
+""".lstrip()
+
+    entry = _by_fqn(extract_python_complexity(source, module_fqn="pkg.mod"))["pkg.mod.elif_chain"]
+
+    assert _metric(entry) == (4, 3)
+
+
+def test_else_body_nested_if_keeps_cognitive_nesting_bonus():
+    source = """
+def else_nested(x, y):
+    if x:
+        return 1
+    else:
+        if y:
+            return 2
+    return 0
+""".lstrip()
+
+    entry = _by_fqn(extract_python_complexity(source, module_fqn="pkg.mod"))["pkg.mod.else_nested"]
+
+    assert _metric(entry) == (3, 3)
+
+
 def test_boolop_three_operands_adds_two_cyclomatic_and_one_cognitive():
     source = """
 def boolop(a, b, c):
@@ -331,6 +364,39 @@ class Beta:
         "pkg.sort.alpha",
         "pkg.sort.zed",
     ]
+
+
+def test_duplicate_symbol_entries_keep_first_definition():
+    source = """
+if TYPE_CHECKING:
+    def parse(x):
+        if x:
+            return 1
+        return 0
+else:
+    def parse(x, y):
+        if x:
+            if y:
+                return 1
+        return 0
+""".lstrip()
+
+    entries = extract_python_complexity(source, module_fqn="pkg.conditional")
+
+    assert [entry.fqn for entry in entries] == ["pkg.conditional.parse"]
+    assert _metric(entries[0]) == (2, 1)
+
+
+def test_repeated_path_inputs_are_deduped_by_fqn():
+    entries = extract_python_complexity_from_paths(
+        [FIXTURE_ROOT / "simple.py", FIXTURE_ROOT / "simple.py"],
+        package_root=FIXTURE_ROOT,
+    )
+
+    fqns = [entry.fqn for entry in entries]
+
+    assert fqns.count("simple.fixture_func") == 1
+    assert fqns.count("simple.FixtureClass.method") == 1
 
 
 def test_output_is_deterministic_across_subprocess_invocations():

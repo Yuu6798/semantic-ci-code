@@ -18,6 +18,7 @@ from __future__ import annotations
 import ast
 import copy
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from semantic_ci_code.domain.state_schema import APISurfaceEntry
@@ -28,6 +29,12 @@ CLASS_KIND = "class"
 METHOD_KIND = "method"
 ASYNC_METHOD_KIND = "async_method"
 CONSTANT_KIND = "constant"
+
+
+@dataclass(frozen=True)
+class _SurfaceCandidate:
+    entry: APISurfaceEntry
+    preserve_signature_duplicates: bool = False
 
 
 def extract_python_api_surface(
@@ -42,42 +49,44 @@ def extract_python_api_surface(
     callers can distinguish parse failures from empty surfaces.
     """
     tree = ast.parse(source, filename=filename)
-    entries: list[APISurfaceEntry] = []
+    candidates: list[_SurfaceCandidate] = []
 
     for stmt in _iter_module_scope_statements(tree.body):
         if isinstance(stmt, ast.AsyncFunctionDef):
-            entries.append(
-                _entry(
+            candidates.append(
+                _candidate(
                     fqn=_join_fqn(module_fqn, stmt.name),
                     kind=ASYNC_FUNCTION_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
         elif isinstance(stmt, ast.FunctionDef):
-            entries.append(
-                _entry(
+            candidates.append(
+                _candidate(
                     fqn=_join_fqn(module_fqn, stmt.name),
                     kind=FUNCTION_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
         elif isinstance(stmt, ast.ClassDef):
             class_fqn = _join_fqn(module_fqn, stmt.name)
-            entries.append(
-                _entry(
+            candidates.append(
+                _candidate(
                     fqn=class_fqn,
                     kind=CLASS_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
                 )
             )
-            entries.extend(_extract_class_methods(stmt, class_fqn))
-        elif isinstance(stmt, ast.Assign):
-            entries.extend(_extract_constants(stmt, module_fqn))
+            candidates.extend(_extract_class_methods(stmt, class_fqn))
+        elif isinstance(stmt, ast.Assign | ast.AnnAssign):
+            candidates.extend(_extract_constants(stmt, module_fqn))
 
-    return _stable_entries(entries)
+    return _stable_entries(candidates)
 
 
 def extract_python_api_surface_from_paths(
@@ -106,13 +115,16 @@ def extract_python_api_surface_from_paths(
             )
         )
 
-    return _stable_entries(entries)
+    return _sort_entries(entries)
 
 
 def _iter_module_scope_statements(stmts: list[ast.stmt]) -> Iterable[ast.stmt]:
     """Yield statements that bind in module scope, walking compound bodies."""
     for stmt in stmts:
-        if isinstance(stmt, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | ast.Assign):
+        if isinstance(
+            stmt,
+            ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | ast.Assign | ast.AnnAssign,
+        ):
             yield stmt
             continue
         if isinstance(stmt, ast.If):
@@ -137,43 +149,55 @@ def _iter_module_scope_statements(stmts: list[ast.stmt]) -> Iterable[ast.stmt]:
                 yield from _iter_module_scope_statements(case.body)
 
 
-def _extract_class_methods(node: ast.ClassDef, class_fqn: str) -> list[APISurfaceEntry]:
-    entries: list[APISurfaceEntry] = []
+def _extract_class_methods(node: ast.ClassDef, class_fqn: str) -> list[_SurfaceCandidate]:
+    candidates: list[_SurfaceCandidate] = []
     for stmt in node.body:
         if isinstance(stmt, ast.AsyncFunctionDef):
-            entries.append(
-                _entry(
+            candidates.append(
+                _candidate(
                     fqn=_join_fqn(class_fqn, stmt.name),
                     kind=ASYNC_METHOD_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
         elif isinstance(stmt, ast.FunctionDef):
-            entries.append(
-                _entry(
+            candidates.append(
+                _candidate(
                     fqn=_join_fqn(class_fqn, stmt.name),
                     kind=METHOD_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
-    return entries
+    return candidates
 
 
-def _extract_constants(stmt: ast.Assign, module_fqn: str) -> list[APISurfaceEntry]:
-    entries: list[APISurfaceEntry] = []
-    for target in stmt.targets:
-        if isinstance(target, ast.Name) and _is_all_caps_name(target.id):
-            entries.append(
-                _entry(
+def _extract_constants(
+    stmt: ast.Assign | ast.AnnAssign, module_fqn: str
+) -> list[_SurfaceCandidate]:
+    candidates: list[_SurfaceCandidate] = []
+    for target in _constant_targets(stmt):
+        if _is_all_caps_name(target.id):
+            candidates.append(
+                _candidate(
                     fqn=_join_fqn(module_fqn, target.id),
                     kind=CONSTANT_KIND,
                     signature=None,
                     leaf_name=target.id,
                 )
             )
-    return entries
+    return candidates
+
+
+def _constant_targets(stmt: ast.Assign | ast.AnnAssign) -> tuple[ast.Name, ...]:
+    if isinstance(stmt, ast.Assign):
+        return tuple(target for target in stmt.targets if isinstance(target, ast.Name))
+    if stmt.value is not None and isinstance(stmt.target, ast.Name):
+        return (stmt.target,)
+    return ()
 
 
 def _render_signature(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> str:
@@ -198,16 +222,61 @@ def _entry(
     )
 
 
-def _stable_entries(entries: Iterable[APISurfaceEntry]) -> tuple[APISurfaceEntry, ...]:
-    seen: set[tuple[str, str, str | None, str | None]] = set()
+def _candidate(
+    *,
+    fqn: str,
+    kind: str,
+    signature: str | None,
+    leaf_name: str,
+    preserve_signature_duplicates: bool = False,
+) -> _SurfaceCandidate:
+    return _SurfaceCandidate(
+        entry=_entry(
+            fqn=fqn,
+            kind=kind,
+            signature=signature,
+            leaf_name=leaf_name,
+        ),
+        preserve_signature_duplicates=preserve_signature_duplicates,
+    )
+
+
+def _stable_entries(candidates: Iterable[_SurfaceCandidate]) -> tuple[APISurfaceEntry, ...]:
+    seen: set[tuple[str, ...]] = set()
     unique: list[APISurfaceEntry] = []
-    for entry in entries:
-        key = (entry.fqn, entry.kind, entry.signature, entry.visibility)
+    for candidate in candidates:
+        entry = candidate.entry
+        key = _dedupe_key(candidate)
         if key in seen:
             continue
         seen.add(key)
         unique.append(entry)
-    return tuple(sorted(unique, key=lambda entry: (entry.fqn, entry.kind)))
+    return _sort_entries(unique)
+
+
+def _dedupe_key(candidate: _SurfaceCandidate) -> tuple[str, ...]:
+    entry = candidate.entry
+    if candidate.preserve_signature_duplicates:
+        return (entry.fqn, entry.kind, entry.signature or "", entry.visibility or "")
+    return (entry.fqn, entry.kind)
+
+
+def _sort_entries(entries: Iterable[APISurfaceEntry]) -> tuple[APISurfaceEntry, ...]:
+    return tuple(sorted(entries, key=lambda entry: (entry.fqn, entry.kind, entry.signature or "")))
+
+
+def _is_overload_definition(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    return any(_is_overload_decorator(decorator) for decorator in node.decorator_list)
+
+
+def _is_overload_decorator(node: ast.expr) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id == "overload"
+    if isinstance(node, ast.Attribute):
+        return node.attr == "overload"
+    if isinstance(node, ast.Call):
+        return _is_overload_decorator(node.func)
+    return False
 
 
 def _visibility_for_leaf_name(name: str) -> str:

@@ -99,6 +99,25 @@ not_a_constant = 4
     assert entries[0].signature is None
 
 
+def test_extracts_annotated_all_caps_constant_with_value():
+    source = """
+from typing import Final
+
+MAX_RETRIES: int = 3
+NAME: Final[str] = "semantic-ci"
+DECLARED_ONLY: str
+""".lstrip()
+
+    entries = extract_python_api_surface(source, module_fqn="pkg.settings")
+
+    assert [entry.fqn for entry in entries] == [
+        "pkg.settings.MAX_RETRIES",
+        "pkg.settings.NAME",
+    ]
+    assert all(entry.kind == "constant" for entry in entries)
+    assert all(entry.signature is None for entry in entries)
+
+
 def test_visibility_public_private_dunder():
     source = """
 def public() -> None:
@@ -186,6 +205,22 @@ def parse(value):
     assert "@overload\ndef parse(value: int) -> int:\n    ..." in signatures
     assert "@overload\ndef parse(value: str) -> str:\n    ..." in signatures
     assert "def parse(value):\n    ..." in signatures
+
+
+def test_regular_redefinition_keeps_first_signature_only():
+    source = """
+def parse(value: int) -> int:
+    return value
+
+def parse(value: str) -> str:
+    return value
+""".lstrip()
+
+    entries = extract_python_api_surface(source, module_fqn="pkg.redef")
+    parse_entries = [entry for entry in entries if entry.fqn == "pkg.redef.parse"]
+
+    assert len(parse_entries) == 1
+    assert parse_entries[0].signature == "def parse(value: int) -> int:\n    ..."
 
 
 def test_output_is_sorted_and_deterministic_across_invocations():

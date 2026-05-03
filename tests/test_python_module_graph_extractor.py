@@ -106,6 +106,16 @@ def test_relative_import_escaping_package_root_produces_no_edge():
     assert entries["sample_pkg.bar.baz"].imports == ()
 
 
+def test_top_level_relative_import_produces_no_edge(tmp_path):
+    _write(tmp_path / "a.py", "from . import b\n")
+    _write(tmp_path / "b.py", "")
+
+    entries = _by_module(extract_python_module_graph(tmp_path))
+
+    assert entries["a"].imports == ()
+    assert entries["b"].imported_by == ()
+
+
 def test_star_import_produces_only_source_module_edge():
     entries = _by_module(extract_python_module_graph(FIXTURE_ROOT))
 

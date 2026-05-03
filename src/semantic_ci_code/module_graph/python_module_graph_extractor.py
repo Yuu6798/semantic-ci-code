@@ -26,8 +26,9 @@ Step A: compute the candidate base module(s).
   ``len(from_)``. Walk up ``len(from_) - 1`` package levels from the
   importer's containing package, then append ``module`` if ``module`` is
   non-empty.
-- If walking up exhausts the importer's package path, the import is
-  unresolvable in our universe and emits no edge.
+- If the importer has no containing package, or walking up exhausts the
+  importer's package path, the import is unresolvable in our universe and
+  emits no edge.
 
 Step B: expand candidates per symbol.
 
@@ -143,6 +144,8 @@ def _candidate_base(
         return entry.module
 
     containing_package = _containing_package(importer, package_modules=package_modules)
+    if not containing_package:
+        return None
     parts = containing_package.split(".") if containing_package else []
     ascents = len(entry.from_) - 1
     if ascents >= len(parts) and ascents > 0:

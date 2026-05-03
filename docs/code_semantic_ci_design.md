@@ -1026,14 +1026,89 @@ vibe coding ツールの言語分布を踏まえた優先度:
 
 これにより §21 の adapter 計画と §22 の TS 前倒しが整合する。
 
-## 23. 関連ドキュメント
+## 23. Comparator Architecture and Application Matrix
+
+### 23.1 中核 contract: Generic 2-state Comparator
+
+semantic CI の core engine は **PR 専用ではなく、汎用的な 2-state 比較器** として設計する。入力 contract:
+
+```
+入力:
+  - baseline_state: CodeState   (実コード抽出 / 仮想 / mock いずれも可)
+  - candidate_state: CodeState  (同上)
+  - intent: target.yaml         (declared change intent)
+
+出力:
+  - verdict: pass | repair | fail
+  - violations: tuple[Violation, ...]
+```
+
+`CodeState` は frozen Pydantic schema として抽象化されているため、**どこから観測されたかを engine は問わない**。これは §2 の 3-state RPE モデル（baseline と observed が両方 CodeState 型）の自然な帰結であり、§21.2 pre-generation validation の前提条件でもある。
+
+PR は最初の主要ユースケースだが、唯一のユースケースではない。Engine の入力契約を生成元から分離することで、後続フェーズでの応用範囲を確保する。
+
+### 23.2 Application Matrix
+
+`CodeState` を「実コード抽出」以外から供給することで、以下の用途が成立する:
+
+| 用途 | baseline 取得 | candidate 取得 | intent 由来 | フェーズ |
+|---|---|---|---|---|
+| **PR review** | git baseline ref | git candidate ref | `.semantic-ci/intent.yaml` | P1 (Brief 4) |
+| **pre-commit hook** | HEAD | staged tree | working intent | §21.5, P3+ |
+| **任意 2 リビジョン比較** | 任意 commit | 任意 commit | 任意 yaml | P1 (Brief 4) |
+| **retrospective audit** | 過去 tag | 過去 tag | 過去 spec を再現 | P3+ |
+| **nightly regression scan** | 24h 前 main | 現 main | observation only | §19.5, P3+ |
+| **pre-generation validation** | 現コード | AI 提案 state（予測） | AI 依頼 spec | §21.2, P2.5 |
+| **what-if simulation** | 現コード | hypothetical state | 設計仮説 | §21, P2.5+ |
+| **contract testing** | expected state | actual state | contract spec | 応用領域 |
+| **educational simulator** | mock state | mock state | 学習用 spec | 応用領域 |
+
+「実コードがそこに存在する」という前提を engine から切り離すことで、AI 時代の vibe coding workflow（§21）と監査・教育・契約テストといった他用途の両方を同一 engine でカバーできる。
+
+### 23.3 Brief 4 設計方針への波及
+
+§24 Brief 4（CLI）は **「PR 専用 CLI」ではなく「2 リビジョン汎用比較器」として設計する**。具体的には:
+
+```bash
+# パターン A: 暗黙の PR モード（最頻ユースケース）
+semantic-ci-code check
+# → 自動で main と現ブランチを比較
+
+# パターン B: 任意 2 リビジョン
+semantic-ci-code check --baseline=v1.0.0 --candidate=v1.1.0
+
+# パターン C: 単発観測（intent なし）
+semantic-ci-code observe --target=HEAD
+
+# パターン D: 任意 snapshot ディレクトリ
+semantic-ci-code check --baseline-dir=./snap_a --candidate-dir=./snap_b
+
+# パターン E: pre-commit
+semantic-ci-code check --baseline=HEAD --candidate=staged
+```
+
+Engine 本体は同一で、CLI が baseline/candidate の取得経路を切り替えるだけ。実装コスト差は引数パースの増分のみ。
+
+### 23.4 設計上の含意
+
+generic comparator として設計することの帰結:
+
+- **エンジンは「実コードがそこに在ること」を前提にしない** — lint/type/test との根本的な差別化
+- **§21.2 pre-generation validation が core engine 機能として直接成立** — adapter 層の追加実装が薄くなる
+- **§10.3 Round-trip Log に仮想 state も hash 化して記録可能** — 「いつ、どんな仮想シナリオで、どんな verdict が出たか」を audit log に残せる
+- **§19.5 unspecified 次元の自動観測** が retrospective audit や regression scan として直接使える
+
+この generic comparator 性質は P1 で実装するが、応用ユースケース（pre-generation / what-if / contract test）は P2.5 以降の vibe coding adapter 層で本格化する。**Engine の input contract を最初から仮想 state も受け付ける形に保つ** ことが、後付け応用を可能にする鍵。
+
+## 24. 関連ドキュメント
 
 - [`CLAUDE.md`](../CLAUDE.md) — リポジトリ全体の運用ポリシー
 - [`AGENTS.md`](../AGENTS.md) — Claude × Codex 連絡プロトコル（Task Brief / Completion Summary）
+- [`brief_3_planning.md`](./brief_3_planning.md) — Brief 3 (pipeline 統合) を CSCI-10〜14 の 5 PR に分割する planning（Brief 3 完了時に archive 候補）
 
 今後 `docs/<topic>.md` を追加した場合は、本節と README の Documentation 節に追記する。
 
-## 24. 次のアクション
+## 25. 次のアクション
 
 本設計を Codex 実装に落とすため、以下の順で Task Brief を発行する:
 

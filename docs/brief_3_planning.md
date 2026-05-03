@@ -352,6 +352,86 @@ class RepairViolation:
 
 合計 LOC 想定: 950-1850。Brief 2 の +3,440 LOC より少ない (各 PR が薄いため)。
 
+## Engine API 契約 (重要、CSCI-10〜14 全体で守る)
+
+§23 (Comparator Architecture) の通り、engine 本体は **「実コードがそこに在ること」を前提にしない汎用 2-state 比較器** として実装する。
+
+### 入力 contract
+
+```python
+def evaluate(
+    baseline: CodeState,      # frozen Pydantic, 抽出 / 仮想 / mock 何でも可
+    candidate: CodeState,     # 同上
+    intent: CompiledTarget,   # CSCI-12 が compile した内部表現
+) -> Verdict: ...
+```
+
+CSCI-10 (orchestrator) は実コードから CodeState を抽出する **1 つの経路**を提供するが、engine 本体 (CSCI-13 evaluator) は CodeState を直接受け取る形で実装する。これにより:
+
+- pre-generation validation (§21.2): AI が予測した CodeState を直接 evaluate に渡せる
+- what-if simulation: 仮想 CodeState を作って evaluate に渡せる
+- contract testing: expected CodeState と actual CodeState を比較できる
+- mock テスト: CSCI-13 自体のテストで仮想 CodeState を使える
+
+### CSCI-10〜14 への具体的な影響
+
+- **CSCI-10**: orchestrator は「実コードから CodeState を作る」関数。evaluator から見ると **CodeState の供給元の 1 つ**でしかない。orchestrator なしでも evaluator は動かせる構造を保つ。
+- **CSCI-11**: delta computer は CodeState 2 個を受けて delta を返す純粋関数。CodeState の出所を問わない。
+- **CSCI-13**: evaluator は (baseline, candidate, compiled_target) を受け取る。CodeState の出所への依存をテストで防ぐ — fixture で仮想 CodeState を組んだテストを最低 1 件含めること。
+- **CSCI-14**: repair emitter は Verdict を構造化するだけ。CodeState には触らない。
+
+### 実装上のガードレール
+
+CSCI-13 のテストに以下を含める:
+
+```python
+def test_evaluator_works_with_virtual_code_state():
+    """Engine は実コード抽出経由でなくても動く（仮想 state でも valid な verdict を返す）"""
+    baseline = CodeState(...)   # 手で組んだ仮想 state
+    candidate = CodeState(...)  # 手で組んだ仮想 state
+    compiled = compile_target_svp("intent: ...\nchange:\n  primary_kind: refactor\n")
+    verdict = evaluate_constraints(compiled, ..., baseline=baseline, candidate=candidate)
+    assert verdict.result in {VerdictResult.PASS, VerdictResult.REPAIR, VerdictResult.FAIL}
+```
+
+これにより engine が「extractor 経由の CodeState 」にだけ動く状態に退化することを防ぐ。
+
+## Brief 4 (CLI) への申し送り
+
+§23.3 で確定した CLI 設計方針:
+
+**Brief 4 は「PR 専用 CLI」ではなく「2 リビジョン汎用比較器」として設計する。**
+
+### 受け付ける呼び出しパターン (Brief 4 で実装)
+
+```bash
+# A. 暗黙の PR モード（最頻ユースケース）
+semantic-ci-code check
+# → main と現ブランチを自動検出して比較
+
+# B. 任意 2 リビジョン
+semantic-ci-code check --baseline=v1.0.0 --candidate=v1.1.0
+
+# C. 単発観測（intent なし、observation only mode）
+semantic-ci-code observe --target=HEAD
+# → CodeState を JSON dump、判定なし
+
+# D. 任意 snapshot ディレクトリ
+semantic-ci-code check --baseline-dir=./snap_a --candidate-dir=./snap_b
+
+# E. pre-commit モード
+semantic-ci-code check --baseline=HEAD --candidate=staged
+```
+
+### Brief 4 の責務分離
+
+- **git 操作の一切は Brief 4 の責任** — Brief 3 の engine は git を知らない
+- **`.semantic-ci/intent.yaml` の発見ロジックも Brief 4** — engine は file path or string を受け取るだけ
+- **JSON / YAML 出力の整形も Brief 4** — engine は Pydantic model を返すだけ
+- **exit code への変換も Brief 4** — engine は VerdictResult enum を返すだけ
+
+Brief 3 で engine を作る時、CLI への結合を作りこまない。これが Brief 4 で「2 リビジョン汎用比較器」を綺麗に実装する前提。
+
 ## 残課題 (Brief 3 範囲外、後続 Brief で扱う)
 
 - **Partial extraction tolerance** (§6.2) — 一部 extractor が落ちても他の verdict を維持する仕組み

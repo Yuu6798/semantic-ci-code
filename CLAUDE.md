@@ -66,6 +66,7 @@ docs/
 | Document | Purpose |
 |---|---|
 | `docs/code_semantic_ci_design.md` | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop |
+| `docs/brief_3_planning.md` | Brief 3 (pipeline 統合) を CSCI-10〜14 に分割する planning 文書。Q1〜Q4 設計判断 + Engine API 契約 + Brief 4 申し送り。Brief 3 完了で archive 候補 |
 
 When adding a new `docs/<topic>.md`, update this table and the README documentation list.
 
@@ -87,3 +88,74 @@ python -m semantic_ci_code
 - Prefer typed Pydantic models for state, constraint, diff, and repair data.
 - Prefer structured parsing over ad hoc string manipulation.
 - Keep README concise; move detailed design into `docs/`.
+
+## Engine Contract
+
+The judgment engine (Brief 3+) is a generic 2-state comparator, not a PR-only tool.
+See `docs/code_semantic_ci_design.md` §23 for the full Application Matrix.
+
+- Engine input: `(baseline_state: CodeState, candidate_state: CodeState, intent)`.
+- `CodeState` is a frozen Pydantic schema. The engine does NOT require that the
+  states come from real-code extraction. They may be predicted, mocked, or
+  constructed by hand. This enables pre-generation validation, what-if
+  simulation, contract testing, and educational simulators alongside the main
+  PR-review use case.
+- Git operations, `.semantic-ci/intent.yaml` discovery, output formatting, and
+  exit code conversion are CLI-layer (Brief 4) responsibilities. The engine
+  itself never touches git and never reads files except through schema-typed
+  inputs.
+- Tests for the evaluator MUST include at least one case that supplies hand-built
+  virtual `CodeState` values so the engine cannot regress into requiring an
+  extractor pipeline.
+
+## Session Memory (永続記憶ワークフロー)
+
+Long-running design conversations are recorded in `.claude/memory/` so that
+later sessions can resume without losing context.
+
+### 仕組み
+
+- 場所: `.claude/memory/`
+- ファイル: `YYYY-MM-DD.md` (同日に複数セッションあれば「Session 2」「Session 3」と節を切って 1 ファイルに追記)
+- 索引: `_index.md` に各セッションの 1 行要約を追記
+
+### 起動時ルール
+
+1. セッション開始時に `_index.md` を読んで過去の決定事項を把握する
+2. 直近 3 件のサマリーは必要に応じて詳細参照する
+3. 過去の設計判断に関する質問はサマリーを確認してから回答する
+
+### 終了時ルール (自動トリガー)
+
+ユーザーが終了意図を示すフレーズを発したら、確認なしで即座に `/wrap-up` 相当の
+処理 (memory への振り返りサマリー保存 + `_index.md` 追記) を実行する。
+
+トリガーフレーズの例:
+- 「今日はここまで」「今日は終わり」「今日はおわり」
+- 「セッション終了」「セッション閉じて」
+- 「また明日」「また今度」「お疲れ様」「お疲れさま」
+- 「done for today」「that's all」
+- 手動: `/wrap-up`
+
+実行内容:
+- 会話の振り返りサマリーを `.claude/memory/YYYY-MM-DD.md` に保存
+- `_index.md` に 1 行サマリーを追記
+- `CLAUDE.md` への更新候補があればユーザーに提案する
+
+### サマリーの構成 (慣例フォーマット)
+
+過去ファイルに合わせて以下のセクションで構成する:
+
+- **コンテキスト** — そのセッションが何を扱ったか 1〜2 段落
+- **設計判断** — なぜその選択をしたか
+- **成功パターン** — 効いたアプローチ
+- **修正・訂正** — バグ・誤認識の記録
+- **工程サマリー** — 表形式で工程と成果
+- **成果物** — マージされた PR / 追加ファイル
+- **次セッションへの引き継ぎ** — 残課題
+- **メモ** — 雑多な気づき
+
+### Git Workflow の例外
+
+`.claude/memory/` の運用ログのみ、 main 直 push の唯一の例外として認められている。
+これ以外の変更はすべて feature branch + PR の通常フローを守る。

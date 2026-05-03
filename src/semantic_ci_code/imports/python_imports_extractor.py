@@ -5,23 +5,23 @@ This P1 extractor is purely syntactic and stdlib-``ast`` based. It emits
 
 Field-population contract:
 
-| Source statement | ``module`` | ``from_`` | ``symbols`` |
+| Source statement | `module` | `from_` | `symbols` |
 |---|---|---|---|
-| ``import x`` | ``"x"`` | ``None`` | ``()`` |
-| ``import x as y`` | ``"x"`` | ``None`` | ``()`` |
-| ``import a.b`` | ``"a.b"`` | ``None`` | ``()`` |
-| ``import a.b as c`` | ``"a.b"`` | ``None`` | ``()`` |
-| ``import a, b`` | two entries: ``("a", None, ())``, ``("b", None, ())`` | | |
-| ``from x import y`` | ``"x"`` | ``None`` | ``("y",)`` |
-| ``from x import y, z`` | ``"x"`` | ``None`` | ``("y", "z")`` |
-| ``from x import y as z`` | ``"x"`` | ``None`` | ``("y",)`` |
-| ``from x.y import z`` | ``"x.y"`` | ``None`` | ``("z",)`` |
-| ``from . import y`` | ``""`` | ``"."`` | ``("y",)`` |
-| ``from . import y as z`` | ``""`` | ``"."`` | ``("y",)`` |
-| ``from .pkg import y`` | ``"pkg"`` | ``"."`` | ``("y",)`` |
-| ``from ..pkg.sub import y, z`` | ``"pkg.sub"`` | ``".."`` | ``("y", "z")`` |
-| ``from x import *`` | ``"x"`` | ``None`` | ``("*",)`` |
-| ``from . import *`` | ``""`` | ``"."`` | ``("*",)`` |
+| `import x` | `"x"` | `None` | `()` |
+| `import x as y` | `"x"` | `None` | `()` (alias info intentionally lost — see below) |
+| `import a.b` | `"a.b"` | `None` | `()` |
+| `import a.b as c` | `"a.b"` | `None` | `()` |
+| `import a, b` | two entries: `("a", None, ())`, `("b", None, ())` | | |
+| `from x import y` | `"x"` | `None` | `("y",)` |
+| `from x import y, z` | `"x"` | `None` | `("y", "z")` (one entry, multiple symbols) |
+| `from x import y as z` | `"x"` | `None` | `("y",)` (original imported name, alias lost) |
+| `from x.y import z` | `"x.y"` | `None` | `("z",)` |
+| `from . import y` | `""` | `"."` | `("y",)` |
+| `from . import y as z` | `""` | `"."` | `("y",)` |
+| `from .pkg import y` | `"pkg"` | `"."` | `("y",)` |
+| `from ..pkg.sub import y, z` | `"pkg.sub"` | `".."` | `("y", "z")` |
+| `from x import *` | `"x"` | `None` | `("*",)` |
+| `from . import *` | `""` | `"."` | `("*",)` |
 
 Core encoding decisions:
 

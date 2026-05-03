@@ -754,14 +754,286 @@ empirical alignment データ収集を急ぐため、TypeScript 対応より先�
 
 `lint pass + test pass + Code Semantic CI pass` の 3 段ゲートで PR を gate するのが想定運用。
 
-## 17. 関連ドキュメント
+## 17. Spec Authorship Anchoring
+
+### 17.1 役割: 記録 (attribution) のみ、ブロックは外部
+
+semantic CI が担うのは **誰が spec を書いたかの記録**のみ。署名の正当性検証や「N 人の承認が必要」等のブロック判定は外部層に委ねる。
+
+| 層 | 担当 |
+|---|---|
+| 記録 (attribution) | semantic CI（hash trail に記録） |
+| 署名検証 (validation) | git / GPG / sigstore |
+| 強制 (enforcement) | CODEOWNERS / branch protection / OPA |
+
+これは §14.2 の「ground truth = 人間」原則と整合し、semantic CI が auth/governance 層に侵食しないための分離。
+
+### 17.2 default behavior
+
+Target SVP に `authorship` セクションを optional フィールドとして定義:
+
+```yaml
+authorship:
+  authors:
+    - identity: alice@example.com
+      signature: <sig>
+  declared_at: 2026-05-01T12:34:56Z
+```
+
+semantic CI はこのフィールドを **evidence chain に転記する**だけで、内容を判定しない。署名が valid かは外部 verifier の責務。
+
+### 17.3 opt-in: 自己宣言型の auth 制約
+
+spec が自己の auth 要件を constraint として宣言した場合のみ、semantic CI は decisive にチェックする:
+
+```yaml
+constraints:
+  - id: requires_two_authors
+    kind: meta
+    target: authorship.authors
+    operator: count_greater_than_or_equal
+    expected: 2
+    severity: hard
+    unknown_policy: fail
+```
+
+- semantic CI: 「authors の数が 2 以上か」を機械的に判定
+- 「その author が誰か」「その signature が valid か」は判定しない（外部に委譲）
+
+これにより spec は自己完結した auth 要求を declare でき、semantic CI は declarative model を維持できる。
+
+### 17.4 AI 生成 spec の検出
+
+vibe coding 時代に spec が AI 生成される可能性に対して、heuristic な記録を提供:
+
+- spec 内 `generation_metadata` フィールド（任意）
+- 既知の AI tool signature（Claude Code / Cursor / Codex 等の trail）
+- これらを evidence chain に記録する（block しない）
+
+判断は組織のポリシーに委ねるが、attribution によって事後的に追跡可能にする。
+
+## 18. Performance Budget
+
+### 18.1 課題
+
+AI 生成 PR が大量発生する環境では baseline 抽出を毎回フル実行すると破綻する。§10 の hash trail と整合しつつ、抽出コストを線形以下に抑える必要がある。
+
+### 18.2 baseline RPE cache
+
+baseline は git ref で content-addressable にキャッシュする:
+
+```
+cache key = (
+    baseline_code_hash,
+    extractor_versions,
+    config_hash,
+    schema_version,
+)
+cache value = baseline_rpe (serialized)
+```
+
+- main の RPE は最初の 1 回だけ抽出
+- PR の baseline が同じ commit を指す限り、抽出スキップ
+- extractor version 変更で自動 invalidation（§10.1 の hash trail と一貫）
+
+### 18.3 incremental extraction
+
+candidate 側は変更ファイルのみ再抽出:
+
+- changed files = `git diff --name-only baseline...candidate`
+- baseline RPE をベースに、changed files の各次元だけ差し替え
+- module graph / imports は依存伝播範囲のみ再計算
+
+### 18.4 per-extractor timeout
+
+各 extractor に timeout を設定し、超過した次元は `unknown_policy` に従う:
+
+```yaml
+performance:
+  extractor_timeouts:
+    api_surface: 30s
+    type_surface: 60s
+    effects: 30s
+    complexity: 15s
+  total_budget: 180s
+```
+
+- §5.4 の `unknown_policy: fail/repair/warn/ignore` と統合
+- timeout で部分結果のまま verdict を出せる（§6.2 partial extraction tolerance）
+
+### 18.5 並列抽出
+
+extractor 間に依存はないため並列実行を default とする。CI matrix での並列化と CLI 内 thread/process pool の二段並列を許容する。
+
+## 19. Spec Quality Metrics
+
+### 19.1 課題
+
+雑な spec は雑な検出しかできない。constraints 0 個の spec は技術的に valid だが意味的に無価値。spec 自身の品質を可視化する meta-verdict を導入する。
+
+### 19.2 spec coverage
+
+spec が言及している RPE 次元の網羅率:
+
+```
+spec_coverage = |constrained_dimensions| / |available_dimensions|
+
+available_dimensions = {
+    api_surface, type_relations, effects, imports,
+    complexity, test_surface, module_graph, ...
+}
+```
+
+例: `api_surface` と `effects` のみ縛っている spec → coverage = 2/8 = 25%
+
+### 19.3 change_kind デフォルトとの差分
+
+§4.2 の change_kind テンプレート展開で得られる constraints と、ユーザ宣言の constraints の差分を report:
+
+- テンプレートに含まれる制約をユーザが override / 削除 → 警告
+- テンプレートが要求する次元をユーザが追加で縛っていない → 情報
+
+### 19.4 meta-verdict
+
+verdict と並行して spec quality verdict を emit:
+
+| level | 条件 |
+|---|---|
+| good | coverage ≥ 60%、change_kind テンプレートを override 削除していない |
+| weak | coverage < 60%、または重要次元（api_surface / effects）の constraint が空 |
+| insufficient | constraints が 0 件、または change_kind 未指定 |
+
+これは block しない（§17 と同じ哲学で attribution のみ）。組織が自主的に「weak 以上を要求する」ポリシーを branch protection 側で実装する。
+
+### 19.5 unspecified 次元の自動観測
+
+spec が言及していない次元も extractor は抽出し、evidence chain に記録する。
+
+- ユーザが宣言していない次元の delta も report に含まれる
+- block はしないが、後から「あの時 effects が増えていた」を遡れる
+- AI 生成 PR の post-incident 分析に有用
+
+## 20. Suite Packaging Strategy
+
+### 20.1 layered distribution
+
+semantic CI を組織が採用しやすい形で配布するため、3 層構成を採る:
+
+```
+semantic-ci-code     ← core (本リポジトリ、純粋な intent vs diff)
+semantic-ci-suite    ← meta-package (core + ruff + mypy + pytest の opinionated bundle)
+semantic-ci-action   ← GitHub Action (suite + workflow yaml + minimal config)
+```
+
+### 20.2 core の不変性
+
+`semantic-ci-code` (core) は決定論性・第三者性・LLM 不依存を維持し、特定 lint / type / test ベンダーへの依存を持たない。
+
+### 20.3 suite の opinionated default
+
+`semantic-ci-suite` は core を内包し、§16 の「3 段ゲート」を最小設定で構築する:
+
+- L1+L2: ruff
+- L3: mypy（pyright も alternative として選択可能）
+- L4: pytest
+- L7: semantic-ci-code
+
+これらをまとめた `pyproject.toml` template と CI workflow を提供する。
+
+### 20.4 action の zero-config
+
+`semantic-ci-action` は GitHub Action 化し、最小設定で導入できる:
+
+```yaml
+- uses: yuu6798/semantic-ci-action@v1
+  with:
+    spec: .semantic-ci/intent.yaml
+```
+
+§12 P3a の Python only Action 配布をこの戦略に統合する。
+
+### 20.5 ブランド維持
+
+各層の責務を明示する:
+- core: decisions about intent
+- suite: standard CI stack with intent gate
+- action: drop-in PR gate for GitHub
+
+suite / action は便宜であり、core の独立性を希釈しない。
+
+## 21. Vibe Coding Adapter Roadmap
+
+### 21.1 priority shift
+
+§12 元計画では Generator Adapter は P5（最終フェーズ）だが、vibe coding ツール（Cursor / Claude Code / v0 / Lovable / Bolt 等）の普及加速を踏まえ、**P2.5 への前倒し**を採用する。
+
+### 21.2 統合ポイント
+
+vibe coding workflow の各段階で gate を提供:
+
+| 段階 | 統合方式 |
+|---|---|
+| pre-generation | spec を AI に渡す前に semantic CI が validate |
+| post-generation | AI 出力 PR に対して通常の verdict |
+| repair loop | Repair SVP を AI への follow-up prompt に変換 |
+
+### 21.3 adapter list (P2.5)
+
+- Claude Code adapter（pre-commit hook / instruction file 連携）
+- Cursor adapter（rule file への変換）
+- Codex (OpenAI) adapter
+- v0 / Lovable / Bolt adapter（HTTP integration、後続）
+
+### 21.4 Repair Compiler の前倒し
+
+§9.3 の Repair Compiler を P5 から P2.5 に移動し、Repair SVP を generator-specific prompt に変換する layer を adapter と同時提供する。
+
+### 21.5 IDE / pre-commit integration
+
+CI 待ちの feedback loop を短縮するため:
+- pre-commit hook 統合（軽量モード、partial extraction）
+- LSP server 化（IDE 内 real-time gate、P3 以降）
+
+## 22. Multi-language Phasing
+
+### 22.1 課題
+
+§12 元計画では TypeScript は P3b（Python の後）だが、vibe coding 主戦場は TS/JSX が多い（v0 / Lovable / Bolt が React 中心）。市場タイミングに合わせ、TS を P2.5 と並列に前倒しする選択肢を保持する。
+
+### 22.2 段階提案
+
+| Phase | 内容 |
+|---|---|
+| P1 | Python only（既定通り） |
+| P2 | Python repair core + TS schema 検証 |
+| P2.5 | vibe coding adapter + TS extractor 着手 |
+| P3 | TS GA + 多言語スキーマ妥当性確認 |
+| P4+ | Go / Rust / Swift（需要と extractor 成熟度次第） |
+
+### 22.3 schema 共通性の検証
+
+§3.3 の言語固有 extension が複数言語で機能することを早期に確認するため、TS extractor の prototype 段階で共通スキーマの妥当性レビューを実施する。
+
+### 22.4 adapter と language の交差
+
+vibe coding ツールの言語分布を踏まえた優先度:
+
+| ツール | 主言語 | 着手フェーズ |
+|---|---|---|
+| Claude Code / Codex | Python / TS / 多 | P2.5 |
+| Cursor | 多言語 | P2.5 |
+| v0 / Lovable / Bolt | TS / React | P2.5（TS 必須） |
+
+これにより §21 の adapter 計画と §22 の TS 前倒しが整合する。
+
+## 23. 関連ドキュメント
 
 - [`CLAUDE.md`](../CLAUDE.md) — リポジトリ全体の運用ポリシー
 - [`AGENTS.md`](../AGENTS.md) — Claude × Codex 連絡プロトコル（Task Brief / Completion Summary）
 
 今後 `docs/<topic>.md` を追加した場合は、本節と README の Documentation 節に追記する。
 
-## 18. 次のアクション
+## 24. 次のアクション
 
 本設計を Codex 実装に落とすため、以下の順で Task Brief を発行する:
 
@@ -771,5 +1043,8 @@ empirical alignment データ収集を急ぐため、TypeScript 対応より先�
 | **Brief 2** | extractor 実装（Python のみ、6 次元） | `codex/code-semantic-ci-py-extractors` |
 | **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` |
 | **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` |
+| **Brief 5** | spec authorship attribution（§17）+ performance budget（§18）| `codex/code-semantic-ci-attribution-perf` |
+| **Brief 6** | spec quality metrics（§19）+ suite packaging（§20）| `codex/code-semantic-ci-quality-suite` |
+| **Brief 7** | vibe coding adapter / Repair Compiler 前倒し（§21）+ TS extractor 前倒し（§22）| `codex/code-semantic-ci-adapter-ts` |
 
 各 Brief 完了ごとに Claude が Completion Summary を review し、次 Brief を発行する。

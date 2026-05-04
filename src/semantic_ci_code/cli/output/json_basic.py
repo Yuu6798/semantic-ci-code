@@ -1,44 +1,49 @@
 from __future__ import annotations
 
-import json
-import sys
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from semantic_ci_code.cli.output.json_formatter import (
+    PACKAGE_NAME as _PACKAGE_NAME,
+)
+from semantic_ci_code.cli.output.json_formatter import (
+    SCHEMA_VERSION as _SCHEMA_VERSION,
+)
+from semantic_ci_code.cli.output.json_formatter import (
+    UNKNOWN_VERSION as _UNKNOWN_VERSION,
+)
+from semantic_ci_code.cli.output.json_formatter import (
+    build_observe_payload as _build_observe_payload,
+)
+from semantic_ci_code.cli.output.json_formatter import (
+    dump_json as _dump_json,
+)
+from semantic_ci_code.cli.output.json_formatter import (
+    package_version as _package_version,
+)
 from semantic_ci_code.domain.state_schema import CodeState
 
-SCHEMA_VERSION = "1"
-PACKAGE_NAME = "semantic-ci-code"
-UNKNOWN_VERSION = "0.0.0+unknown"
+SCHEMA_VERSION = _SCHEMA_VERSION
+PACKAGE_NAME = _PACKAGE_NAME
+UNKNOWN_VERSION = _UNKNOWN_VERSION
 
 
 def package_version() -> str:
-    try:
-        return version(PACKAGE_NAME)
-    except PackageNotFoundError:
-        return UNKNOWN_VERSION
+    return _package_version()
 
 
 def build_observe_payload(state: CodeState) -> dict[str, Any]:
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "subcommand": "observe",
-        "verdict": None,
-        "intent": None,
-        "primary_kind": None,
-        "allowed_secondary_kinds": [],
-        "summary": None,
-        "results": [],
-        "repair_plan": None,
-        "code_state": state.model_dump(mode="json"),
-        "files_touched": 0,
-        "loc_delta": {"added": 0, "removed": 0},
-        "engine": {
-            "extractor_pyver": f"{sys.version_info.major}.{sys.version_info.minor}",
-            "package_version": package_version(),
-        },
-    }
+    return _build_observe_payload(state)
 
 
 def dump_json(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
+    return _dump_json(payload)
+
+
+__all__ = [
+    "PACKAGE_NAME",
+    "SCHEMA_VERSION",
+    "UNKNOWN_VERSION",
+    "build_observe_payload",
+    "dump_json",
+    "package_version",
+]

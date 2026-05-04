@@ -1,0 +1,11 @@
+intent: allow unresolved diagnostic as repair
+change:
+  primary_kind: feature
+constraints:
+  - id: unresolved_repair
+    kind: delta
+    target: python_specific.missing
+    operator: equals
+    expected: 1
+    severity: hard
+    unknown_policy: repair

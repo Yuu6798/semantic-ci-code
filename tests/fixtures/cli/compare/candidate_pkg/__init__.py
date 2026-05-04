@@ -1,0 +1,1 @@
+"""Candidate compare fixture."""

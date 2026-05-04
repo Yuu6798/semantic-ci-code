@@ -20,6 +20,7 @@ from semantic_ci_code.domain.state_schema import (
     CodeState,
     CodeStateDelta,
     ComplexityDelta,
+    EffectChanges,
     EffectClass,
     EffectEntry,
     SymbolDelta,
@@ -826,15 +827,82 @@ def test_bugfix_template_fails_on_new_effect():
     compiled = compile_target_svp("intent: bugfix\nchange:\n  primary_kind: bugfix\n")
     verdict = evaluate_constraints(
         compiled,
-        CodeStateDelta(),
-        baseline=CodeState(effects=()),
-        candidate=CodeState(
-            effects=(EffectEntry(fqn="pkg.write", effect_class=EffectClass.FS),),
+        CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=({"fqn": "pkg.write", "effect_class": "fs"},),
+            )
         ),
+        baseline=CodeState(effects=()),
+        candidate=CodeState(effects=(EffectEntry(fqn="pkg.write", effect_class=EffectClass.FS),)),
     )
 
     assert verdict.result is VerdictResult.FAIL
     assert verdict.results[1].constraint_id == "template:bugfix:no_new_effects"
+
+
+def test_feature_no_new_effects_ignores_absolute_evidence_path_changes():
+    compiled = compile_target_svp("intent: feature\nchange:\n  primary_kind: feature\n")
+    baseline = CodeState(
+        effects=(
+            EffectEntry(
+                fqn="print",
+                effect_class=EffectClass.STDOUT,
+                confidence=1.0,
+                evidence={"file": "C:/tmp/baseline/pkg/mod.py", "line": 1},
+            ),
+        )
+    )
+    candidate = CodeState(
+        effects=(
+            EffectEntry(
+                fqn="print",
+                effect_class=EffectClass.STDOUT,
+                confidence=1.0,
+                evidence={"file": "C:/repo/candidate/pkg/mod.py", "line": 1},
+            ),
+        )
+    )
+
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(effect_changes=EffectChanges()),
+        baseline=baseline,
+        candidate=candidate,
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[1].constraint_id == "template:feature:no_new_effects"
+    assert verdict.results[1].status is ResultStatus.SATISFIED
+
+
+def test_refactor_effects_unchanged_uses_effect_changes_not_raw_evidence_paths():
+    compiled = compile_target_svp("intent: refactor\nchange:\n  primary_kind: refactor\n")
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(effect_changes=EffectChanges()),
+        baseline=CodeState(
+            effects=(
+                EffectEntry(
+                    fqn="print",
+                    effect_class=EffectClass.STDOUT,
+                    evidence={"file": "C:/tmp/baseline/pkg/mod.py"},
+                ),
+            )
+        ),
+        candidate=CodeState(
+            effects=(
+                EffectEntry(
+                    fqn="print",
+                    effect_class=EffectClass.STDOUT,
+                    evidence={"file": "C:/repo/candidate/pkg/mod.py"},
+                ),
+            )
+        ),
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[2].constraint_id == "template:refactor:effects_unchanged"
+    assert verdict.results[2].status is ResultStatus.SATISFIED
 
 
 def test_dict_valued_expected_is_canonical_between_yaml_and_hand_built():

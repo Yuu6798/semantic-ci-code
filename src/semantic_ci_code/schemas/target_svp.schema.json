@@ -102,6 +102,67 @@
       "title": "DeltaConstraint",
       "type": "object"
     },
+    "EffectAllowRule": {
+      "additionalProperties": false,
+      "properties": {
+        "effect_class": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffectClass"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fqn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fqn"
+        }
+      },
+      "title": "EffectAllowRule",
+      "type": "object"
+    },
+    "EffectClass": {
+      "enum": [
+        "pure",
+        "io",
+        "net",
+        "fs",
+        "process",
+        "env",
+        "time_random",
+        "stdout",
+        "dynamic_code",
+        "unsafe_deserialize",
+        "global_mutation"
+      ],
+      "title": "EffectClass",
+      "type": "string"
+    },
+    "EffectsPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_new": {
+          "items": {
+            "$ref": "#/$defs/EffectAllowRule"
+          },
+          "title": "Allow New",
+          "type": "array"
+        }
+      },
+      "title": "EffectsPolicy",
+      "type": "object"
+    },
     "Operator": {
       "enum": [
         "equals",
@@ -301,6 +362,17 @@
       },
       "title": "Constraints",
       "type": "array"
+    },
+    "effects": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EffectsPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "intent": {
       "title": "Intent",

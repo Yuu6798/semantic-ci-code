@@ -22,7 +22,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
 
-from semantic_ci_code.compiler import CompiledConstraint, CompiledTarget, ConstraintSource
+from semantic_ci_code.compiler import (
+    CompiledConstraint,
+    CompiledEffectAllowRule,
+    CompiledTarget,
+    ConstraintSource,
+)
 from semantic_ci_code.domain.state_schema import CodeState, CodeStateDelta, JsonValue
 from semantic_ci_code.evaluator.operators import (
     BASELINE_OPERATORS,
@@ -54,6 +59,12 @@ E_REPAIR_KIND_UNSUPPORTED_P1: Final = "E_REPAIR_KIND_UNSUPPORTED_P1"
 _TARGET_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
 _CODE_STATE_FIELDS = frozenset(CodeState.model_fields)
 _CODE_STATE_DELTA_FIELDS = frozenset(CodeStateDelta.model_fields)
+_NO_NEW_EFFECTS_TEMPLATE_IDS: Final = frozenset(
+    {
+        "template:bugfix:no_new_effects",
+        "template:feature:no_new_effects",
+    }
+)
 
 
 class ResultStatus(StrEnum):
@@ -118,6 +129,7 @@ def evaluate_constraints(
             delta=delta,
             baseline=baseline,
             candidate=candidate,
+            effect_allow_new=compiled.effect_allow_new,
         )
         for constraint in compiled.constraints
     )
@@ -130,6 +142,7 @@ def _evaluate_constraint(
     delta: CodeStateDelta,
     baseline: CodeState,
     candidate: CodeState,
+    effect_allow_new: tuple[CompiledEffectAllowRule, ...],
 ) -> ConstraintResult:
     if constraint.kind is ConstraintKind.REPAIR:
         return _result(
@@ -159,6 +172,11 @@ def _evaluate_constraint(
         if constraint.kind is ConstraintKind.STATE:
             return _evaluate_state_constraint(constraint, segments, candidate=candidate)
         if constraint.kind is ConstraintKind.DELTA:
+            delta = _delta_for_constraint(
+                constraint,
+                delta=delta,
+                effect_allow_new=effect_allow_new,
+            )
             return _evaluate_delta_constraint(
                 constraint,
                 segments,
@@ -272,6 +290,70 @@ def _evaluate_delta_constraint(
         return _from_operator_outcome(constraint, outcome)
 
     return _result(constraint, ResultStatus.UNKNOWN, E_PATH_UNRESOLVED, target=constraint.target)
+
+
+def _delta_for_constraint(
+    constraint: CompiledConstraint,
+    *,
+    delta: CodeStateDelta,
+    effect_allow_new: tuple[CompiledEffectAllowRule, ...],
+) -> CodeStateDelta:
+    """Return the delta view used by this constraint.
+
+    Target SVP ``effects.allow_new`` is a narrow policy escape hatch for
+    feature/bugfix template ``no_new_effects`` checks. User constraints still
+    see the original ``effect_changes.added`` tuple.
+    """
+
+    if (
+        not effect_allow_new
+        or constraint.source is not ConstraintSource.TEMPLATE
+        or constraint.id not in _NO_NEW_EFFECTS_TEMPLATE_IDS
+        or constraint.target != "effect_changes.added"
+        or constraint.operator is not Operator.EQUALS
+    ):
+        return delta
+
+    added = tuple(
+        effect
+        for effect in delta.effect_changes.added
+        if not _effect_matches_allow_rule(effect, effect_allow_new)
+    )
+    if added == delta.effect_changes.added:
+        return delta
+
+    return delta.model_copy(
+        update={
+            "effect_changes": delta.effect_changes.model_copy(update={"added": added}),
+        }
+    )
+
+
+def _effect_matches_allow_rule(
+    effect: object,
+    rules: tuple[CompiledEffectAllowRule, ...],
+) -> bool:
+    effect_fqn = _effect_field(effect, "fqn")
+    effect_class = _effect_field(effect, "effect_class")
+    effect_class_value = getattr(effect_class, "value", effect_class)
+
+    for rule in rules:
+        if rule.fqn is not None and effect_fqn != rule.fqn:
+            continue
+        if rule.effect_class is not None and effect_class_value != rule.effect_class.value:
+            continue
+        return True
+    return False
+
+
+def _effect_field(effect: object, key: str) -> object:
+    if isinstance(effect, dict):
+        return effect.get(key)
+    if isinstance(effect, tuple | list):
+        for item in effect:
+            if isinstance(item, tuple | list) and len(item) == 2 and item[0] == key:
+                return item[1]
+    return getattr(effect, key, None)
 
 
 def _from_operator_outcome(

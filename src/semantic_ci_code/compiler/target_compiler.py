@@ -25,7 +25,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from semantic_ci_code.domain.state_schema import ChangeKind
+from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import (
     Constraint,
     ConstraintKind,
@@ -39,6 +39,7 @@ from semantic_ci_code.framework.target_svp import TargetSVP, parse_target_svp_ya
 __all__ = [
     "CompileError",
     "CompiledConstraint",
+    "CompiledEffectAllowRule",
     "CompiledTarget",
     "ConstraintSource",
     "compile_target_svp",
@@ -83,12 +84,19 @@ class CompiledConstraint:
 
 
 @dataclass(frozen=True)
+class CompiledEffectAllowRule:
+    fqn: str | None = None
+    effect_class: EffectClass | None = None
+
+
+@dataclass(frozen=True)
 class CompiledTarget:
     intent: str
     primary_kind: ChangeKind
     allowed_secondary_kinds: tuple[ChangeKind, ...]
     scope: tuple[tuple[str, tuple[str, ...]], ...]
     constraints: tuple[CompiledConstraint, ...]
+    effect_allow_new: tuple[CompiledEffectAllowRule, ...] = ()
 
 
 @dataclass(init=False)
@@ -170,6 +178,7 @@ def compile_target_svp(
         allowed_secondary_kinds=target_svp.change.allowed_secondary_kinds,
         scope=_freeze_change_scope(target_svp.change.scope),
         constraints=constraints,
+        effect_allow_new=_compile_effect_allow_new(target_svp),
     )
 
 
@@ -202,6 +211,16 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
                 path=f"constraints[{index}].target",
             )
 
+    if target_svp.effects is None:
+        return
+    for index, rule in enumerate(target_svp.effects.allow_new):
+        if rule.fqn is None and rule.effect_class is None:
+            raise CompileError(
+                message="effects.allow_new entries require fqn or effect_class.",
+                filename=filename,
+                path=f"effects.allow_new[{index}]",
+            )
+
 
 def _compile_user_constraint(constraint: Constraint) -> CompiledConstraint:
     return CompiledConstraint(
@@ -216,6 +235,15 @@ def _compile_user_constraint(constraint: Constraint) -> CompiledConstraint:
         evidence_required=constraint.evidence_required,
         scope=constraint.scope,
         source=ConstraintSource.USER,
+    )
+
+
+def _compile_effect_allow_new(target_svp: TargetSVP) -> tuple[CompiledEffectAllowRule, ...]:
+    if target_svp.effects is None:
+        return ()
+    return tuple(
+        CompiledEffectAllowRule(fqn=rule.fqn, effect_class=rule.effect_class)
+        for rule in target_svp.effects.allow_new
     )
 
 

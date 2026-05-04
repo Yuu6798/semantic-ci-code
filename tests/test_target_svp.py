@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from semantic_ci_code.domain.state_schema import ChangeKind
+from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import DeltaConstraint, Operator
 from semantic_ci_code.framework.target_svp import (
     TargetSVP,
@@ -86,6 +86,25 @@ def test_feature_sample_yaml_loads_without_information_loss():
     assert all(isinstance(constraint, DeltaConstraint) for constraint in target_svp.constraints)
     assert target_svp.constraints[0].operator is Operator.INCLUDES_ALL
     assert target_svp.constraints[0].expected == ["src.api.users.fetch_user_profile"]
+
+
+def test_effect_allow_new_policy_loads_without_information_loss():
+    target_svp = parse_target_svp_yaml(
+        """
+intent: add git-backed check command
+change:
+  primary_kind: feature
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+"""
+    )
+
+    assert target_svp.effects is not None
+    assert len(target_svp.effects.allow_new) == 1
+    assert target_svp.effects.allow_new[0].fqn == "subprocess.run"
+    assert target_svp.effects.allow_new[0].effect_class is EffectClass.PROCESS
 
 
 def test_refactor_sample_yaml_loads_without_information_loss():

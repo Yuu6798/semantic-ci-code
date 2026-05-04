@@ -1,21 +1,16 @@
 from __future__ import annotations
 
-import sys
-import traceback
 from argparse import Namespace
 from pathlib import Path
 
 from semantic_ci_code.cli.command_support import (
+    _engine_error,
     _exit_code_for,
-    _one_line,
+    _internal_bug,
     _render_payload,
     _stderr,
+    _usage_error,
     _write_output,
-)
-from semantic_ci_code.cli.exit_codes import (
-    ENGINE_ERROR,
-    INTERNAL_BUG,
-    USAGE_ERROR,
 )
 from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.cli.target_loader import (
@@ -65,29 +60,17 @@ def run_compare(args: Namespace) -> int:
             return output_status
         return _exit_code_for(verdict.result, strict_repair=args.strict_repair)
     except TargetUsageError as exc:
-        _stderr(_one_line(str(exc)))
-        return USAGE_ERROR
+        return _usage_error(exc)
     except ValueError as exc:
-        _stderr(_one_line(str(exc)))
-        return USAGE_ERROR
+        return _usage_error(exc)
     except OSError as exc:
-        _stderr(_one_line(str(exc)))
-        return USAGE_ERROR
+        return _usage_error(exc)
     except CompileError as exc:
-        _stderr(_one_line(str(exc)))
-        if args.verbose:
-            traceback.print_exc(file=sys.stderr)
-        return ENGINE_ERROR
+        return _engine_error(exc, args, show_traceback=True)
     except ExtractorError as exc:
-        _stderr(f"extractor failed: {_one_line(str(exc))}")
-        if args.verbose:
-            traceback.print_exc(file=sys.stderr)
-        return ENGINE_ERROR
+        return _engine_error(exc, args, prefix="extractor failed", show_traceback=True)
     except Exception as exc:
-        _stderr(f"internal error: {_one_line(str(exc))}; rerun with --verbose for traceback")
-        if args.verbose:
-            traceback.print_exc(file=sys.stderr)
-        return INTERNAL_BUG
+        return _internal_bug(exc, args)
 
 
 def _resolve_dir(raw_path: str, label: str) -> Path:

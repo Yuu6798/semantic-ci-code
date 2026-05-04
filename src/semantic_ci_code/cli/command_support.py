@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import sys
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from semantic_ci_code.cli.exit_codes import FAIL, SUCCESS, USAGE_ERROR
+from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, FAIL, INTERNAL_BUG, SUCCESS, USAGE_ERROR
 from semantic_ci_code.cli.output import dump_json, format_human, resolve_format, use_color
 from semantic_ci_code.evaluator import VerdictResult
 
@@ -50,3 +51,31 @@ def _render_payload(
     if output_format == "json":
         return dump_json(payload)
     return human_renderer(payload, use_color=use_color(getattr(args, "no_color", False)))
+
+
+def _usage_error(exc: BaseException) -> int:
+    _stderr(_one_line(str(exc)))
+    return USAGE_ERROR
+
+
+def _engine_error(
+    exc: BaseException,
+    args: Any,
+    *,
+    prefix: str | None = None,
+    show_traceback: bool = False,
+) -> int:
+    message = _one_line(str(exc))
+    if prefix:
+        message = f"{prefix}: {message}"
+    _stderr(message)
+    if show_traceback and args.verbose:
+        traceback.print_exc(file=sys.stderr)
+    return ENGINE_ERROR
+
+
+def _internal_bug(exc: BaseException, args: Any) -> int:
+    _stderr(f"internal error: {_one_line(str(exc))}; rerun with --verbose for traceback")
+    if args.verbose:
+        traceback.print_exc(file=sys.stderr)
+    return INTERNAL_BUG

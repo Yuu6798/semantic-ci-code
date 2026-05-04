@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import sys
-import traceback
 from argparse import Namespace
 from pathlib import Path
 
-from semantic_ci_code.cli.command_support import _one_line, _stderr, _write_output
-from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, INTERNAL_BUG, USAGE_ERROR
+from semantic_ci_code.cli.command_support import (
+    _engine_error,
+    _internal_bug,
+    _stderr,
+    _usage_error,
+    _write_output,
+)
 from semantic_ci_code.cli.output import dump_json
 from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.pipeline import (
@@ -32,19 +35,13 @@ def run_observe(args: Namespace) -> int:
             _stderr(_HUMAN_FALLBACK_WARNING)
         return _write_output(output, args.output)
     except ValueError as exc:
-        _stderr(_one_line(str(exc)))
-        return USAGE_ERROR
+        return _usage_error(exc)
     except OSError as exc:
-        _stderr(_one_line(str(exc)))
-        return USAGE_ERROR
+        return _usage_error(exc)
     except ExtractorError as exc:
-        _stderr(f"extractor failed: {_one_line(str(exc))}")
-        return ENGINE_ERROR
+        return _engine_error(exc, args, prefix="extractor failed")
     except Exception as exc:
-        _stderr(f"internal error: {_one_line(str(exc))}; rerun with --verbose for traceback")
-        if args.verbose:
-            traceback.print_exc(file=sys.stderr)
-        return INTERNAL_BUG
+        return _internal_bug(exc, args)
 
 
 def _extract_state(args: Namespace, *, root: Path):

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from semantic_ci_code.compiler import (
+    CompiledAPISurfaceAllowRule,
     CompiledConstraint,
     CompiledEffectAllowRule,
     CompiledTarget,
@@ -299,6 +300,42 @@ effects:
         CompiledEffectAllowRule(fqn="subprocess.run", effect_class=EffectClass.PROCESS),
     )
     assert hash(compiled)
+
+
+def test_api_surface_allow_changes_policy_compiles_to_frozen_rules():
+    compiled = compile_target_svp(
+        """
+intent: allow test helper movement
+change:
+  primary_kind: refactor
+api_surface:
+  allow_changes:
+    - fqn: git_helpers.run_semantic_ci
+    - fqn_prefix: helpers.
+"""
+    )
+
+    assert compiled.api_surface_allow_changes == (
+        CompiledAPISurfaceAllowRule(fqn="git_helpers.run_semantic_ci"),
+        CompiledAPISurfaceAllowRule(fqn_prefix="helpers."),
+    )
+    assert hash(compiled)
+
+
+def test_api_surface_allow_changes_rule_requires_fqn_or_prefix():
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(
+            """
+intent: invalid api allow
+change:
+  primary_kind: refactor
+api_surface:
+  allow_changes:
+    - {}
+"""
+        )
+
+    assert exc_info.value.path == "api_surface.allow_changes[0]"
 
 
 def test_effect_allow_new_rule_requires_fqn_or_effect_class():

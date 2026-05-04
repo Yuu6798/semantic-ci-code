@@ -50,8 +50,14 @@ def format_compile_human(payload: dict[str, Any], *, use_color: bool) -> str:
         f"Primary kind: {target['primary_kind']}",
         f"Allowed secondary: {', '.join(secondary) if secondary else '-'}",
         f"Constraints: {len(constraints)}",
-        "",
     ]
+    api_allow = target.get("api_surface_policy", {}).get("allow_changes", [])
+    effect_allow = target.get("effects_policy", {}).get("allow_new", [])
+    if api_allow:
+        lines.append(f"API allow changes: {len(api_allow)}")
+    if effect_allow:
+        lines.append(f"Effect allow new: {len(effect_allow)}")
+    lines.append("")
 
     for index, constraint in enumerate(constraints):
         if index:

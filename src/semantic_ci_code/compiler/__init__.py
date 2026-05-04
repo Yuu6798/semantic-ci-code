@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from semantic_ci_code.compiler.target_compiler import (
+    CompiledAPISurfaceAllowRule,
     CompiledConstraint,
     CompiledEffectAllowRule,
     CompiledTarget,
@@ -11,6 +12,7 @@ from semantic_ci_code.compiler.target_compiler import (
 
 __all__ = [
     "CompileError",
+    "CompiledAPISurfaceAllowRule",
     "CompiledConstraint",
     "CompiledEffectAllowRule",
     "CompiledTarget",

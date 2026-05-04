@@ -867,6 +867,103 @@ def test_feature_template_ignores_removed_private_api():
     assert verdict.results[0].status is ResultStatus.SATISFIED
 
 
+def test_refactor_template_allows_declared_api_surface_changes():
+    compiled = compile_target_svp(
+        """
+intent: refactor test helper plumbing
+change:
+  primary_kind: refactor
+api_surface:
+  allow_changes:
+    - fqn: git_helpers.run_semantic_ci
+    - fqn_prefix: helpers.
+"""
+    )
+    baseline = CodeState(
+        api_surface=(
+            api("git_helpers.run_semantic_ci"),
+            api("stable.public_api"),
+        )
+    )
+    candidate = CodeState(
+        api_surface=(
+            api("helpers.run_semantic_ci"),
+            api("helpers.payload"),
+            api("stable.public_api"),
+        )
+    )
+
+    verdict = evaluate_constraints(
+        compiled,
+        compute_code_state_delta(baseline, candidate),
+        baseline=baseline,
+        candidate=candidate,
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[0].constraint_id == "template:refactor:api_surface_unchanged"
+    assert verdict.results[0].status is ResultStatus.SATISFIED
+
+
+def test_feature_template_allows_declared_removed_api_surface():
+    compiled = compile_target_svp(
+        """
+intent: move test helper internals
+change:
+  primary_kind: feature
+api_surface:
+  allow_changes:
+    - fqn_prefix: test_helpers.
+"""
+    )
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(
+            api_surface_delta=SymbolDelta(
+                removed=({"fqn": "test_helpers.run_cli", "visibility": "public"},)
+            )
+        ),
+        baseline=CodeState(),
+        candidate=CodeState(),
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[0].constraint_id == "template:feature:no_removed_api"
+    assert verdict.results[0].status is ResultStatus.SATISFIED
+
+
+def test_api_surface_allow_changes_does_not_hide_user_constraints():
+    compiled = compile_target_svp(
+        """
+intent: refactor test helper plumbing
+change:
+  primary_kind: refactor
+api_surface:
+  allow_changes:
+    - fqn: git_helpers.run_semantic_ci
+    - fqn_prefix: helpers.
+constraints:
+  - id: user_still_checks_api
+    kind: delta
+    target: api_surface_public
+    operator: equals_baseline
+"""
+    )
+    baseline = CodeState(api_surface=(api("git_helpers.run_semantic_ci"),))
+    candidate = CodeState(api_surface=(api("helpers.run_semantic_ci"),))
+
+    verdict = evaluate_constraints(
+        compiled,
+        compute_code_state_delta(baseline, candidate),
+        baseline=baseline,
+        candidate=candidate,
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert verdict.results[-1].constraint_id == "user_still_checks_api"
+    assert verdict.results[-1].status is ResultStatus.VIOLATED
+
+
 def test_bugfix_template_fails_on_new_effect():
     compiled = compile_target_svp("intent: bugfix\nchange:\n  primary_kind: bugfix\n")
     verdict = evaluate_constraints(

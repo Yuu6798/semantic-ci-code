@@ -38,6 +38,7 @@ from semantic_ci_code.framework.target_svp import TargetSVP, parse_target_svp_ya
 
 __all__ = [
     "CompileError",
+    "CompiledAPISurfaceAllowRule",
     "CompiledConstraint",
     "CompiledEffectAllowRule",
     "CompiledTarget",
@@ -49,6 +50,12 @@ __all__ = [
 class ConstraintSource(StrEnum):
     TEMPLATE = "template"
     USER = "user"
+
+
+@dataclass(frozen=True)
+class CompiledAPISurfaceAllowRule:
+    fqn: str | None = None
+    fqn_prefix: str | None = None
 
 
 @dataclass(frozen=True)
@@ -96,6 +103,7 @@ class CompiledTarget:
     allowed_secondary_kinds: tuple[ChangeKind, ...]
     scope: tuple[tuple[str, tuple[str, ...]], ...]
     constraints: tuple[CompiledConstraint, ...]
+    api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...] = ()
     effect_allow_new: tuple[CompiledEffectAllowRule, ...] = ()
 
 
@@ -178,6 +186,7 @@ def compile_target_svp(
         allowed_secondary_kinds=target_svp.change.allowed_secondary_kinds,
         scope=_freeze_change_scope(target_svp.change.scope),
         constraints=constraints,
+        api_surface_allow_changes=_compile_api_surface_allow_changes(target_svp),
         effect_allow_new=_compile_effect_allow_new(target_svp),
     )
 
@@ -211,6 +220,21 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
                 path=f"constraints[{index}].target",
             )
 
+    if target_svp.api_surface is not None:
+        for index, rule in enumerate(target_svp.api_surface.allow_changes):
+            if rule.fqn is None and rule.fqn_prefix is None:
+                raise CompileError(
+                    message="api_surface.allow_changes entries require fqn or fqn_prefix.",
+                    filename=filename,
+                    path=f"api_surface.allow_changes[{index}]",
+                )
+            if rule.fqn == "" or rule.fqn_prefix == "":
+                raise CompileError(
+                    message="api_surface.allow_changes values must not be empty.",
+                    filename=filename,
+                    path=f"api_surface.allow_changes[{index}]",
+                )
+
     if target_svp.effects is None:
         return
     for index, rule in enumerate(target_svp.effects.allow_new):
@@ -235,6 +259,17 @@ def _compile_user_constraint(constraint: Constraint) -> CompiledConstraint:
         evidence_required=constraint.evidence_required,
         scope=constraint.scope,
         source=ConstraintSource.USER,
+    )
+
+
+def _compile_api_surface_allow_changes(
+    target_svp: TargetSVP,
+) -> tuple[CompiledAPISurfaceAllowRule, ...]:
+    if target_svp.api_surface is None:
+        return ()
+    return tuple(
+        CompiledAPISurfaceAllowRule(fqn=rule.fqn, fqn_prefix=rule.fqn_prefix)
+        for rule in target_svp.api_surface.allow_changes
     )
 
 

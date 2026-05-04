@@ -70,6 +70,17 @@ compute a verdict.
     "primary_kind": "refactor",
     "allowed_secondary_kinds": [],
     "scope": [],
+    "api_surface_policy": {
+      "allow_changes": [
+        {"fqn": "git_helpers.run_semantic_ci", "fqn_prefix": null},
+        {"fqn": null, "fqn_prefix": "helpers."}
+      ]
+    },
+    "effects_policy": {
+      "allow_new": [
+        {"fqn": "subprocess.run", "effect_class": "process"}
+      ]
+    },
     "constraints": [
       {
         "id": "template:refactor:api_surface_unchanged",
@@ -95,6 +106,11 @@ compute a verdict.
 
 `compiled_target.constraints` preserves compiler order: template constraints
 first, then user constraints in YAML order.
+
+`compiled_target.api_surface_policy.allow_changes` and
+`compiled_target.effects_policy.allow_new` are deterministic allow lists used by
+built-in template constraints only. User constraints still observe the original
+semantic state and delta.
 
 ## Compatibility Policy
 

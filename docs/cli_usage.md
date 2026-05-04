@@ -32,6 +32,31 @@ Subcommands that need a target use this order:
 If both implicit locations exist, the command exits with usage error 2 and asks
 the user to pass `--target`.
 
+## Target Policies
+
+`target.yaml` can carry narrow allow-list policies for template constraints.
+These policies do not change extractor output and do not hide values from user
+constraints; they only change the comparison view used by built-in templates.
+
+```yaml
+intent: refactor CLI test helper plumbing
+change:
+  primary_kind: refactor
+api_surface:
+  allow_changes:
+    - fqn: git_helpers.run_semantic_ci
+    - fqn_prefix: helpers.
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+```
+
+`api_surface.allow_changes` accepts exact `fqn` and deterministic
+`fqn_prefix` rules. It is intended for scoped exceptions such as test helper
+movement where public-looking symbols are not production API. `effects.allow_new`
+accepts exact effect FQNs and/or effect classes for feature and bugfix templates.
+
 ## Output Format
 
 `--format json|human` overrides all defaults. Without an explicit format:

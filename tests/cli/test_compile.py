@@ -46,6 +46,38 @@ def test_compile_refactor_templates_before_user_constraint():
     ]
 
 
+def test_compile_json_includes_policy_allow_lists(tmp_path: Path):
+    target = tmp_path / "target.yaml"
+    target.write_text(
+        """
+intent: allow scoped semantic exceptions
+change:
+  primary_kind: feature
+api_surface:
+  allow_changes:
+    - fqn: test_helpers.run_cli
+    - fqn_prefix: helpers.
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+""",
+        encoding="utf-8",
+    )
+
+    result = run_semantic_ci(tmp_path, "compile", "--target", str(target), "--format", "json")
+    compiled = payload(result)["compiled_target"]
+
+    assert result.returncode == 0
+    assert compiled["api_surface_policy"]["allow_changes"] == [
+        {"fqn": "test_helpers.run_cli", "fqn_prefix": None},
+        {"fqn": None, "fqn_prefix": "helpers."},
+    ]
+    assert compiled["effects_policy"]["allow_new"] == [
+        {"fqn": "subprocess.run", "effect_class": "process"},
+    ]
+
+
 def test_compile_human_no_color_contains_labels_without_ansi():
     result = run_semantic_ci(
         FIXTURES,

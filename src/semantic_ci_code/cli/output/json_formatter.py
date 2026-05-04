@@ -5,7 +5,12 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-from semantic_ci_code.compiler import CompiledConstraint, CompiledTarget
+from semantic_ci_code.compiler import (
+    CompiledAPISurfaceAllowRule,
+    CompiledConstraint,
+    CompiledEffectAllowRule,
+    CompiledTarget,
+)
 from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
@@ -73,6 +78,17 @@ def build_compile_payload(compiled: CompiledTarget) -> dict[str, Any]:
             "primary_kind": compiled.primary_kind.value,
             "allowed_secondary_kinds": [kind.value for kind in compiled.allowed_secondary_kinds],
             "scope": [[key, list(values)] for key, values in compiled.scope],
+            "api_surface_policy": {
+                "allow_changes": [
+                    _serialize_api_surface_allow_rule(rule)
+                    for rule in compiled.api_surface_allow_changes
+                ],
+            },
+            "effects_policy": {
+                "allow_new": [
+                    _serialize_effect_allow_rule(rule) for rule in compiled.effect_allow_new
+                ],
+            },
             "constraints": [
                 _serialize_compiled_constraint(constraint) for constraint in compiled.constraints
             ],
@@ -131,6 +147,20 @@ def _serialize_compiled_constraint(constraint: CompiledConstraint) -> dict[str, 
         "tolerance": constraint.tolerance,
         "evidence_required": constraint.evidence_required,
         "scope": _json_value(constraint.scope),
+    }
+
+
+def _serialize_api_surface_allow_rule(rule: CompiledAPISurfaceAllowRule) -> dict[str, Any]:
+    return {
+        "fqn": rule.fqn,
+        "fqn_prefix": rule.fqn_prefix,
+    }
+
+
+def _serialize_effect_allow_rule(rule: CompiledEffectAllowRule) -> dict[str, Any]:
+    return {
+        "fqn": rule.fqn,
+        "effect_class": rule.effect_class.value if rule.effect_class is not None else None,
     }
 
 

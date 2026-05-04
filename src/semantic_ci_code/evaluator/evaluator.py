@@ -13,6 +13,10 @@ segment resolves on ``delta``; a ``CodeState`` first segment resolves on both
 ``baseline`` and ``candidate`` and requires a baseline-aware operator.
 ``python_specific`` exists on both state and delta models, so ``kind`` decides
 the root: ``state`` reads candidate state, while ``delta`` reads delta.
+
+Target SVP ``api_surface.allow_changes`` is a narrow policy escape hatch for
+template API checks. Matching FQNs are removed from the template's comparison
+view only; user constraints still see the original api surface and delta.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from enum import StrEnum
 from typing import Final
 
 from semantic_ci_code.compiler import (
+    CompiledAPISurfaceAllowRule,
     CompiledConstraint,
     CompiledEffectAllowRule,
     CompiledTarget,
@@ -63,6 +68,18 @@ _NO_NEW_EFFECTS_TEMPLATE_IDS: Final = frozenset(
     {
         "template:bugfix:no_new_effects",
         "template:feature:no_new_effects",
+    }
+)
+_API_SURFACE_UNCHANGED_TEMPLATE_IDS: Final = frozenset(
+    {
+        "template:refactor:api_surface_unchanged",
+        "template:bugfix:api_surface_unchanged",
+        "template:test_update:api_surface_unchanged",
+    }
+)
+_API_SURFACE_REMOVED_TEMPLATE_IDS: Final = frozenset(
+    {
+        "template:feature:no_removed_api",
     }
 )
 
@@ -130,6 +147,7 @@ def evaluate_constraints(
             baseline=baseline,
             candidate=candidate,
             effect_allow_new=compiled.effect_allow_new,
+            api_surface_allow_changes=compiled.api_surface_allow_changes,
         )
         for constraint in compiled.constraints
     )
@@ -143,6 +161,7 @@ def _evaluate_constraint(
     baseline: CodeState,
     candidate: CodeState,
     effect_allow_new: tuple[CompiledEffectAllowRule, ...],
+    api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...],
 ) -> ConstraintResult:
     if constraint.kind is ConstraintKind.REPAIR:
         return _result(
@@ -176,6 +195,13 @@ def _evaluate_constraint(
                 constraint,
                 delta=delta,
                 effect_allow_new=effect_allow_new,
+                api_surface_allow_changes=api_surface_allow_changes,
+            )
+            baseline, candidate = _states_for_constraint(
+                constraint,
+                baseline=baseline,
+                candidate=candidate,
+                api_surface_allow_changes=api_surface_allow_changes,
             )
             return _evaluate_delta_constraint(
                 constraint,
@@ -297,36 +323,126 @@ def _delta_for_constraint(
     *,
     delta: CodeStateDelta,
     effect_allow_new: tuple[CompiledEffectAllowRule, ...],
+    api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...],
 ) -> CodeStateDelta:
     """Return the delta view used by this constraint.
 
+    Target SVP ``api_surface.allow_changes`` is a narrow policy escape hatch for
+    template API removal checks.
+
     Target SVP ``effects.allow_new`` is a narrow policy escape hatch for
     feature/bugfix template ``no_new_effects`` checks. User constraints still
-    see the original ``effect_changes.added`` tuple.
+    see the original api surface and effect delta tuples.
     """
 
+    delta_view = delta
+
     if (
-        not effect_allow_new
-        or constraint.source is not ConstraintSource.TEMPLATE
-        or constraint.id not in _NO_NEW_EFFECTS_TEMPLATE_IDS
-        or constraint.target != "effect_changes.added"
-        or constraint.operator is not Operator.EQUALS
+        api_surface_allow_changes
+        and constraint.source is ConstraintSource.TEMPLATE
+        and constraint.id in _API_SURFACE_REMOVED_TEMPLATE_IDS
+        and constraint.target == "api_surface_delta.removed_public"
+        and constraint.operator is Operator.EQUALS
     ):
-        return delta
+        removed = _filter_api_surface_entries(
+            delta_view.api_surface_delta.removed,
+            api_surface_allow_changes,
+        )
+        if removed != delta_view.api_surface_delta.removed:
+            delta_view = delta_view.model_copy(
+                update={
+                    "api_surface_delta": delta_view.api_surface_delta.model_copy(
+                        update={"removed": removed}
+                    ),
+                }
+            )
 
-    added = tuple(
-        effect
-        for effect in delta.effect_changes.added
-        if not _effect_matches_allow_rule(effect, effect_allow_new)
-    )
-    if added == delta.effect_changes.added:
-        return delta
+    if (
+        effect_allow_new
+        and constraint.source is ConstraintSource.TEMPLATE
+        and constraint.id in _NO_NEW_EFFECTS_TEMPLATE_IDS
+        and constraint.target == "effect_changes.added"
+        and constraint.operator is Operator.EQUALS
+    ):
+        added = tuple(
+            effect
+            for effect in delta_view.effect_changes.added
+            if not _effect_matches_allow_rule(effect, effect_allow_new)
+        )
+        if added != delta_view.effect_changes.added:
+            delta_view = delta_view.model_copy(
+                update={
+                    "effect_changes": delta_view.effect_changes.model_copy(update={"added": added}),
+                }
+            )
 
-    return delta.model_copy(
-        update={
-            "effect_changes": delta.effect_changes.model_copy(update={"added": added}),
-        }
+    return delta_view
+
+
+def _states_for_constraint(
+    constraint: CompiledConstraint,
+    *,
+    baseline: CodeState,
+    candidate: CodeState,
+    api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...],
+) -> tuple[CodeState, CodeState]:
+    """Return baseline/candidate views used by this constraint."""
+
+    if (
+        not api_surface_allow_changes
+        or constraint.source is not ConstraintSource.TEMPLATE
+        or constraint.id not in _API_SURFACE_UNCHANGED_TEMPLATE_IDS
+        or constraint.target != "api_surface_public"
+        or constraint.operator is not Operator.EQUALS_BASELINE
+    ):
+        return baseline, candidate
+
+    return (
+        _filter_code_state_api_surface(baseline, api_surface_allow_changes),
+        _filter_code_state_api_surface(candidate, api_surface_allow_changes),
     )
+
+
+def _filter_code_state_api_surface(
+    state: CodeState,
+    rules: tuple[CompiledAPISurfaceAllowRule, ...],
+) -> CodeState:
+    api_surface = _filter_api_surface_entries(state.api_surface, rules)
+    if api_surface == state.api_surface:
+        return state
+    return state.model_copy(update={"api_surface": api_surface})
+
+
+def _filter_api_surface_entries(
+    entries: tuple[object, ...],
+    rules: tuple[CompiledAPISurfaceAllowRule, ...],
+) -> tuple[object, ...]:
+    return tuple(entry for entry in entries if not _api_surface_matches_allow_rule(entry, rules))
+
+
+def _api_surface_matches_allow_rule(
+    entry: object,
+    rules: tuple[CompiledAPISurfaceAllowRule, ...],
+) -> bool:
+    fqn = _api_surface_field(entry, "fqn")
+    if not isinstance(fqn, str):
+        return False
+    for rule in rules:
+        if rule.fqn is not None and fqn == rule.fqn:
+            return True
+        if rule.fqn_prefix is not None and fqn.startswith(rule.fqn_prefix):
+            return True
+    return False
+
+
+def _api_surface_field(entry: object, key: str) -> object:
+    if isinstance(entry, dict):
+        return entry.get(key)
+    if isinstance(entry, tuple | list):
+        for item in entry:
+            if isinstance(item, tuple | list) and len(item) == 2 and item[0] == key:
+                return item[1]
+    return getattr(entry, key, None)
 
 
 def _effect_matches_allow_rule(

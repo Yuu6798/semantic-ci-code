@@ -25,6 +25,15 @@ change:
   primary_kind: feature
 ```
 
+For scoped exceptions, such as test helper movement that should not count as
+production API breakage, add explicit allow-list policy:
+
+```yaml
+api_surface:
+  allow_changes:
+    - fqn_prefix: tests.helpers.
+```
+
 Inspect a package without judging it:
 
 ```bash

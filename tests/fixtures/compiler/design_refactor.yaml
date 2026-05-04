@@ -1,0 +1,12 @@
+intent: simplify user service internals
+change:
+  primary_kind: refactor
+
+constraints:
+  - id: complexity_should_decrease
+    kind: delta
+    target: complexity_delta.cyclomatic
+    operator: less_than
+    expected: 0
+    severity: soft
+    unknown_policy: warn

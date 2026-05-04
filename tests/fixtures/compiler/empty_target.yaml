@@ -1,0 +1,8 @@
+intent: empty target
+change:
+  primary_kind: feature
+constraints:
+  - id: empty_target
+    kind: delta
+    target: ""
+    operator: equals

@@ -1,0 +1,3 @@
+intent: add user profile endpoint
+change:
+  primary_kind: feature

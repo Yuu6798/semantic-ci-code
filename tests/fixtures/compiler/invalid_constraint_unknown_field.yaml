@@ -1,0 +1,9 @@
+intent: invalid extra constraint field
+change:
+  primary_kind: feature
+constraints:
+  - id: bad_extra
+    kind: delta
+    target: imports
+    operator: equals
+    extra_field: true

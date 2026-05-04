@@ -1,0 +1,4 @@
+intent: invalid extra root field
+change:
+  primary_kind: feature
+unexpected: true

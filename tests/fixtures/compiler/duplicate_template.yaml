@@ -1,0 +1,8 @@
+intent: duplicate template id
+change:
+  primary_kind: feature
+constraints:
+  - id: template:feature:no_removed_api
+    kind: delta
+    target: imports
+    operator: equals

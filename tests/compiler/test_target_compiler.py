@@ -10,13 +10,14 @@ import pytest
 
 from semantic_ci_code.compiler import (
     CompiledConstraint,
+    CompiledEffectAllowRule,
     CompiledTarget,
     CompileError,
     ConstraintSource,
     compile_target_svp,
 )
 from semantic_ci_code.compiler.templates import TEMPLATE_CONSTRAINTS
-from semantic_ci_code.domain.state_schema import ChangeKind
+from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import (
     ConstraintKind,
     Operator,
@@ -279,6 +280,41 @@ def test_design_feature_sample_compiles_and_preserves_optional_fields():
     assert no_new_io.scope == "src.models.*"
     assert feature_added.expected == ("src.api.users.fetch_user_profile",)
     assert hash(compiled)
+
+
+def test_effect_allow_new_policy_compiles_to_frozen_rules():
+    compiled = compile_target_svp(
+        """
+intent: allow git subprocess
+change:
+  primary_kind: feature
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+"""
+    )
+
+    assert compiled.effect_allow_new == (
+        CompiledEffectAllowRule(fqn="subprocess.run", effect_class=EffectClass.PROCESS),
+    )
+    assert hash(compiled)
+
+
+def test_effect_allow_new_rule_requires_fqn_or_effect_class():
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(
+            """
+intent: invalid effect allow
+change:
+  primary_kind: feature
+effects:
+  allow_new:
+    - {}
+"""
+        )
+
+    assert exc_info.value.path == "effects.allow_new[0]"
 
 
 def test_design_refactor_sample_compiles():

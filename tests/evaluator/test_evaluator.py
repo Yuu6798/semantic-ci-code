@@ -840,6 +840,105 @@ def test_bugfix_template_fails_on_new_effect():
     assert verdict.results[1].constraint_id == "template:bugfix:no_new_effects"
 
 
+def test_feature_template_allows_declared_new_effect():
+    compiled = compile_target_svp(
+        """
+intent: add git-backed check command
+change:
+  primary_kind: feature
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+"""
+    )
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=({"fqn": "subprocess.run", "effect_class": "process"},),
+            )
+        ),
+        baseline=CodeState(),
+        candidate=CodeState(),
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[1].constraint_id == "template:feature:no_new_effects"
+    assert verdict.results[1].status is ResultStatus.SATISFIED
+
+
+def test_effect_allow_new_keeps_unallowed_effects_visible_to_template():
+    compiled = compile_target_svp(
+        """
+intent: add git-backed check command
+change:
+  primary_kind: feature
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+"""
+    )
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=(
+                    {"fqn": "subprocess.run", "effect_class": "process"},
+                    {"fqn": "pathlib.Path.write_text", "effect_class": "fs"},
+                ),
+            )
+        ),
+        baseline=CodeState(),
+        candidate=CodeState(),
+    )
+
+    result = verdict.results[1]
+    observed = dict(result.evidence)["observed"]
+
+    assert verdict.result is VerdictResult.FAIL
+    assert result.status is ResultStatus.VIOLATED
+    assert "pathlib.Path.write_text" in repr(observed)
+    assert "subprocess.run" not in repr(observed)
+
+
+def test_effect_allow_new_does_not_hide_effects_from_user_constraints():
+    compiled = compile_target_svp(
+        """
+intent: add git-backed check command
+change:
+  primary_kind: feature
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+constraints:
+  - id: user_can_still_see_process_effect
+    kind: delta
+    target: effect_changes.added
+    operator: includes_any
+    expected:
+      - fqn: subprocess.run
+        effect_class: process
+"""
+    )
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=({"fqn": "subprocess.run", "effect_class": "process"},),
+            )
+        ),
+        baseline=CodeState(),
+        candidate=CodeState(),
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[-1].constraint_id == "user_can_still_see_process_effect"
+    assert verdict.results[-1].status is ResultStatus.SATISFIED
+
+
 def test_feature_no_new_effects_ignores_absolute_evidence_path_changes():
     compiled = compile_target_svp("intent: feature\nchange:\n  primary_kind: feature\n")
     baseline = CodeState(

@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from semantic_ci_code.domain.state_schema import ChangeKind
+from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import Constraint
 
 
@@ -17,11 +17,25 @@ class ChangeBlock(BaseModel):
     scope: dict[str, tuple[str, ...]] = Field(default_factory=dict)
 
 
+class EffectAllowRule(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    fqn: str | None = None
+    effect_class: EffectClass | None = None
+
+
+class EffectsPolicy(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    allow_new: tuple[EffectAllowRule, ...] = Field(default_factory=tuple)
+
+
 class TargetSVP(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     intent: str
     change: ChangeBlock
+    effects: EffectsPolicy | None = None
     constraints: tuple[Constraint, ...] = Field(default_factory=tuple)
 
 

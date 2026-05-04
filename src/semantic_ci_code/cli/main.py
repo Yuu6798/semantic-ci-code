@@ -6,6 +6,7 @@ import sys
 from semantic_ci_code.cli.commands.check import run_check
 from semantic_ci_code.cli.commands.compare import run_compare
 from semantic_ci_code.cli.commands.observe import run_observe
+from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
 from semantic_ci_code.cli.output.json_formatter import package_version
 
@@ -81,6 +82,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="disable ANSI color in human output",
     )
 
+    pre_commit = subcommands.add_parser(
+        "pre-commit",
+        help="compare staged index against HEAD",
+    )
+    pre_commit.add_argument("--target", default=None, help="Target SVP YAML file")
+    pre_commit.add_argument(
+        "--package-root",
+        default=".",
+        help="repo-relative Python package root inside HEAD and the staged index",
+    )
+    pre_commit.add_argument("--format", choices=("json", "human"), default=None)
+    pre_commit.add_argument(
+        "--output",
+        default=None,
+        help="write output to this file instead of stdout",
+    )
+    pre_commit.add_argument("--strict-repair", action="store_true")
+    pre_commit.add_argument(
+        "--no-color",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="disable ANSI color in human output",
+    )
+
     return parser
 
 
@@ -99,6 +124,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_compare(args)
     if args.subcommand == "check":
         return run_check(args)
+    if args.subcommand == "pre-commit":
+        return run_pre_commit(args)
 
     parser.print_help(sys.stderr)
     return USAGE_ERROR

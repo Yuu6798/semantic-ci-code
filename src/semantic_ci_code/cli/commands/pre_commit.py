@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import traceback
 from argparse import Namespace
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from semantic_ci_code.cli.delta_overlay import overlay_delta, summarize_numstat
@@ -14,17 +16,15 @@ from semantic_ci_code.cli.exit_codes import (
     SUCCESS,
     USAGE_ERROR,
 )
-from semantic_ci_code.cli.git_diff import numstat_range
+from semantic_ci_code.cli.git_diff import numstat_cached, staged_paths
 from semantic_ci_code.cli.git_runtime import (
     GitCommandError,
     GitConfigError,
     GitError,
     GitNotFoundError,
-    is_dirty,
     is_git_available,
     repo_root,
-    resolve_baseline,
-    resolve_candidate,
+    run_git,
 )
 from semantic_ci_code.cli.output import dump_json, format_human, resolve_format, use_color
 from semantic_ci_code.cli.output.json_formatter import build_payload
@@ -34,44 +34,31 @@ from semantic_ci_code.cli.target_loader import (
     load_compiled_target,
 )
 from semantic_ci_code.cli.worktree import materialize_ref
-from semantic_ci_code.compiler import CompileError
+from semantic_ci_code.compiler import CompiledTarget, CompileError
 from semantic_ci_code.delta import compute_code_state_delta
-from semantic_ci_code.evaluator import VerdictResult, evaluate_constraints
+from semantic_ci_code.evaluator import Verdict, VerdictResult, evaluate_constraints
 from semantic_ci_code.pipeline import ExtractorError, extract_python_code_state
-from semantic_ci_code.repair import emit_repair_plan
+from semantic_ci_code.repair import RepairPlan, emit_repair_plan
 
 
-def run_check(args: Namespace) -> int:
+def run_pre_commit(args: Namespace) -> int:
     try:
         if not is_git_available():
-            raise GitNotFoundError("git is required for 'check'; install git or use 'compare'")
+            raise GitNotFoundError("git is required for 'pre-commit'; install git")
 
         root = repo_root(Path.cwd())
-        baseline_ref = resolve_baseline(
-            args.baseline_rev,
-            repo_root=root,
-            no_fetch=args.no_fetch,
-        )
-        candidate_ref = resolve_candidate(args.candidate_rev)
         package_root = _package_root_relative(args.package_root)
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
 
-        if args.verbose:
-            _stderr(f"resolved baseline={baseline_ref} candidate={candidate_ref}")
-        if not args.allow_dirty and candidate_ref == "HEAD" and is_dirty(root):
-            _stderr(
-                "working tree is dirty; using HEAD commit. "
-                "pass --allow-dirty to evaluate working directory."
-            )
+        if not staged_paths(root):
+            return _emit_empty_pass(args, compiled=compiled)
 
-        with materialize_ref(root, baseline_ref, prefix="semantic-ci-baseline-") as baseline_dir:
-            candidate_context = (
-                nullcontext(root)
-                if args.allow_dirty
-                else materialize_ref(root, candidate_ref, prefix="semantic-ci-candidate-")
-            )
-            with candidate_context as candidate_dir:
+        entries = numstat_cached(root)
+        files_touched, loc_delta = summarize_numstat(entries)
+
+        with materialize_ref(root, "HEAD", prefix="semantic-ci-baseline-") as baseline_dir:
+            with _export_index(root, prefix="semantic-ci-candidate-") as candidate_dir:
                 baseline_root = _resolve_package_root(baseline_dir, package_root, "baseline")
                 candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
                 if args.verbose:
@@ -82,30 +69,18 @@ def run_check(args: Namespace) -> int:
                 candidate = extract_python_code_state(candidate_root)
 
         delta = compute_code_state_delta(baseline, candidate)
-        entries = (
-            numstat_range(root, baseline_ref)
-            if args.allow_dirty
-            else numstat_range(root, baseline_ref, candidate_ref)
-        )
-        files_touched, loc_delta = summarize_numstat(entries)
         delta = overlay_delta(delta, files_touched=files_touched, loc_delta=loc_delta)
         verdict = evaluate_constraints(compiled, delta, baseline=baseline, candidate=candidate)
         repair_plan = emit_repair_plan(verdict)
         payload = build_payload(
-            "check",
+            "pre-commit",
             compiled=compiled,
             verdict=verdict,
             repair_plan=repair_plan,
             files_touched=files_touched,
             loc_delta=loc_delta,
         )
-        output_format = resolve_format(args.format, args.output, subcommand="check")
-        output = (
-            dump_json(payload)
-            if output_format == "json"
-            else format_human(payload, use_color=use_color(args.no_color))
-        )
-        output_status = _write_output(output, args.output)
+        output_status = _render_and_write(payload, args)
         if output_status != SUCCESS:
             return output_status
         return _exit_code_for(verdict.result, strict_repair=args.strict_repair)
@@ -146,10 +121,43 @@ def run_check(args: Namespace) -> int:
         return INTERNAL_BUG
 
 
+@contextmanager
+def _export_index(repo_root: Path, *, prefix: str) -> Iterator[Path]:
+    with tempfile.TemporaryDirectory(prefix=prefix) as temp_dir:
+        export_root = Path(temp_dir)
+        run_git(
+            ["checkout-index", f"--prefix={export_root.as_posix()}/", "-a"],
+            cwd=repo_root,
+        )
+        yield export_root
+
+
+def _emit_empty_pass(args: Namespace, *, compiled: CompiledTarget) -> int:
+    verdict = Verdict(result=VerdictResult.PASS, results=())
+    repair_plan = RepairPlan(result=VerdictResult.PASS, instructions=())
+    payload = build_payload(
+        "pre-commit",
+        compiled=compiled,
+        verdict=verdict,
+        repair_plan=repair_plan,
+    )
+    return _render_and_write(payload, args)
+
+
+def _render_and_write(payload: dict, args: Namespace) -> int:
+    output_format = resolve_format(args.format, args.output, subcommand="pre-commit")
+    output = (
+        dump_json(payload)
+        if output_format == "json"
+        else format_human(payload, use_color=use_color(args.no_color))
+    )
+    return _write_output(output, args.output)
+
+
 def _package_root_relative(raw_path: str) -> Path:
     path = Path(raw_path)
     if path.is_absolute():
-        raise ValueError(f"package_root must be repo-relative for check: {path}")
+        raise ValueError(f"package_root must be repo-relative for pre-commit: {path}")
     return path
 
 

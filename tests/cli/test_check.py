@@ -217,13 +217,42 @@ def test_shallow_clone_fetch_fallback_resolves_origin_main(tmp_path: Path):
     assert payload(result)["verdict"] == "pass"
 
 
-def test_files_touched_and_loc_delta_are_zero_until_csci_18(tmp_path: Path):
+def test_files_touched_and_loc_delta_are_zero_for_identical_refs(tmp_path: Path):
+    repo = init_repo(tmp_path)
+    head = git(repo, "rev-parse", "HEAD").stdout.strip()
+    write_file(repo / "target.yaml", "intent: same ref\nchange:\n  primary_kind: feature\n")
+
+    data = payload(
+        run_semantic_ci(
+            repo,
+            "check",
+            "--baseline-rev",
+            head,
+            "--candidate-rev",
+            head,
+            "--format",
+            "json",
+        )
+    )
+
+    assert data["files_touched"] == 0
+    assert data["loc_delta"] == {"added": 0, "removed": 0}
+
+
+def test_files_touched_is_populated_for_different_refs(tmp_path: Path):
     repo = init_repo(tmp_path)
 
     data = payload(run_semantic_ci(repo, "check", "--format", "json"))
 
-    assert data["files_touched"] == 0
-    assert data["loc_delta"] == {"added": 0, "removed": 0}
+    assert data["files_touched"] > 0
+
+
+def test_loc_delta_matches_git_numstat_for_different_refs(tmp_path: Path):
+    repo = init_repo(tmp_path)
+
+    data = payload(run_semantic_ci(repo, "check", "--format", "json"))
+
+    assert data["loc_delta"] == {"added": 4, "removed": 0}
 
 
 def test_target_yaml_is_loaded_from_invoking_cwd_not_worktree(tmp_path: Path):

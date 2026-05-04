@@ -199,3 +199,17 @@ def run_semantic_ci(
 def write_file(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def stage_changes(repo: Path, files: dict[str, str | bytes | None]) -> None:
+    for relative_path, content in files.items():
+        path = repo / relative_path
+        if content is None:
+            path.unlink()
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(content, bytes):
+            path.write_bytes(content)
+        else:
+            path.write_text(content, encoding="utf-8")
+    git(repo, "add", "-A")

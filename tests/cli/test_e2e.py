@@ -104,6 +104,7 @@ def test_docs_for_brief_4_cli_exist_and_are_linked_from_readme():
         "docs/cli_usage.md",
         "docs/exit_codes.md",
         "docs/json_schema.md",
+        "docs/cli_test_inventory.md",
     ):
         assert (REPO_ROOT / relative_path).exists()
         assert relative_path in readme

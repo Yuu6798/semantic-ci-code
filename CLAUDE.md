@@ -69,6 +69,7 @@ docs/
 | `docs/cli_usage.md` | User-facing CLI contract for `observe`, `compare`, `check`, `pre-commit`, and `compile`, including target discovery and format selection |
 | `docs/exit_codes.md` | Stable CLI exit code policy for CI integration |
 | `docs/json_schema.md` | CLI JSON `schema_version="1"` envelopes for verdict and compile outputs |
+| `docs/cli_test_inventory.md` | CLI test coverage inventory, runtime notes, and conservative reduction candidates |
 | `docs/brief_4_planning.md` | (Brief 4 complete; retained for Brief 5 reference) Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR が merge され `semantic-ci` CLI 5 subcommand が release 可能状態。Open Questions 16 件のうち未確定分は Brief 5 / Brief 4b で消化予定 |
 | `docs/brief_3_planning.md` | (Archived) Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。CSCI-10〜14 の全 PR が merge され Brief 3 は完結済み。当時の判断履歴として保存 |
 | `docs/multi_agent_audit_case.md` | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |

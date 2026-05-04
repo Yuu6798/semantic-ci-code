@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from semantic_ci_code.cli.commands.check import run_check
 from semantic_ci_code.cli.commands.compare import run_compare
 from semantic_ci_code.cli.commands.observe import run_observe
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
@@ -55,6 +56,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="disable ANSI color in human output",
     )
 
+    check = subcommands.add_parser("check", help="compare git refs using temporary worktrees")
+    check.add_argument("--baseline-rev", default=None, help="baseline git ref")
+    check.add_argument("--candidate-rev", default=None, help="candidate git ref")
+    check.add_argument("--target", default=None, help="Target SVP YAML file")
+    check.add_argument(
+        "--package-root",
+        default=".",
+        help="repo-relative Python package root inside each git tree",
+    )
+    check.add_argument("--format", choices=("json", "human"), default=None)
+    check.add_argument(
+        "--output",
+        default=None,
+        help="write output to this file instead of stdout",
+    )
+    check.add_argument("--strict-repair", action="store_true")
+    check.add_argument("--no-fetch", action="store_true")
+    check.add_argument("--allow-dirty", action="store_true")
+    check.add_argument(
+        "--no-color",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="disable ANSI color in human output",
+    )
+
     return parser
 
 
@@ -71,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_observe(args)
     if args.subcommand == "compare":
         return run_compare(args)
+    if args.subcommand == "check":
+        return run_check(args)
 
     parser.print_help(sys.stderr)
     return USAGE_ERROR

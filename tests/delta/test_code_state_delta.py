@@ -147,6 +147,33 @@ def test_api_surface_added_removed_and_changed_entries():
     )
 
 
+def test_api_surface_duplicate_identity_keys_are_group_compared():
+    overload_int = api("pkg.parse", signature="@overload\ndef parse(value: int):\n    ...")
+    overload_str = api("pkg.parse", signature="@overload\ndef parse(value: str):\n    ...")
+    overload_bytes = api("pkg.parse", signature="@overload\ndef parse(value: bytes):\n    ...")
+    baseline = CodeState(api_surface=(overload_str, overload_int))
+    candidate = CodeState(api_surface=(overload_int, overload_bytes))
+
+    delta = compute_code_state_delta(baseline, candidate)
+
+    assert delta.api_surface_delta.added == ()
+    assert delta.api_surface_delta.removed == ()
+    assert delta.api_surface_delta.changed == (
+        {
+            "fqn": "pkg.parse",
+            "kind": "function",
+            "before": [
+                overload_int.model_dump(mode="json"),
+                overload_str.model_dump(mode="json"),
+            ],
+            "after": [
+                overload_bytes.model_dump(mode="json"),
+                overload_int.model_dump(mode="json"),
+            ],
+        },
+    )
+
+
 def test_effects_added_removed_and_class_change_as_removed_plus_added():
     baseline = CodeState(
         effects=(

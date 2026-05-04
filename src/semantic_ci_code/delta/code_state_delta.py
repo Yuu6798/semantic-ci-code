@@ -11,7 +11,10 @@ Delta rules:
   only in candidate are ``added``; entries present only in baseline are
   ``removed``; entries present in both with different ``signature`` or
   ``visibility`` are ``changed`` as ``{"fqn", "kind", "before", "after"}``.
-  Lists are sorted by ``(fqn, kind)``.
+  Duplicate entries with the same key, such as overload stubs, are compared as
+  sorted variant groups. If either side has multiple variants, ``before`` and
+  ``after`` are lists of entry dumps; singleton changes keep the scalar dump
+  shape. Lists are sorted by ``(fqn, kind)`` plus variant fields where needed.
 - ``type_changes`` is always ``()`` in P1 until a ``type_relations`` extractor
   exists.
 - ``effect_changes`` uses identity key ``(fqn, effect_class)`` and has no
@@ -107,23 +110,23 @@ def _api_surface_delta(
     baseline: tuple[APISurfaceEntry, ...],
     candidate: tuple[APISurfaceEntry, ...],
 ) -> SymbolDelta:
-    base = _index_by(baseline, _api_key)
-    cand = _index_by(candidate, _api_key)
+    base = _group_by(baseline, _api_key)
+    cand = _group_by(candidate, _api_key)
 
-    added = tuple(_dump(cand[key]) for key in _sorted_added_keys(base, cand))
-    removed = tuple(_dump(base[key]) for key in _sorted_removed_keys(base, cand))
+    added = tuple(
+        _dump(entry)
+        for key in _sorted_added_keys(base, cand)
+        for entry in _sort_api_entries(cand[key])
+    )
+    removed = tuple(
+        _dump(entry)
+        for key in _sorted_removed_keys(base, cand)
+        for entry in _sort_api_entries(base[key])
+    )
     changed = tuple(
-        {
-            "fqn": key[0],
-            "kind": key[1],
-            "before": _dump(base[key]),
-            "after": _dump(cand[key]),
-        }
+        _api_changed_entry(key=key, baseline=base[key], candidate=cand[key])
         for key in sorted(base.keys() & cand.keys())
-        if (
-            base[key].signature != cand[key].signature
-            or base[key].visibility != cand[key].visibility
-        )
+        if _api_group_dumps(base[key]) != _api_group_dumps(cand[key])
     )
     return SymbolDelta(added=added, removed=removed, changed=changed)
 
@@ -268,6 +271,13 @@ def _index_by(entries: Iterable[T], key: Callable[[T], K]) -> dict[K, T]:
     return indexed
 
 
+def _group_by(entries: Iterable[T], key: Callable[[T], K]) -> dict[K, list[T]]:
+    grouped: dict[K, list[T]] = {}
+    for entry in entries:
+        grouped.setdefault(key(entry), []).append(entry)
+    return grouped
+
+
 def _sorted_added_keys(base: dict[K, T], cand: dict[K, T]) -> list[K]:
     return sorted(cand.keys() - base.keys())
 
@@ -278,6 +288,40 @@ def _sorted_removed_keys(base: dict[K, T], cand: dict[K, T]) -> list[K]:
 
 def _api_key(entry: APISurfaceEntry) -> tuple[str, str]:
     return entry.fqn, entry.kind
+
+
+def _api_variant_key(entry: APISurfaceEntry) -> tuple[str, str, str, str]:
+    return entry.fqn, entry.kind, entry.signature or "", entry.visibility or ""
+
+
+def _sort_api_entries(entries: list[APISurfaceEntry]) -> list[APISurfaceEntry]:
+    return sorted(entries, key=_api_variant_key)
+
+
+def _api_group_dumps(entries: list[APISurfaceEntry]) -> list[JsonValue]:
+    return [_dump(entry) for entry in _sort_api_entries(entries)]
+
+
+def _api_changed_entry(
+    *,
+    key: tuple[str, str],
+    baseline: list[APISurfaceEntry],
+    candidate: list[APISurfaceEntry],
+) -> JsonMapping:
+    force_list = len(baseline) != 1 or len(candidate) != 1
+    return {
+        "fqn": key[0],
+        "kind": key[1],
+        "before": _api_changed_payload(baseline, force_list=force_list),
+        "after": _api_changed_payload(candidate, force_list=force_list),
+    }
+
+
+def _api_changed_payload(entries: list[APISurfaceEntry], *, force_list: bool) -> JsonValue:
+    dumps = _api_group_dumps(entries)
+    if force_list:
+        return dumps
+    return dumps[0]
 
 
 def _effect_key(entry: EffectEntry) -> tuple[str, str]:

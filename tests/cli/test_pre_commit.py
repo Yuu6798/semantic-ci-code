@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from .git_helpers import (
@@ -11,14 +10,10 @@ from .git_helpers import (
     TARGET_REPAIR,
     git,
     init_repo_without_candidate_commit,
-    run_semantic_ci,
     stage_changes,
     write_file,
 )
-
-
-def payload(result) -> dict:
-    return json.loads(result.stdout)
+from .helpers import payload, run_semantic_ci
 
 
 def test_pre_commit_with_no_staged_changes_returns_empty_pass(tmp_path: Path):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import pickle
 from pathlib import Path
 
@@ -19,13 +18,9 @@ from .git_helpers import (
     init_repo_without_candidate_commit,
     init_topic_only_repo,
     run,
-    run_semantic_ci,
     write_file,
 )
-
-
-def payload(result) -> dict:
-    return json.loads(result.stdout)
+from .helpers import parse_json, payload, run_semantic_ci
 
 
 def test_check_pass_fixture_exits_zero_with_json_verdict_pass(tmp_path: Path):
@@ -126,7 +121,7 @@ def test_no_fetch_skips_fetch_commands(tmp_path: Path):
 
     assert result.returncode == 0
     records = [
-        json.loads(line)["args"] for line in command_log.read_text(encoding="utf-8").splitlines()
+        parse_json(line)["args"] for line in command_log.read_text(encoding="utf-8").splitlines()
     ]
     assert not any(command[1] == "fetch" for command in records)
 

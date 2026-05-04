@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -174,26 +173,6 @@ def init_topic_only_repo(tmp_path: Path) -> Path:
     git(repo, "add", ".")
     git(repo, "commit", "-m", "topic")
     return repo
-
-
-def run_semantic_ci(
-    repo: Path,
-    *args: str,
-    hash_seed: str = "1",
-    extra_env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    env = {
-        "PYTHONHASHSEED": hash_seed,
-        "PYTHONPATH": str(SRC_ROOT),
-    }
-    if extra_env:
-        env.update(extra_env)
-    return run(
-        [sys.executable, "-m", "semantic_ci_code.cli", *args],
-        cwd=repo,
-        env=env,
-        check=False,
-    )
 
 
 def write_file(path: Path, text: str) -> None:

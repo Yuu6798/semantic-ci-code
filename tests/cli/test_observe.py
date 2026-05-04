@@ -1,48 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
+
+from .helpers import parse_json, run_console, run_module
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli"
 OBSERVE_PKG = FIXTURES / "observe_pkg"
 
 
-def run_cli(
-    *args: str,
-    hash_seed: str = "1",
-    cwd: Path | None = None,
-) -> subprocess.CompletedProcess[str]:
-    env = os.environ.copy()
-    env["PYTHONHASHSEED"] = hash_seed
-    env["PYTHONPATH"] = "src"
-    return subprocess.run(
-        ["semantic-ci", *args],
-        cwd=cwd,
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-
-def run_module(*args: str, hash_seed: str = "1") -> subprocess.CompletedProcess[str]:
-    env = os.environ.copy()
-    env["PYTHONHASHSEED"] = hash_seed
-    env["PYTHONPATH"] = "src"
-    return subprocess.run(
-        [sys.executable, "-m", "semantic_ci_code.cli", *args],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-
-def parse_json(stdout: str) -> dict:
-    return json.loads(stdout)
+def run_cli(*args: str, hash_seed: str = "1", cwd: Path | None = None):
+    return run_console(cwd or Path.cwd(), *args, hash_seed=hash_seed)
 
 
 def test_console_script_version_exits_zero():
@@ -55,7 +25,7 @@ def test_console_script_version_exits_zero():
 
 
 def test_python_module_version_exits_zero():
-    result = run_module("--version")
+    result = run_module(Path.cwd(), "--version")
 
     assert result.returncode == 0
     assert result.stdout.strip()

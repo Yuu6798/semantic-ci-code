@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
-import os
-import re
-import subprocess
 from pathlib import Path
 
 from semantic_ci_code.api_surface import extract_python_api_surface
+
+from .helpers import parse_json, payload, run_console
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compare"
 BASELINE = FIXTURES / "baseline_pkg"
@@ -15,7 +13,6 @@ PASS_TARGET = FIXTURES / "target_pass.yaml"
 REPAIR_TARGET = FIXTURES / "target_repair.yaml"
 FAIL_TARGET = FIXTURES / "target_fail.yaml"
 INVALID_TARGET = FIXTURES / "target_invalid.yaml"
-ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def run_cli(
@@ -23,20 +20,12 @@ def run_cli(
     cwd: Path | None = None,
     hash_seed: str = "1",
     extra_env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    env = os.environ.copy()
-    env["PYTHONHASHSEED"] = hash_seed
-    env["PYTHONPATH"] = "src"
-    if extra_env:
-        env.update(extra_env)
-    return subprocess.run(
-        ["semantic-ci", *args],
-        cwd=cwd,
-        env=env,
-        text=True,
-        encoding="utf-8",
-        capture_output=True,
-        check=False,
+):
+    return run_console(
+        cwd or Path.cwd(),
+        *args,
+        hash_seed=hash_seed,
+        extra_env=extra_env,
     )
 
 
@@ -50,14 +39,6 @@ def compare_args(target: Path = PASS_TARGET) -> list[str]:
         "--target",
         str(target),
     ]
-
-
-def payload(result: subprocess.CompletedProcess[str]) -> dict:
-    return json.loads(result.stdout)
-
-
-def strip_ansi(text: str) -> str:
-    return ANSI_RE.sub("", text)
 
 
 def test_compare_pass_fixture_exits_zero_with_json_verdict_pass():
@@ -231,7 +212,7 @@ def test_compare_output_file_defaults_to_json_and_leaves_stdout_empty(tmp_path: 
 
     assert result.returncode == 0
     assert result.stdout == ""
-    assert json.loads(output.read_text(encoding="utf-8"))["verdict"] == "pass"
+    assert parse_json(output.read_text(encoding="utf-8"))["verdict"] == "pass"
 
 
 def test_compare_package_root_overrides_baseline_and_candidate_dirs(tmp_path: Path):

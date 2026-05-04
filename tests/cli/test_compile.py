@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from .git_helpers import run_semantic_ci
+from .helpers import parse_json, payload, run_semantic_ci
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compile"
-
-
-def payload(result) -> dict:
-    return json.loads(result.stdout)
 
 
 def test_compile_json_happy_path():
@@ -93,7 +88,7 @@ def test_compile_output_writes_file(tmp_path: Path):
 
     assert result.returncode == 0
     assert result.stdout == ""
-    assert json.loads(output.read_text(encoding="utf-8"))["subcommand"] == "compile"
+    assert parse_json(output.read_text(encoding="utf-8"))["subcommand"] == "compile"
 
 
 def test_compile_invalid_target_exits_engine_error(tmp_path: Path):

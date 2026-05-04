@@ -24,6 +24,7 @@ dev = [
 
 [project.scripts]
 semantic-ci-code = "semantic_ci_code.__main__:main"
+semantic-ci = "semantic_ci_code.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

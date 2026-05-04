@@ -1,0 +1,1 @@
+"""Observe fixture package."""

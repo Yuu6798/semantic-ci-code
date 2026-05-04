@@ -8,12 +8,17 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from semantic_ci_code.cli.command_support import (
+    _exit_code_for,
+    _one_line,
+    _render_payload,
+    _stderr,
+    _write_output,
+)
 from semantic_ci_code.cli.delta_overlay import overlay_delta, summarize_numstat
 from semantic_ci_code.cli.exit_codes import (
     ENGINE_ERROR,
-    FAIL,
     INTERNAL_BUG,
-    SUCCESS,
     USAGE_ERROR,
 )
 from semantic_ci_code.cli.git_diff import numstat_cached, staged_paths
@@ -26,7 +31,6 @@ from semantic_ci_code.cli.git_runtime import (
     repo_root,
     run_git,
 )
-from semantic_ci_code.cli.output import dump_json, format_human, resolve_format, use_color
 from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.cli.target_loader import (
     TargetUsageError,
@@ -81,7 +85,7 @@ def run_pre_commit(args: Namespace) -> int:
             loc_delta=loc_delta,
         )
         output_status = _render_and_write(payload, args)
-        if output_status != SUCCESS:
+        if output_status != 0:
             return output_status
         return _exit_code_for(verdict.result, strict_repair=args.strict_repair)
     except TargetUsageError as exc:
@@ -145,13 +149,7 @@ def _emit_empty_pass(args: Namespace, *, compiled: CompiledTarget) -> int:
 
 
 def _render_and_write(payload: dict, args: Namespace) -> int:
-    output_format = resolve_format(args.format, args.output, subcommand="pre-commit")
-    output = (
-        dump_json(payload)
-        if output_format == "json"
-        else format_human(payload, use_color=use_color(args.no_color))
-    )
-    return _write_output(output, args.output)
+    return _write_output(_render_payload(payload, args, subcommand="pre-commit"), args.output)
 
 
 def _package_root_relative(raw_path: str) -> Path:
@@ -168,32 +166,3 @@ def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Pa
     if not path.is_dir():
         raise ValueError(f"{label} package_root is not a directory: {path}")
     return path
-
-
-def _write_output(output: str, target: str | None) -> int:
-    if target is None:
-        print(output, end="")
-        return SUCCESS
-    path = Path(target)
-    try:
-        path.write_text(output, encoding="utf-8")
-    except OSError as exc:
-        _stderr(_one_line(str(exc)))
-        return USAGE_ERROR
-    return SUCCESS
-
-
-def _exit_code_for(result: VerdictResult, *, strict_repair: bool) -> int:
-    if result is VerdictResult.FAIL:
-        return FAIL
-    if result is VerdictResult.REPAIR and strict_repair:
-        return FAIL
-    return SUCCESS
-
-
-def _stderr(message: str) -> None:
-    print(message, file=sys.stderr)
-
-
-def _one_line(message: str) -> str:
-    return message.splitlines()[0] if message else ""

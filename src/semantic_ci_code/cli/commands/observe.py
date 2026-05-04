@@ -5,7 +5,8 @@ import traceback
 from argparse import Namespace
 from pathlib import Path
 
-from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, INTERNAL_BUG, SUCCESS, USAGE_ERROR
+from semantic_ci_code.cli.command_support import _one_line, _stderr, _write_output
+from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, INTERNAL_BUG, USAGE_ERROR
 from semantic_ci_code.cli.output import dump_json
 from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.pipeline import (
@@ -67,24 +68,3 @@ def _path_from_cli(raw_path: str, *, package_root: Path) -> Path:
     if path.is_absolute():
         return path
     return package_root / path
-
-
-def _write_output(output: str, target: str | None) -> int:
-    if target is None:
-        print(output, end="")
-        return SUCCESS
-    path = Path(target)
-    try:
-        path.write_text(output, encoding="utf-8")
-    except OSError as exc:
-        _stderr(_one_line(str(exc)))
-        return USAGE_ERROR
-    return SUCCESS
-
-
-def _stderr(message: str) -> None:
-    print(message, file=sys.stderr)
-
-
-def _one_line(message: str) -> str:
-    return message.splitlines()[0] if message else ""

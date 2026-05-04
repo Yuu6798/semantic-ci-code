@@ -57,6 +57,10 @@ docs/                        # design documents
 - [AGENTS.md](AGENTS.md) - Claude x Codex task handoff protocol
 - [CLAUDE.md](CLAUDE.md) - repository-level agent operating policy
 
+## Appendix
+
+並列エージェント運用におけるオーケストレーター盲点の観測事例（core scope 外の応用観測）: [Multi-Agent Orchestration Audit Gap](docs/multi_agent_audit_case.md)。
+
 ## License
 
 MIT. Revisit before a commercial or source-available release if the product policy changes.

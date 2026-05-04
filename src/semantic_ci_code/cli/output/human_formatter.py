@@ -41,6 +41,26 @@ def format_human(payload: dict[str, Any], *, use_color: bool) -> str:
     return "\n".join(lines) + "\n"
 
 
+def format_compile_human(payload: dict[str, Any], *, use_color: bool) -> str:
+    target = payload["compiled_target"]
+    constraints = target["constraints"]
+    secondary = target["allowed_secondary_kinds"]
+    lines: list[str] = [
+        f"Intent: {target['intent']}",
+        f"Primary kind: {target['primary_kind']}",
+        f"Allowed secondary: {', '.join(secondary) if secondary else '-'}",
+        f"Constraints: {len(constraints)}",
+        "",
+    ]
+
+    for index, constraint in enumerate(constraints):
+        if index:
+            lines.append("")
+        lines.extend(_compiled_constraint_lines(constraint, use_color=use_color))
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _verdict_line(payload: dict[str, Any], *, use_color: bool) -> str:
     verdict = str(payload["verdict"]).upper()
     marker = "✓" if payload["verdict"] == "pass" else "✗"
@@ -65,3 +85,25 @@ def _instruction_lines(item: dict[str, Any], *, use_color: bool) -> list[str]:
         f"  operator:  {item['operator']}",
         f"  message:   {item['message']}",
     ]
+
+
+def _compiled_constraint_lines(item: dict[str, Any], *, use_color: bool) -> list[str]:
+    label = item["source"].upper()
+    color = "cyan" if item["source"] == "template" else "yellow"
+    lines = [
+        colored(f"[{label}] {item['id']}", color, enabled=use_color),
+        f"  kind:           {item['kind']}",
+        f"  target:         {item['target']}",
+        f"  operator:       {item['operator']}",
+        f"  severity:       {item['severity']}",
+        f"  unknown_policy: {item['unknown_policy']}",
+    ]
+    if item["tolerance"] is not None:
+        lines.append(f"  tolerance:      {item['tolerance']}")
+    if item["evidence_required"]:
+        lines.append("  evidence_required: true")
+    if item["scope"] is not None:
+        lines.append(f"  scope:          {item['scope']}")
+    if item["expected"] is not None:
+        lines.append(f"  expected:       {item['expected']}")
+    return lines

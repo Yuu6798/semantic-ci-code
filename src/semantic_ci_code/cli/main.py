@@ -5,6 +5,7 @@ import sys
 
 from semantic_ci_code.cli.commands.check import run_check
 from semantic_ci_code.cli.commands.compare import run_compare
+from semantic_ci_code.cli.commands.compile import run_compile
 from semantic_ci_code.cli.commands.observe import run_observe
 from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
@@ -106,6 +107,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="disable ANSI color in human output",
     )
 
+    compile_cmd = subcommands.add_parser("compile", help="compile target.yaml without judging")
+    compile_cmd.add_argument("--target", default=None, help="Target SVP YAML file")
+    compile_cmd.add_argument("--format", choices=("json", "human"), default=None)
+    compile_cmd.add_argument(
+        "--output",
+        default=None,
+        help="write output to this file instead of stdout",
+    )
+    compile_cmd.add_argument(
+        "--no-color",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="disable ANSI color in human output",
+    )
+
     return parser
 
 
@@ -126,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_check(args)
     if args.subcommand == "pre-commit":
         return run_pre_commit(args)
+    if args.subcommand == "compile":
+        return run_compile(args)
 
     parser.print_help(sys.stderr)
     return USAGE_ERROR

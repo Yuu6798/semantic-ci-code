@@ -5,7 +5,7 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-from semantic_ci_code.compiler import CompiledTarget
+from semantic_ci_code.compiler import CompiledConstraint, CompiledTarget
 from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
@@ -64,6 +64,26 @@ def build_observe_payload(state: CodeState) -> dict[str, Any]:
     return build_payload("observe", state=state)
 
 
+def build_compile_payload(compiled: CompiledTarget) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "subcommand": "compile",
+        "compiled_target": {
+            "intent": compiled.intent,
+            "primary_kind": compiled.primary_kind.value,
+            "allowed_secondary_kinds": [kind.value for kind in compiled.allowed_secondary_kinds],
+            "scope": [[key, list(values)] for key, values in compiled.scope],
+            "constraints": [
+                _serialize_compiled_constraint(constraint) for constraint in compiled.constraints
+            ],
+        },
+        "engine": {
+            "extractor_pyver": f"{sys.version_info.major}.{sys.version_info.minor}",
+            "package_version": package_version(),
+        },
+    }
+
+
 def dump_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
 
@@ -95,6 +115,22 @@ def _serialize_constraint_result(result: ConstraintResult) -> dict[str, Any]:
         "status": result.status.value,
         "error_code": result.error_code,
         "evidence": _pairs_to_dict(result.evidence),
+    }
+
+
+def _serialize_compiled_constraint(constraint: CompiledConstraint) -> dict[str, Any]:
+    return {
+        "id": constraint.id,
+        "source": constraint.source.value,
+        "kind": constraint.kind.value,
+        "target": constraint.target,
+        "operator": constraint.operator.value,
+        "expected": _json_value(constraint.expected),
+        "severity": constraint.severity.value,
+        "unknown_policy": constraint.unknown_policy.value,
+        "tolerance": constraint.tolerance,
+        "evidence_required": constraint.evidence_required,
+        "scope": _json_value(constraint.scope),
     }
 
 

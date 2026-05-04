@@ -1,0 +1,16 @@
+intent: verify refactor target with user rule
+change:
+  primary_kind: refactor
+  allowed_secondary_kinds:
+    - test_update
+  scope:
+    files:
+      - src/semantic_ci_code/cli/main.py
+constraints:
+  - id: complexity_should_decrease
+    kind: delta
+    target: complexity_delta.cyclomatic
+    operator: less_than
+    expected: 0
+    severity: soft
+    unknown_policy: warn

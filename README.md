@@ -1,65 +1,76 @@
 # semantic-ci-code
 
-> **This is not a linter. This is not a type checker. This is not a test runner.**
->
-> Semantic CI Code Edition is a deterministic semantic CI layer for validating
-> whether a code change matches its declared intent.
+Semantic CI Code Edition is a deterministic semantic CI layer for code changes.
+It compares observed code semantics against a declared `target.yaml` intent and
+returns stable JSON or human-readable repair guidance.
 
-## Current Status
+It is not a linter, type checker, test runner, or LLM-as-judge service.
 
-Bootstrap scaffold. The repository now defines the Code Edition boundary, Python
-package layout, CI, and development workflow. Product behavior is still design-first.
-
-## Scope
-
-Semantic CI Code Edition compares:
-
-- declared change intent
-- expected code state
-- baseline code state
-- observed code state
-
-It emits a semantic diff plus repair instructions for the next generator pass.
-
-Out of scope:
-
-- replacing linters, type checkers, or test runners
-- LLM-as-judge behavior
-- API-key services
-- the music PoC implementation
-
-## Setup
+## Install
 
 ```bash
 pip install -e ".[dev]"
+semantic-ci --version
 ```
+
+The legacy `semantic-ci-code` entrypoint is still available and unchanged.
+
+## Quick Start
+
+Create a minimal `target.yaml`:
+
+```yaml
+intent: add user profile endpoint
+change:
+  primary_kind: feature
+```
+
+Inspect a package without judging it:
+
+```bash
+semantic-ci observe --package-root src/semantic_ci_code --format json
+```
+
+Compare two local directories:
+
+```bash
+semantic-ci compare --baseline-dir /tmp/base --candidate-dir /tmp/candidate --target target.yaml
+```
+
+Check a git change against `origin/main`:
+
+```bash
+semantic-ci check --target target.yaml
+```
+
+Check staged changes before committing:
+
+```bash
+semantic-ci pre-commit --target target.yaml
+```
+
+Dry-compile a target file:
+
+```bash
+semantic-ci compile --target target.yaml --format human
+```
+
+## Documentation
+
+- [CLI Usage](docs/cli_usage.md) - subcommands, flags, target discovery, and output formats
+- [Exit Codes](docs/exit_codes.md) - CI-facing exit code contract
+- [JSON Output Schema](docs/json_schema.md) - `schema_version="1"` envelopes
+- [Code Semantic CI Design](docs/code_semantic_ci_design.md) - Code Edition v0.1 design spec
+- [AGENTS.md](AGENTS.md) - Claude x Codex task handoff protocol
+- [CLAUDE.md](CLAUDE.md) - repository-level agent operating policy
 
 ## Development
 
 ```bash
 ruff check .
+ruff format --check .
 pytest -q
-python -m semantic_ci_code
 ```
-
-## Project Structure
-
-```text
-src/semantic_ci_code/        # Python package
-tests/                       # pytest suite
-docs/                        # design documents
-.github/workflows/ci.yml     # ruff + pytest CI
-```
-
-## Documentation
-
-- [Code Semantic CI Design](docs/code_semantic_ci_design.md) - Code Edition v0.1 design spec
-- [AGENTS.md](AGENTS.md) - Claude x Codex task handoff protocol
-- [CLAUDE.md](CLAUDE.md) - repository-level agent operating policy
-
-## Appendix
-
-並列エージェント運用におけるオーケストレーター盲点の観測事例（core scope 外の応用観測）: [Multi-Agent Orchestration Audit Gap](docs/multi_agent_audit_case.md)。
 
 ## License
 

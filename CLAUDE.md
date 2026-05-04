@@ -66,7 +66,8 @@ docs/
 | Document | Purpose |
 |---|---|
 | `docs/code_semantic_ci_design.md` | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop |
-| `docs/brief_3_planning.md` | Brief 3 (pipeline 統合) を CSCI-10〜14 に分割する planning 文書。Q1〜Q4 設計判断 + Engine API 契約 + Brief 4 申し送り。Brief 3 完了で archive 候補 |
+| `docs/brief_4_planning.md` | Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割する planning 文書。subcommand contract / exit code policy / JSON schema_version=1 / git worktree 方針 / Open Questions 16 件 |
+| `docs/brief_3_planning.md` | (Archived) Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。CSCI-10〜14 の全 PR が merge され Brief 3 は完結済み。当時の判断履歴として保存 |
 | `docs/multi_agent_audit_case.md` | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
 
 When adding a new `docs/<topic>.md`, update this table and the README documentation list.

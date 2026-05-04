@@ -5,7 +5,8 @@ import pickle
 from pathlib import Path
 
 from semantic_ci_code.cli.git_runtime import GitCommandError
-from tests.cli.git_helpers import (
+
+from .git_helpers import (
     BAD_SOURCE,
     BASELINE_SOURCE,
     CANDIDATE_SOURCE,

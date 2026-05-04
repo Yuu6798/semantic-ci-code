@@ -265,6 +265,7 @@ def _test_surface_changes(
 
 
 def _index_by(entries: Iterable[T], key: Callable[[T], K]) -> dict[K, T]:
+    """Index entries that are expected to be deduped by their extractor contract."""
     indexed: dict[K, T] = {}
     for entry in entries:
         indexed.setdefault(key(entry), entry)

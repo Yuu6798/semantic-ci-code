@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pickle
 import subprocess
 import sys
 from pathlib import Path
@@ -207,7 +208,8 @@ def test_duplicate_user_constraint_id_raises_compile_error():
 
     message = str(exc_info.value)
     assert "duplicate" in message
-    assert "user" in message
+    assert "user[0]" in message
+    assert "user[1]" in message
 
 
 def test_duplicate_user_vs_template_constraint_id_raises_compile_error():
@@ -216,8 +218,27 @@ def test_duplicate_user_vs_template_constraint_id_raises_compile_error():
 
     message = str(exc_info.value)
     assert "template:feature:no_removed_api" in message
-    assert "template" in message
-    assert "user" in message
+    assert "template[0]" in message
+    assert "user[0]" in message
+
+
+def test_compile_error_round_trips_through_pickle():
+    error = CompileError(
+        "bad target",
+        filename="target.yaml",
+        path="constraints[0].target",
+        line=4,
+        column=9,
+    )
+
+    restored = pickle.loads(pickle.dumps(error))
+
+    assert restored.message == "bad target"
+    assert restored.filename == "target.yaml"
+    assert restored.path == "constraints[0].target"
+    assert restored.line == 4
+    assert restored.column == 9
+    assert str(restored) == "target.yaml:4:9: bad target at constraints[0].target"
 
 
 def test_empty_constraint_target_raises_compile_error():

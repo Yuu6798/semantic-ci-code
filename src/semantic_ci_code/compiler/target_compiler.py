@@ -102,7 +102,6 @@ class CompileError(Exception):
     def __init__(
         self,
         message: str,
-        *,
         filename: str = "<string>",
         path: str | None = None,
         line: int | None = None,
@@ -231,21 +230,23 @@ def _validate_unique_ids(
     *,
     filename: str,
 ) -> None:
-    seen: dict[str, tuple[int, ConstraintSource]] = {}
-    for index, constraint in enumerate(constraints):
+    seen: dict[str, str] = {}
+    source_counts: dict[ConstraintSource, int] = {}
+    for constraint in constraints:
+        source_index = source_counts.get(constraint.source, 0)
+        location = f"{constraint.source.value}[{source_index}]"
         previous = seen.get(constraint.id)
         if previous is not None:
-            previous_index, previous_source = previous
             raise CompileError(
                 message=(
                     f"duplicate constraint id {constraint.id!r}; first occurrence at "
-                    f"{previous_source.value}[{previous_index}], second occurrence at "
-                    f"{constraint.source.value}[{index}]"
+                    f"{previous}, second occurrence at {location}"
                 ),
                 filename=filename,
                 path="constraints",
             )
-        seen[constraint.id] = (index, constraint.source)
+        seen[constraint.id] = location
+        source_counts[constraint.source] = source_index + 1
 
 
 def _freeze_change_scope(

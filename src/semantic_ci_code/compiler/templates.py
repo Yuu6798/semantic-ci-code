@@ -51,8 +51,9 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
         ),
         _template(
             id="template:refactor:effects_unchanged",
-            target="effects",
-            operator=Operator.EQUALS_BASELINE,
+            target="effect_changes",
+            operator=Operator.EQUALS,
+            expected={"added": (), "removed": ()},
         ),
         _template(
             id="template:refactor:test_surface_unchanged",
@@ -68,8 +69,9 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
         ),
         _template(
             id="template:bugfix:no_new_effects",
-            target="effects",
-            operator=Operator.NO_NEW_ITEMS,
+            target="effect_changes.added",
+            operator=Operator.EQUALS,
+            expected=(),
         ),
     ),
     ChangeKind.FEATURE: (
@@ -81,8 +83,9 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
         ),
         _template(
             id="template:feature:no_new_effects",
-            target="effects",
-            operator=Operator.NO_NEW_ITEMS,
+            target="effect_changes.added",
+            operator=Operator.EQUALS,
+            expected=(),
         ),
     ),
     ChangeKind.TEST_UPDATE: (
@@ -93,8 +96,9 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
         ),
         _template(
             id="template:test_update:effects_unchanged",
-            target="effects",
-            operator=Operator.EQUALS_BASELINE,
+            target="effect_changes",
+            operator=Operator.EQUALS,
+            expected={"added": (), "removed": ()},
         ),
         _template(
             id="template:test_update:imports_unchanged",

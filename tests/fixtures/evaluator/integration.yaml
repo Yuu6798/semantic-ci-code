@@ -1,0 +1,12 @@
+intent: add a small public API
+change:
+  primary_kind: feature
+
+constraints:
+  - id: complexity_increased
+    kind: delta
+    target: complexity_delta.cyclomatic
+    operator: greater_than_or_equal
+    expected: 1
+    severity: soft
+    unknown_policy: warn

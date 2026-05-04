@@ -1,0 +1,48 @@
+intent: add user profile fetch API
+change:
+  primary_kind: feature
+  allowed_secondary_kinds: [test_update]
+  scope:
+    files: ["src/api/users.py", "tests/test_users.py"]
+
+constraints:
+  - id: feature_added
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_all
+    expected: ["src.api.users.fetch_user_profile"]
+    severity: hard
+    unknown_policy: fail
+    evidence_required: true
+
+  - id: no_other_api_changes
+    kind: delta
+    target: api_surface.public_symbols
+    operator: superset_of_baseline
+    severity: hard
+    unknown_policy: fail
+
+  - id: no_new_io_in_models
+    kind: delta
+    target: effects
+    operator: no_new_items
+    scope: src.models.*
+    severity: hard
+    unknown_policy: repair
+
+  - id: complexity_budget
+    kind: delta
+    target: complexity_delta.cyclomatic
+    operator: less_than_or_equal
+    expected: 5
+    severity: soft
+    unknown_policy: warn
+    tolerance: 0.5
+
+  - id: test_added
+    kind: delta
+    target: test_surface_delta.new_test_cases
+    operator: greater_than_or_equal
+    expected: 1
+    severity: hard
+    unknown_policy: fail

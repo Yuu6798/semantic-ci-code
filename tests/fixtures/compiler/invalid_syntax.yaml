@@ -1,0 +1,9 @@
+intent: broken
+change:
+  primary_kind: feature
+constraints:
+  - id: bad
+    kind: delta
+    target: imports
+    operator: equals
+    expected: [

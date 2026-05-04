@@ -1,0 +1,12 @@
+intent: duplicate user ids
+change:
+  primary_kind: feature
+constraints:
+  - id: duplicate
+    kind: delta
+    target: imports
+    operator: equals
+  - id: duplicate
+    kind: delta
+    target: effects
+    operator: equals

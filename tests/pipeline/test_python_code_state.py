@@ -112,6 +112,35 @@ def test_empty_paths_variant_keeps_module_graph_and_empties_per_file_fields():
     assert state.module_graph
 
 
+def test_paths_variant_is_independent_of_explicit_file_order(tmp_path):
+    package_root = tmp_path / "pkg"
+    package_root.mkdir()
+    (package_root / "__init__.py").write_text("", encoding="utf-8")
+    a_path = package_root / "a.py"
+    b_path = package_root / "b.py"
+    a_path.write_text('def a():\n    print("a")\n', encoding="utf-8")
+    b_path.write_text('def b():\n    print("b")\n', encoding="utf-8")
+
+    first = extract_python_code_state_from_paths((a_path, b_path), package_root=package_root)
+    second = extract_python_code_state_from_paths((b_path, a_path), package_root=package_root)
+
+    assert _state_json(first) == _state_json(second)
+
+
+def test_init_only_package_with_api_keeps_module_graph(tmp_path):
+    package_root = tmp_path / "pkg"
+    package_root.mkdir()
+    (package_root / "__init__.py").write_text(
+        "def api():\n    return 1\n",
+        encoding="utf-8",
+    )
+
+    state = extract_python_code_state(package_root)
+
+    assert {entry.fqn for entry in state.api_surface} == {"pkg.api"}
+    assert [entry.module for entry in state.module_graph] == ["pkg"]
+
+
 def test_syntax_error_is_wrapped_with_extractor_name_and_path():
     with pytest.raises(ExtractorError) as captured:
         extract_python_code_state(SYNTAX_ERROR)

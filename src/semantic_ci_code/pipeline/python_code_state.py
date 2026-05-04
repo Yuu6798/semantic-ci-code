@@ -21,6 +21,7 @@ so cutting it to a file subset would create a misleading ``CodeState``.
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -226,7 +227,7 @@ def _python_paths_from_inputs(
                     expanded.append(resolved)
         elif path.suffix == ".py" and path not in expanded:
             expanded.append(path)
-    return tuple(expanded)
+    return tuple(sorted(expanded, key=lambda path: str(path.resolve())))
 
 
 def _resolve_package_root(package_root: Path) -> Path:
@@ -247,9 +248,25 @@ def _suppress_empty_package_graph(
     if (
         len(module_paths) == 1
         and module_paths[0].name == "__init__.py"
+        and _is_empty_python_file(module_paths[0])
         and len(graph) == 1
         and graph[0].imports == ()
         and graph[0].imported_by == ()
     ):
         return ()
     return graph
+
+
+def _is_empty_python_file(path: Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    body = tree.body
+    if not body:
+        return True
+    if len(body) == 1 and isinstance(body[0], ast.Pass):
+        return True
+    return (
+        len(body) == 1
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    )

@@ -1,0 +1,3 @@
+intent: keep public API stable during refactor
+change:
+  primary_kind: refactor

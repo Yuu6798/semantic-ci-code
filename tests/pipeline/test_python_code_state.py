@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import pickle
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from semantic_ci_code.domain.state_schema import CodeState
+from semantic_ci_code.domain.state_schema import CodeState, ModuleGraphEntry
 from semantic_ci_code.pipeline import (
     ExtractorError,
     extract_python_code_state,
@@ -35,7 +36,7 @@ def _module_graph_by_name(state: CodeState):
     return {entry.module: entry for entry in state.module_graph}
 
 
-def test_empty_package_returns_code_state_with_default_fields():
+def test_empty_package_returns_code_state_with_extractor_natural_module_graph():
     state = extract_python_code_state(EMPTY_PACKAGE)
 
     assert isinstance(state, CodeState)
@@ -44,7 +45,7 @@ def test_empty_package_returns_code_state_with_default_fields():
     assert state.imports == ()
     assert state.complexity == ()
     assert state.test_surface == ()
-    assert state.module_graph == ()
+    assert state.module_graph == (ModuleGraphEntry(module="empty_package"),)
     assert state.type_relations == ()
     assert state.control_flow == ()
     assert state.data_flow == ()
@@ -161,6 +162,26 @@ def test_missing_path_fails_fast_with_one_line_error():
         extract_python_code_state_from_paths((missing,), package_root=MULTI_MODULE)
 
 
+def test_path_outside_package_root_fails_with_one_line_error(tmp_path):
+    package_root = tmp_path / "pkg"
+    package_root.mkdir()
+    outside_path = tmp_path / "outside.py"
+    outside_path.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside package_root"):
+        extract_python_code_state_from_paths((outside_path,), package_root=package_root)
+
+
+def test_extractor_error_round_trips_through_pickle():
+    error = ExtractorError("api_surface", Path("bad.py"))
+
+    restored = pickle.loads(pickle.dumps(error))
+
+    assert restored.args == ("api_surface", Path("bad.py"))
+    assert restored.extractor_name == "api_surface"
+    assert restored.path == Path("bad.py")
+
+
 def test_model_dump_json_is_byte_identical_across_two_invocations():
     first = extract_python_code_state(MULTI_MODULE)
     second = extract_python_code_state(MULTI_MODULE)
@@ -181,19 +202,24 @@ print(state.model_dump_json())
     env["PYTHONPATH"] = (
         src_path if not env.get("PYTHONPATH") else os.pathsep.join((src_path, env["PYTHONPATH"]))
     )
-    run1 = subprocess.run(
-        [sys.executable, "-c", script],
-        check=True,
-        capture_output=True,
-        env=env,
-        text=True,
-    )
-    run2 = subprocess.run(
-        [sys.executable, "-c", script],
-        check=True,
-        capture_output=True,
-        env=env,
-        text=True,
-    )
+    run1 = _run_subprocess(script, env=env, pythonhashseed="1")
+    run2 = _run_subprocess(script, env=env, pythonhashseed="2")
 
     assert run1.stdout == run2.stdout
+
+
+def _run_subprocess(
+    script: str,
+    *,
+    env: dict[str, str],
+    pythonhashseed: str,
+) -> subprocess.CompletedProcess[str]:
+    run_env = env.copy()
+    run_env["PYTHONHASHSEED"] = pythonhashseed
+    return subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        env=run_env,
+        text=True,
+    )

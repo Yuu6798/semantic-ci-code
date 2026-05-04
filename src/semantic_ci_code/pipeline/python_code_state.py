@@ -21,9 +21,7 @@ so cutting it to a file subset would create a misleading ``CodeState``.
 
 from __future__ import annotations
 
-import ast
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
@@ -46,12 +44,16 @@ from semantic_ci_code.test_surface import extract_python_test_surface_from_paths
 T = TypeVar("T")
 
 
-@dataclass(frozen=True)
 class ExtractorError(Exception):
     """Fail-fast wrapper for extractor failures."""
 
     extractor_name: str
     path: Path | None
+
+    def __init__(self, extractor_name: str, path: Path | None) -> None:
+        self.extractor_name = extractor_name
+        self.path = path
+        super().__init__(extractor_name, path)
 
     def __str__(self) -> str:
         location = str(self.path) if self.path is not None else "<package_root>"
@@ -178,10 +180,7 @@ def _extract_module_graph(package_root: Path) -> tuple[ModuleGraphEntry, ...]:
     return _run_extractor(
         "module_graph",
         package_root,
-        lambda: _suppress_empty_package_graph(
-            package_root=package_root,
-            graph=extract_python_module_graph(package_root),
-        ),
+        lambda: extract_python_module_graph(package_root),
     )
 
 
@@ -214,19 +213,19 @@ def _python_paths_from_inputs(
     package_root: Path,
 ) -> tuple[Path, ...]:
     expanded: list[Path] = []
+    seen: set[Path] = set()
     for raw_path in paths:
         path = Path(raw_path).resolve()
         if not path.exists():
             raise ValueError(f"path does not exist under package_root: {path}")
-        path.relative_to(package_root)
+        _ensure_under_package_root(path, package_root=package_root)
         if path.is_dir():
             for candidate in sorted(path.rglob("*.py"), key=lambda item: str(item.resolve())):
                 resolved = candidate.resolve()
-                resolved.relative_to(package_root)
-                if resolved not in expanded:
-                    expanded.append(resolved)
-        elif path.suffix == ".py" and path not in expanded:
-            expanded.append(path)
+                _ensure_under_package_root(resolved, package_root=package_root)
+                _append_once(resolved, expanded=expanded, seen=seen)
+        elif path.suffix == ".py":
+            _append_once(path, expanded=expanded, seen=seen)
     return tuple(sorted(expanded, key=lambda path: str(path.resolve())))
 
 
@@ -239,34 +238,14 @@ def _resolve_package_root(package_root: Path) -> Path:
     return root
 
 
-def _suppress_empty_package_graph(
-    *,
-    package_root: Path,
-    graph: tuple[ModuleGraphEntry, ...],
-) -> tuple[ModuleGraphEntry, ...]:
-    module_paths = tuple(sorted(package_root.rglob("*.py"), key=lambda path: str(path.resolve())))
-    if (
-        len(module_paths) == 1
-        and module_paths[0].name == "__init__.py"
-        and _is_empty_python_file(module_paths[0])
-        and len(graph) == 1
-        and graph[0].imports == ()
-        and graph[0].imported_by == ()
-    ):
-        return ()
-    return graph
+def _ensure_under_package_root(path: Path, *, package_root: Path) -> None:
+    if path == package_root or package_root in path.parents:
+        return
+    raise ValueError(f"path is outside package_root: {path}")
 
 
-def _is_empty_python_file(path: Path) -> bool:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    body = tree.body
-    if not body:
-        return True
-    if len(body) == 1 and isinstance(body[0], ast.Pass):
-        return True
-    return (
-        len(body) == 1
-        and isinstance(body[0], ast.Expr)
-        and isinstance(body[0].value, ast.Constant)
-        and isinstance(body[0].value.value, str)
-    )
+def _append_once(path: Path, *, expanded: list[Path], seen: set[Path]) -> None:
+    if path in seen:
+        return
+    seen.add(path)
+    expanded.append(path)

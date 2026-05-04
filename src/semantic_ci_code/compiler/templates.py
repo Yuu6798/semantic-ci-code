@@ -41,7 +41,7 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
     ChangeKind.REFACTOR: (
         _template(
             id="template:refactor:api_surface_unchanged",
-            target="api_surface",
+            target="api_surface_public",
             operator=Operator.EQUALS_BASELINE,
         ),
         _template(
@@ -64,7 +64,7 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
     ChangeKind.BUGFIX: (
         _template(
             id="template:bugfix:api_surface_unchanged",
-            target="api_surface",
+            target="api_surface_public",
             operator=Operator.EQUALS_BASELINE,
         ),
         _template(
@@ -77,7 +77,7 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
     ChangeKind.FEATURE: (
         _template(
             id="template:feature:no_removed_api",
-            target="api_surface_delta.removed",
+            target="api_surface_delta.removed_public",
             operator=Operator.EQUALS,
             expected=(),
         ),
@@ -91,7 +91,7 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
     ChangeKind.TEST_UPDATE: (
         _template(
             id="template:test_update:api_surface_unchanged",
-            target="api_surface",
+            target="api_surface_public",
             operator=Operator.EQUALS_BASELINE,
         ),
         _template(

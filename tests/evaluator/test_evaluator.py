@@ -810,17 +810,61 @@ def test_refactor_template_fails_when_api_surface_changes():
     assert verdict.results[0].status is ResultStatus.VIOLATED
 
 
+def test_refactor_template_ignores_private_api_surface_changes():
+    compiled = compile_target_svp("intent: refactor\nchange:\n  primary_kind: refactor\n")
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(),
+        baseline=CodeState(
+            api_surface=(APISurfaceEntry(fqn="pkg._helper", kind="function", visibility="private"),)
+        ),
+        candidate=CodeState(
+            api_surface=(
+                APISurfaceEntry(
+                    fqn="pkg._helper",
+                    kind="function",
+                    signature="def _helper(x):\n    ...",
+                    visibility="private",
+                ),
+                APISurfaceEntry(fqn="pkg._new_helper", kind="function", visibility="private"),
+            )
+        ),
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[0].status is ResultStatus.SATISFIED
+
+
 def test_feature_template_fails_on_removed_api():
     compiled = compile_target_svp("intent: feature\nchange:\n  primary_kind: feature\n")
     verdict = evaluate_constraints(
         compiled,
-        CodeStateDelta(api_surface_delta=SymbolDelta(removed=({"fqn": "pkg.removed"},))),
+        CodeStateDelta(
+            api_surface_delta=SymbolDelta(removed=({"fqn": "pkg.removed", "visibility": "public"},))
+        ),
         baseline=CodeState(),
         candidate=CodeState(),
     )
 
     assert verdict.result is VerdictResult.FAIL
     assert verdict.results[0].constraint_id == "template:feature:no_removed_api"
+
+
+def test_feature_template_ignores_removed_private_api():
+    compiled = compile_target_svp("intent: feature\nchange:\n  primary_kind: feature\n")
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(
+            api_surface_delta=SymbolDelta(
+                removed=({"fqn": "pkg._removed", "visibility": "private"},)
+            )
+        ),
+        baseline=CodeState(),
+        candidate=CodeState(),
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[0].status is ResultStatus.SATISFIED
 
 
 def test_bugfix_template_fails_on_new_effect():

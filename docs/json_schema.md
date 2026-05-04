@@ -75,7 +75,7 @@ compute a verdict.
         "id": "template:refactor:api_surface_unchanged",
         "source": "template",
         "kind": "delta",
-        "target": "api_surface",
+        "target": "api_surface_public",
         "operator": "equals_baseline",
         "expected": null,
         "severity": "hard",

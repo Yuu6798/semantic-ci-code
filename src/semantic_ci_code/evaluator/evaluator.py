@@ -57,7 +57,7 @@ E_OPERATOR_UNSUPPORTED_P1: Final = "E_OPERATOR_UNSUPPORTED_P1"
 E_REPAIR_KIND_UNSUPPORTED_P1: Final = "E_REPAIR_KIND_UNSUPPORTED_P1"
 
 _TARGET_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
-_CODE_STATE_FIELDS = frozenset(CodeState.model_fields)
+_CODE_STATE_FIELDS = frozenset(CodeState.model_fields) | {"api_surface_public"}
 _CODE_STATE_DELTA_FIELDS = frozenset(CodeStateDelta.model_fields)
 _NO_NEW_EFFECTS_TEMPLATE_IDS: Final = frozenset(
     {

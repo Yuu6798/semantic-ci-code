@@ -18,8 +18,25 @@ class GitNotFoundError(GitError):
 class GitCommandError(GitError):
     """A git subprocess failed."""
 
-    def __init__(self, args: list[str], *, cwd: Path, returncode: int, stderr: str) -> None:
-        self.args_list = tuple(args)
+    def __init__(
+        self,
+        args_or_message: list[str] | str,
+        *,
+        cwd: Path | None = None,
+        returncode: int | None = None,
+        stderr: str = "",
+    ) -> None:
+        if isinstance(args_or_message, str) and cwd is None and returncode is None:
+            self.args_list: tuple[str, ...] = ()
+            self.cwd = None
+            self.returncode = None
+            self.stderr = ""
+            super().__init__(args_or_message)
+            return
+
+        if not isinstance(args_or_message, list) or cwd is None or returncode is None:
+            raise TypeError("GitCommandError requires git args, cwd, returncode, and stderr")
+        self.args_list = tuple(args_or_message)
         self.cwd = cwd
         self.returncode = returncode
         self.stderr = stderr

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import pickle
 from pathlib import Path
 
+from semantic_ci_code.cli.git_runtime import GitCommandError
 from tests.cli.git_helpers import (
     BAD_SOURCE,
     BASELINE_SOURCE,
@@ -304,3 +306,16 @@ def test_missing_package_root_exits_usage_error(tmp_path: Path):
 
     assert result.returncode == 2
     assert "baseline package_root does not exist" in result.stderr
+
+
+def test_git_command_error_is_pickle_compatible(tmp_path: Path):
+    err = GitCommandError(
+        ["rev-parse", "missing"],
+        cwd=tmp_path,
+        returncode=1,
+        stderr="bad ref",
+    )
+
+    restored = pickle.loads(pickle.dumps(err))
+
+    assert str(restored) == str(err)

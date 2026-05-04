@@ -1,5 +1,14 @@
 # Brief 4 Planning — Semantic CI CLI / operational entrypoint
 
+> **STATUS: Brief 4 complete (2026-05-04).**
+> CSCI-15 (PR #21) / CSCI-16 (#22) / CSCI-17 (#23) / CSCI-17b (#24) / CSCI-18 (#25) /
+> CSCI-19 (#26) として全 PR が merge 済み。`semantic-ci` CLI は 5 subcommand
+> (`observe` / `compare` / `check` / `pre-commit` / `compile`) で release 可能な状態。
+>
+> 本文書は **archive せず** Brief 5 起草時の reference として retain する (Open
+> Questions 16 件のうち未確定分が Brief 5 / Brief 4b で消化される予定)。
+> 後続の Brief 5 (Vibe Coding Adapter / Repair Compiler) は別 planning 文書で起草予定。
+
 本文書は `docs/code_semantic_ci_design.md` の Brief 4 (CLI 層) を 5 つの narrow PR
 (CSCI-15 〜 CSCI-19) に分割する planning 文書。実装着手前に **Goals / Non-goals /
 CLI contract / Exit code policy / Output format / Git integration / PR split / Open

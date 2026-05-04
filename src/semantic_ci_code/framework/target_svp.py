@@ -9,6 +9,19 @@ from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import Constraint
 
 
+class APISurfaceAllowRule(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    fqn: str | None = None
+    fqn_prefix: str | None = None
+
+
+class APISurfacePolicy(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    allow_changes: tuple[APISurfaceAllowRule, ...] = Field(default_factory=tuple)
+
+
 class ChangeBlock(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -35,6 +48,7 @@ class TargetSVP(BaseModel):
 
     intent: str
     change: ChangeBlock
+    api_surface: APISurfacePolicy | None = None
     effects: EffectsPolicy | None = None
     constraints: tuple[Constraint, ...] = Field(default_factory=tuple)
 

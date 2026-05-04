@@ -1,5 +1,50 @@
 {
   "$defs": {
+    "APISurfaceAllowRule": {
+      "additionalProperties": false,
+      "properties": {
+        "fqn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fqn"
+        },
+        "fqn_prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fqn Prefix"
+        }
+      },
+      "title": "APISurfaceAllowRule",
+      "type": "object"
+    },
+    "APISurfacePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_changes": {
+          "items": {
+            "$ref": "#/$defs/APISurfaceAllowRule"
+          },
+          "title": "Allow Changes",
+          "type": "array"
+        }
+      },
+      "title": "APISurfacePolicy",
+      "type": "object"
+    },
     "ChangeBlock": {
       "additionalProperties": false,
       "properties": {
@@ -335,6 +380,17 @@
   },
   "additionalProperties": false,
   "properties": {
+    "api_surface": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/APISurfacePolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "change": {
       "$ref": "#/$defs/ChangeBlock"
     },

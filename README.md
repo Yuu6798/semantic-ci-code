@@ -69,6 +69,7 @@ semantic-ci compile --target target.yaml --format human
 - [CLI Usage](docs/cli_usage.md) - subcommands, flags, target discovery, and output formats
 - [Exit Codes](docs/exit_codes.md) - CI-facing exit code contract
 - [JSON Output Schema](docs/json_schema.md) - `schema_version="1"` envelopes
+- [CLI Test Inventory](docs/cli_test_inventory.md) - CLI test coverage map and reduction candidates
 - [Code Semantic CI Design](docs/code_semantic_ci_design.md) - Code Edition v0.1 design spec
 - [AGENTS.md](AGENTS.md) - Claude x Codex task handoff protocol
 - [CLAUDE.md](CLAUDE.md) - repository-level agent operating policy

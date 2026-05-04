@@ -6,7 +6,8 @@ from argparse import Namespace
 from pathlib import Path
 
 from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, INTERNAL_BUG, SUCCESS, USAGE_ERROR
-from semantic_ci_code.cli.output.json_basic import build_observe_payload, dump_json
+from semantic_ci_code.cli.output import dump_json
+from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.pipeline import (
     ExtractorError,
     extract_python_code_state,
@@ -24,7 +25,7 @@ def run_observe(args: Namespace) -> int:
         if args.verbose:
             _stderr(f"observing package_root={root}")
         state = _extract_state(args, root=root)
-        payload = build_observe_payload(state)
+        payload = build_payload("observe", state=state)
         output = dump_json(payload)
         if args.format == "human":
             _stderr(_HUMAN_FALLBACK_WARNING)

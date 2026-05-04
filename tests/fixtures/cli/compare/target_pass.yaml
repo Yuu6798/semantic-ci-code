@@ -1,0 +1,15 @@
+intent: add a public API
+change:
+  primary_kind: feature
+constraints:
+  - id: added_api_present
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_any
+    expected:
+      - fqn: mod.added
+        kind: function
+        signature: |-
+          def added() -> int:
+              ...
+        visibility: public

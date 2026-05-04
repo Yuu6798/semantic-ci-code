@@ -1,0 +1,9 @@
+intent: invalid target
+change:
+  primary_kind: feature
+constraints:
+  - id: invalid_operator
+    kind: delta
+    target: api_surface_delta.added
+    operator: definitely_not_an_operator
+    expected: []

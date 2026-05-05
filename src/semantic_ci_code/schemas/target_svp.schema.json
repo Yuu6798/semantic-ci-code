@@ -45,6 +45,72 @@
       "title": "APISurfacePolicy",
       "type": "object"
     },
+    "Author": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "title": "Identity",
+          "type": "string"
+        },
+        "signature": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signature"
+        }
+      },
+      "required": [
+        "identity"
+      ],
+      "title": "Author",
+      "type": "object"
+    },
+    "Authorship": {
+      "additionalProperties": false,
+      "properties": {
+        "authors": {
+          "items": {
+            "$ref": "#/$defs/Author"
+          },
+          "minItems": 0,
+          "title": "Authors",
+          "type": "array"
+        },
+        "declared_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declared At"
+        },
+        "generation_metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Metadata"
+        }
+      },
+      "title": "Authorship",
+      "type": "object"
+    },
     "ChangeBlock": {
       "additionalProperties": false,
       "properties": {
@@ -384,6 +450,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/APISurfacePolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "authorship": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Authorship"
         },
         {
           "type": "null"

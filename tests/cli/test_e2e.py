@@ -93,7 +93,7 @@ def test_e2e_help_lists_all_subcommands():
     result = run_console(COMPILE, "--help")
 
     assert result.returncode == 0
-    for name in ("observe", "compare", "check", "pre-commit", "compile"):
+    for name in ("observe", "compare", "check", "pre-commit", "compile", "init"):
         assert name in result.stdout
 
 

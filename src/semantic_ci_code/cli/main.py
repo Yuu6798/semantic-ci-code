@@ -9,6 +9,7 @@ from semantic_ci_code.cli.commands.compile import run_compile
 from semantic_ci_code.cli.commands.observe import run_observe
 from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
+from semantic_ci_code.cli.init_command import run_init
 from semantic_ci_code.cli.output.json_formatter import package_version
 
 _ALL_FORMATS = ("json", "human", "sarif", "gh-actions")
@@ -146,6 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     compile_cmd = subcommands.add_parser("compile", help="compile target.yaml without judging")
     compile_cmd.add_argument("--target", default=None, help="Target SVP YAML file")
+    compile_cmd.add_argument("target_path", nargs="?", help="Target SVP YAML file")
     compile_cmd.add_argument("--format", choices=_ALL_FORMATS, default=None)
     compile_cmd.add_argument(
         "--output",
@@ -158,6 +160,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=argparse.SUPPRESS,
         help="disable ANSI color in human output",
     )
+
+    init = subcommands.add_parser("init", help="scaffold a semantic-ci target.yaml")
+    init.add_argument("--path", default=None, help="target.yaml path to create")
+    init.add_argument("--force", action="store_true", help="overwrite an existing file")
 
     return parser
 
@@ -181,6 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_pre_commit(args)
     if args.subcommand == "compile":
         return run_compile(args)
+    if args.subcommand == "init":
+        return run_init(args)
 
     parser.print_help(sys.stderr)
     return USAGE_ERROR

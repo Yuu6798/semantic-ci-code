@@ -71,6 +71,62 @@ def test_sarif_severity_mapping_uses_repair_category():
     assert levels["template:refactor:api_surface_unchanged"] == "error"
 
 
+def test_sarif_maps_soft_and_info_violations_to_warning_and_note():
+    rendered = format_sarif(
+        {
+            "subcommand": "compare",
+            "verdict": "repair",
+            "mode": None,
+            "engine": {"extractor_pyver": "3.11", "package_version": "0.test"},
+            "results": [
+                {
+                    "constraint_id": "user:soft",
+                    "source": "user",
+                    "kind": "delta",
+                    "target": "files_touched",
+                    "operator": "equals",
+                    "severity": "soft",
+                    "unknown_policy": "fail",
+                    "status": "violated",
+                    "error_code": "E_VIOLATION",
+                    "evidence": {},
+                },
+                {
+                    "constraint_id": "user:info",
+                    "source": "user",
+                    "kind": "delta",
+                    "target": "files_touched",
+                    "operator": "equals",
+                    "severity": "info",
+                    "unknown_policy": "fail",
+                    "status": "violated",
+                    "error_code": "E_VIOLATION",
+                    "evidence": {},
+                },
+            ],
+            "repair_plan": {
+                "instructions": [
+                    {
+                        "constraint_id": "user:soft",
+                        "category": "suggested",
+                        "repair_code": "R_USER_VIOLATION",
+                        "message": "soft violation",
+                    },
+                    {
+                        "constraint_id": "user:info",
+                        "category": "info",
+                        "repair_code": "R_USER_VIOLATION",
+                        "message": "info violation",
+                    },
+                ],
+            },
+        }
+    )
+    levels = {item["ruleId"]: item["level"] for item in json.loads(rendered)["runs"][0]["results"]}
+
+    assert levels == {"user:soft": "warning", "user:info": "note"}
+
+
 def test_sarif_location_uses_file_line_evidence_when_present():
     rendered = format_sarif(
         {
@@ -235,4 +291,4 @@ def test_compile_rejects_sarif_format():
 def test_regular_json_payload_schema_version_remains_current():
     data = payload(run_semantic_ci(Path.cwd(), *compare_args(REPAIR_TARGET), "--format", "json"))
 
-    assert data["schema_version"] == "3"
+    assert data["schema_version"] == "4"

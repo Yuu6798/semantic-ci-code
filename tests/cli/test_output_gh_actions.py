@@ -69,6 +69,34 @@ def test_gh_actions_repair_maps_to_warning():
     assert "R_PATH_UNRESOLVED" in result.stdout
 
 
+def test_gh_actions_maps_soft_and_info_to_warning_and_notice():
+    rendered = format_gh_actions(
+        {
+            "repair_plan": {
+                "instructions": [
+                    {
+                        "constraint_id": "user:soft",
+                        "repair_code": "R_USER_VIOLATION",
+                        "category": "suggested",
+                        "message": "soft violation",
+                    },
+                    {
+                        "constraint_id": "user:info",
+                        "repair_code": "R_USER_VIOLATION",
+                        "category": "info",
+                        "message": "info violation",
+                    },
+                ],
+            },
+        }
+    )
+
+    assert rendered.splitlines() == [
+        "::warning::R_USER_VIOLATION user:soft: soft violation",
+        "::notice::R_USER_VIOLATION user:info: info violation",
+    ]
+
+
 def test_gh_actions_escapes_message_and_properties():
     rendered = format_gh_actions(
         {

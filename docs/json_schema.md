@@ -1,7 +1,7 @@
 # Semantic CI JSON Output Schema
 
 Semantic CI CLI output is JSON by default in non-TTY contexts and when
-`--output` is used. The current schema version is `"3"`.
+`--output` is used. The current schema version is `"4"`.
 
 The CLI has two envelopes:
 
@@ -21,13 +21,18 @@ bump beyond the current CLI schema version.
 
 ```jsonc
 {
-  "schema_version": "3",
+  "schema_version": "4",
   "subcommand": "check",
   "mode": "full",
   "verdict": "pass",
   "intent": "add user profile endpoint",
   "primary_kind": "feature",
   "allowed_secondary_kinds": [],
+  "target_authorship": {
+    "authors": [{"identity": "alice@example.com", "signature": null}],
+    "declared_at": "2026-05-05T12:00:00Z",
+    "generation_metadata": {"tool": "codex"}
+  },
   "summary": {
     "fix_required": 0,
     "suggested": 0,
@@ -57,13 +62,14 @@ bump beyond the current CLI schema version.
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | CLI JSON schema version. Currently `"3"`. |
+| `schema_version` | CLI JSON schema version. Currently `"4"`. |
 | `subcommand` | One of `observe`, `compare`, `check`, `pre-commit`. |
 | `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
 | `intent` | Target intent, or `null` for `observe`. |
 | `primary_kind` | Target primary change kind, or `null` for `observe`. |
 | `allowed_secondary_kinds` | Target secondary change kinds. Empty for `observe`. |
+| `target_authorship` | Target authorship metadata, or `null` when omitted or for `observe`. Semantic CI reports this metadata but does not validate signatures in P1. |
 | `summary` | Counts by repair category plus satisfied and skipped constraints. `null` for `observe`. |
 | `results` | Serialized evaluator `ConstraintResult` entries in evaluation order. |
 | `repair_plan` | Serialized repair plan, or `null` for `observe`. |
@@ -80,13 +86,18 @@ compute a verdict.
 
 ```jsonc
 {
-  "schema_version": "3",
+  "schema_version": "4",
   "subcommand": "compile",
   "compiled_target": {
     "intent": "verify refactor target",
     "primary_kind": "refactor",
     "allowed_secondary_kinds": [],
     "scope": [],
+    "authorship": {
+      "authors": [{"identity": "alice@example.com", "signature": null}],
+      "declared_at": "2026-05-05T12:00:00Z",
+      "generation_metadata": {"tool": "codex"}
+    },
     "api_surface_policy": {
       "allow_changes": [
         {"fqn": "git_helpers.run_semantic_ci", "fqn_prefix": null},
@@ -131,6 +142,9 @@ compute a verdict.
 `compiled_target.constraints` preserves compiler order: template constraints
 first, then user constraints in YAML order.
 
+`compiled_target.authorship` mirrors optional target authorship metadata. It is
+`null` when the target file omits `authorship`.
+
 `compiled_target.api_surface_policy.allow_changes` and
 `compiled_target.effects_policy.allow_new` are deterministic allow lists used by
 built-in template constraints only. User constraints still observe the original
@@ -152,6 +166,7 @@ may use the same version when they are explicitly keyed by `subcommand`.
 | `2` | verdict | Added `summary.skipped` for constraints skipped by partial extraction modes. |
 | `2` | verdict | Clarified that `results[].status == "skipped"` can mean a smoke-mode partial CodeState skipped that constraint's target dimension. |
 | `3` | verdict, compile | Added top-level `cache` stats and aligned both envelopes on schema version `"3"`. |
+| `4` | verdict, compile | Added `target_authorship` to verdict envelopes and `compiled_target.authorship` to compile envelopes. |
 
 ## v2 to v3 Diff
 
@@ -162,3 +177,14 @@ may use the same version when they are explicitly keyed by `subcommand`.
   CodeState cache.
 - Migration: consumers reading v2 can treat a missing `cache` field as
   `{hit: 0, miss: 0, invalid: 0, write_failed: 0, disabled: true}`.
+
+## v3 to v4 Diff
+
+- Added `target_authorship` to verdict envelopes. Shape:
+  `{authors: [{identity: str, signature: str|null}], declared_at: str|null,
+  generation_metadata: object|null}` or `null`.
+- Added `compiled_target.authorship` to compile envelopes with the same shape.
+- Semantic CI only unmarshals and reports authorship metadata in v4. Signature
+  verification, author-count policy, and AI generation detection are deferred to
+  opt-in constraints in a later brief.
+- Migration: consumers reading v3 can treat missing authorship fields as `null`.

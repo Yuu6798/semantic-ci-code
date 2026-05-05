@@ -602,7 +602,7 @@ def test_non_cache_subcommands_emit_disabled_cache_stats(tmp_path: Path):
 
     for result in (compare, observe, compile_result, pre_commit):
         assert result.returncode == 0
-        assert payload(result)["schema_version"] == "3"
+        assert payload(result)["schema_version"] == "4"
         assert payload(result)["cache"] == {
             "hit": 0,
             "miss": 0,

@@ -24,7 +24,9 @@ def run_compile(args: Namespace) -> int:
     try:
         if args.format in {"sarif", "gh-actions"}:
             raise ValueError(f"{args.format} format is not supported for compile")
-        target_path = discover_target(args.target, cwd=Path.cwd())
+        if args.target is not None and args.target_path is not None:
+            raise ValueError("pass target either positionally or with --target, not both")
+        target_path = discover_target(args.target or args.target_path, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
         payload = build_compile_payload(compiled)
         output = _render_payload(

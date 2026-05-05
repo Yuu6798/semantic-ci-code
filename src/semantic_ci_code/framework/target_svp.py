@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,11 +44,27 @@ class EffectsPolicy(BaseModel):
     allow_new: tuple[EffectAllowRule, ...] = Field(default_factory=tuple)
 
 
+class Author(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    identity: str
+    signature: str | None = None
+
+
+class Authorship(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    authors: tuple[Author, ...] = Field(default_factory=tuple, min_length=0)
+    declared_at: str | None = None
+    generation_metadata: dict[str, Any] | None = None
+
+
 class TargetSVP(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     intent: str
     change: ChangeBlock
+    authorship: Authorship | None = None
     api_surface: APISurfacePolicy | None = None
     effects: EffectsPolicy | None = None
     constraints: tuple[Constraint, ...] = Field(default_factory=tuple)

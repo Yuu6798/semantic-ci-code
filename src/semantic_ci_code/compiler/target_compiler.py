@@ -39,6 +39,8 @@ from semantic_ci_code.framework.target_svp import TargetSVP, parse_target_svp_ya
 __all__ = [
     "CompileError",
     "CompiledAPISurfaceAllowRule",
+    "CompiledAuthor",
+    "CompiledAuthorship",
     "CompiledConstraint",
     "CompiledEffectAllowRule",
     "CompiledTarget",
@@ -97,6 +99,28 @@ class CompiledEffectAllowRule:
 
 
 @dataclass(frozen=True)
+class CompiledAuthor:
+    identity: str
+    signature: str | None = None
+
+
+@dataclass(frozen=True)
+class CompiledAuthorship:
+    authors: tuple[CompiledAuthor, ...]
+    declared_at: str | None = None
+    generation_metadata: JsonValue = None
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.authors,
+                self.declared_at,
+                _hashable_json(self.generation_metadata),
+            )
+        )
+
+
+@dataclass(frozen=True)
 class CompiledTarget:
     intent: str
     primary_kind: ChangeKind
@@ -105,6 +129,7 @@ class CompiledTarget:
     constraints: tuple[CompiledConstraint, ...]
     api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...] = ()
     effect_allow_new: tuple[CompiledEffectAllowRule, ...] = ()
+    authorship: CompiledAuthorship | None = None
 
 
 @dataclass(init=False)
@@ -188,6 +213,7 @@ def compile_target_svp(
         constraints=constraints,
         api_surface_allow_changes=_compile_api_surface_allow_changes(target_svp),
         effect_allow_new=_compile_effect_allow_new(target_svp),
+        authorship=_compile_authorship(target_svp),
     )
 
 
@@ -209,9 +235,6 @@ def _parse_target_svp(yaml_source: str, *, filename: str) -> TargetSVP:
 
 
 def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None:
-    if target_svp.intent == "":
-        raise CompileError(message="intent must not be empty.", filename=filename, path="intent")
-
     for index, constraint in enumerate(target_svp.constraints):
         if constraint.target == "":
             raise CompileError(
@@ -279,6 +302,19 @@ def _compile_effect_allow_new(target_svp: TargetSVP) -> tuple[CompiledEffectAllo
     return tuple(
         CompiledEffectAllowRule(fqn=rule.fqn, effect_class=rule.effect_class)
         for rule in target_svp.effects.allow_new
+    )
+
+
+def _compile_authorship(target_svp: TargetSVP) -> CompiledAuthorship | None:
+    if target_svp.authorship is None:
+        return None
+    return CompiledAuthorship(
+        authors=tuple(
+            CompiledAuthor(identity=author.identity, signature=author.signature)
+            for author in target_svp.authorship.authors
+        ),
+        declared_at=target_svp.authorship.declared_at,
+        generation_metadata=target_svp.authorship.generation_metadata,
     )
 
 

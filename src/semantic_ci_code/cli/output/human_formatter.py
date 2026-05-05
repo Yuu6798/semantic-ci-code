@@ -26,6 +26,8 @@ _VERDICT_COLOR = {
 
 def format_human(payload: dict[str, Any], *, use_color: bool) -> str:
     lines: list[str] = []
+    if payload.get("mode") == "smoke":
+        lines.append("[smoke mode] partial CodeState (api_surface, imports, effects only)")
     lines.append(f"Intent: {payload.get('intent') or '-'}")
     lines.append(f"Primary kind: {payload.get('primary_kind') or '-'}")
     lines.append("")
@@ -77,16 +79,24 @@ def _verdict_line(payload: dict[str, Any], *, use_color: bool) -> str:
         f"{summary['suggested']} suggested, "
         f"{summary['info']} info, "
         f"{summary['unresolved']} unresolved, "
-        f"{summary['satisfied']} satisfied)"
+        f"{summary['satisfied']} satisfied, "
+        f"{summary.get('skipped', 0)} skipped)"
     )
     return colored(text, _VERDICT_COLOR.get(payload["verdict"], "gray"), enabled=use_color)
 
 
 def _instruction_lines(item: dict[str, Any], *, use_color: bool) -> list[str]:
-    label = _CATEGORY_LABEL[item["category"]]
-    header = f"[{label}] {item['repair_code']}  {item['constraint_id']}"
+    if item["status"] == "skipped":
+        header = f"[SKIPPED] {item['repair_code']}  {item['constraint_id']}"
+        if not use_color:
+            header = f"~ {header}"
+        color = "gray"
+    else:
+        label = _CATEGORY_LABEL[item["category"]]
+        header = f"[{label}] {item['repair_code']}  {item['constraint_id']}"
+        color = _CATEGORY_COLOR[item["category"]]
     return [
-        colored(header, _CATEGORY_COLOR[item["category"]], enabled=use_color),
+        colored(header, color, enabled=use_color),
         f"  target:    {item['target']}",
         f"  operator:  {item['operator']}",
         f"  message:   {item['message']}",

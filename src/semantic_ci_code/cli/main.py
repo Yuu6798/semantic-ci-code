@@ -74,6 +74,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="write output to this file instead of stdout",
     )
     check.add_argument("--strict-repair", action="store_true")
+    check.add_argument(
+        "--mode",
+        choices=("smoke", "full"),
+        default=None,
+        help="execution mode; defaults to SEMANTIC_CI_MODE or full",
+    )
     check.add_argument("--no-fetch", action="store_true")
     check.add_argument("--allow-dirty", action="store_true")
     check.add_argument(
@@ -100,6 +106,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="write output to this file instead of stdout",
     )
     pre_commit.add_argument("--strict-repair", action="store_true")
+    pre_commit.add_argument(
+        "--mode",
+        choices=("smoke", "full"),
+        default=None,
+        help="execution mode; defaults to SEMANTIC_CI_MODE or full",
+    )
     pre_commit.add_argument(
         "--no-color",
         action="store_true",

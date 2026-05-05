@@ -70,6 +70,18 @@ Color is enabled only for human output when stdout is a TTY. `--no-color` and
 `NO_COLOR` disable color. `FORCE_COLOR` enables color for non-TTY output unless
 `--no-color` or `NO_COLOR` is set.
 
+## Execution Modes
+
+`check` and `pre-commit` accept `--mode {smoke,full}`. `full` is the default
+and preserves the existing behavior. `smoke` is a faster partial run that
+extracts only `api_surface`, `imports`, and `effects`; constraints that target
+unextracted dimensions are reported as `skipped` and do not affect the verdict.
+
+If `--mode` is omitted, `SEMANTIC_CI_MODE=smoke|full` can override the default.
+An explicit `--mode` flag always wins over the environment. Cache support
+(worktree reuse and extractor memoization) is intentionally deferred to
+CSCI-26 and later.
+
 ## `semantic-ci observe`
 
 ```text
@@ -116,6 +128,7 @@ semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--target <yaml>] [--package-root <repo-relative-dir>]
                   [--format {json,human}] [--output <file>]
                   [--strict-repair] [--no-fetch] [--allow-dirty]
+                  [--mode {smoke,full}]
 ```
 
 Compares git refs using temporary detached worktrees. Defaults are:
@@ -133,6 +146,7 @@ Examples:
 semantic-ci check
 semantic-ci check --baseline-rev origin/main --candidate-rev HEAD --target target.yaml
 semantic-ci check --allow-dirty --package-root src/semantic_ci_code
+semantic-ci check --mode smoke
 ```
 
 ## `semantic-ci pre-commit`
@@ -140,7 +154,7 @@ semantic-ci check --allow-dirty --package-root src/semantic_ci_code
 ```text
 semantic-ci pre-commit [--target <yaml>] [--package-root <repo-relative-dir>]
                        [--format {json,human}] [--output <file>]
-                       [--strict-repair]
+                       [--strict-repair] [--mode {smoke,full}]
 ```
 
 Compares `HEAD` against the staged index. The staged index is exported with
@@ -152,6 +166,7 @@ Examples:
 ```bash
 semantic-ci pre-commit --target target.yaml
 semantic-ci pre-commit --strict-repair
+semantic-ci pre-commit --mode smoke
 ```
 
 ## `semantic-ci compile`

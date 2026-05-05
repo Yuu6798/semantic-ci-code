@@ -15,7 +15,7 @@ from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 PACKAGE_NAME = "semantic-ci-code"
 UNKNOWN_VERSION = "0.0.0+unknown"
 
@@ -36,10 +36,12 @@ def build_payload(
     repair_plan: RepairPlan | None = None,
     files_touched: int = 0,
     loc_delta: LocDelta | None = None,
+    mode: str | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "subcommand": subcommand,
+        "mode": mode,
         "verdict": verdict.result.value if verdict is not None else None,
         "intent": compiled.intent if compiled is not None else None,
         "primary_kind": compiled.primary_kind.value if compiled is not None else None,
@@ -112,8 +114,14 @@ def _summary(verdict: Verdict, repair_plan: RepairPlan | None) -> dict[str, int]
         ),
         "suggested": sum(1 for item in instructions if item.category is RepairCategory.SUGGESTED),
         "info": sum(1 for item in instructions if item.category is RepairCategory.INFO),
-        "unresolved": sum(1 for item in instructions if item.category is RepairCategory.UNRESOLVED),
+        "unresolved": sum(
+            1
+            for item in instructions
+            if item.category is RepairCategory.UNRESOLVED
+            and item.status is not ResultStatus.SKIPPED
+        ),
         "satisfied": sum(1 for item in verdict.results if item.status is ResultStatus.SATISFIED),
+        "skipped": sum(1 for item in verdict.results if item.status is ResultStatus.SKIPPED),
     }
 
 

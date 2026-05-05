@@ -20,6 +20,9 @@ parsing output text.
 
 `compare`, `check`, and `pre-commit` map PASS/REPAIR/FAIL through the table
 above. `--strict-repair` changes only REPAIR from exit 0 to exit 1.
+`check --mode smoke` and `pre-commit --mode smoke` use the same exit-code
+policy; skipped constraints are reported in output but do not contribute to
+PASS, REPAIR, or FAIL.
 
 `compile` does not compute a verdict. Successful compilation exits 0. Target
 discovery errors exit 2. Compile errors exit 3.

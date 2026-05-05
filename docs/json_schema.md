@@ -1,7 +1,7 @@
 # Semantic CI JSON Output Schema
 
 Semantic CI CLI output is JSON by default in non-TTY contexts and when
-`--output` is used. The current schema version is `"1"`.
+`--output` is used. The current schema version is `"2"`.
 
 The CLI has two envelopes:
 
@@ -15,8 +15,9 @@ rendered with two-space indentation.
 
 ```jsonc
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "subcommand": "check",
+  "mode": "full",
   "verdict": "pass",
   "intent": "add user profile endpoint",
   "primary_kind": "feature",
@@ -26,7 +27,8 @@ rendered with two-space indentation.
     "suggested": 0,
     "info": 0,
     "unresolved": 0,
-    "satisfied": 2
+    "satisfied": 2,
+    "skipped": 0
   },
   "results": [],
   "repair_plan": {"result": "pass", "instructions": []},
@@ -42,13 +44,14 @@ rendered with two-space indentation.
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | CLI JSON schema version. Currently `"1"`. |
+| `schema_version` | CLI JSON schema version. Currently `"2"`. |
 | `subcommand` | One of `observe`, `compare`, `check`, `pre-commit`. |
+| `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
 | `intent` | Target intent, or `null` for `observe`. |
 | `primary_kind` | Target primary change kind, or `null` for `observe`. |
 | `allowed_secondary_kinds` | Target secondary change kinds. Empty for `observe`. |
-| `summary` | Counts by repair category plus satisfied constraints. `null` for `observe`. |
+| `summary` | Counts by repair category plus satisfied and skipped constraints. `null` for `observe`. |
 | `results` | Serialized evaluator `ConstraintResult` entries in evaluation order. |
 | `repair_plan` | Serialized repair plan, or `null` for `observe`. |
 | `code_state` | Full `CodeState` dump for `observe`; otherwise `null`. |
@@ -63,7 +66,7 @@ compute a verdict.
 
 ```jsonc
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "subcommand": "compile",
   "compiled_target": {
     "intent": "verify refactor target",
@@ -118,3 +121,12 @@ Within a given envelope, removing fields, renaming fields, or changing field
 meaning requires a schema version bump. Adding a new top-level field to an
 existing envelope also requires a bump. Separate envelopes, such as `compile`,
 may use the same version when they are explicitly keyed by `subcommand`.
+
+## Version History
+
+| Version | Envelope | Change |
+|---|---|---|
+| `1` | verdict | Initial Brief 4 JSON envelope. |
+| `2` | verdict | Added top-level `mode` for execution mode reporting. |
+| `2` | verdict | Added `summary.skipped` for constraints skipped by partial extraction modes. |
+| `2` | verdict | Clarified that `results[].status == "skipped"` can mean a smoke-mode partial CodeState skipped that constraint's target dimension. |

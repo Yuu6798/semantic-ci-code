@@ -307,6 +307,12 @@ def _message(result: ConstraintResult, repair_code: str) -> str:
             f"operator={result.operator.value}, kind={result.kind.value}."
         )
 
+    if result.error_code == "E_DIMENSION_SKIPPED":
+        return (
+            f"{result.constraint_id}: skipped because execution mode did not "
+            f"extract this target dimension; target={result.target}."
+        )
+
     return f"{result.constraint_id}: unrecognized error_code={result.error_code}."
 
 

@@ -20,6 +20,15 @@ Scope guard:
 The product exists to catch intent drift in generated or manually edited pull
 requests while remaining deterministic and auditable.
 
+## Current Status (snapshot)
+
+- **Phase**: P1 (Python Static Semantic CI MVP) — Exit criteria 達成済み(Brief 1〜4 / CSCI-1〜19 merged、`semantic-ci` CLI 5 subcommand release 可能)
+- **Next**: Brief 5 planning(P2 / P2.5 入口)。`docs/brief_4_planning.md §10` の Open Questions 16 件棚卸しが先行作業
+- **Frontloaded**(`design.md §21 / §22`): Vibe Coding Adapter / Repair Compiler を P5 → **P2.5** へ、TypeScript extractor を P3b → **P2.5 並列** へ
+- **Hot-fix candidate**: effects slice extractor の `fqn` semantics 修正(P1 内で完結、`.claude/memory/2026-05-05.md` Session 2 に詳細)
+
+詳細: phase 定義は `docs/code_semantic_ci_design.md §12`、Brief 進捗は同 `§25`、直近の決定経緯は `.claude/memory/_index.md`。
+
 ## Tech Stack
 
 - Language: Python 3.11+

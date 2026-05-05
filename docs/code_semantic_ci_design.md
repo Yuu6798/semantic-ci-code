@@ -619,7 +619,11 @@ svp-rpe-code/
 
 ## 12. フェーズ計画
 
-### P1: Python Static Semantic CI MVP（3–4 週）
+> **現在地(2026-05 時点)**: P1 完走間近(Brief 1〜4 merged、Exit criteria 達成済み)。Brief 5 planning に向けて P2 / P2.5 の入口段階。Brief 進捗の詳細は §25 参照。
+>
+> **§21 / §22 による前倒し反映**: Generator Adapter(元 P5)と Repair Compiler は **P2.5** に、TypeScript extractor(元 P3b)は **P2.5 並列** に移動済み。本節の元計画と §21/§22 で記述が分かれている箇所は §21/§22 が優先。
+
+### P1: Python Static Semantic CI MVP（3–4 週） ✓ 完走間近
 
 - Python のみ
 - 静的特徴のみ（coverage は除外）
@@ -638,7 +642,9 @@ svp-rpe-code/
 
 **Exit criteria**: fixtures 全件で verdict 安定 + 決定論テスト pass + hash trail が再現可能
 
-### P2: Python Repair Core Completion（3–4 週）
+**Status**: Brief 1(schema)/ Brief 2(extractor 6 次元)/ Brief 3(pipeline)/ Brief 4(CLI 5 subcommand)が CSCI-1〜19 として merged。`semantic-ci` CLI release 可能状態。残務として extractor 系の hot-fix 候補(effects slice の `fqn` semantics 修正、§7.3 の Level 2/3 拡張は P2 予定どおり)あり。
+
+### P2: Python Repair Core Completion（3–4 週） ⏭ 次フェーズ
 
 - effect_db 拡張（resolution Level 2 / 一部 3）
 - 部分 CFG / 簡易 data flow
@@ -646,6 +652,15 @@ svp-rpe-code/
 - `reduce` / `defer` / `lock` の完全実装
 - Markdown レポート
 - snapshot tests（fixture diff の自動検出）
+
+### P2.5: Vibe Coding Adapter + Repair Compiler + TS extractor 並列（§21 / §22 で前倒し）
+
+§12 元計画(P5 / P3b)から **P2.5 へ前倒し**された統合 phase。詳細は §21・§22。
+
+- **Generator Adapter**(§21.3): Claude Code / Cursor / Codex / v0 / Lovable / Bolt 等の AI 生成ツール統合
+- **Repair Compiler**(§21.4 / §9.3): Repair SVP → generator-specific prompt の compiler
+- **TypeScript extractor 着手**(§22.2): P3b から並列前倒し
+- **Pre-generation validation 専用 entry point**(候補): `semantic-ci validate-plan` 等(`docs/pre_generation_validation_case.md` 残された問い #4)
 
 ### P3a: GitHub Action 配布（Python only）（2–3 週）
 
@@ -669,7 +684,9 @@ empirical alignment データ収集を急ぐため、TypeScript 対応より先�
 - artifact upload
 - exit code policy の本番運用
 
-### P5: Generator Adapter
+### P5: Generator Adapter → §21.1 で **P2.5 に前倒し済み**(本 phase は実質空席)
+
+元計画では最終フェーズだったが、vibe coding ツールの普及加速を受けて中身が P2.5 に移動。履歴として残す。
 
 - `Repair SVP` → generator-specific prompt patch の compiler
 - Codex / Claude Code adapter
@@ -1110,16 +1127,19 @@ generic comparator として設計することの帰結:
 
 ## 25. 次のアクション
 
-本設計を Codex 実装に落とすため、以下の順で Task Brief を発行する:
+本設計を Codex 実装に落とすため、以下の順で Task Brief を発行する。
 
-| Brief | 範囲 | 想定 PR |
-|---|---|---|
-| **Brief 1** | schema 定義（`CodeState` / `CodeStateDelta` / `Constraint` 型 / `Target SVP` DSL JSON Schema） | `codex/code-semantic-ci-schema` |
-| **Brief 2** | extractor 実装（Python のみ、6 次元） | `codex/code-semantic-ci-py-extractors` |
-| **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` |
-| **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` |
-| **Brief 5** | spec authorship attribution（§17）+ performance budget（§18）| `codex/code-semantic-ci-attribution-perf` |
-| **Brief 6** | spec quality metrics（§19）+ suite packaging（§20）| `codex/code-semantic-ci-quality-suite` |
-| **Brief 7** | vibe coding adapter / Repair Compiler 前倒し（§21）+ TS extractor 前倒し（§22）| `codex/code-semantic-ci-adapter-ts` |
+> **注**: Brief 5 以降の中身は §21 / §22 の P2.5 前倒しを受けて再調整中。下表の Brief 5〜7 は元計画(spec authorship 系を先行する案)で、現行運用案(`init` / Vibe Coding Adapter / Repair Compiler を Brief 5 として優先)は `docs/brief_4_planning.md §11` 参照。**Brief 5 起草時に下表を更新する**。
+
+| Brief | 範囲 | 想定 PR | Status |
+|---|---|---|---|
+| **Brief 1** | schema 定義（`CodeState` / `CodeStateDelta` / `Constraint` 型 / `Target SVP` DSL JSON Schema） | `codex/code-semantic-ci-schema` | merged |
+| **Brief 2** | extractor 実装（Python のみ、6 次元） | `codex/code-semantic-ci-py-extractors` | merged (CSCI-5〜9) |
+| **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` | merged (CSCI-10〜14、`brief_3_planning.md` archived) |
+| **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` | merged (CSCI-15〜19、`brief_4_planning.md` 完結) |
+| **Brief 4b** | SARIF 出力 + GitHub Actions annotation | `codex/code-semantic-ci-sarif` | pending(`brief_4_planning.md §11` 参照) |
+| **Brief 5** | (元計画) spec authorship attribution（§17）+ performance budget（§18）<br>(現行運用案) `semantic-ci init` / Vibe Coding Adapter / Repair Compiler 前倒し(§21) | `codex/code-semantic-ci-attribution-perf` | **planning(再調整中)** |
+| **Brief 6** | spec quality metrics（§19）+ suite packaging（§20）| `codex/code-semantic-ci-quality-suite` | pending |
+| **Brief 7** | vibe coding adapter / Repair Compiler 前倒し（§21）+ TS extractor 前倒し（§22）| `codex/code-semantic-ci-adapter-ts` | pending(中身は Brief 5 現行案と重複、再分割対象) |
 
 各 Brief 完了ごとに Claude が Completion Summary を review し、次 Brief を発行する。

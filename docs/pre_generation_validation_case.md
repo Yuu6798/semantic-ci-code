@@ -6,42 +6,44 @@
 
 `code_semantic_ci_design.md` §23.1 は engine の入力 contract を「`baseline_state` / `candidate_state` は実コード抽出 / 仮想 / mock のいずれも可」と規定している。同 §23.4 は含意として「§21.2 pre-generation validation が core engine 機能として直接成立」と述べる。
 
-これらは設計上の主張だが、外部コードベース上で実装が意図通り動くかは検証されていなかった。本観測は外部 Python リポジトリ（kyegomez/OpenMythos `main`）に対して、本実装を伴わない stub のみの candidate を engine に渡し、判定が想定通りに分離するかを 3 ケースで確かめた記録である。
+これらは設計上の主張だが、実装が意図通り動くかは個別検証が要る。本観測は本実装を伴わない stub のみの candidate を engine に渡し、判定が想定通りに分離するかを 3 ケースで確かめた記録である。
+
+実験は repo 同梱の合成 baseline（`experiments/pre_generation_validation/baseline/tinypkg/`、~25 行）で実施し、`tempfile.TemporaryDirectory` 上に case ごとの candidate を展開する形をとる。外部 network・外部 repo・stdlib 外の依存なしで再現可能。
 
 ## 実験設定
 
-- baseline: OpenMythos `main` (pristine), `/tmp/openmythos-experiment/baseline/`
-- intent: feature 追加（`checkpoint.save_checkpoint` と `checkpoint.load_checkpoint` を user 制約として要求）
-- candidate: OpenMythos に新規 stub ファイル `open_mythos/checkpoint.py` を追加した tree。stub の本体はすべて `raise NotImplementedError("pre-generation stub")`
+- baseline: `experiments/pre_generation_validation/baseline/tinypkg/` (Counter クラス + public method 2 つ)
+- intent: feature 追加（`persistence.save_counter` と `persistence.load_counter` を user 制約として要求）
+- candidate: tinypkg に新規 stub ファイル `tinypkg/persistence.py` を追加した tree。stub の本体はすべて `raise NotImplementedError("pre-generation stub")`
 - engine: `semantic-ci compare`（追加実装なし、現行 CLI 経路のみ）
 
 ケース構成:
 
 | ケース | 予測 stub | 既存コードへの変更 |
 |---|---|---|
-| F1_pass | `save_checkpoint` + `load_checkpoint` 両方を declare | なし |
-| F2_missing | `save_checkpoint` のみ declare | なし |
-| F3_collateral | `save_checkpoint` + `load_checkpoint` 両方を declare | `LTIInjection.get_A` を `_compute_A` に privatize |
+| F1_pass | `save_counter` + `load_counter` 両方を declare | なし |
+| F2_missing | `save_counter` のみ declare | なし |
+| F3_collateral | `save_counter` + `load_counter` 両方を declare | `Counter.increment` を `_bump` に privatize |
 
 ## 観測された判定
 
 | ケース | 期待 | verdict | 違反した制約 |
 |---|---|---|---|
 | F1_pass | pass | pass ✓ | (4 制約全 satisfied) |
-| F2_missing | fail | fail ✓ | user: `load_checkpoint_added` |
+| F2_missing | fail | fail ✓ | user: `load_counter_added` |
 | F3_collateral | fail | fail ✓ | template: `feature:no_removed_api` |
 
-3/3 が期待 verdict と一致。各判定は 1 秒未満（0.48〜0.50s）。
+3/3 が期待 verdict と一致。
 
 ## 含意
 
 ### 1. §23.1 入力 contract が実装で動作することの直接証明
 
-candidate ディレクトリ内の `checkpoint.py` は本体を一切持たない stub のみだが、extractor は signature を抽出し、engine は CodeState を生成して制約評価を行った。state の出自を engine が問わない設計が、CLI 経路を含めて end-to-end で機能することが確認された。
+candidate ディレクトリ内の `persistence.py` は本体を一切持たない stub のみだが、extractor は signature を抽出し、engine は CodeState を生成して制約評価を行った。state の出自を engine が問わない設計が、CLI 経路を含めて end-to-end で機能することが確認された。
 
 ### 2. 二系統制約の同時動作
 
-`primary_kind: feature` から自動展開される template 制約（`no_removed_api`, `no_new_effects`）と、target.yaml に明示された user 制約（`save_checkpoint_added`, `load_checkpoint_added`）が、同一 verdict 計算内で独立して評価された。F2 は user 制約のみ違反、F3 は template 制約のみ違反というパターンを分離して捕捉できている。これは §4.2「change_kind は制約テンプレート展開器」の機能仕様の動作確認にあたる。
+`primary_kind: feature` から自動展開される template 制約（`no_removed_api`, `no_new_effects`）と、target.yaml に明示された user 制約（`save_counter_added`, `load_counter_added`）が、同一 verdict 計算内で独立して評価された。F2 は user 制約のみ違反、F3 は template 制約のみ違反というパターンを分離して捕捉できている。これは §4.2「change_kind は制約テンプレート展開器」の機能仕様の動作確認にあたる。
 
 ### 3. omission と commission の分離報告
 
@@ -54,7 +56,7 @@ repair plan の構造がこの区別を保持するため、計画修正の方�
 
 ### 4. コスト構造の含意
 
-実装着手前の検証コストは < 1 秒（extractor + engine）。生成→テスト→指摘→再生成の往復に対する **予防コスト**としての非対称性が定量例として残った。
+実装着手前の検証コストは extractor + engine 1 回分のみ。生成→テスト→指摘→再生成の往復に対する **予防コスト**としての非対称性が定量例として残った。
 
 ## Scope Guard
 
@@ -78,16 +80,21 @@ repair plan の構造がこの区別を保持するため、計画修正の方�
 
 ## 再現
 
-実験スクリプトとケースデータは隔離環境（`/tmp/openmythos-experiment/`）に保管。リポジトリ本体には影響しない。
+repo 同梱のスクリプトで完全再現可能。clean checkout から:
 
 ```bash
-# baseline = pristine OpenMythos main を /tmp/openmythos-experiment/baseline/ に展開済み
-python /tmp/openmythos-experiment/run_pregen.py
-# 期待出力: 3/3 verdicts matched expectation
+pip install -e ".[dev]"
+python experiments/pre_generation_validation/run.py
 ```
 
-ケースは `cases_pregen/F{1,2,3}_*/candidate/` に毎回 fresh build される（冪等）。
+期待出力:
+
+```
+3/3 verdicts matched expectation
+```
+
+exit code: 3/3 一致時 `0`、それ以外 `1`。詳細は [`experiments/pre_generation_validation/README.md`](../experiments/pre_generation_validation/README.md) を参照。
 
 ## 出典
 
-本観測は 2026-05-05 の壁打ちセッション中に実行された。本文書は事後の整理であり、実験記録ではない（実行ログ全文・stub ソース・verdict.json は本文書に収録せず、再現スクリプトのみで再生可能とする）。
+本観測は 2026-05-05 の壁打ちセッション中に実行された。当初は外部 Python リポジトリ（kyegomez/OpenMythos `main`）上で同一構造の 3 ケースを試し 3/3 一致を得た。本リポジトリへの収録にあたって、外部依存と再現性のトレードオフを解消するため、合成 baseline (`tinypkg`) に置き換え同等の判定分離が成立することを確認している。本文書は事後の整理であり、生のログではない（実行ログ全文・stub ソース・verdict.json は本文書に収録せず、再現スクリプトのみで再生可能とする）。

@@ -755,6 +755,41 @@ def outer():
     assert entries[0].evidence["resolved_call"] == "print"
 
 
+def test_function_definition_time_calls_use_parent_scope():
+    source = """
+@print("decorator")
+def run(path=open("cfg")):
+    open(path)
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert [
+        (entry.evidence["line"], entry.fqn, entry.evidence["resolved_call"]) for entry in entries
+    ] == [
+        (1, "<module>", "print"),
+        (2, "<module>", "open"),
+        (3, "run", "open"),
+    ]
+
+
+def test_nested_function_defaults_use_enclosing_function_scope():
+    source = """
+def outer():
+    def inner(path=open("cfg")):
+        print("inner")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert [
+        (entry.evidence["line"], entry.fqn, entry.evidence["resolved_call"]) for entry in entries
+    ] == [
+        (2, "outer", "open"),
+        (3, "outer.inner", "print"),
+    ]
+
+
 def test_call_effects_can_be_grouped_by_enclosing_fqn():
     source = """
 def alpha():

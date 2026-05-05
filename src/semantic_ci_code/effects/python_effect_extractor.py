@@ -280,18 +280,29 @@ class _CallEffectVisitor(ast.NodeVisitor):
         self.entries: list[EffectEntry] = []
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._visit_named_scope(node.name, node)
+        self._visit_function_definition_context(node)
+        self._visit_named_body_scope(node.name, node.body)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._visit_named_scope(node.name, node)
+        self._visit_function_definition_context(node)
+        self._visit_named_body_scope(node.name, node.body)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        self._visit_named_scope(node.name, node)
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for base in node.bases:
+            self.visit(base)
+        for keyword in node.keywords:
+            self.visit(keyword)
+        for type_param in getattr(node, "type_params", ()):
+            self.visit(type_param)
+        self._visit_named_body_scope(node.name, node.body)
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
+        self.visit(node.args)
         self._scope_stack.append("<lambda>")
         try:
-            self.generic_visit(node)
+            self.visit(node.body)
         finally:
             self._scope_stack.pop()
 
@@ -317,10 +328,23 @@ class _CallEffectVisitor(ast.NodeVisitor):
                 )
         self.generic_visit(node)
 
-    def _visit_named_scope(self, name: str, node: ast.AST) -> None:
+    def _visit_function_definition_context(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        self.visit(node.args)
+        if node.returns is not None:
+            self.visit(node.returns)
+        for type_param in getattr(node, "type_params", ()):
+            self.visit(type_param)
+
+    def _visit_named_body_scope(self, name: str, body: list[ast.stmt]) -> None:
         self._scope_stack.append(name)
         try:
-            self.generic_visit(node)
+            for stmt in body:
+                self.visit(stmt)
         finally:
             self._scope_stack.pop()
 

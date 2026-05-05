@@ -59,12 +59,20 @@ accepts exact effect FQNs and/or effect classes for feature and bugfix templates
 
 ## Output Format
 
-`--format json|human` overrides all defaults. Without an explicit format:
+`--format json|human|sarif|gh-actions` overrides all defaults where supported.
+Without an explicit format:
 
 - `observe` defaults to JSON.
 - `compare`, `check`, `pre-commit`, and `compile` use human output on a TTY and
   JSON when piped, redirected, or written with `--output`.
 - `--output <file>` defaults to JSON.
+
+`sarif` and `gh-actions` are CI integration formats for verdict-producing
+subcommands only: `compare`, `check`, and `pre-commit`. `observe` and `compile`
+reject them with usage error 2. `sarif` emits SARIF 2.1.0 JSON and can be used
+with `--output`. `gh-actions` emits GitHub workflow commands (`::error`,
+`::warning`, `::notice`) to stdout and rejects `--output` because workflow
+commands must be written to the job log.
 
 Color is enabled only for human output when stdout is a TTY. `--no-color` and
 `NO_COLOR` disable color. `FORCE_COLOR` enables color for non-TTY output unless
@@ -107,7 +115,7 @@ semantic-ci compare --baseline-dir <dir> --candidate-dir <dir>
                     [--target <yaml>]
                     [--package-root-baseline <dir>]
                     [--package-root-candidate <dir>]
-                    [--format {json,human}] [--output <file>]
+                    [--format {json,human,sarif,gh-actions}] [--output <file>]
                     [--strict-repair]
 ```
 
@@ -119,6 +127,8 @@ Examples:
 ```bash
 semantic-ci compare --baseline-dir /tmp/base --candidate-dir /tmp/candidate
 semantic-ci compare --baseline-dir base --candidate-dir candidate --strict-repair
+semantic-ci compare --baseline-dir base --candidate-dir candidate --format sarif --output semantic-ci.sarif
+semantic-ci compare --baseline-dir base --candidate-dir candidate --format gh-actions
 ```
 
 ## `semantic-ci check`
@@ -126,7 +136,7 @@ semantic-ci compare --baseline-dir base --candidate-dir candidate --strict-repai
 ```text
 semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--target <yaml>] [--package-root <repo-relative-dir>]
-                  [--format {json,human}] [--output <file>]
+                  [--format {json,human,sarif,gh-actions}] [--output <file>]
                   [--strict-repair] [--no-fetch] [--allow-dirty]
                   [--mode {smoke,full}] [--no-cache] [--cache-dir <dir>]
                   [--cache-max-bytes <int>]
@@ -169,13 +179,15 @@ semantic-ci check --allow-dirty --package-root src/semantic_ci_code
 semantic-ci check --mode smoke
 semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600
+semantic-ci check --format sarif --output semantic-ci.sarif
+semantic-ci check --format gh-actions
 ```
 
 ## `semantic-ci pre-commit`
 
 ```text
 semantic-ci pre-commit [--target <yaml>] [--package-root <repo-relative-dir>]
-                       [--format {json,human}] [--output <file>]
+                       [--format {json,human,sarif,gh-actions}] [--output <file>]
                        [--strict-repair] [--mode {smoke,full}]
                        [--no-cache] [--cache-dir <dir>]
                        [--cache-max-bytes <int>]
@@ -198,6 +210,7 @@ semantic-ci pre-commit --target target.yaml
 semantic-ci pre-commit --strict-repair
 semantic-ci pre-commit --mode smoke
 semantic-ci pre-commit --cache-dir .semantic-ci/cache
+semantic-ci pre-commit --format gh-actions
 ```
 
 ## `semantic-ci compile`

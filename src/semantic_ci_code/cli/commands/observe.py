@@ -25,6 +25,8 @@ _HUMAN_FALLBACK_WARNING = (
 
 def run_observe(args: Namespace) -> int:
     try:
+        if args.format in {"sarif", "gh-actions"}:
+            raise ValueError(f"{args.format} format is not supported for observe")
         root = _resolve_package_root(Path(args.package_root))
         if args.verbose:
             _stderr(f"observing package_root={root}")

@@ -8,6 +8,8 @@ from typing import Any
 
 from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, FAIL, INTERNAL_BUG, SUCCESS, USAGE_ERROR
 from semantic_ci_code.cli.output import dump_json, format_human, resolve_format, use_color
+from semantic_ci_code.cli.output_gh_actions import format_gh_actions
+from semantic_ci_code.cli.output_sarif import format_sarif
 from semantic_ci_code.evaluator import VerdictResult
 
 
@@ -50,6 +52,12 @@ def _render_payload(
     output_format = resolve_format(args.format, args.output, subcommand=subcommand)
     if output_format == "json":
         return dump_json(payload)
+    if output_format == "sarif":
+        return format_sarif(payload)
+    if output_format == "gh-actions":
+        if args.output is not None:
+            raise ValueError("gh-actions format does not support --output")
+        return format_gh_actions(payload)
     return human_renderer(payload, use_color=use_color(getattr(args, "no_color", False)))
 
 

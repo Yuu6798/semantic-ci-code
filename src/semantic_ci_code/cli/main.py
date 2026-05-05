@@ -11,6 +11,9 @@ from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
 from semantic_ci_code.cli.output.json_formatter import package_version
 
+_ALL_FORMATS = ("json", "human", "sarif", "gh-actions")
+_VERDICT_FORMATS = _ALL_FORMATS
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="semantic-ci")
@@ -35,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="optional Python files or directories to limit per-file extractors",
     )
-    observe.add_argument("--format", choices=("json", "human"), default="json")
+    observe.add_argument("--format", choices=_ALL_FORMATS, default="json")
     observe.add_argument("--output", default=None, help="write JSON to this file instead of stdout")
 
     compare = subcommands.add_parser("compare", help="compare two local Python package roots")
@@ -44,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--target", default=None, help="Target SVP YAML file")
     compare.add_argument("--package-root-baseline", default=None, help="baseline package root")
     compare.add_argument("--package-root-candidate", default=None, help="candidate package root")
-    compare.add_argument("--format", choices=("json", "human"), default=None)
+    compare.add_argument("--format", choices=_VERDICT_FORMATS, default=None)
     compare.add_argument(
         "--output",
         default=None,
@@ -67,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="repo-relative Python package root inside each git tree",
     )
-    check.add_argument("--format", choices=("json", "human"), default=None)
+    check.add_argument("--format", choices=_VERDICT_FORMATS, default=None)
     check.add_argument(
         "--output",
         default=None,
@@ -110,7 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="repo-relative Python package root inside HEAD and the staged index",
     )
-    pre_commit.add_argument("--format", choices=("json", "human"), default=None)
+    pre_commit.add_argument("--format", choices=_VERDICT_FORMATS, default=None)
     pre_commit.add_argument(
         "--output",
         default=None,
@@ -143,7 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     compile_cmd = subcommands.add_parser("compile", help="compile target.yaml without judging")
     compile_cmd.add_argument("--target", default=None, help="Target SVP YAML file")
-    compile_cmd.add_argument("--format", choices=("json", "human"), default=None)
+    compile_cmd.add_argument("--format", choices=_ALL_FORMATS, default=None)
     compile_cmd.add_argument(
         "--output",
         default=None,

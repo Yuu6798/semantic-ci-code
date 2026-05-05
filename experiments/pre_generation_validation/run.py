@@ -19,6 +19,7 @@ Run:
 
 Exit code is 0 when 3/3 verdicts match expectation, 1 otherwise.
 """
+
 from __future__ import annotations
 
 import json
@@ -58,7 +59,7 @@ def save_counter(counter: Counter, path: str) -> None:
     raise NotImplementedError("pre-generation stub")
 '''
 
-TARGET_YAML = '''\
+TARGET_YAML = """\
 intent: add public save/load helpers for Counter persistence
 change:
   primary_kind: feature
@@ -85,7 +86,7 @@ constraints:
           def load_counter(path: str) -> Counter:
               ...
         visibility: public
-'''
+"""
 
 
 def patch_add_full_stub(pkg: Path) -> None:
@@ -170,8 +171,7 @@ def run_compare(baseline: Path, candidate: Path, target: Path) -> dict:
         "violations": data.get("summary", {}).get("fix_required", 0),
         "satisfied": data.get("summary", {}).get("satisfied", 0),
         "constraints": [
-            {"id": r["constraint_id"], "status": r["status"]}
-            for r in data.get("results", [])
+            {"id": r["constraint_id"], "status": r["status"]} for r in data.get("results", [])
         ],
     }
 
@@ -194,10 +194,7 @@ def main() -> int:
             outcome = run_compare(BASELINE, cand, target)
             rows.append((case, outcome))
 
-    print(
-        f"{'case':<18} {'expected':<10} {'verdict':<10} "
-        f"{'violns':<8} {'sat':<6} {'match':<6}"
-    )
+    print(f"{'case':<18} {'expected':<10} {'verdict':<10} {'violns':<8} {'sat':<6} {'match':<6}")
     print("-" * 60)
     correct = 0
     for case, outcome in rows:

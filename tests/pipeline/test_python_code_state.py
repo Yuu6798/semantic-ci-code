@@ -62,7 +62,8 @@ def test_single_module_fixture_populates_all_six_extracted_fields():
         "mod.public_api",
         "mod.test_public_api",
     }
-    assert {entry.fqn for entry in state.effects} >= {"print"}
+    assert {entry.fqn for entry in state.effects} >= {"public_api"}
+    assert {entry.evidence["resolved_call"] for entry in state.effects} >= {"print"}
     assert any(entry.module == "math" and entry.symbols == ("sqrt",) for entry in state.imports)
     assert {entry.fqn for entry in state.complexity} >= {
         "mod.public_api",

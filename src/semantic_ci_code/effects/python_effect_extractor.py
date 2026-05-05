@@ -249,32 +249,78 @@ def _extract_call_effects(
     filename: str,
 ) -> list[EffectEntry]:
     """Detect direct_call / imported_alias effects from call sites."""
-    entries: list[EffectEntry] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
+    visitor = _CallEffectVisitor(index=index, alias_map=alias_map, filename=filename)
+    visitor.visit(tree)
+    return visitor.entries
+
+
+class _CallEffectVisitor(ast.NodeVisitor):
+    """Collect call effects while tracking enclosing Python scopes."""
+
+    def __init__(
+        self,
+        *,
+        index: dict[str, EffectSignature],
+        alias_map: dict[str, str],
+        filename: str,
+    ) -> None:
+        self._index = index
+        self._alias_map = alias_map
+        self._filename = filename
+        self._scope_stack: list[str] = []
+        self.entries: list[EffectEntry] = []
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._visit_named_scope(node.name, node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._visit_named_scope(node.name, node)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self._visit_named_scope(node.name, node)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        self._scope_stack.append("<lambda>")
+        try:
+            self.generic_visit(node)
+        finally:
+            self._scope_stack.pop()
+
+    def visit_Call(self, node: ast.Call) -> None:
         raw = _resolve_dotted_name(node.func)
-        if raw is None:
-            continue
-        resolved, level = _resolve_call(raw, alias_map)
-        signature = index.get(resolved)
-        if signature is None:
-            continue
-        entries.append(
-            EffectEntry(
-                fqn=resolved,
-                effect_class=signature.effect_class,
-                confidence=1.0,
-                evidence={
-                    "raw_call": raw,
-                    "resolved_call": resolved,
-                    "file": filename,
-                    "line": node.lineno,
-                    "resolution_level": level.value,
-                },
-            )
-        )
-    return entries
+        if raw is not None:
+            resolved, level = _resolve_call(raw, self._alias_map)
+            signature = self._index.get(resolved)
+            if signature is not None:
+                self.entries.append(
+                    EffectEntry(
+                        fqn=self._enclosing_fqn(),
+                        effect_class=signature.effect_class,
+                        confidence=1.0,
+                        evidence={
+                            "raw_call": raw,
+                            "resolved_call": resolved,
+                            "file": self._filename,
+                            "line": node.lineno,
+                            "resolution_level": level.value,
+                        },
+                    )
+                )
+        self.generic_visit(node)
+
+    def _visit_named_scope(self, name: str, node: ast.AST) -> None:
+        self._scope_stack.append(name)
+        try:
+            self.generic_visit(node)
+        finally:
+            self._scope_stack.pop()
+
+    def _enclosing_fqn(self) -> str:
+        if not self._scope_stack:
+            return "<module>"
+        if self._scope_stack[-1] == "<lambda>":
+            return "<lambda>"
+        return ".".join(self._scope_stack)
 
 
 # --------------------------------------------------------------------- #

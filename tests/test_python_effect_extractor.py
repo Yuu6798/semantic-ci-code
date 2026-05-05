@@ -15,8 +15,8 @@ from semantic_ci_code.effects.python_effect_extractor import (
 )
 
 
-def _by_fqn(entries: tuple[EffectEntry, ...]) -> dict[str, EffectEntry]:
-    return {entry.fqn: entry for entry in entries}
+def _by_resolved_call(entries: tuple[EffectEntry, ...]) -> dict[str, EffectEntry]:
+    return {entry.evidence["resolved_call"]: entry for entry in _call_effects(entries)}
 
 
 def _call_effects(entries: tuple[EffectEntry, ...]) -> tuple[EffectEntry, ...]:
@@ -28,6 +28,10 @@ def _call_effects(entries: tuple[EffectEntry, ...]) -> tuple[EffectEntry, ...]:
     on the same fixtures, so the call assertions filter through this.
     """
     return tuple(e for e in entries if e.effect_class is not EffectClass.GLOBAL_MUTATION)
+
+
+def _resolved_calls(entries: tuple[EffectEntry, ...]) -> set[str]:
+    return {entry.evidence["resolved_call"] for entry in _call_effects(entries)}
 
 
 def test_default_python_effect_db_loads():
@@ -51,9 +55,9 @@ urllib.request.urlopen("https://example.com")
 """.lstrip()
 
     entries = extract_python_effects(source, filename="sample.py")
-    fqns = {entry.fqn for entry in entries}
 
-    assert fqns == {
+    assert {entry.fqn for entry in entries} == {"<module>"}
+    assert _resolved_calls(entries) == {
         "open",
         "print",
         "eval",
@@ -131,7 +135,7 @@ operating_system.remove("a")
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "os.remove"
+    assert entry.fqn == "<module>"
     assert entry.effect_class is EffectClass.FS
     assert entry.evidence["raw_call"] == "operating_system.remove"
     assert entry.evidence["resolved_call"] == "os.remove"
@@ -148,7 +152,7 @@ sp.run(["ls"])
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "subprocess.run"
+    assert entry.fqn == "<module>"
     assert entry.evidence["raw_call"] == "sp.run"
     assert entry.evidence["resolved_call"] == "subprocess.run"
     assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
@@ -164,7 +168,7 @@ request.urlopen("https://example.com")
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "urllib.request.urlopen"
+    assert entry.fqn == "<module>"
     assert entry.evidence["raw_call"] == "request.urlopen"
     assert entry.evidence["resolved_call"] == "urllib.request.urlopen"
     assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
@@ -180,7 +184,7 @@ remove("a.txt")
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "os.remove"
+    assert entry.fqn == "<module>"
     assert entry.evidence["raw_call"] == "remove"
     assert entry.evidence["resolved_call"] == "os.remove"
     assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
@@ -196,7 +200,7 @@ rm("a.txt")
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "os.remove"
+    assert entry.fqn == "<module>"
     assert entry.evidence["raw_call"] == "rm"
     assert entry.evidence["resolved_call"] == "os.remove"
     assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
@@ -212,7 +216,7 @@ urlopen("https://example.com")
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "urllib.request.urlopen"
+    assert entry.fqn == "<module>"
     assert entry.evidence["raw_call"] == "urlopen"
     assert entry.evidence["resolved_call"] == "urllib.request.urlopen"
     assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
@@ -228,7 +232,7 @@ fetch("https://example.com")
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "urllib.request.urlopen"
+    assert entry.fqn == "<module>"
     assert entry.evidence["raw_call"] == "fetch"
     assert entry.evidence["resolved_call"] == "urllib.request.urlopen"
     assert entry.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
@@ -244,7 +248,7 @@ os.remove("a")
 
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.fqn == "os.remove"
+    assert entry.fqn == "<module>"
     assert entry.evidence["raw_call"] == "os.remove"
     assert entry.evidence["resolved_call"] == "os.remove"
     assert entry.evidence["resolution_level"] == ResolutionLevel.DIRECT_CALL.value
@@ -410,7 +414,7 @@ op.remove("a")
     # an open() detection, so we only assert that the aliased call is
     # gone.
     assert all(entry.evidence["raw_call"] != "op.remove" for entry in entries)
-    assert all(entry.fqn != "os.remove" for entry in entries)
+    assert "os.remove" not in _resolved_calls(entries)
 
 
 def test_alias_shadowed_by_nested_compound_statement():
@@ -445,7 +449,7 @@ op.remove("a")
     entries = extract_python_effects(source, filename="m.py")
 
     assert len(entries) == 1
-    assert entries[0].fqn == "os.remove"
+    assert entries[0].fqn == "<module>"
     assert entries[0].evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
 
 
@@ -461,7 +465,7 @@ op.remove("a")
     entries = extract_python_effects(source, filename="m.py")
 
     assert len(entries) == 1
-    assert entries[0].fqn == "os.remove"
+    assert entries[0].fqn == "<module>"
     assert entries[0].evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
 
 
@@ -513,7 +517,8 @@ sp.run(["ls"])
     entries = extract_python_effects(source, filename="m.py")
     state = CodeState(effects=entries)
 
-    assert {e.fqn for e in state.effects} == {"os.remove", "subprocess.run"}
+    assert {e.fqn for e in state.effects} == {"<module>"}
+    assert _resolved_calls(state.effects) == {"os.remove", "subprocess.run"}
     assert all(
         e.evidence["resolution_level"] == ResolutionLevel.IMPORTED_ALIAS.value
         for e in state.effects
@@ -587,7 +592,7 @@ pickle.loads(b"")
     entries = extract_python_effects(source, filename="m.py")
     by_class: dict[EffectClass, list[str]] = {}
     for entry in entries:
-        by_class.setdefault(entry.effect_class, []).append(entry.fqn)
+        by_class.setdefault(entry.effect_class, []).append(entry.evidence["resolved_call"])
 
     assert set(by_class[EffectClass.DYNAMIC_CODE]) == {
         "eval",
@@ -610,22 +615,24 @@ def test_repeated_call_emits_one_entry_per_occurrence():
     source = "print('a')\nprint('b')\nprint('c')\n"
     entries = extract_python_effects(source, filename="m.py")
     assert [e.evidence["line"] for e in entries] == [1, 2, 3]
-    assert {e.fqn for e in entries} == {"print"}
+    assert {e.fqn for e in entries} == {"<module>"}
+    assert _resolved_calls(entries) == {"print"}
 
 
 def test_entries_record_dotted_fqn_for_attribute_calls():
     source = "import os\nos.remove('a')\n"
     entries = extract_python_effects(source, filename="m.py")
-    by_fqn = _by_fqn(entries)
-    assert "os.remove" in by_fqn
-    assert by_fqn["os.remove"].evidence["resolution_level"] == "direct_call"
+    by_call = _by_resolved_call(entries)
+    assert by_call["os.remove"].fqn == "<module>"
+    assert by_call["os.remove"].evidence["resolution_level"] == "direct_call"
 
 
 def test_nested_calls_are_each_detected():
     source = "print(open('a.txt'))\n"
     entries = extract_python_effects(source, filename="m.py")
-    fqns = [entry.fqn for entry in entries]
-    assert sorted(fqns) == ["open", "print"]
+    resolved_calls = [entry.evidence["resolved_call"] for entry in entries]
+    assert sorted(resolved_calls) == ["open", "print"]
+    assert {entry.fqn for entry in entries} == {"<module>"}
 
 
 def test_extractor_ignores_non_python_signatures():
@@ -672,6 +679,99 @@ def test_extractor_skips_calls_only_present_in_non_python_signatures():
     entries = extract_python_effects("print('hi')\n", filename="m.py", db=foreign_only_db)
 
     assert entries == ()
+
+
+def test_call_effect_fqn_uses_module_for_module_level_call():
+    entries = extract_python_effects("print('module')\n", filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "<module>"
+    assert entries[0].evidence["resolved_call"] == "print"
+
+
+def test_call_effect_fqn_uses_enclosing_function_name():
+    source = """
+def run():
+    print("function")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "run"
+    assert entries[0].evidence["resolved_call"] == "print"
+
+
+def test_call_effect_fqn_uses_enclosing_method_name():
+    source = """
+class Worker:
+    def run(self):
+        print("method")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "Worker.run"
+    assert entries[0].evidence["resolved_call"] == "print"
+
+
+def test_call_effect_fqn_uses_nested_function_name():
+    source = """
+def outer():
+    def inner():
+        print("nested")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "outer.inner"
+    assert entries[0].evidence["resolved_call"] == "print"
+
+
+def test_call_effects_can_be_grouped_by_enclosing_fqn():
+    source = """
+def alpha():
+    print("alpha")
+    open("alpha.txt")
+
+def beta():
+    print("beta")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+    by_fqn: dict[str, set[str]] = {}
+    for entry in entries:
+        by_fqn.setdefault(entry.fqn, set()).add(entry.evidence["resolved_call"])
+
+    assert by_fqn == {
+        "alpha": {"print", "open"},
+        "beta": {"print"},
+    }
+
+
+def test_call_effect_fqn_uses_lambda_scope():
+    source = "handler = lambda: print('lambda')\n"
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "<lambda>"
+    assert entries[0].evidence["resolved_call"] == "print"
+
+
+def test_comprehension_call_inherits_enclosing_function_scope():
+    source = """
+def run(items):
+    return [print(item) for item in items]
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "run"
+    assert entries[0].evidence["resolved_call"] == "print"
 
 
 # --------------------------------------------------------------------- #
@@ -1022,8 +1122,14 @@ print("hi")
         by_class.setdefault(e.effect_class, []).append(e.fqn)
 
     assert set(by_class[EffectClass.GLOBAL_MUTATION]) == {"module:CONFIG", "module:x"}
-    assert "os.remove" in by_class[EffectClass.FS]
-    assert "print" in by_class[EffectClass.STDOUT]
+    assert any(
+        e.effect_class is EffectClass.FS and e.evidence.get("resolved_call") == "os.remove"
+        for e in entries
+    )
+    assert any(
+        e.effect_class is EffectClass.STDOUT and e.evidence.get("resolved_call") == "print"
+        for e in entries
+    )
 
 
 def test_global_mutation_results_assignable_to_code_state():

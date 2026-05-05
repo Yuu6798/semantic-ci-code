@@ -786,6 +786,24 @@ def test_call_effect_fqn_uses_lambda_scope():
     assert entries[0].evidence["resolved_call"] == "print"
 
 
+def test_call_effect_fqn_preserves_outer_scope_for_nested_lambdas():
+    source = """
+def alpha():
+    return lambda: print("alpha")
+
+def beta():
+    return lambda: print("beta")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="pkg/m.py", module_fqn="pkg.m")
+    effects = {(entry.fqn, entry.evidence["resolved_call"]) for entry in entries}
+
+    assert effects == {
+        ("pkg.m.alpha.<lambda>", "print"),
+        ("pkg.m.beta.<lambda>", "print"),
+    }
+
+
 def test_comprehension_call_inherits_enclosing_function_scope():
     source = """
 def run(items):

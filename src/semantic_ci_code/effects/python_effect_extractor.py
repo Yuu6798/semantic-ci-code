@@ -327,10 +327,7 @@ class _CallEffectVisitor(ast.NodeVisitor):
     def _enclosing_fqn(self) -> str:
         if not self._scope_stack:
             return self._module_fqn or "<module>"
-        if self._scope_stack[-1] == "<lambda>":
-            local_fqn = "<lambda>"
-        else:
-            local_fqn = ".".join(self._scope_stack)
+        local_fqn = ".".join(self._scope_stack)
         return f"{self._module_fqn}.{local_fqn}" if self._module_fqn else local_fqn
 
 

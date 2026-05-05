@@ -47,8 +47,19 @@ def api(
     return APISurfaceEntry(fqn=fqn, kind=kind, signature=signature, visibility=visibility)
 
 
-def effect(fqn: str, effect_class: EffectClass) -> EffectEntry:
-    return EffectEntry(fqn=fqn, effect_class=effect_class, confidence=1.0)
+def effect(
+    fqn: str,
+    effect_class: EffectClass,
+    *,
+    resolved_call: str | None = None,
+) -> EffectEntry:
+    evidence = {"resolved_call": resolved_call} if resolved_call is not None else None
+    return EffectEntry(
+        fqn=fqn,
+        effect_class=effect_class,
+        confidence=1.0,
+        evidence=evidence,
+    )
 
 
 def imp(
@@ -198,6 +209,23 @@ def test_effects_added_removed_and_class_change_as_removed_plus_added():
         effect("os.remove", EffectClass.FS).model_dump(mode="json"),
         effect("pkg.op", EffectClass.IO).model_dump(mode="json"),
     )
+
+
+def test_effects_same_scope_and_class_keep_resolved_call_identity():
+    baseline = CodeState(effects=(effect("pkg.run", EffectClass.FS, resolved_call="open"),))
+    candidate = CodeState(
+        effects=(
+            effect("pkg.run", EffectClass.FS, resolved_call="open"),
+            effect("pkg.run", EffectClass.FS, resolved_call="os.remove"),
+        )
+    )
+
+    delta = compute_code_state_delta(baseline, candidate)
+
+    assert delta.effect_changes.added == (
+        effect("pkg.run", EffectClass.FS, resolved_call="os.remove").model_dump(mode="json"),
+    )
+    assert delta.effect_changes.removed == ()
 
 
 def test_imports_added_removed_and_symbol_change_as_removed_plus_added():

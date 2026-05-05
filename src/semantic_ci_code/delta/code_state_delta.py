@@ -17,10 +17,12 @@ Delta rules:
   shape. Lists are sorted by ``(fqn, kind)`` plus variant fields where needed.
 - ``type_changes`` is always ``()`` in P1 until a ``type_relations`` extractor
   exists.
-- ``effect_changes`` uses identity key ``(fqn, effect_class)`` and has no
-  ``changed`` slot. A same-fqn effect class change is represented as removed
-  old class plus added new class. ``confidence`` and ``evidence`` differences
-  are ignored in P1.
+- ``effect_changes`` uses identity key ``(fqn, effect_class, resolved_call)``
+  and has no ``changed`` slot. ``resolved_call`` comes from
+  ``evidence["resolved_call"]`` for call effects and is ``""`` otherwise. A
+  same-fqn effect class change is represented as removed old class plus added
+  new class. ``confidence`` and non-identity evidence differences are ignored
+  in P1.
 - ``imports_delta`` uses identity key ``(module, from_ or "", sorted symbols)``.
   A same-module symbols-only change is represented as removed old row plus
   added new row. Import JSON uses ``by_alias=True`` to preserve the ``from``
@@ -325,8 +327,16 @@ def _api_changed_payload(entries: list[APISurfaceEntry], *, force_list: bool) ->
     return dumps[0]
 
 
-def _effect_key(entry: EffectEntry) -> tuple[str, str]:
-    return entry.fqn, entry.effect_class.value
+def _effect_key(entry: EffectEntry) -> tuple[str, str, str]:
+    return entry.fqn, entry.effect_class.value, _effect_resolved_call(entry)
+
+
+def _effect_resolved_call(entry: EffectEntry) -> str:
+    if isinstance(entry.evidence, dict):
+        resolved_call = entry.evidence.get("resolved_call")
+        if isinstance(resolved_call, str):
+            return resolved_call
+    return ""
 
 
 def _import_key(entry: ImportEntry) -> tuple[str, str, tuple[str, ...]]:

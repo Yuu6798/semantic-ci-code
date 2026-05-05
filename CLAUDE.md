@@ -87,6 +87,7 @@ docs/
 | `docs/cli_test_inventory.md` | CLI test coverage inventory, runtime notes, and conservative reduction candidates |
 | `docs/brief_4_planning.md` | (Brief 4 complete; retained for Brief 5 reference) Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR が merge され `semantic-ci` CLI 5 subcommand が release 可能状態。Open Questions 16 件のうち未確定分は Brief 5 / Brief 4b で消化予定 |
 | `docs/brief_4b_planning.md` | Brief 4b (CI integration outputs) を CSCI-28 に集約する planning 文書。SARIF 2.1.0 出力 + GitHub Actions annotation + `.pre-commit-hooks.yaml` manifest を 1 PR で完結させる設計と Task Brief。Brief 4 Open Questions Q9/Q10/Q11 を救済 |
+| `docs/brief_4c_planning.md` | Brief 4c (effect extractor `fqn` semantics 修正) を CSCI-29 に集約する planning 文書。`_extract_call_effects` を AST `NodeVisitor` 化して `EffectEntry.fqn` を callee 指向から enclosing function 指向に切り替え、設計 §3.1 schema に適合させる P1 内 hot-fix。CodeState cache `CACHE_FORMAT_VERSION` bump 含む |
 | `docs/brief_3_planning.md` | (Archived) Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。CSCI-10〜14 の全 PR が merge され Brief 3 は完結済み。当時の判断履歴として保存 |
 | `docs/multi_agent_audit_case.md` | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
 | `docs/pre_generation_validation_case.md` | 外部 Python リポジトリ上で stub のみの candidate を engine に渡し §23.1 入力 contract が実装で動作することを 3 ケースで確認した観測事例。core scope 外の応用観測 |

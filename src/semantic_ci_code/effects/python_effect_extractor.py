@@ -208,6 +208,7 @@ def extract_python_effects(
     source: str,
     *,
     filename: str = "<string>",
+    module_fqn: str | None = None,
     db: tuple[EffectSignature, ...] | None = None,
 ) -> tuple[EffectEntry, ...]:
     """Extract direct-call, import-alias, and global-mutation effects.
@@ -237,7 +238,7 @@ def extract_python_effects(
     alias_map = _collect_alias_map(tree)
 
     entries: list[EffectEntry] = []
-    entries.extend(_extract_call_effects(tree, index, alias_map, filename))
+    entries.extend(_extract_call_effects(tree, index, alias_map, filename, module_fqn))
     entries.extend(_extract_global_mutations(tree, filename))
     return tuple(entries)
 
@@ -247,34 +248,111 @@ def _extract_call_effects(
     index: dict[str, EffectSignature],
     alias_map: dict[str, str],
     filename: str,
+    module_fqn: str | None,
 ) -> list[EffectEntry]:
     """Detect direct_call / imported_alias effects from call sites."""
-    entries: list[EffectEntry] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
+    visitor = _CallEffectVisitor(
+        index=index,
+        alias_map=alias_map,
+        filename=filename,
+        module_fqn=module_fqn,
+    )
+    visitor.visit(tree)
+    return visitor.entries
+
+
+class _CallEffectVisitor(ast.NodeVisitor):
+    """Collect call effects while tracking enclosing Python scopes."""
+
+    def __init__(
+        self,
+        *,
+        index: dict[str, EffectSignature],
+        alias_map: dict[str, str],
+        filename: str,
+        module_fqn: str | None,
+    ) -> None:
+        self._index = index
+        self._alias_map = alias_map
+        self._filename = filename
+        self._module_fqn = module_fqn
+        self._scope_stack: list[str] = []
+        self.entries: list[EffectEntry] = []
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._visit_function_definition_context(node)
+        self._visit_named_body_scope(node.name, node.body)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._visit_function_definition_context(node)
+        self._visit_named_body_scope(node.name, node.body)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for base in node.bases:
+            self.visit(base)
+        for keyword in node.keywords:
+            self.visit(keyword)
+        for type_param in getattr(node, "type_params", ()):
+            self.visit(type_param)
+        self._visit_named_body_scope(node.name, node.body)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        self.visit(node.args)
+        self._scope_stack.append("<lambda>")
+        try:
+            self.visit(node.body)
+        finally:
+            self._scope_stack.pop()
+
+    def visit_Call(self, node: ast.Call) -> None:
         raw = _resolve_dotted_name(node.func)
-        if raw is None:
-            continue
-        resolved, level = _resolve_call(raw, alias_map)
-        signature = index.get(resolved)
-        if signature is None:
-            continue
-        entries.append(
-            EffectEntry(
-                fqn=resolved,
-                effect_class=signature.effect_class,
-                confidence=1.0,
-                evidence={
-                    "raw_call": raw,
-                    "resolved_call": resolved,
-                    "file": filename,
-                    "line": node.lineno,
-                    "resolution_level": level.value,
-                },
-            )
-        )
-    return entries
+        if raw is not None:
+            resolved, level = _resolve_call(raw, self._alias_map)
+            signature = self._index.get(resolved)
+            if signature is not None:
+                self.entries.append(
+                    EffectEntry(
+                        fqn=self._enclosing_fqn(),
+                        effect_class=signature.effect_class,
+                        confidence=1.0,
+                        evidence={
+                            "raw_call": raw,
+                            "resolved_call": resolved,
+                            "file": self._filename,
+                            "line": node.lineno,
+                            "resolution_level": level.value,
+                        },
+                    )
+                )
+        self.generic_visit(node)
+
+    def _visit_function_definition_context(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        self.visit(node.args)
+        if node.returns is not None:
+            self.visit(node.returns)
+        for type_param in getattr(node, "type_params", ()):
+            self.visit(type_param)
+
+    def _visit_named_body_scope(self, name: str, body: list[ast.stmt]) -> None:
+        self._scope_stack.append(name)
+        try:
+            for stmt in body:
+                self.visit(stmt)
+        finally:
+            self._scope_stack.pop()
+
+    def _enclosing_fqn(self) -> str:
+        if not self._scope_stack:
+            return self._module_fqn or "<module>"
+        local_fqn = ".".join(self._scope_stack)
+        return f"{self._module_fqn}.{local_fqn}" if self._module_fqn else local_fqn
 
 
 # --------------------------------------------------------------------- #

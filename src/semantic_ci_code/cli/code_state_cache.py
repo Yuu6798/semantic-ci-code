@@ -16,7 +16,7 @@ from semantic_ci_code.cli.modes import ExecutionMode
 from semantic_ci_code.cli.output.json_formatter import UNKNOWN_VERSION, package_version
 from semantic_ci_code.domain.state_schema import CodeState
 
-CACHE_FORMAT_VERSION = 1
+CACHE_FORMAT_VERSION = 2
 CODE_STATE_SCHEMA_VERSION = "1"
 DEFAULT_CACHE_MAX_BYTES = 100 * 1024 * 1024
 DEFAULT_EVICTION_LOW_WATER = 0.8

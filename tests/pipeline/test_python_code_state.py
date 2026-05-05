@@ -62,7 +62,8 @@ def test_single_module_fixture_populates_all_six_extracted_fields():
         "mod.public_api",
         "mod.test_public_api",
     }
-    assert {entry.fqn for entry in state.effects} >= {"print"}
+    assert {entry.fqn for entry in state.effects} >= {"mod.public_api"}
+    assert {entry.evidence["resolved_call"] for entry in state.effects} >= {"print"}
     assert any(entry.module == "math" and entry.symbols == ("sqrt",) for entry in state.imports)
     assert {entry.fqn for entry in state.complexity} >= {
         "mod.public_api",
@@ -100,6 +101,31 @@ def test_paths_variant_limits_per_file_extractors_but_keeps_whole_repo_module_gr
     assert {"multi_module", "alpha", "beta", "gamma"} <= set(graph)
     assert graph["alpha"].imports == ("beta",)
     assert graph["beta"].imports == ("gamma",)
+
+
+def test_effect_fqns_include_module_prefix_in_multi_file_pipeline():
+    state = extract_python_code_state(MULTI_MODULE)
+    effects = {(entry.fqn, entry.evidence["resolved_call"]) for entry in state.effects}
+
+    assert ("beta.beta", "print") in effects
+
+
+def test_effect_fqns_do_not_collide_for_same_scope_name_in_different_modules(tmp_path):
+    package_root = tmp_path / "pkg"
+    package_root.mkdir()
+    (package_root / "__init__.py").write_text("", encoding="utf-8")
+    (package_root / "a.py").write_text(
+        "def run():\n    print('a')\n",
+        encoding="utf-8",
+    )
+    (package_root / "b.py").write_text(
+        "def run():\n    print('b')\n",
+        encoding="utf-8",
+    )
+
+    state = extract_python_code_state(package_root)
+
+    assert {entry.fqn for entry in state.effects} == {"a.run", "b.run"}
 
 
 def test_empty_paths_variant_keeps_module_graph_and_empties_per_file_fields():

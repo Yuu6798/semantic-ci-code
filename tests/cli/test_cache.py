@@ -466,7 +466,10 @@ def test_corrupt_cache_is_miss_and_overwritten(tmp_path: Path):
         "write_failed": 0,
         "disabled": False,
     }
-    assert json.loads(cache_file.read_text(encoding="utf-8"))["cache_format_version"] == 1
+    assert (
+        json.loads(cache_file.read_text(encoding="utf-8"))["cache_format_version"]
+        == CACHE_FORMAT_VERSION
+    )
 
 
 def test_cache_format_version_mismatch_is_invalid(tmp_path: Path):

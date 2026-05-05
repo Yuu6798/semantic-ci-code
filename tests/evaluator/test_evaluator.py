@@ -1009,6 +1009,40 @@ effects:
     assert verdict.results[1].status is ResultStatus.SATISFIED
 
 
+def test_feature_template_allows_declared_new_effect_by_resolved_call():
+    compiled = compile_target_svp(
+        """
+intent: add git-backed check command
+change:
+  primary_kind: feature
+effects:
+  allow_new:
+    - fqn: subprocess.run
+      effect_class: process
+"""
+    )
+    verdict = evaluate_constraints(
+        compiled,
+        CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=(
+                    {
+                        "fqn": "build",
+                        "effect_class": "process",
+                        "evidence": {"resolved_call": "subprocess.run"},
+                    },
+                ),
+            )
+        ),
+        baseline=CodeState(),
+        candidate=CodeState(),
+    )
+
+    assert verdict.result is VerdictResult.PASS
+    assert verdict.results[1].constraint_id == "template:feature:no_new_effects"
+    assert verdict.results[1].status is ResultStatus.SATISFIED
+
+
 def test_effect_allow_new_keeps_unallowed_effects_visible_to_template():
     compiled = compile_target_svp(
         """

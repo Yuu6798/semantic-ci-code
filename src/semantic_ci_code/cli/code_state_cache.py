@@ -1,0 +1,194 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+from collections.abc import Callable
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+from pydantic import ValidationError
+
+from semantic_ci_code.cli.modes import ExecutionMode
+from semantic_ci_code.cli.output.json_formatter import package_version
+from semantic_ci_code.domain.state_schema import CodeState
+
+CACHE_FORMAT_VERSION = 1
+CODE_STATE_SCHEMA_VERSION = "1"
+
+LogFn = Callable[[str], None]
+
+
+def cache_disabled(*, no_cache_flag: bool) -> bool:
+    if no_cache_flag:
+        return True
+    return os.environ.get("SEMANTIC_CI_NO_CACHE") == "1"
+
+
+def resolve_cache_root(raw_cache_dir: str | None, *, repo_root: Path, cwd: Path) -> Path:
+    if raw_cache_dir is None:
+        return repo_root / ".semantic-ci" / "cache"
+    path = Path(raw_cache_dir)
+    if not path.is_absolute():
+        path = cwd / path
+    return path.resolve()
+
+
+def package_root_cache_path(package_root: Path) -> PurePosixPath:
+    value = package_root.as_posix()
+    return PurePosixPath(value or ".")
+
+
+def dimensions_for_cache(dimensions: frozenset[str] | None) -> tuple[str, ...] | None:
+    if dimensions is None:
+        return None
+    return tuple(sorted(dimensions))
+
+
+def current_python_xy() -> str:
+    return f"{sys.version_info.major}.{sys.version_info.minor}"
+
+
+def cache_key(
+    *,
+    tree_object_id: str,
+    package_root_relpath_posix: PurePosixPath,
+    mode: ExecutionMode,
+    dimensions_sorted_tuple: tuple[str, ...] | None,
+    python_xy: str,
+    package_version_value: str,
+    code_state_schema_version: str = CODE_STATE_SCHEMA_VERSION,
+    cache_format_version: int = CACHE_FORMAT_VERSION,
+) -> str:
+    payload = {
+        "cache_format_version": cache_format_version,
+        "code_state_schema_version": code_state_schema_version,
+        "dimensions": (
+            list(dimensions_sorted_tuple) if dimensions_sorted_tuple is not None else None
+        ),
+        "mode": mode.value,
+        "package_root": package_root_relpath_posix.as_posix(),
+        "package_version": package_version_value,
+        "python_xy": python_xy,
+        "tree_object_id": tree_object_id,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def key_meta(
+    *,
+    tree_object_id: str,
+    package_root_relpath_posix: PurePosixPath,
+    mode: ExecutionMode,
+    dimensions_sorted_tuple: tuple[str, ...] | None,
+    python_xy: str | None = None,
+    package_version_value: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "tree_object_id": tree_object_id,
+        "package_root": package_root_relpath_posix.as_posix(),
+        "mode": mode.value,
+        "dimensions": (
+            list(dimensions_sorted_tuple) if dimensions_sorted_tuple is not None else None
+        ),
+        "python_xy": python_xy or current_python_xy(),
+        "package_version": package_version_value or package_version(),
+    }
+
+
+def key_for_state(
+    *,
+    tree_object_id: str,
+    package_root_relpath_posix: PurePosixPath,
+    mode: ExecutionMode,
+    dimensions_sorted_tuple: tuple[str, ...] | None,
+    python_xy: str | None = None,
+    package_version_value: str | None = None,
+    code_state_schema_version: str = CODE_STATE_SCHEMA_VERSION,
+    cache_format_version: int = CACHE_FORMAT_VERSION,
+) -> str:
+    return cache_key(
+        tree_object_id=tree_object_id,
+        package_root_relpath_posix=package_root_relpath_posix,
+        mode=mode,
+        dimensions_sorted_tuple=dimensions_sorted_tuple,
+        python_xy=python_xy or current_python_xy(),
+        package_version_value=package_version_value or package_version(),
+        code_state_schema_version=code_state_schema_version,
+        cache_format_version=cache_format_version,
+    )
+
+
+def read_cached_code_state(
+    cache_root: Path,
+    key: str,
+    *,
+    log: LogFn | None = None,
+) -> CodeState | None:
+    path = _cache_path(cache_root, key)
+    if not path.exists():
+        _log(log, f"cache miss: code_state {key}")
+        return None
+
+    try:
+        raw = path.read_text(encoding="utf-8")
+        if not raw.strip():
+            raise ValueError("empty cache file")
+        payload = json.loads(raw)
+        if payload["cache_format_version"] != CACHE_FORMAT_VERSION:
+            raise ValueError("cache_format_version mismatch")
+        if payload["code_state_schema_version"] != CODE_STATE_SCHEMA_VERSION:
+            raise ValueError("code_state_schema_version mismatch")
+        state = CodeState.model_validate(payload["code_state"])
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError, ValidationError) as exc:
+        _log(log, f"cache invalid: {_one_line(str(exc))}; recomputing")
+        return None
+
+    _log(log, f"cache hit: code_state {key}")
+    return state
+
+
+def write_cached_code_state(
+    cache_root: Path,
+    key: str,
+    *,
+    state: CodeState,
+    meta: dict[str, Any],
+    log: LogFn | None = None,
+) -> None:
+    path = _cache_path(cache_root, key)
+    tmp_path = path.with_name(f"{path.name}.tmp")
+    payload = {
+        "cache_format_version": CACHE_FORMAT_VERSION,
+        "code_state_schema_version": CODE_STATE_SCHEMA_VERSION,
+        "key_meta": meta,
+        "code_state": state.model_dump(mode="json"),
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path.write_text(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, path)
+    except OSError as exc:
+        _log(log, f"cache write failed: {_one_line(str(exc))}")
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _cache_path(cache_root: Path, key: str) -> Path:
+    return cache_root / "code_state" / f"{key}.json"
+
+
+def _log(log: LogFn | None, message: str) -> None:
+    if log is not None:
+        log(message)
+
+
+def _one_line(message: str) -> str:
+    return message.splitlines()[0] if message else ""

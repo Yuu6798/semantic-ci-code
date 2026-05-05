@@ -128,7 +128,7 @@ semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--target <yaml>] [--package-root <repo-relative-dir>]
                   [--format {json,human}] [--output <file>]
                   [--strict-repair] [--no-fetch] [--allow-dirty]
-                  [--mode {smoke,full}]
+                  [--mode {smoke,full}] [--no-cache] [--cache-dir <dir>]
 ```
 
 Compares git refs using temporary detached worktrees. Defaults are:
@@ -140,6 +140,15 @@ Compares git refs using temporary detached worktrees. Defaults are:
 Without `--allow-dirty`, a dirty working tree emits a warning and still checks
 the `HEAD` commit. With `--allow-dirty`, the working tree is used as candidate.
 
+`check` caches ref-backed `CodeState` extraction under
+`<repo>/.semantic-ci/cache/code_state/` by default. The cache key includes the
+package subtree object id, package root, execution mode, extracted dimensions,
+Python minor version, package version, CodeState schema version, and cache format
+version. `--no-cache` or `SEMANTIC_CI_NO_CACHE=1` disables both reads and writes.
+`--cache-dir <dir>` changes the cache root; relative paths are resolved from the
+invoking working directory. Add `.semantic-ci/cache/` to your project `.gitignore`
+if you use the default cache location.
+
 Examples:
 
 ```bash
@@ -147,6 +156,7 @@ semantic-ci check
 semantic-ci check --baseline-rev origin/main --candidate-rev HEAD --target target.yaml
 semantic-ci check --allow-dirty --package-root src/semantic_ci_code
 semantic-ci check --mode smoke
+semantic-ci check --cache-dir .semantic-ci/cache
 ```
 
 ## `semantic-ci pre-commit`

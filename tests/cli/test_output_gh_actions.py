@@ -119,6 +119,34 @@ def test_gh_actions_uses_pair_list_file_line_evidence():
     assert rendered.startswith("::error file=src/effects.py,line=7::")
 
 
+def test_gh_actions_normalizes_temp_worktree_paths_for_annotations():
+    rendered = format_gh_actions(
+        {
+            "repair_plan": {
+                "instructions": [
+                    {
+                        "constraint_id": "user:absolute_temp",
+                        "repair_code": "R_NEW_EFFECT",
+                        "category": "fix_required",
+                        "message": "effect added",
+                        "extra_evidence": {
+                            "observed": {
+                                "file": (
+                                    "C:/Users/me/AppData/Local/Temp/"
+                                    "semantic-ci-candidate-abc/pkg/mod.py"
+                                ),
+                                "line": 11,
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+    )
+
+    assert rendered.startswith("::error file=pkg/mod.py,line=11::")
+
+
 def test_gh_actions_output_file_is_usage_error(tmp_path: Path):
     result = run_semantic_ci(
         Path.cwd(),

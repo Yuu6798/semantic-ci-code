@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 
@@ -28,6 +29,26 @@ def find_file_line(value: Any) -> tuple[str, int | None] | None:
                 return found
 
     return None
+
+
+def normalize_annotation_path(file_path: str) -> str:
+    """Return a repository-usable annotation path when evidence came from temp trees."""
+
+    normalized = file_path.replace("\\", "/")
+    parts = [part for part in normalized.split("/") if part]
+    for index, part in enumerate(parts):
+        if part.startswith(("semantic-ci-baseline-", "semantic-ci-candidate-")):
+            suffix = parts[index + 1 :]
+            if suffix:
+                return "/".join(suffix)
+
+    path = Path(file_path)
+    if path.is_absolute():
+        try:
+            return path.relative_to(Path.cwd()).as_posix()
+        except ValueError:
+            return normalized
+    return normalized
 
 
 def _pair_list_mapping(value: list[Any]) -> dict[str, Any] | None:

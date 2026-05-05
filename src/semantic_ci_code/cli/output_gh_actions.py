@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from semantic_ci_code.cli.output_locations import find_file_line
+from semantic_ci_code.cli.output_locations import find_file_line, normalize_annotation_path
 
 
 def format_gh_actions(payload: dict[str, Any]) -> str:
@@ -44,7 +44,7 @@ def _properties(instruction: dict[str, Any]) -> dict[str, str]:
     if found is None:
         return properties
     file_path, line = found
-    properties["file"] = str(file_path).replace("\\", "/")
+    properties["file"] = normalize_annotation_path(file_path)
     if line is not None:
         properties["line"] = str(line)
     return properties

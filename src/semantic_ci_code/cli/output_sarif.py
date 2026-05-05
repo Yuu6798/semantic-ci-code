@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from semantic_ci_code.cli.output_locations import find_file_line
+from semantic_ci_code.cli.output_locations import find_file_line, normalize_annotation_path
 
 SARIF_VERSION = "2.1.0"
 SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
@@ -148,7 +148,7 @@ def _location(
             region["startLine"] = line
         return {
             "physicalLocation": {
-                "artifactLocation": {"uri": str(file_path).replace("\\", "/")},
+                "artifactLocation": {"uri": normalize_annotation_path(file_path)},
                 **({"region": region} if region else {}),
             },
         }

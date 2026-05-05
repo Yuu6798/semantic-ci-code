@@ -139,6 +139,41 @@ def test_sarif_location_uses_pair_list_file_line_evidence():
     assert location["region"]["startLine"] == 7
 
 
+def test_sarif_location_normalizes_temp_worktree_paths():
+    rendered = format_sarif(
+        {
+            "subcommand": "check",
+            "verdict": "fail",
+            "mode": "full",
+            "engine": {"extractor_pyver": "3.11", "package_version": "0.test"},
+            "results": [
+                {
+                    "constraint_id": "user:absolute_temp",
+                    "source": "user",
+                    "kind": "delta",
+                    "target": "effects",
+                    "operator": "no_new_items",
+                    "severity": "hard",
+                    "unknown_policy": "fail",
+                    "status": "violated",
+                    "error_code": "E_VIOLATION",
+                    "evidence": {
+                        "observed": {
+                            "file": "/tmp/semantic-ci-candidate-abc/pkg/mod.py",
+                            "line": 11,
+                        },
+                    },
+                },
+            ],
+            "repair_plan": {"instructions": []},
+        }
+    )
+    location = json.loads(rendered)["runs"][0]["results"][0]["locations"][0]["physicalLocation"]
+
+    assert location["artifactLocation"]["uri"] == "pkg/mod.py"
+    assert location["region"]["startLine"] == 11
+
+
 def test_sarif_output_file_writes_json_and_leaves_stdout_empty(tmp_path: Path):
     output = tmp_path / "semantic-ci.sarif"
     result = run_semantic_ci(

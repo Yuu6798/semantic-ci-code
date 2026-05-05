@@ -144,8 +144,22 @@ def test_pre_commit_subprocess_determinism_across_hash_seeds(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
 
-    first = run_semantic_ci(repo, "pre-commit", "--format", "json", hash_seed="1")
-    second = run_semantic_ci(repo, "pre-commit", "--format", "json", hash_seed="2")
+    first = run_semantic_ci(
+        repo,
+        "pre-commit",
+        "--format",
+        "json",
+        "--no-cache",
+        hash_seed="1",
+    )
+    second = run_semantic_ci(
+        repo,
+        "pre-commit",
+        "--format",
+        "json",
+        "--no-cache",
+        hash_seed="2",
+    )
 
     assert first.returncode == 0
     assert first.stdout == second.stdout

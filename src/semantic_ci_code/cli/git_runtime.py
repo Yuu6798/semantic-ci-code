@@ -126,6 +126,14 @@ def tree_object_id(ref: str, subpath: str, *, cwd: Path) -> str:
     return lines[0]
 
 
+def staged_tree_object_id(cwd: Path) -> str:
+    output = run_git(["write-tree"], cwd=cwd)
+    lines = tuple(line for line in output.splitlines() if line)
+    if len(lines) != 1:
+        raise GitCommandError(f"git write-tree produced {len(lines)} object ids")
+    return lines[0]
+
+
 def is_dirty(cwd: Path) -> bool:
     return bool(run_git(["status", "--porcelain"], cwd=cwd).strip())
 

@@ -78,9 +78,9 @@ extracts only `api_surface`, `imports`, and `effects`; constraints that target
 unextracted dimensions are reported as `skipped` and do not affect the verdict.
 
 If `--mode` is omitted, `SEMANTIC_CI_MODE=smoke|full` can override the default.
-An explicit `--mode` flag always wins over the environment. Cache support
-(worktree reuse and extractor memoization) is intentionally deferred to
-CSCI-26 and later.
+An explicit `--mode` flag always wins over the environment. CodeState caching
+is available for `check` and `pre-commit`; worktree reuse and extractor
+memoization remain deferred.
 
 ## `semantic-ci observe`
 
@@ -129,6 +129,7 @@ semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--format {json,human}] [--output <file>]
                   [--strict-repair] [--no-fetch] [--allow-dirty]
                   [--mode {smoke,full}] [--no-cache] [--cache-dir <dir>]
+                  [--cache-max-bytes <int>]
 ```
 
 Compares git refs using temporary detached worktrees. Defaults are:
@@ -149,8 +150,15 @@ cache key uses a deterministic fingerprint of the `semantic_ci_code` Python
 sources instead of the constant unknown version fallback. `--no-cache` or
 `SEMANTIC_CI_NO_CACHE=1` disables both reads and writes. `--cache-dir <dir>`
 changes the cache root; relative paths are resolved from the invoking working
-directory. Add `.semantic-ci/cache/` to your project `.gitignore` if you use the
-default cache location.
+directory. `--cache-max-bytes <int>` controls size-based eviction; the default
+is 100 MiB, `0` disables eviction, and `SEMANTIC_CI_CACHE_MAX_BYTES` can set the
+default when the flag is absent. Add `.semantic-ci/cache/` to your project
+`.gitignore` if you use the default cache location.
+
+JSON output includes `cache: {hit, miss, invalid, write_failed, disabled}` for
+the current command invocation. `hit` and `miss` count individual baseline /
+candidate lookups, `invalid` counts corrupt or version-mismatched entries that
+were recomputed, and `write_failed` counts failed cache writes.
 
 Examples:
 
@@ -160,6 +168,7 @@ semantic-ci check --baseline-rev origin/main --candidate-rev HEAD --target targe
 semantic-ci check --allow-dirty --package-root src/semantic_ci_code
 semantic-ci check --mode smoke
 semantic-ci check --cache-dir .semantic-ci/cache
+semantic-ci check --cache-max-bytes 104857600
 ```
 
 ## `semantic-ci pre-commit`
@@ -168,11 +177,19 @@ semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci pre-commit [--target <yaml>] [--package-root <repo-relative-dir>]
                        [--format {json,human}] [--output <file>]
                        [--strict-repair] [--mode {smoke,full}]
+                       [--no-cache] [--cache-dir <dir>]
+                       [--cache-max-bytes <int>]
 ```
 
 Compares `HEAD` against the staged index. The staged index is exported with
 `git checkout-index`, so unstaged working-tree changes are ignored. If there are
 no staged files, the command returns an empty PASS payload with exit 0.
+
+`pre-commit` uses the same CodeState cache as `check`. Baseline `HEAD` is keyed
+by the package subtree object id; the staged candidate is keyed by
+`git write-tree`, so identical staged content can hit cache across repeated
+runs. `--no-cache`, `SEMANTIC_CI_NO_CACHE=1`, `--cache-dir`, and
+`--cache-max-bytes` have the same meaning as they do for `check`.
 
 Examples:
 
@@ -180,6 +197,7 @@ Examples:
 semantic-ci pre-commit --target target.yaml
 semantic-ci pre-commit --strict-repair
 semantic-ci pre-commit --mode smoke
+semantic-ci pre-commit --cache-dir .semantic-ci/cache
 ```
 
 ## `semantic-ci compile`

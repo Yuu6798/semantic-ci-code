@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from pathlib import Path
 
 from semantic_ci_code.cli.code_state_cache import (
+    CacheStats,
     cache_disabled,
     current_python_xy,
     dimensions_for_cache,
@@ -12,6 +13,7 @@ from semantic_ci_code.cli.code_state_cache import (
     key_meta,
     package_root_cache_path,
     read_cached_code_state,
+    resolve_cache_max_bytes,
     resolve_cache_root,
     write_cached_code_state,
 )
@@ -71,6 +73,8 @@ def run_check(args: Namespace) -> int:
         dimensions_tuple = dimensions_for_cache(dimensions)
         use_cache = not cache_disabled(no_cache_flag=args.no_cache)
         cache_root = resolve_cache_root(args.cache_dir, repo_root=root, cwd=Path.cwd())
+        cache_max_bytes = resolve_cache_max_bytes(args.cache_max_bytes) if use_cache else 0
+        cache_stats = CacheStats(disabled=not use_cache)
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
 
@@ -103,6 +107,8 @@ def run_check(args: Namespace) -> int:
                     dimensions_tuple=dimensions_tuple,
                     cache_root=cache_root,
                     use_cache=use_cache,
+                    cache_stats=cache_stats,
+                    cache_max_bytes=cache_max_bytes,
                     verbose=args.verbose,
                 )
                 if args.verbose:
@@ -117,6 +123,8 @@ def run_check(args: Namespace) -> int:
                     dimensions_tuple=dimensions_tuple,
                     cache_root=cache_root,
                     use_cache=use_cache and not args.allow_dirty,
+                    cache_stats=cache_stats,
+                    cache_max_bytes=cache_max_bytes,
                     verbose=args.verbose,
                 )
 
@@ -144,6 +152,7 @@ def run_check(args: Namespace) -> int:
             files_touched=files_touched,
             loc_delta=loc_delta,
             mode=mode.value,
+            cache_stats=cache_stats,
         )
         output_status = _write_output(
             _render_payload(payload, args, subcommand="check"), args.output
@@ -208,6 +217,8 @@ def _extract_code_state(
     dimensions_tuple: tuple[str, ...] | None,
     cache_root: Path,
     use_cache: bool,
+    cache_stats: CacheStats,
+    cache_max_bytes: int,
     verbose: bool,
 ):
     if not use_cache:
@@ -224,7 +235,7 @@ def _extract_code_state(
         python_xy=python_xy,
     )
     log = _stderr if verbose else None
-    cached = read_cached_code_state(cache_root, key, log=log)
+    cached = read_cached_code_state(cache_root, key, stats=cache_stats, log=log)
     if cached is not None:
         return cached
 
@@ -240,6 +251,8 @@ def _extract_code_state(
             dimensions_sorted_tuple=dimensions_tuple,
             python_xy=python_xy,
         ),
+        stats=cache_stats,
+        max_bytes=cache_max_bytes,
         log=log,
     )
     return state

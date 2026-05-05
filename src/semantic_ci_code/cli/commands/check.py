@@ -173,9 +173,19 @@ def run_check(args: Namespace) -> int:
 
 def _package_root_relative(raw_path: str) -> Path:
     path = Path(raw_path)
-    if path.is_absolute():
+    if path.is_absolute() or path.drive:
         raise ValueError(f"package_root must be repo-relative for check: {path}")
-    return path
+    parts: list[str] = []
+    for part in path.parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError(f"package_root must stay within repo for check: {path}")
+            parts.pop()
+            continue
+        parts.append(part)
+    return Path(*parts) if parts else Path(".")
 
 
 def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Path:

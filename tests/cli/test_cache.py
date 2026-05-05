@@ -196,6 +196,43 @@ def test_cache_dir_override_accepts_relative_and_absolute_paths(tmp_path: Path):
     assert (absolute_dir / "code_state").exists()
 
 
+def test_package_root_is_normalized_before_tree_object_id(tmp_path: Path):
+    repo = init_repo(tmp_path)
+    cache_dir = tmp_path / "cache"
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--format",
+        "json",
+        "--no-fetch",
+        "--package-root",
+        "src/..",
+        "--cache-dir",
+        str(cache_dir),
+    )
+
+    assert result.returncode == 0
+    assert len(tuple((cache_dir / "code_state").glob("*.json"))) == 2
+
+
+def test_package_root_cannot_escape_repo_for_cache_key(tmp_path: Path):
+    repo = init_repo(tmp_path)
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--format",
+        "json",
+        "--no-fetch",
+        "--package-root",
+        "..",
+    )
+
+    assert result.returncode == 2
+    assert "package_root must stay within repo for check" in result.stderr
+
+
 def test_corrupt_cache_is_miss_and_overwritten(tmp_path: Path):
     repo = init_repo(tmp_path)
     cache_dir = tmp_path / "cache"

@@ -73,6 +73,7 @@ docs/
 | `docs/brief_4_planning.md` | (Brief 4 complete; retained for Brief 5 reference) Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR が merge され `semantic-ci` CLI 5 subcommand が release 可能状態。Open Questions 16 件のうち未確定分は Brief 5 / Brief 4b で消化予定 |
 | `docs/brief_3_planning.md` | (Archived) Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。CSCI-10〜14 の全 PR が merge され Brief 3 は完結済み。当時の判断履歴として保存 |
 | `docs/multi_agent_audit_case.md` | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
+| `docs/pre_generation_validation_case.md` | 外部 Python リポジトリ上で stub のみの candidate を engine に渡し §23.1 入力 contract が実装で動作することを 3 ケースで確認した観測事例。core scope 外の応用観測 |
 
 When adding a new `docs/<topic>.md`, update this table and the README documentation list.
 

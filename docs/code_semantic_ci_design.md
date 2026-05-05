@@ -642,7 +642,12 @@ svp-rpe-code/
 
 **Exit criteria**: fixtures 全件で verdict 安定 + 決定論テスト pass + hash trail が再現可能
 
-**Status**: Brief 1(schema)/ Brief 2(extractor 6 次元)/ Brief 3(pipeline)/ Brief 4(CLI 5 subcommand)が CSCI-1〜19 として merged。`semantic-ci` CLI release 可能状態。残務として extractor 系の hot-fix 候補(effects slice の `fqn` semantics 修正、§7.3 の Level 2/3 拡張は P2 予定どおり)あり。
+**Status**: Brief 1(schema)/ Brief 2(extractor 6 次元)/ Brief 3(pipeline)/ Brief 4(CLI 5 subcommand)が CSCI-1〜19 として merged。`semantic-ci` CLI release 可能状態。
+
+**P1 内 hot-fix(優先、Brief 4c で対応)**:
+- **effects slice extractor の `fqn` semantics 修正**: `python_effect_extractor.py` の `EffectEntry.fqn` が現在 callee 名(例: `print`)を保持しているが、§3.1 schema は enclosing function(例: `audit.audit_state`)を要求している。AST `NodeVisitor` 化 + FunctionDef stack 導入で per-fqn 比較を機能させる。半日〜1 日規模、Brief 4b と並列可。詳細は `.claude/memory/2026-05-05.md` Session 2
+
+§7.3 の Level 2/3(method call 解決、`Path.write_text` 等)は P2 予定どおり、本 hot-fix のスコープ外。
 
 ### P2: Python Repair Core Completion（3–4 週） ⏭ 次フェーズ
 
@@ -1129,7 +1134,7 @@ generic comparator として設計することの帰結:
 
 本設計を Codex 実装に落とすため、以下の順で Task Brief を発行する。
 
-> **注**: Brief 5 以降の中身は §21 / §22 の P2.5 前倒しを受けて再調整中。下表の Brief 5〜7 は元計画(spec authorship 系を先行する案)で、現行運用案(`init` / Vibe Coding Adapter / Repair Compiler を Brief 5 として優先)は `docs/brief_4_planning.md §11` 参照。**Brief 5 起草時に下表を更新する**。
+> **現行運用(2026-05 確定)**: §21 / §22 の P2.5 前倒しを受け、元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は **deferred**(後回し)。**Brief 5 = `init` + Vibe Coding Adapter + Repair Compiler の P2.5 entry** に確定。`brief_4_planning.md §11` と整合。
 
 | Brief | 範囲 | 想定 PR | Status |
 |---|---|---|---|
@@ -1137,9 +1142,10 @@ generic comparator として設計することの帰結:
 | **Brief 2** | extractor 実装（Python のみ、6 次元） | `codex/code-semantic-ci-py-extractors` | merged (CSCI-5〜9) |
 | **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` | merged (CSCI-10〜14、`brief_3_planning.md` archived) |
 | **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` | merged (CSCI-15〜19、`brief_4_planning.md` 完結) |
-| **Brief 4b** | SARIF 出力 + GitHub Actions annotation | `codex/code-semantic-ci-sarif` | pending(`brief_4_planning.md §11` 参照) |
-| **Brief 5** | (元計画) spec authorship attribution（§17）+ performance budget（§18）<br>(現行運用案) `semantic-ci init` / Vibe Coding Adapter / Repair Compiler 前倒し(§21) | `codex/code-semantic-ci-attribution-perf` | **planning(再調整中)** |
-| **Brief 6** | spec quality metrics（§19）+ suite packaging（§20）| `codex/code-semantic-ci-quality-suite` | pending |
-| **Brief 7** | vibe coding adapter / Repair Compiler 前倒し（§21）+ TS extractor 前倒し（§22）| `codex/code-semantic-ci-adapter-ts` | pending(中身は Brief 5 現行案と重複、再分割対象) |
+| **Brief 4b** | SARIF 出力 + GitHub Actions annotation | `codex/code-semantic-ci-sarif` | **next**(Brief 5 の前) |
+| **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/code-semantic-ci-effect-fqn-fix` | **P1 内 hot-fix(優先)**、Brief 4b と並列可 |
+| **Brief 5** | `semantic-ci init`（target.yaml scaffolding）+ Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4）— P2.5 entry | `codex/code-semantic-ci-adapter-compiler` | planning(Brief 5 起草時に Open Questions 棚卸し → CSCI 分割) |
+| **Brief 6** | TypeScript extractor 着手（§22.2、P2.5 並列） | `codex/code-semantic-ci-ts-extractor` | pending |
+| **Brief 7+** | (deferred / 後回し) spec authorship attribution（§17）/ performance budget（§18）/ spec quality metrics（§19）/ suite packaging（§20）/ orchestrator 観測応用（`docs/multi_agent_audit_case.md`） | TBD | deferred |
 
 各 Brief 完了ごとに Claude が Completion Summary を review し、次 Brief を発行する。

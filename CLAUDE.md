@@ -23,9 +23,10 @@ requests while remaining deterministic and auditable.
 ## Current Status (snapshot)
 
 - **Phase**: P1 (Python Static Semantic CI MVP) — Exit criteria 達成済み(Brief 1〜4 / CSCI-1〜19 merged、`semantic-ci` CLI 5 subcommand release 可能)
-- **Next**: Brief 5 planning(P2 / P2.5 入口)。`docs/brief_4_planning.md §10` の Open Questions 16 件棚卸しが先行作業
-- **Frontloaded**(`design.md §21 / §22`): Vibe Coding Adapter / Repair Compiler を P5 → **P2.5** へ、TypeScript extractor を P3b → **P2.5 並列** へ
-- **Hot-fix candidate**: effects slice extractor の `fqn` semantics 修正(P1 内で完結、`.claude/memory/2026-05-05.md` Session 2 に詳細)
+- **P1 内 hot-fix(優先)**: **Brief 4c** — effects slice extractor の `fqn` semantics 修正(`python_effect_extractor.py` を callee 指向 → enclosing function 指向へ、設計 §3.1 schema に適合)。詳細経緯は `.claude/memory/2026-05-05.md` Session 2
+- **Next sequence**: Brief 4b(SARIF / GH Actions annotation)→ Brief 5(`semantic-ci init` + Vibe Coding Adapter + Repair Compiler、P2.5 entry)。`brief_4_planning.md §10` Open Questions 16 件の棚卸しを Brief 5 起草前に実施
+- **Frontloaded**(`design.md §21 / §22`): Vibe Coding Adapter / Repair Compiler を P5 → **P2.5**、TypeScript extractor を P3b → **P2.5 並列**
+- **Deferred**: 元 §25 Brief 5/6 の spec authorship attribution / performance budget / spec quality metrics / suite packaging(§17〜§20)。現行運用では Brief 7+ 以降に後置
 
 詳細: phase 定義は `docs/code_semantic_ci_design.md §12`、Brief 進捗は同 `§25`、直近の決定経緯は `.claude/memory/_index.md`。
 

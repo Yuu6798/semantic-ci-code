@@ -4,6 +4,17 @@ from argparse import Namespace
 from contextlib import nullcontext
 from pathlib import Path
 
+from semantic_ci_code.cli.code_state_cache import (
+    cache_disabled,
+    current_python_xy,
+    dimensions_for_cache,
+    key_for_state,
+    key_meta,
+    package_root_cache_path,
+    read_cached_code_state,
+    resolve_cache_root,
+    write_cached_code_state,
+)
 from semantic_ci_code.cli.command_support import (
     _engine_error,
     _exit_code_for,
@@ -25,6 +36,7 @@ from semantic_ci_code.cli.git_runtime import (
     repo_root,
     resolve_baseline,
     resolve_candidate,
+    tree_object_id,
 )
 from semantic_ci_code.cli.modes import dimensions_for_mode, resolve_execution_mode
 from semantic_ci_code.cli.output.json_formatter import build_payload
@@ -56,6 +68,9 @@ def run_check(args: Namespace) -> int:
         package_root = _package_root_relative(args.package_root)
         mode = resolve_execution_mode(args.mode)
         dimensions = dimensions_for_mode(mode)
+        dimensions_tuple = dimensions_for_cache(dimensions)
+        use_cache = not cache_disabled(no_cache_flag=args.no_cache)
+        cache_root = resolve_cache_root(args.cache_dir, repo_root=root, cwd=Path.cwd())
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
 
@@ -78,10 +93,32 @@ def run_check(args: Namespace) -> int:
                 candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
                 if args.verbose:
                     _stderr(f"extracting baseline package_root={baseline_root}")
-                baseline = extract_python_code_state(baseline_root, dimensions=dimensions)
+                baseline = _extract_code_state(
+                    package_root=package_root,
+                    resolved_package_root=baseline_root,
+                    repo_root=root,
+                    ref=baseline_ref,
+                    mode=mode,
+                    dimensions=dimensions,
+                    dimensions_tuple=dimensions_tuple,
+                    cache_root=cache_root,
+                    use_cache=use_cache,
+                    verbose=args.verbose,
+                )
                 if args.verbose:
                     _stderr(f"extracting candidate package_root={candidate_root}")
-                candidate = extract_python_code_state(candidate_root, dimensions=dimensions)
+                candidate = _extract_code_state(
+                    package_root=package_root,
+                    resolved_package_root=candidate_root,
+                    repo_root=root,
+                    ref=candidate_ref,
+                    mode=mode,
+                    dimensions=dimensions,
+                    dimensions_tuple=dimensions_tuple,
+                    cache_root=cache_root,
+                    use_cache=use_cache and not args.allow_dirty,
+                    verbose=args.verbose,
+                )
 
         delta = compute_code_state_delta(baseline, candidate)
         entries = (
@@ -136,9 +173,19 @@ def run_check(args: Namespace) -> int:
 
 def _package_root_relative(raw_path: str) -> Path:
     path = Path(raw_path)
-    if path.is_absolute():
+    if path.is_absolute() or path.drive:
         raise ValueError(f"package_root must be repo-relative for check: {path}")
-    return path
+    parts: list[str] = []
+    for part in path.parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError(f"package_root must stay within repo for check: {path}")
+            parts.pop()
+            continue
+        parts.append(part)
+    return Path(*parts) if parts else Path(".")
 
 
 def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Path:
@@ -148,3 +195,51 @@ def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Pa
     if not path.is_dir():
         raise ValueError(f"{label} package_root is not a directory: {path}")
     return path
+
+
+def _extract_code_state(
+    *,
+    package_root: Path,
+    resolved_package_root: Path,
+    repo_root: Path,
+    ref: str,
+    mode,
+    dimensions: frozenset[str] | None,
+    dimensions_tuple: tuple[str, ...] | None,
+    cache_root: Path,
+    use_cache: bool,
+    verbose: bool,
+):
+    if not use_cache:
+        return extract_python_code_state(resolved_package_root, dimensions=dimensions)
+
+    package_root_posix = package_root_cache_path(package_root)
+    tree_id = tree_object_id(ref, package_root_posix.as_posix(), cwd=repo_root)
+    python_xy = current_python_xy()
+    key = key_for_state(
+        tree_object_id=tree_id,
+        package_root_relpath_posix=package_root_posix,
+        mode=mode,
+        dimensions_sorted_tuple=dimensions_tuple,
+        python_xy=python_xy,
+    )
+    log = _stderr if verbose else None
+    cached = read_cached_code_state(cache_root, key, log=log)
+    if cached is not None:
+        return cached
+
+    state = extract_python_code_state(resolved_package_root, dimensions=dimensions)
+    write_cached_code_state(
+        cache_root,
+        key,
+        state=state,
+        meta=key_meta(
+            tree_object_id=tree_id,
+            package_root_relpath_posix=package_root_posix,
+            mode=mode,
+            dimensions_sorted_tuple=dimensions_tuple,
+            python_xy=python_xy,
+        ),
+        log=log,
+    )
+    return state

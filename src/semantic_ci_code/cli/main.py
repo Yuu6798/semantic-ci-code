@@ -82,6 +82,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check.add_argument("--no-fetch", action="store_true")
     check.add_argument("--allow-dirty", action="store_true")
+    check.add_argument("--no-cache", action="store_true", help="disable CodeState cache")
+    check.add_argument(
+        "--cache-dir",
+        default=None,
+        help="cache root directory; defaults to <repo>/.semantic-ci/cache",
+    )
     check.add_argument(
         "--no-color",
         action="store_true",

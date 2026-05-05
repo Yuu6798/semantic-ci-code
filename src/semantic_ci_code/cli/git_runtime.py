@@ -117,6 +117,15 @@ def repo_root(cwd: Path) -> Path:
     return Path(output.strip()).resolve()
 
 
+def tree_object_id(ref: str, subpath: str, *, cwd: Path) -> str:
+    spec = f"{ref}^{{tree}}" if subpath == "." else f"{ref}:{subpath}"
+    output = run_git(["rev-parse", "--verify", spec], cwd=cwd)
+    lines = tuple(line for line in output.splitlines() if line)
+    if len(lines) != 1:
+        raise GitCommandError(f"git rev-parse produced {len(lines)} object ids for {spec}")
+    return lines[0]
+
+
 def is_dirty(cwd: Path) -> bool:
     return bool(run_git(["status", "--porcelain"], cwd=cwd).strip())
 

@@ -82,6 +82,43 @@ def test_cache_key_changes_for_each_axis():
         assert cache_key(**changed) != baseline
 
 
+def test_cache_package_version_uses_source_fingerprint_when_metadata_is_unknown(monkeypatch):
+    monkeypatch.setattr(code_state_cache, "package_version", lambda: "0.0.0+unknown")
+    monkeypatch.setattr(code_state_cache, "_source_fingerprint", lambda: "abc123")
+
+    assert code_state_cache.cache_package_version() == "0.0.0+unknown.source.abc123"
+
+
+def test_unknown_package_metadata_source_fingerprint_invalidates_cache_key(monkeypatch):
+    base = {
+        "tree_object_id": "tree-a",
+        "package_root_relpath_posix": Path("pkg"),
+        "mode": ExecutionMode.SMOKE,
+        "dimensions_sorted_tuple": ("api_surface", "effects", "imports"),
+        "python_xy": "3.11",
+    }
+
+    monkeypatch.setattr(code_state_cache, "package_version", lambda: "0.0.0+unknown")
+    monkeypatch.setattr(code_state_cache, "_source_fingerprint", lambda: "source-a")
+    before = code_state_cache.key_for_state(**base)
+
+    monkeypatch.setattr(code_state_cache, "_source_fingerprint", lambda: "source-b")
+    after = code_state_cache.key_for_state(**base)
+
+    assert after != before
+
+
+def test_installed_package_metadata_is_used_without_source_fingerprint(monkeypatch):
+    monkeypatch.setattr(code_state_cache, "package_version", lambda: "1.2.3")
+    monkeypatch.setattr(
+        code_state_cache,
+        "_source_fingerprint",
+        lambda: (_ for _ in ()).throw(AssertionError("source fingerprint should not run")),
+    )
+
+    assert code_state_cache.cache_package_version() == "1.2.3"
+
+
 def test_cache_verdict_matches_no_cache_byte_for_byte(tmp_path: Path):
     repo = init_repo(tmp_path)
     cache_dir = tmp_path / "cache"

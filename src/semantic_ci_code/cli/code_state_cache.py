@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from semantic_ci_code.cli.modes import ExecutionMode
-from semantic_ci_code.cli.output.json_formatter import package_version
+from semantic_ci_code.cli.output.json_formatter import UNKNOWN_VERSION, package_version
 from semantic_ci_code.domain.state_schema import CodeState
 
 CACHE_FORMAT_VERSION = 1
@@ -48,6 +48,22 @@ def dimensions_for_cache(dimensions: frozenset[str] | None) -> tuple[str, ...] |
 
 def current_python_xy() -> str:
     return f"{sys.version_info.major}.{sys.version_info.minor}"
+
+
+def cache_package_version() -> str:
+    """Return the package version component used in CodeState cache keys.
+
+    Installed packages use package metadata directly. Source-tree execution can
+    legitimately lack metadata, in which case `package_version()` returns the
+    constant unknown fallback. A constant would let extractor code changes reuse
+    stale cache entries, so cache keys include a deterministic source fingerprint
+    only for that fallback case.
+    """
+
+    value = package_version()
+    if value != UNKNOWN_VERSION:
+        return value
+    return f"{UNKNOWN_VERSION}.source.{_source_fingerprint()}"
 
 
 def cache_key(
@@ -94,7 +110,7 @@ def key_meta(
             list(dimensions_sorted_tuple) if dimensions_sorted_tuple is not None else None
         ),
         "python_xy": python_xy or current_python_xy(),
-        "package_version": package_version_value or package_version(),
+        "package_version": package_version_value or cache_package_version(),
     }
 
 
@@ -115,7 +131,7 @@ def key_for_state(
         mode=mode,
         dimensions_sorted_tuple=dimensions_sorted_tuple,
         python_xy=python_xy or current_python_xy(),
-        package_version_value=package_version_value or package_version(),
+        package_version_value=package_version_value or cache_package_version(),
         code_state_schema_version=code_state_schema_version,
         cache_format_version=cache_format_version,
     )
@@ -192,3 +208,21 @@ def _log(log: LogFn | None, message: str) -> None:
 
 def _one_line(message: str) -> str:
     return message.splitlines()[0] if message else ""
+
+
+def _source_fingerprint() -> str:
+    package_root = Path(__file__).resolve().parents[1]
+    digest = hashlib.sha256()
+    for path in sorted(
+        package_root.rglob("*.py"),
+        key=lambda candidate: candidate.relative_to(package_root).as_posix(),
+    ):
+        relative = path.relative_to(package_root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        try:
+            digest.update(path.read_bytes())
+        except OSError as exc:
+            digest.update(f"<unreadable:{type(exc).__name__}>".encode())
+        digest.update(b"\0")
+    return digest.hexdigest()[:16]

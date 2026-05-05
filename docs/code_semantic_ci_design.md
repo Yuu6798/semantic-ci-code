@@ -849,11 +849,13 @@ CSCI-26 implements the first operational slice of this budget: `semantic-ci
 check` stores ref-backed Python `CodeState` observations in
 `.semantic-ci/cache/code_state/`, keyed by the package subtree object id,
 package root, execution mode, extracted dimensions, Python minor version,
-package version, CodeState schema version, and cache format version. Cache
-misses, corrupt entries, and write failures fall back to normal extraction; JSON
-verdict output and engine semantics remain unchanged. Worktree caching,
-incremental extraction, eviction, and JSON cache statistics remain CSCI-27+
-work.
+package version, CodeState schema version, and cache format version. If package
+metadata is unavailable during source-tree execution, the package-version key
+component falls back to a deterministic source fingerprint so extractor changes
+invalidate stale entries. Cache misses, corrupt entries, and write failures fall
+back to normal extraction; JSON verdict output and engine semantics remain
+unchanged. Worktree caching, incremental extraction, eviction, and JSON cache
+statistics remain CSCI-27+ work.
 
 baseline は git ref で content-addressable にキャッシュする:
 

@@ -1,0 +1,14 @@
+- id: semantic-ci
+  name: semantic-ci
+  description: Run Semantic CI against staged Python changes
+  entry: semantic-ci pre-commit
+  language: python
+  pass_filenames: false
+  stages: [pre-commit]
+- id: semantic-ci-smoke
+  name: semantic-ci smoke
+  description: Run Semantic CI smoke mode against staged Python changes
+  entry: semantic-ci pre-commit --mode smoke
+  language: python
+  pass_filenames: false
+  stages: [pre-commit]

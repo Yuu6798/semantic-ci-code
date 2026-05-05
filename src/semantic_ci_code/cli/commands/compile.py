@@ -22,6 +22,8 @@ from semantic_ci_code.compiler import CompileError
 
 def run_compile(args: Namespace) -> int:
     try:
+        if args.format in {"sarif", "gh-actions"}:
+            raise ValueError(f"{args.format} format is not supported for compile")
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
         payload = build_compile_payload(compiled)

@@ -11,6 +11,12 @@ The CLI has two envelopes:
 Both are deterministic: field order is fixed by insertion order and JSON is
 rendered with two-space indentation.
 
+`--format sarif` and `--format gh-actions` are separate CI integration outputs,
+not variants of the verdict envelope below. SARIF emits a SARIF 2.1.0 document,
+while `gh-actions` emits GitHub workflow command lines. They do not change the
+verdict or compile JSON envelopes and therefore do not require a schema version
+bump beyond the current CLI schema version.
+
 ## Verdict Envelope
 
 ```jsonc

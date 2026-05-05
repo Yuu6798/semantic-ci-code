@@ -152,10 +152,14 @@ adapter 出力に必ず含める metadata:
     "primary_kind": "feature|bugfix|refactor|test_update",
     "constraint_count": int,
     "render_timestamp": null,               # determinism のため null 固定
+    "input_kind": "verdict_envelope" | "raw_repair_plan" | "target_svp",
+                                            # compile-repair: "verdict_envelope" or "raw_repair_plan"
+                                            # validate-plan : "target_svp" 固定
 }
 ```
 
 `render_timestamp` は **always null**(§14.2 determinism 維持)。
+`input_kind` は §8.1 の auto-detect 結果を hint として転記。
 
 ### 5.4 Adapter Protocol 抽象
 
@@ -354,8 +358,27 @@ semantic-ci compile-repair
     [--format json]                          # 任意、JSON envelope
 ```
 
-`--input` は CSCI-14 RepairPlan の JSON 出力 shape を期待。CI で `semantic-ci check
---format json | semantic-ci compile-repair --adapter claude-code` の pipe 接続を可能に。
+`--input` は **2 種類の input shape を auto-detect** で受け付ける:
+
+1. **verdict envelope**(`semantic-ci check / compare / pre-commit --format json` の出力、
+   `repair_plan` を **nested field** として持つ、`docs/json_schema.md` Verdict Envelope 仕様)
+   → top-level の `subcommand` field 存在 + `repair_plan` field 存在で envelope と判定し、
+   `repair_plan` を抽出して core に渡す
+2. **raw RepairPlan JSON**(CSCI-14 `RepairPlan.model_dump()` 等を直接 dump したもの)
+   → top-level に `instructions` 等の RepairPlan 専用 key を持ち、`subcommand` を持たない
+
+これにより `semantic-ci check --format json | semantic-ci compile-repair --adapter
+claude-code` の pipe 接続が、**user 側で field 抽出する必要なく**動作する(既存 CLI の
+主用途を尊重)。同時に raw `RepairPlan` JSON を直接持つ test fixture / 外部生成物にも
+対応する。
+
+不正な shape(どちらにも該当しない)は **exit 2** + 人間可読エラー(`unrecognized
+input: expected verdict envelope (with subcommand + repair_plan) or raw RepairPlan
+(with instructions)` 相当)。
+
+`compile-repair` は **input 種別を `metadata.input_kind` field に転記**(値は
+`"verdict_envelope"` or `"raw_repair_plan"`)。下流が input 経路を区別したいときの
+hint。`metadata` schema は planning §5.3 を拡張。
 
 ## 9. JSON schema 影響
 
@@ -492,8 +515,12 @@ frontmatter dump、本文は string concat で OK。
 - file input(`--input plan.json`)
 - `--output` で file 書き出し
 - `--format json` で JSON envelope に rendered + metadata
-- pipe 連携: `semantic-ci check --format json | semantic-ci compile-repair --adapter claude-code`
-- 不正 plan.json で exit 2
+- **input shape auto-detect**(planning §8.1):
+  - **verdict envelope input**(`{subcommand: "check", verdict: ..., repair_plan: {...}, ...}`)で `metadata.input_kind == "verdict_envelope"`、`repair_plan` を抽出して render
+  - **raw RepairPlan input**(`{instructions: [...], ...}`)で `metadata.input_kind == "raw_repair_plan"`、そのまま render
+  - **同 RepairPlan を verdict envelope で包んだ場合と raw で渡した場合で、`rendered` が byte-identical**(extraction の正確性)
+  - **不正 shape**(`subcommand` も `instructions` も持たない)で exit 2 + 人間可読エラー
+- pipe 連携: `semantic-ci check --format json | semantic-ci compile-repair --adapter claude-code` が **user 側 jq 等の field 抽出なしで** pass through(verdict envelope auto-detect 経路の end-to-end test)
 
 ### 13.4 `validate-plan` subcommand(CSCI-35)
 - target.yaml + baseline-rev で render(全 adapter)

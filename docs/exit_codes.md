@@ -24,6 +24,11 @@ above. `--strict-repair` changes only REPAIR from exit 0 to exit 1.
 policy; skipped constraints are reported in output but do not contribute to
 PASS, REPAIR, or FAIL.
 
+Cache hit, miss, invalidation, write failure, and best-effort eviction do not
+change exit-code policy. Cache write and eviction failures are reported through
+cache stats or verbose diagnostics, then the command continues with the computed
+verdict.
+
 `compile` does not compute a verdict. Successful compilation exits 0. Target
 discovery errors exit 2. Compile errors exit 3.
 

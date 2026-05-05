@@ -183,7 +183,7 @@ def test_smoke_json_envelope_reports_mode_and_skipped_summary(tmp_path: Path):
     data = payload(result)
 
     assert result.returncode == 0
-    assert data["schema_version"] == "2"
+    assert data["schema_version"] == "3"
     assert data["mode"] == "smoke"
     assert data["summary"]["skipped"] == 1
     assert data["results"][-1]["status"] == "skipped"
@@ -272,6 +272,7 @@ def _timed_pre_commit(
         mode,
         "--format",
         "json",
+        "--no-cache",
         extra_env=extra_env,
     )
     elapsed = time.perf_counter() - start

@@ -4,7 +4,9 @@ import hashlib
 import json
 import os
 import sys
+import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -16,8 +18,20 @@ from semantic_ci_code.domain.state_schema import CodeState
 
 CACHE_FORMAT_VERSION = 1
 CODE_STATE_SCHEMA_VERSION = "1"
+DEFAULT_CACHE_MAX_BYTES = 100 * 1024 * 1024
+DEFAULT_EVICTION_LOW_WATER = 0.8
+STALE_TMP_SECONDS = 60 * 60
 
 LogFn = Callable[[str], None]
+
+
+@dataclass
+class CacheStats:
+    hit: int = 0
+    miss: int = 0
+    invalid: int = 0
+    write_failed: int = 0
+    disabled: bool = False
 
 
 def cache_disabled(*, no_cache_flag: bool) -> bool:
@@ -33,6 +47,23 @@ def resolve_cache_root(raw_cache_dir: str | None, *, repo_root: Path, cwd: Path)
     if not path.is_absolute():
         path = cwd / path
     return path.resolve()
+
+
+def resolve_cache_max_bytes(raw_max_bytes: str | None) -> int:
+    raw_value = (
+        raw_max_bytes
+        if raw_max_bytes is not None
+        else os.environ.get("SEMANTIC_CI_CACHE_MAX_BYTES")
+    )
+    if raw_value is None:
+        return DEFAULT_CACHE_MAX_BYTES
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"cache max bytes must be an integer: {raw_value}") from exc
+    if value < 0:
+        raise ValueError("cache max bytes must be non-negative")
+    return value
 
 
 def package_root_cache_path(package_root: Path) -> PurePosixPath:
@@ -141,10 +172,13 @@ def read_cached_code_state(
     cache_root: Path,
     key: str,
     *,
+    stats: CacheStats | None = None,
     log: LogFn | None = None,
 ) -> CodeState | None:
     path = _cache_path(cache_root, key)
     if not path.exists():
+        if stats is not None:
+            stats.miss += 1
         _log(log, f"cache miss: code_state {key}")
         return None
 
@@ -159,9 +193,14 @@ def read_cached_code_state(
             raise ValueError("code_state_schema_version mismatch")
         state = CodeState.model_validate(payload["code_state"])
     except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError, ValidationError) as exc:
+        if stats is not None:
+            stats.invalid += 1
+            stats.miss += 1
         _log(log, f"cache invalid: {_one_line(str(exc))}; recomputing")
         return None
 
+    if stats is not None:
+        stats.hit += 1
     _log(log, f"cache hit: code_state {key}")
     return state
 
@@ -172,6 +211,8 @@ def write_cached_code_state(
     *,
     state: CodeState,
     meta: dict[str, Any],
+    stats: CacheStats | None = None,
+    max_bytes: int | None = None,
     log: LogFn | None = None,
 ) -> None:
     path = _cache_path(cache_root, key)
@@ -189,12 +230,50 @@ def write_cached_code_state(
             encoding="utf-8",
         )
         os.replace(tmp_path, path)
+        if max_bytes is not None:
+            evict_to_budget(cache_root, max_bytes, log=log)
     except OSError as exc:
+        if stats is not None:
+            stats.write_failed += 1
         _log(log, f"cache write failed: {_one_line(str(exc))}")
         try:
             tmp_path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+def evict_to_budget(
+    cache_root: Path,
+    budget_bytes: int,
+    *,
+    low_water: float = DEFAULT_EVICTION_LOW_WATER,
+    log: LogFn | None = None,
+) -> tuple[Path, ...]:
+    if budget_bytes <= 0:
+        return ()
+
+    records = sorted(_cache_file_records(cache_root), key=lambda record: record[1])
+    total = sum(size for _, _, size in records)
+    if total <= budget_bytes:
+        return ()
+
+    target = int(budget_bytes * low_water)
+    removed: list[Path] = []
+    for path, mtime, size in records:
+        if total <= target:
+            break
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            total -= size
+            continue
+        except OSError as exc:
+            _log(log, f"cache eviction failed: {_one_line(str(exc))}")
+            continue
+        total -= size
+        removed.append(path)
+        _log(log, f"cache evicted: {path} (mtime={mtime})")
+    return tuple(removed)
 
 
 def _cache_path(cache_root: Path, key: str) -> Path:
@@ -208,6 +287,35 @@ def _log(log: LogFn | None, message: str) -> None:
 
 def _one_line(message: str) -> str:
     return message.splitlines()[0] if message else ""
+
+
+def _cache_file_records(cache_root: Path) -> tuple[tuple[Path, float, int], ...]:
+    if not cache_root.exists():
+        return ()
+    now = time.time()
+    records: list[tuple[Path, float, int]] = []
+    for path in cache_root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix == ".json":
+            record = _file_record(path)
+        elif path.suffix == ".tmp":
+            record = _file_record(path)
+            if record is not None and now - record[1] < STALE_TMP_SECONDS:
+                record = None
+        else:
+            record = None
+        if record is not None:
+            records.append(record)
+    return tuple(records)
+
+
+def _file_record(path: Path) -> tuple[Path, float, int] | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (path, stat.st_mtime, stat.st_size)
 
 
 def _source_fingerprint() -> str:

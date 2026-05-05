@@ -40,6 +40,8 @@ def format_human(payload: dict[str, Any], *, use_color: bool) -> str:
             lines.append("")
             lines.extend(_instruction_lines(item, use_color=use_color))
 
+    lines.append("")
+    lines.append(_cache_line(payload))
     return "\n".join(lines) + "\n"
 
 
@@ -66,6 +68,8 @@ def format_compile_human(payload: dict[str, Any], *, use_color: bool) -> str:
             lines.append("")
         lines.extend(_compiled_constraint_lines(constraint, use_color=use_color))
 
+    lines.append("")
+    lines.append(_cache_line(payload))
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -123,3 +127,15 @@ def _compiled_constraint_lines(item: dict[str, Any], *, use_color: bool) -> list
     if item["expected"] is not None:
         lines.append(f"  expected:       {item['expected']}")
     return lines
+
+
+def _cache_line(payload: dict[str, Any]) -> str:
+    cache = payload.get("cache") or {}
+    return (
+        "cache: "
+        f"hit={cache.get('hit', 0)} "
+        f"miss={cache.get('miss', 0)} "
+        f"invalid={cache.get('invalid', 0)} "
+        f"write_failed={cache.get('write_failed', 0)} "
+        f"disabled={str(cache.get('disabled', True)).lower()}"
+    )

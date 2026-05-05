@@ -1,7 +1,7 @@
 # Semantic CI JSON Output Schema
 
 Semantic CI CLI output is JSON by default in non-TTY contexts and when
-`--output` is used. The current schema version is `"2"`.
+`--output` is used. The current schema version is `"3"`.
 
 The CLI has two envelopes:
 
@@ -15,7 +15,7 @@ rendered with two-space indentation.
 
 ```jsonc
 {
-  "schema_version": "2",
+  "schema_version": "3",
   "subcommand": "check",
   "mode": "full",
   "verdict": "pass",
@@ -35,6 +35,13 @@ rendered with two-space indentation.
   "code_state": null,
   "files_touched": 1,
   "loc_delta": {"added": 4, "removed": 0},
+  "cache": {
+    "hit": 0,
+    "miss": 2,
+    "invalid": 0,
+    "write_failed": 0,
+    "disabled": false
+  },
   "engine": {
     "extractor_pyver": "3.11",
     "package_version": "0.1.0"
@@ -44,7 +51,7 @@ rendered with two-space indentation.
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | CLI JSON schema version. Currently `"2"`. |
+| `schema_version` | CLI JSON schema version. Currently `"3"`. |
 | `subcommand` | One of `observe`, `compare`, `check`, `pre-commit`. |
 | `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
@@ -57,6 +64,7 @@ rendered with two-space indentation.
 | `code_state` | Full `CodeState` dump for `observe`; otherwise `null`. |
 | `files_touched` | Git diff file count. Zero for `observe` and `compare`. |
 | `loc_delta` | Git diff line count. Zero for `observe` and `compare`. |
+| `cache` | Cache stats for this invocation: `hit`, `miss`, `invalid`, `write_failed`, and `disabled`. |
 | `engine` | Python minor version and package version. |
 
 ## Compile Envelope
@@ -66,7 +74,7 @@ compute a verdict.
 
 ```jsonc
 {
-  "schema_version": "2",
+  "schema_version": "3",
   "subcommand": "compile",
   "compiled_target": {
     "intent": "verify refactor target",
@@ -100,6 +108,13 @@ compute a verdict.
       }
     ]
   },
+  "cache": {
+    "hit": 0,
+    "miss": 0,
+    "invalid": 0,
+    "write_failed": 0,
+    "disabled": true
+  },
   "engine": {
     "extractor_pyver": "3.11",
     "package_version": "0.1.0"
@@ -130,3 +145,14 @@ may use the same version when they are explicitly keyed by `subcommand`.
 | `2` | verdict | Added top-level `mode` for execution mode reporting. |
 | `2` | verdict | Added `summary.skipped` for constraints skipped by partial extraction modes. |
 | `2` | verdict | Clarified that `results[].status == "skipped"` can mean a smoke-mode partial CodeState skipped that constraint's target dimension. |
+| `3` | verdict, compile | Added top-level `cache` stats and aligned both envelopes on schema version `"3"`. |
+
+## v2 to v3 Diff
+
+- Added top-level `cache` to verdict and compile envelopes.
+- Shape: `{hit: int, miss: int, invalid: int, write_failed: int, disabled: bool}`.
+- `check` and `pre-commit` report real cache activity. `observe`, `compare`, and
+  `compile` emit `disabled: true` with zero counters because they do not use the
+  CodeState cache.
+- Migration: consumers reading v2 can treat a missing `cache` field as
+  `{hit: 0, miss: 0, invalid: 0, write_failed: 0, disabled: true}`.

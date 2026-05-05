@@ -6,6 +6,19 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from semantic_ci_code.cli.code_state_cache import (
+    CacheStats,
+    cache_disabled,
+    current_python_xy,
+    dimensions_for_cache,
+    key_for_state,
+    key_meta,
+    package_root_cache_path,
+    read_cached_code_state,
+    resolve_cache_max_bytes,
+    resolve_cache_root,
+    write_cached_code_state,
+)
 from semantic_ci_code.cli.command_support import (
     _engine_error,
     _exit_code_for,
@@ -25,6 +38,8 @@ from semantic_ci_code.cli.git_runtime import (
     is_git_available,
     repo_root,
     run_git,
+    staged_tree_object_id,
+    tree_object_id,
 )
 from semantic_ci_code.cli.modes import dimensions_for_mode, resolve_execution_mode
 from semantic_ci_code.cli.output.json_formatter import build_payload
@@ -50,14 +65,25 @@ def run_pre_commit(args: Namespace) -> int:
         package_root = _package_root_relative(args.package_root)
         mode = resolve_execution_mode(args.mode)
         dimensions = dimensions_for_mode(mode)
+        dimensions_tuple = dimensions_for_cache(dimensions)
+        use_cache = not cache_disabled(no_cache_flag=args.no_cache)
+        cache_root = resolve_cache_root(args.cache_dir, repo_root=root, cwd=Path.cwd())
+        cache_max_bytes = resolve_cache_max_bytes(args.cache_max_bytes) if use_cache else 0
+        cache_stats = CacheStats(disabled=not use_cache)
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
 
         if not staged_paths(root):
-            return _emit_empty_pass(args, compiled=compiled, mode=mode.value)
+            return _emit_empty_pass(
+                args,
+                compiled=compiled,
+                mode=mode.value,
+                cache_stats=cache_stats,
+            )
 
         entries = numstat_cached(root)
         files_touched, loc_delta = summarize_numstat(entries)
+        staged_tree = staged_tree_object_id(root)
 
         with materialize_ref(root, "HEAD", prefix="semantic-ci-baseline-") as baseline_dir:
             with _export_index(root, prefix="semantic-ci-candidate-") as candidate_dir:
@@ -65,10 +91,36 @@ def run_pre_commit(args: Namespace) -> int:
                 candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
                 if args.verbose:
                     _stderr(f"extracting baseline package_root={baseline_root}")
-                baseline = extract_python_code_state(baseline_root, dimensions=dimensions)
+                baseline = _extract_code_state(
+                    package_root=package_root,
+                    resolved_package_root=baseline_root,
+                    repo_root=root,
+                    ref="HEAD",
+                    mode=mode,
+                    dimensions=dimensions,
+                    dimensions_tuple=dimensions_tuple,
+                    cache_root=cache_root,
+                    use_cache=use_cache,
+                    cache_stats=cache_stats,
+                    cache_max_bytes=cache_max_bytes,
+                    verbose=args.verbose,
+                )
                 if args.verbose:
                     _stderr(f"extracting candidate package_root={candidate_root}")
-                candidate = extract_python_code_state(candidate_root, dimensions=dimensions)
+                candidate = _extract_code_state(
+                    package_root=package_root,
+                    resolved_package_root=candidate_root,
+                    repo_root=root,
+                    ref=staged_tree,
+                    mode=mode,
+                    dimensions=dimensions,
+                    dimensions_tuple=dimensions_tuple,
+                    cache_root=cache_root,
+                    use_cache=use_cache,
+                    cache_stats=cache_stats,
+                    cache_max_bytes=cache_max_bytes,
+                    verbose=args.verbose,
+                )
 
         delta = compute_code_state_delta(baseline, candidate)
         delta = overlay_delta(delta, files_touched=files_touched, loc_delta=loc_delta)
@@ -88,6 +140,7 @@ def run_pre_commit(args: Namespace) -> int:
             files_touched=files_touched,
             loc_delta=loc_delta,
             mode=mode.value,
+            cache_stats=cache_stats,
         )
         output_status = _render_and_write(payload, args)
         if output_status != 0:
@@ -124,7 +177,13 @@ def _export_index(repo_root: Path, *, prefix: str) -> Iterator[Path]:
         yield export_root
 
 
-def _emit_empty_pass(args: Namespace, *, compiled: CompiledTarget, mode: str) -> int:
+def _emit_empty_pass(
+    args: Namespace,
+    *,
+    compiled: CompiledTarget,
+    mode: str,
+    cache_stats: CacheStats,
+) -> int:
     verdict = Verdict(result=VerdictResult.PASS, results=())
     repair_plan = RepairPlan(result=VerdictResult.PASS, instructions=())
     payload = build_payload(
@@ -133,6 +192,7 @@ def _emit_empty_pass(args: Namespace, *, compiled: CompiledTarget, mode: str) ->
         verdict=verdict,
         repair_plan=repair_plan,
         mode=mode,
+        cache_stats=cache_stats,
     )
     return _render_and_write(payload, args)
 
@@ -143,9 +203,19 @@ def _render_and_write(payload: dict, args: Namespace) -> int:
 
 def _package_root_relative(raw_path: str) -> Path:
     path = Path(raw_path)
-    if path.is_absolute():
+    if path.is_absolute() or path.drive:
         raise ValueError(f"package_root must be repo-relative for pre-commit: {path}")
-    return path
+    parts: list[str] = []
+    for part in path.parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError(f"package_root must stay within repo for pre-commit: {path}")
+            parts.pop()
+            continue
+        parts.append(part)
+    return Path(*parts) if parts else Path(".")
 
 
 def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Path:
@@ -155,3 +225,55 @@ def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Pa
     if not path.is_dir():
         raise ValueError(f"{label} package_root is not a directory: {path}")
     return path
+
+
+def _extract_code_state(
+    *,
+    package_root: Path,
+    resolved_package_root: Path,
+    repo_root: Path,
+    ref: str,
+    mode,
+    dimensions: frozenset[str] | None,
+    dimensions_tuple: tuple[str, ...] | None,
+    cache_root: Path,
+    use_cache: bool,
+    cache_stats: CacheStats,
+    cache_max_bytes: int,
+    verbose: bool,
+):
+    if not use_cache:
+        return extract_python_code_state(resolved_package_root, dimensions=dimensions)
+
+    package_root_posix = package_root_cache_path(package_root)
+    tree_id = tree_object_id(ref, package_root_posix.as_posix(), cwd=repo_root)
+    python_xy = current_python_xy()
+    key = key_for_state(
+        tree_object_id=tree_id,
+        package_root_relpath_posix=package_root_posix,
+        mode=mode,
+        dimensions_sorted_tuple=dimensions_tuple,
+        python_xy=python_xy,
+    )
+    log = _stderr if verbose else None
+    cached = read_cached_code_state(cache_root, key, stats=cache_stats, log=log)
+    if cached is not None:
+        return cached
+
+    state = extract_python_code_state(resolved_package_root, dimensions=dimensions)
+    write_cached_code_state(
+        cache_root,
+        key,
+        state=state,
+        meta=key_meta(
+            tree_object_id=tree_id,
+            package_root_relpath_posix=package_root_posix,
+            mode=mode,
+            dimensions_sorted_tuple=dimensions_tuple,
+            python_xy=python_xy,
+        ),
+        stats=cache_stats,
+        max_bytes=cache_max_bytes,
+        log=log,
+    )
+    return state

@@ -89,6 +89,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="cache root directory; defaults to <repo>/.semantic-ci/cache",
     )
     check.add_argument(
+        "--cache-max-bytes",
+        default=None,
+        help="maximum cache size in bytes; 0 disables eviction",
+    )
+    check.add_argument(
         "--no-color",
         action="store_true",
         default=argparse.SUPPRESS,
@@ -117,6 +122,17 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("smoke", "full"),
         default=None,
         help="execution mode; defaults to SEMANTIC_CI_MODE or full",
+    )
+    pre_commit.add_argument("--no-cache", action="store_true", help="disable CodeState cache")
+    pre_commit.add_argument(
+        "--cache-dir",
+        default=None,
+        help="cache root directory; defaults to <repo>/.semantic-ci/cache",
+    )
+    pre_commit.add_argument(
+        "--cache-max-bytes",
+        default=None,
+        help="maximum cache size in bytes; 0 disables eviction",
     )
     pre_commit.add_argument(
         "--no-color",

@@ -15,7 +15,7 @@ from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 PACKAGE_NAME = "semantic-ci-code"
 UNKNOWN_VERSION = "0.0.0+unknown"
 
@@ -37,6 +37,7 @@ def build_payload(
     files_touched: int = 0,
     loc_delta: LocDelta | None = None,
     mode: str | None = None,
+    cache_stats: Any | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
@@ -60,6 +61,7 @@ def build_payload(
         "code_state": state.model_dump(mode="json") if state is not None else None,
         "files_touched": files_touched,
         "loc_delta": _serialize_loc_delta(loc_delta or LocDelta()),
+        "cache": _serialize_cache_stats(cache_stats),
         "engine": {
             "extractor_pyver": f"{sys.version_info.major}.{sys.version_info.minor}",
             "package_version": package_version(),
@@ -71,7 +73,11 @@ def build_observe_payload(state: CodeState) -> dict[str, Any]:
     return build_payload("observe", state=state)
 
 
-def build_compile_payload(compiled: CompiledTarget) -> dict[str, Any]:
+def build_compile_payload(
+    compiled: CompiledTarget,
+    *,
+    cache_stats: Any | None = None,
+) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "subcommand": "compile",
@@ -95,6 +101,7 @@ def build_compile_payload(compiled: CompiledTarget) -> dict[str, Any]:
                 _serialize_compiled_constraint(constraint) for constraint in compiled.constraints
             ],
         },
+        "cache": _serialize_cache_stats(cache_stats),
         "engine": {
             "extractor_pyver": f"{sys.version_info.major}.{sys.version_info.minor}",
             "package_version": package_version(),
@@ -207,6 +214,24 @@ def _serialize_repair_instruction(instruction: RepairInstruction) -> dict[str, A
 
 def _serialize_loc_delta(loc_delta: LocDelta) -> dict[str, int]:
     return {"added": loc_delta.added, "removed": loc_delta.removed}
+
+
+def _serialize_cache_stats(stats: Any | None) -> dict[str, Any]:
+    if stats is None:
+        return {
+            "hit": 0,
+            "miss": 0,
+            "invalid": 0,
+            "write_failed": 0,
+            "disabled": True,
+        }
+    return {
+        "hit": int(getattr(stats, "hit", 0)),
+        "miss": int(getattr(stats, "miss", 0)),
+        "invalid": int(getattr(stats, "invalid", 0)),
+        "write_failed": int(getattr(stats, "write_failed", 0)),
+        "disabled": bool(getattr(stats, "disabled", False)),
+    }
 
 
 def _pairs_to_dict(pairs: tuple[tuple[str, Any], ...]) -> dict[str, Any]:

@@ -19,7 +19,7 @@ def test_compile_json_happy_path():
     data = payload(result)
 
     assert result.returncode == 0
-    assert data["schema_version"] == "2"
+    assert data["schema_version"] == "3"
     assert data["subcommand"] == "compile"
     assert "verdict" not in data
     assert data["compiled_target"]["constraints"]

@@ -19,7 +19,7 @@ def test_compile_json_happy_path():
     data = payload(result)
 
     assert result.returncode == 0
-    assert data["schema_version"] == "3"
+    assert data["schema_version"] == "4"
     assert data["subcommand"] == "compile"
     assert "verdict" not in data
     assert data["compiled_target"]["constraints"]
@@ -76,6 +76,35 @@ effects:
     assert compiled["effects_policy"]["allow_new"] == [
         {"fqn": "subprocess.run", "effect_class": "process"},
     ]
+
+
+def test_compile_json_includes_authorship(tmp_path: Path):
+    target = tmp_path / "target.yaml"
+    target.write_text(
+        """
+intent: authorship
+change:
+  primary_kind: feature
+authorship:
+  authors:
+    - identity: alice@example.com
+      signature: sig-1
+  declared_at: "2026-05-05T12:00:00Z"
+  generation_metadata:
+    tool: codex
+""",
+        encoding="utf-8",
+    )
+
+    result = run_semantic_ci(tmp_path, "compile", str(target), "--format", "json")
+    compiled = payload(result)["compiled_target"]
+
+    assert result.returncode == 0
+    assert compiled["authorship"] == {
+        "authors": [{"identity": "alice@example.com", "signature": "sig-1"}],
+        "declared_at": "2026-05-05T12:00:00Z",
+        "generation_metadata": {"tool": "codex"},
+    }
 
 
 def test_compile_human_no_color_contains_labels_without_ansi():

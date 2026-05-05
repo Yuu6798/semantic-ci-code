@@ -57,6 +57,22 @@ effects:
 movement where public-looking symbols are not production API. `effects.allow_new`
 accepts exact effect FQNs and/or effect classes for feature and bugfix templates.
 
+## Target Authorship
+
+`target.yaml` may include an optional `authorship` section. Semantic CI parses
+and reports this metadata but does not validate signatures, author counts, or
+AI generation hints in P1.
+
+```yaml
+authorship:
+  authors:
+    - identity: alice@example.com
+      signature: optional-signature
+  declared_at: "2026-05-05T12:00:00Z"
+  generation_metadata:
+    tool: codex
+```
+
 ## Output Format
 
 `--format json|human|sarif|gh-actions` overrides all defaults where supported.
@@ -106,6 +122,24 @@ Examples:
 ```bash
 semantic-ci observe --package-root src/semantic_ci_code
 semantic-ci observe --package-root . --paths src/semantic_ci_code/cli
+```
+
+## `semantic-ci init`
+
+```text
+semantic-ci init [--path <file>] [--force]
+```
+
+Scaffolds a commented target file. The default output path is
+`.semantic-ci/target.yaml`; parent directories are created as needed. Existing
+files are not overwritten unless `--force` is provided.
+
+Examples:
+
+```bash
+semantic-ci init
+semantic-ci init --path target.yaml
+semantic-ci init --path .semantic-ci/target.yaml --force
 ```
 
 ## `semantic-ci compare`
@@ -216,7 +250,7 @@ semantic-ci pre-commit --format gh-actions
 ## `semantic-ci compile`
 
 ```text
-semantic-ci compile [--target <yaml>] [--format {json,human}] [--output <file>]
+semantic-ci compile [<yaml>] [--target <yaml>] [--format {json,human}] [--output <file>]
 ```
 
 Compiles `target.yaml` and prints the normalized `CompiledTarget`. It does not
@@ -225,6 +259,7 @@ extract code, compute a delta, evaluate constraints, or emit a verdict.
 Examples:
 
 ```bash
+semantic-ci compile .semantic-ci/target.yaml
 semantic-ci compile --target target.yaml --format json
 semantic-ci compile --target target.yaml --format human --no-color
 ```

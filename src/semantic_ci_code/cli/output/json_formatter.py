@@ -7,6 +7,7 @@ from typing import Any
 
 from semantic_ci_code.compiler import (
     CompiledAPISurfaceAllowRule,
+    CompiledAuthorship,
     CompiledConstraint,
     CompiledEffectAllowRule,
     CompiledTarget,
@@ -15,7 +16,7 @@ from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
 
-SCHEMA_VERSION = "3"
+SCHEMA_VERSION = "4"
 PACKAGE_NAME = "semantic-ci-code"
 UNKNOWN_VERSION = "0.0.0+unknown"
 
@@ -50,6 +51,11 @@ def build_payload(
             [kind.value for kind in compiled.allowed_secondary_kinds]
             if compiled is not None
             else []
+        ),
+        "target_authorship": (
+            _serialize_authorship(compiled.authorship)
+            if compiled is not None and compiled.authorship is not None
+            else None
         ),
         "summary": _summary(verdict, repair_plan) if verdict is not None else None,
         "results": (
@@ -86,6 +92,7 @@ def build_compile_payload(
             "primary_kind": compiled.primary_kind.value,
             "allowed_secondary_kinds": [kind.value for kind in compiled.allowed_secondary_kinds],
             "scope": [[key, list(values)] for key, values in compiled.scope],
+            "authorship": _serialize_authorship(compiled.authorship),
             "api_surface_policy": {
                 "allow_changes": [
                     _serialize_api_surface_allow_rule(rule)
@@ -176,6 +183,22 @@ def _serialize_effect_allow_rule(rule: CompiledEffectAllowRule) -> dict[str, Any
     return {
         "fqn": rule.fqn,
         "effect_class": rule.effect_class.value if rule.effect_class is not None else None,
+    }
+
+
+def _serialize_authorship(authorship: CompiledAuthorship | None) -> dict[str, Any] | None:
+    if authorship is None:
+        return None
+    return {
+        "authors": [
+            {
+                "identity": author.identity,
+                "signature": author.signature,
+            }
+            for author in authorship.authors
+        ],
+        "declared_at": authorship.declared_at,
+        "generation_metadata": _json_value(authorship.generation_metadata),
     }
 
 

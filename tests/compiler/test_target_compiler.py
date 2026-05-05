@@ -10,6 +10,8 @@ import pytest
 
 from semantic_ci_code.compiler import (
     CompiledAPISurfaceAllowRule,
+    CompiledAuthor,
+    CompiledAuthorship,
     CompiledConstraint,
     CompiledEffectAllowRule,
     CompiledTarget,
@@ -250,11 +252,10 @@ def test_empty_constraint_target_raises_compile_error():
     assert exc_info.value.path == "constraints[0].target"
 
 
-def test_empty_intent_raises_compile_error():
-    with pytest.raises(CompileError) as exc_info:
-        compile_target_svp(read_fixture("empty_intent.yaml"))
+def test_empty_intent_is_allowed_for_init_scaffold():
+    compiled = compile_target_svp(read_fixture("empty_intent.yaml"))
 
-    assert exc_info.value.path == "intent"
+    assert compiled.intent == ""
 
 
 def test_design_feature_sample_compiles_and_preserves_optional_fields():
@@ -318,6 +319,35 @@ api_surface:
     assert compiled.api_surface_allow_changes == (
         CompiledAPISurfaceAllowRule(fqn="git_helpers.run_semantic_ci"),
         CompiledAPISurfaceAllowRule(fqn_prefix="helpers."),
+    )
+    assert hash(compiled)
+
+
+def test_authorship_compiles_to_frozen_metadata():
+    compiled = compile_target_svp(
+        """
+intent: authorship anchor
+change:
+  primary_kind: feature
+authorship:
+  authors:
+    - identity: alice@example.com
+      signature: sig-1
+    - identity: bot:semantic-ci
+  declared_at: "2026-05-05T12:00:00Z"
+  generation_metadata:
+    tool: codex
+    model: gpt-test
+"""
+    )
+
+    assert compiled.authorship == CompiledAuthorship(
+        authors=(
+            CompiledAuthor(identity="alice@example.com", signature="sig-1"),
+            CompiledAuthor(identity="bot:semantic-ci"),
+        ),
+        declared_at="2026-05-05T12:00:00Z",
+        generation_metadata={"tool": "codex", "model": "gpt-test"},
     )
     assert hash(compiled)
 

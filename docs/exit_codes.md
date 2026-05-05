@@ -8,6 +8,7 @@ parsing output text.
 | `0` | Pass | `Verdict.result == pass`. |
 | `0` | Repair advisory | `Verdict.result == repair` without `--strict-repair`. |
 | `0` | No staged work | `semantic-ci pre-commit` with an empty staged index. |
+| `0` | Initialized target | `semantic-ci init` created or overwrote the target file. |
 | `1` | Semantic failure | `Verdict.result == fail`. |
 | `1` | Strict repair | `Verdict.result == repair` with `--strict-repair`. |
 | `2` | Usage or configuration error | Bad flags, missing paths, missing or ambiguous `target.yaml`, unsupported language. |
@@ -17,6 +18,10 @@ parsing output text.
 ## Subcommand Notes
 
 `observe` does not compute a verdict, so it returns only 0, 2, 3, or 4.
+
+`init` does not compute a verdict. Successful scaffold creation exits 0.
+Existing output files without `--force` and write/path errors exit 2. It has no
+normal engine-error path; exit 3 remains reserved by the global policy.
 
 `compare`, `check`, and `pre-commit` map PASS/REPAIR/FAIL through the table
 above. `--strict-repair` changes only REPAIR from exit 0 to exit 1.

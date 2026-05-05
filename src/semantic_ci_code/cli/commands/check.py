@@ -26,6 +26,7 @@ from semantic_ci_code.cli.git_runtime import (
     resolve_baseline,
     resolve_candidate,
 )
+from semantic_ci_code.cli.modes import dimensions_for_mode, resolve_execution_mode
 from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.cli.target_loader import (
     TargetUsageError,
@@ -53,6 +54,8 @@ def run_check(args: Namespace) -> int:
         )
         candidate_ref = resolve_candidate(args.candidate_rev)
         package_root = _package_root_relative(args.package_root)
+        mode = resolve_execution_mode(args.mode)
+        dimensions = dimensions_for_mode(mode)
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
 
@@ -75,10 +78,10 @@ def run_check(args: Namespace) -> int:
                 candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
                 if args.verbose:
                     _stderr(f"extracting baseline package_root={baseline_root}")
-                baseline = extract_python_code_state(baseline_root)
+                baseline = extract_python_code_state(baseline_root, dimensions=dimensions)
                 if args.verbose:
                     _stderr(f"extracting candidate package_root={candidate_root}")
-                candidate = extract_python_code_state(candidate_root)
+                candidate = extract_python_code_state(candidate_root, dimensions=dimensions)
 
         delta = compute_code_state_delta(baseline, candidate)
         entries = (
@@ -88,7 +91,13 @@ def run_check(args: Namespace) -> int:
         )
         files_touched, loc_delta = summarize_numstat(entries)
         delta = overlay_delta(delta, files_touched=files_touched, loc_delta=loc_delta)
-        verdict = evaluate_constraints(compiled, delta, baseline=baseline, candidate=candidate)
+        verdict = evaluate_constraints(
+            compiled,
+            delta,
+            baseline=baseline,
+            candidate=candidate,
+            extracted_dimensions=dimensions,
+        )
         repair_plan = emit_repair_plan(verdict)
         payload = build_payload(
             "check",
@@ -97,6 +106,7 @@ def run_check(args: Namespace) -> int:
             repair_plan=repair_plan,
             files_touched=files_touched,
             loc_delta=loc_delta,
+            mode=mode.value,
         )
         output_status = _write_output(
             _render_payload(payload, args, subcommand="check"), args.output

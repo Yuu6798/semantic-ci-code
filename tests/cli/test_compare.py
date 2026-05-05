@@ -72,7 +72,7 @@ def test_compare_fail_fixture_exits_one():
 def test_compare_json_shape_contains_full_report_fields():
     data = payload(run_cli(*compare_args(PASS_TARGET), "--format", "json"))
 
-    assert data["schema_version"] == "1"
+    assert data["schema_version"] == "2"
     assert data["subcommand"] == "compare"
     assert data["intent"] == "add a public API"
     assert data["primary_kind"] == "feature"
@@ -82,6 +82,7 @@ def test_compare_json_shape_contains_full_report_fields():
         "info": 0,
         "unresolved": 0,
         "satisfied": 3,
+        "skipped": 0,
     }
     assert data["results"]
     assert data["repair_plan"] == {"result": "pass", "instructions": []}
@@ -101,7 +102,14 @@ def test_compare_files_touched_and_loc_delta_are_zero():
 def test_compare_summary_keys_are_ints():
     summary = payload(run_cli(*compare_args(REPAIR_TARGET), "--format", "json"))["summary"]
 
-    assert set(summary) == {"fix_required", "suggested", "info", "unresolved", "satisfied"}
+    assert set(summary) == {
+        "fix_required",
+        "suggested",
+        "info",
+        "unresolved",
+        "satisfied",
+        "skipped",
+    }
     assert all(isinstance(value, int) for value in summary.values())
 
 

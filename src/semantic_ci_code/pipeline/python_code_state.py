@@ -43,6 +43,21 @@ from semantic_ci_code.test_surface import extract_python_test_surface_from_paths
 
 T = TypeVar("T")
 
+DIMENSION_API_SURFACE = "api_surface"
+DIMENSION_EFFECTS = "effects"
+DIMENSION_IMPORTS = "imports"
+DIMENSION_COMPLEXITY = "complexity"
+DIMENSION_TEST_SURFACE = "test_surface"
+DIMENSION_MODULE_GRAPH = "module_graph"
+
+SMOKE_DIMENSIONS = frozenset(
+    {
+        DIMENSION_API_SURFACE,
+        DIMENSION_EFFECTS,
+        DIMENSION_IMPORTS,
+    }
+)
+
 
 class ExtractorError(Exception):
     """Fail-fast wrapper for extractor failures."""
@@ -67,49 +82,83 @@ class ExtractorError(Exception):
         )
 
 
-def extract_python_code_state(package_root: Path) -> CodeState:
+def extract_python_code_state(
+    package_root: Path,
+    *,
+    dimensions: frozenset[str] | None = None,
+) -> CodeState:
     """Assemble a whole-package Python ``CodeState`` from ``package_root``.
 
-    All six extracted fields are populated from the package root. P1-unextracted
+    By default all six extracted fields are populated from the package root.
+    Passing ``dimensions`` limits extraction to that subset and leaves omitted
+    dimensions at schema defaults; this is used by CLI smoke mode. P1-unextracted
     fields such as ``type_relations``, ``control_flow``, ``data_flow``, and
-    ``coverage`` are left at the schema defaults.
+    ``coverage`` are always left at the schema defaults.
     """
     root = _resolve_package_root(package_root)
     paths = _python_paths_from_inputs((root,), package_root=root)
-    return _assemble_code_state(paths=paths, package_root=root)
+    return _assemble_code_state(paths=paths, package_root=root, dimensions=dimensions)
 
 
 def extract_python_code_state_from_paths(
     paths: Iterable[Path],
     *,
     package_root: Path,
+    dimensions: frozenset[str] | None = None,
 ) -> CodeState:
     """Assemble a Python ``CodeState`` with per-file fields limited to ``paths``.
 
     ``paths`` is consumed exactly once, then expanded deterministically. Empty
     iterables are valid and yield empty per-file fields. ``module_graph`` is
-    still extracted from the whole ``package_root`` because it is a structural
-    repository invariant, not a per-file signal.
+    extracted from the whole ``package_root`` when selected because it is a
+    structural repository invariant, not a per-file signal. Passing
+    ``dimensions`` limits extraction to that subset and leaves omitted
+    dimensions at schema defaults.
     """
     root = _resolve_package_root(package_root)
     selected_paths = tuple(paths)
     expanded_paths = _python_paths_from_inputs(selected_paths, package_root=root)
-    return _assemble_code_state(paths=expanded_paths, package_root=root)
+    return _assemble_code_state(paths=expanded_paths, package_root=root, dimensions=dimensions)
 
 
 def _assemble_code_state(
     *,
     paths: tuple[Path, ...],
     package_root: Path,
+    dimensions: frozenset[str] | None,
 ) -> CodeState:
     return CodeState(
-        api_surface=_extract_api_surface(paths, package_root=package_root),
-        effects=_extract_effects(paths),
-        imports=_extract_imports(paths, package_root=package_root),
-        complexity=_extract_complexity(paths, package_root=package_root),
-        test_surface=_extract_test_surface(paths, package_root=package_root),
-        module_graph=_extract_module_graph(package_root),
+        api_surface=(
+            _extract_api_surface(paths, package_root=package_root)
+            if _should_extract(DIMENSION_API_SURFACE, dimensions)
+            else ()
+        ),
+        effects=_extract_effects(paths) if _should_extract(DIMENSION_EFFECTS, dimensions) else (),
+        imports=(
+            _extract_imports(paths, package_root=package_root)
+            if _should_extract(DIMENSION_IMPORTS, dimensions)
+            else ()
+        ),
+        complexity=(
+            _extract_complexity(paths, package_root=package_root)
+            if _should_extract(DIMENSION_COMPLEXITY, dimensions)
+            else ()
+        ),
+        test_surface=(
+            _extract_test_surface(paths, package_root=package_root)
+            if _should_extract(DIMENSION_TEST_SURFACE, dimensions)
+            else ()
+        ),
+        module_graph=(
+            _extract_module_graph(package_root)
+            if _should_extract(DIMENSION_MODULE_GRAPH, dimensions)
+            else ()
+        ),
     )
+
+
+def _should_extract(dimension: str, dimensions: frozenset[str] | None) -> bool:
+    return dimensions is None or dimension in dimensions
 
 
 def _extract_api_surface(

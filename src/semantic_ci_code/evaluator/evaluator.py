@@ -60,6 +60,7 @@ __all__ = [
 E_OPERATOR_TARGET_MISMATCH: Final = "E_OPERATOR_TARGET_MISMATCH"
 E_OPERATOR_UNSUPPORTED_P1: Final = "E_OPERATOR_UNSUPPORTED_P1"
 E_REPAIR_KIND_UNSUPPORTED_P1: Final = "E_REPAIR_KIND_UNSUPPORTED_P1"
+E_DIMENSION_SKIPPED: Final = "E_DIMENSION_SKIPPED"
 
 _TARGET_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
 _CODE_STATE_FIELDS = frozenset(CodeState.model_fields) | {"api_surface_public"}
@@ -137,6 +138,7 @@ def evaluate_constraints(
     *,
     baseline: CodeState,
     candidate: CodeState,
+    extracted_dimensions: frozenset[str] | None = None,
 ) -> Verdict:
     """Evaluate compiled constraints against baseline/candidate states and delta."""
 
@@ -148,6 +150,7 @@ def evaluate_constraints(
             candidate=candidate,
             effect_allow_new=compiled.effect_allow_new,
             api_surface_allow_changes=compiled.api_surface_allow_changes,
+            extracted_dimensions=extracted_dimensions,
         )
         for constraint in compiled.constraints
     )
@@ -162,6 +165,7 @@ def _evaluate_constraint(
     candidate: CodeState,
     effect_allow_new: tuple[CompiledEffectAllowRule, ...],
     api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...],
+    extracted_dimensions: frozenset[str] | None,
 ) -> ConstraintResult:
     if constraint.kind is ConstraintKind.REPAIR:
         return _result(
@@ -185,6 +189,15 @@ def _evaluate_constraint(
             ResultStatus.UNKNOWN,
             E_PATH_UNRESOLVED,
             target=constraint.target,
+        )
+    skipped_dimension = _skipped_dimension(segments, extracted_dimensions)
+    if skipped_dimension is not None:
+        return _result(
+            constraint,
+            ResultStatus.SKIPPED,
+            E_DIMENSION_SKIPPED,
+            reason="partial_code_state",
+            dimension=skipped_dimension,
         )
 
     try:
@@ -535,3 +548,49 @@ def _target_segments(target: str) -> tuple[str, ...] | None:
     if _TARGET_PATTERN.fullmatch(target) is None:
         return None
     return tuple(target.split("."))
+
+
+def _skipped_dimension(
+    segments: tuple[str, ...],
+    extracted_dimensions: frozenset[str] | None,
+) -> str | None:
+    if extracted_dimensions is None:
+        return None
+    dimension = _dimension_for_target(segments)
+    if dimension is None or dimension in extracted_dimensions:
+        return None
+    return dimension
+
+
+def _dimension_for_target(segments: tuple[str, ...]) -> str | None:
+    first = segments[0]
+    if first in {"api_surface", "api_surface_public", "api_surface_delta"}:
+        return "api_surface"
+    if first in {"effects", "effect_changes"}:
+        return "effects"
+    if first in {"imports", "imports_delta"}:
+        return "imports"
+    if first in {"complexity", "complexity_delta"}:
+        return "complexity"
+    if first in {"test_surface", "test_surface_delta"}:
+        return "test_surface"
+    if first == "module_graph":
+        return "module_graph"
+    if first in {"type_relations", "type_changes"}:
+        return "type_relations"
+    if first in {"control_flow", "cfg_delta"}:
+        return "control_flow"
+    if first == "data_flow":
+        return "data_flow"
+    if first in {"coverage", "coverage_delta"}:
+        return "coverage"
+    if first == "python_specific" and len(segments) > 1:
+        if segments[1] == "module_graph_delta":
+            return "module_graph"
+        if segments[1] == "complexity_changes":
+            return "complexity"
+        if segments[1] == "test_surface_changes":
+            return "test_surface"
+    if first == "typescript_specific":
+        return "typescript_specific"
+    return None

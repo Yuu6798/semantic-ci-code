@@ -463,11 +463,12 @@ def _effect_matches_allow_rule(
     rules: tuple[CompiledEffectAllowRule, ...],
 ) -> bool:
     effect_fqn = _effect_field(effect, "fqn")
+    effect_resolved_call = _effect_resolved_call(effect)
     effect_class = _effect_field(effect, "effect_class")
     effect_class_value = getattr(effect_class, "value", effect_class)
 
     for rule in rules:
-        if rule.fqn is not None and effect_fqn != rule.fqn:
+        if rule.fqn is not None and rule.fqn not in {effect_fqn, effect_resolved_call}:
             continue
         if rule.effect_class is not None and effect_class_value != rule.effect_class.value:
             continue
@@ -483,6 +484,17 @@ def _effect_field(effect: object, key: str) -> object:
             if isinstance(item, tuple | list) and len(item) == 2 and item[0] == key:
                 return item[1]
     return getattr(effect, key, None)
+
+
+def _effect_resolved_call(effect: object) -> object:
+    evidence = _effect_field(effect, "evidence")
+    if isinstance(evidence, dict):
+        return evidence.get("resolved_call")
+    if isinstance(evidence, tuple | list):
+        for item in evidence:
+            if isinstance(item, tuple | list) and len(item) == 2 and item[0] == "resolved_call":
+                return item[1]
+    return None
 
 
 def _from_operator_outcome(

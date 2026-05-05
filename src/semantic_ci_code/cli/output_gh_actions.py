@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from semantic_ci_code.cli.output_locations import find_file_line
+
 
 def format_gh_actions(payload: dict[str, Any]) -> str:
     """Render repair instructions as deterministic GitHub Actions commands."""
@@ -37,7 +39,7 @@ def _command_name(instruction: dict[str, Any]) -> str:
 
 
 def _properties(instruction: dict[str, Any]) -> dict[str, str]:
-    found = _find_file_line(instruction)
+    found = find_file_line(instruction)
     properties: dict[str, str] = {}
     if found is None:
         return properties
@@ -46,23 +48,6 @@ def _properties(instruction: dict[str, Any]) -> dict[str, str]:
     if line is not None:
         properties["line"] = str(line)
     return properties
-
-
-def _find_file_line(value: Any) -> tuple[str, int | None] | None:
-    if isinstance(value, dict):
-        if isinstance(value.get("file"), str):
-            line_value = value.get("line")
-            return value["file"], line_value if isinstance(line_value, int) else None
-        for item in value.values():
-            found = _find_file_line(item)
-            if found is not None:
-                return found
-    if isinstance(value, list):
-        for item in value:
-            found = _find_file_line(item)
-            if found is not None:
-                return found
-    return None
 
 
 def _escape_message(value: str) -> str:

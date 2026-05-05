@@ -92,6 +92,33 @@ def test_gh_actions_escapes_message_and_properties():
     assert "line 1%0A100%25 bad" in rendered
 
 
+def test_gh_actions_uses_pair_list_file_line_evidence():
+    rendered = format_gh_actions(
+        {
+            "repair_plan": {
+                "instructions": [
+                    {
+                        "constraint_id": "user:pair_list",
+                        "repair_code": "R_NEW_EFFECT",
+                        "category": "fix_required",
+                        "message": "effect added",
+                        "extra_evidence": {
+                            "observed": [
+                                [
+                                    "evidence",
+                                    [["file", "src/effects.py"], ["line", 7]],
+                                ],
+                            ],
+                        },
+                    },
+                ],
+            },
+        }
+    )
+
+    assert rendered.startswith("::error file=src/effects.py,line=7::")
+
+
 def test_gh_actions_output_file_is_usage_error(tmp_path: Path):
     result = run_semantic_ci(
         Path.cwd(),

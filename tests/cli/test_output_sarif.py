@@ -102,6 +102,43 @@ def test_sarif_location_uses_file_line_evidence_when_present():
     assert location["region"]["startLine"] == 12
 
 
+def test_sarif_location_uses_pair_list_file_line_evidence():
+    rendered = format_sarif(
+        {
+            "subcommand": "compare",
+            "verdict": "fail",
+            "mode": None,
+            "engine": {"extractor_pyver": "3.11", "package_version": "0.test"},
+            "results": [
+                {
+                    "constraint_id": "user:pair_list",
+                    "source": "user",
+                    "kind": "delta",
+                    "target": "effects",
+                    "operator": "no_new_items",
+                    "severity": "hard",
+                    "unknown_policy": "fail",
+                    "status": "violated",
+                    "error_code": "E_VIOLATION",
+                    "evidence": {
+                        "observed": [
+                            [
+                                "evidence",
+                                [["file", "src/effects.py"], ["line", 7]],
+                            ],
+                        ],
+                    },
+                },
+            ],
+            "repair_plan": {"instructions": []},
+        }
+    )
+    location = json.loads(rendered)["runs"][0]["results"][0]["locations"][0]["physicalLocation"]
+
+    assert location["artifactLocation"]["uri"] == "src/effects.py"
+    assert location["region"]["startLine"] == 7
+
+
 def test_sarif_output_file_writes_json_and_leaves_stdout_empty(tmp_path: Path):
     output = tmp_path / "semantic-ci.sarif"
     result = run_semantic_ci(

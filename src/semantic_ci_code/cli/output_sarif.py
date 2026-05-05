@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from semantic_ci_code.cli.output_locations import find_file_line
+
 SARIF_VERSION = "2.1.0"
 SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 
@@ -137,7 +139,7 @@ def _location(
         evidence_sources.append(instruction.get("extra_evidence") or {})
         evidence_sources.append({"observed": instruction.get("observed")})
     for source in evidence_sources:
-        found = _find_file_line(source)
+        found = find_file_line(source)
         if found is None:
             continue
         file_path, line = found
@@ -150,21 +152,4 @@ def _location(
                 **({"region": region} if region else {}),
             },
         }
-    return None
-
-
-def _find_file_line(value: Any) -> tuple[str, int | None] | None:
-    if isinstance(value, dict):
-        if isinstance(value.get("file"), str):
-            line_value = value.get("line")
-            return value["file"], line_value if isinstance(line_value, int) else None
-        for item in value.values():
-            found = _find_file_line(item)
-            if found is not None:
-                return found
-    if isinstance(value, list):
-        for item in value:
-            found = _find_file_line(item)
-            if found is not None:
-                return found
     return None

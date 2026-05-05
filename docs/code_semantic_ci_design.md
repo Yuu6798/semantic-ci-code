@@ -655,8 +655,11 @@ svp-rpe-code/
 - 部分 CFG / 簡易 data flow
 - `repair_order` の優先順制御
 - `reduce` / `defer` / `lock` の完全実装
+  - **`lock` operator は §8.2 の lock violation 即 fail 仕様に準拠**（Brief 3 残課題 #8 を本フェーズで吸収）
 - Markdown レポート
 - snapshot tests（fixture diff の自動検出）
+- **Performance budget 部分対応（§18）**: per-extractor timeout、incremental extraction の foundation（Brief 3 残課題 #5 から本フェーズに繰り上げ）
+- **Hash trail per-extractor version（§10 残部）**: extractor 個別 version を hash に組み込み、P3a empirical alignment の reproducibility 担保（Brief 3 残課題 #9 残部から本フェーズに繰り上げ）
 
 ### P2.5: Vibe Coding Adapter + Repair Compiler + TS extractor 並列（§21 / §22 で前倒し）
 
@@ -1134,7 +1137,12 @@ generic comparator として設計することの帰結:
 
 本設計を Codex 実装に落とすため、以下の順で Task Brief を発行する。
 
-> **現行運用(2026-05 確定)**: §21 / §22 の P2.5 前倒しを受け、元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は **deferred**(後回し)。**Brief 5 = `init` + Vibe Coding Adapter + Repair Compiler の P2.5 entry** に確定。`brief_4_planning.md §11` と整合。
+> **現行運用(2026-05 確定、Brief 3/4 未解決の再分配反映済み)**:
+> - **Brief 5 の肥大化を解消**: `semantic-ci init`(Q4)と spec authorship anchoring(§17 / Brief 3 #7)と soft/info constraint kind(Brief 3 #2)は **Brief 4d に独立 thin Brief 化**。Brief 5 本体は Vibe Coding Adapter + Repair Compiler に絞る
+> - **Brief 4b に Q11 同梱**: pre-commit framework manifest(`.pre-commit-hooks.yaml`)を SARIF と一括で発行
+> - **Brief 5 と Brief 6 を並列発行**: §22 設計通り(直列の "Brief 5 → Brief 6" を改める)
+> - **P2 Brief 化時に Brief 3 #5 / #8 / #9 残部を細目として明記**: Lock violation 即 fail / per-extractor timeout / per-extractor version の hash trail 組込
+> - 元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は分解済み — §17 / §18 は本表で行先確定、§19 / §20 のみ Brief 7+ に残置
 
 | Brief | 範囲 | 想定 PR | Status |
 |---|---|---|---|
@@ -1142,10 +1150,12 @@ generic comparator として設計することの帰結:
 | **Brief 2** | extractor 実装（Python のみ、6 次元） | `codex/code-semantic-ci-py-extractors` | merged (CSCI-5〜9) |
 | **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` | merged (CSCI-10〜14、`brief_3_planning.md` archived) |
 | **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` | merged (CSCI-15〜19、`brief_4_planning.md` 完結) |
-| **Brief 4b** | SARIF 出力 + GitHub Actions annotation | `codex/code-semantic-ci-sarif` | **next**(Brief 5 の前) |
-| **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/code-semantic-ci-effect-fqn-fix` | **P1 内 hot-fix(優先)**、Brief 4b と並列可 |
-| **Brief 5** | `semantic-ci init`（target.yaml scaffolding）+ Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4）— P2.5 entry | `codex/code-semantic-ci-adapter-compiler` | planning(Brief 5 起草時に Open Questions 棚卸し → CSCI 分割) |
-| **Brief 6** | TypeScript extractor 着手（§22.2、P2.5 並列） | `codex/code-semantic-ci-ts-extractor` | pending |
-| **Brief 7+** | (deferred / 後回し) spec authorship attribution（§17）/ performance budget（§18）/ spec quality metrics（§19）/ suite packaging（§20）/ orchestrator 観測応用（`docs/multi_agent_audit_case.md`） | TBD | deferred |
+| **Brief 4b** | SARIF 出力（Q9）+ GitHub Actions annotation（Q10）+ **`.pre-commit-hooks.yaml` manifest（Q11）同梱** | `codex/code-semantic-ci-sarif-precommit` | **next**(Brief 4c / 4d と並列発行) |
+| **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/code-semantic-ci-effect-fqn-fix` | **P1 内 hot-fix(優先)**、Brief 4b と並列 |
+| **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/code-semantic-ci-thin-spec` | **Brief 4b / 4c と並列発行可、Brief 5 の前** |
+| **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/code-semantic-ci-adapter-compiler` | planning |
+| **Brief 6** | TypeScript extractor 着手（§22.2、P2.5 並列） | `codex/code-semantic-ci-ts-extractor` | **Brief 5 と並列発行**（§22 設計通り） |
+| **P2 Brief 群** | Repair Core Completion (§12 参照) — Brief 3 #5 / #8 / #9 残部を細目として明記:<br>・**Lock violation 即 fail（§8.2 / Brief 3 #8）** を `lock` operator 完全実装の一部として<br>・**Performance budget 部分対応（§18 / Brief 3 #5）**: per-extractor timeout、incremental extraction の foundation<br>・**Hash trail per-extractor version（§10 / Brief 3 #9 残部）**: P3a empirical alignment の reproducibility 担保 | TBD（P2 Brief 化時に分割） | pending |
+| **Brief 7+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`） | TBD | deferred |
 
 各 Brief 完了ごとに Claude が Completion Summary を review し、次 Brief を発行する。

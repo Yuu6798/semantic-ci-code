@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TypeVar
 
 from semantic_ci_code.api_surface import extract_python_api_surface_from_paths
+from semantic_ci_code.api_surface.python_api_extractor import _module_fqn_from_path
 from semantic_ci_code.complexity import extract_python_complexity_from_paths
 from semantic_ci_code.domain.state_schema import (
     APISurfaceEntry,
@@ -133,7 +134,11 @@ def _assemble_code_state(
             if _should_extract(DIMENSION_API_SURFACE, dimensions)
             else ()
         ),
-        effects=_extract_effects(paths) if _should_extract(DIMENSION_EFFECTS, dimensions) else (),
+        effects=(
+            _extract_effects(paths, package_root=package_root)
+            if _should_extract(DIMENSION_EFFECTS, dimensions)
+            else ()
+        ),
         imports=(
             _extract_imports(paths, package_root=package_root)
             if _should_extract(DIMENSION_IMPORTS, dimensions)
@@ -173,16 +178,23 @@ def _extract_api_surface(
     )
 
 
-def _extract_effects(paths: tuple[Path, ...]) -> tuple[EffectEntry, ...]:
+def _extract_effects(
+    paths: tuple[Path, ...],
+    *,
+    package_root: Path,
+) -> tuple[EffectEntry, ...]:
     entries: list[EffectEntry] = []
     for path in paths:
+        resolved = path.resolve()
+        module_fqn = _module_fqn_from_path(resolved, package_root=package_root)
         entries.extend(
             _run_extractor(
                 "effects",
                 path,
-                lambda path=path: extract_python_effects(
+                lambda path=path, module_fqn=module_fqn: extract_python_effects(
                     _read_source(path),
                     filename=str(path),
+                    module_fqn=module_fqn,
                 ),
             )
         )

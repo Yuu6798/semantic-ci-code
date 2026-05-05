@@ -208,6 +208,7 @@ def extract_python_effects(
     source: str,
     *,
     filename: str = "<string>",
+    module_fqn: str | None = None,
     db: tuple[EffectSignature, ...] | None = None,
 ) -> tuple[EffectEntry, ...]:
     """Extract direct-call, import-alias, and global-mutation effects.
@@ -237,7 +238,7 @@ def extract_python_effects(
     alias_map = _collect_alias_map(tree)
 
     entries: list[EffectEntry] = []
-    entries.extend(_extract_call_effects(tree, index, alias_map, filename))
+    entries.extend(_extract_call_effects(tree, index, alias_map, filename, module_fqn))
     entries.extend(_extract_global_mutations(tree, filename))
     return tuple(entries)
 
@@ -247,9 +248,15 @@ def _extract_call_effects(
     index: dict[str, EffectSignature],
     alias_map: dict[str, str],
     filename: str,
+    module_fqn: str | None,
 ) -> list[EffectEntry]:
     """Detect direct_call / imported_alias effects from call sites."""
-    visitor = _CallEffectVisitor(index=index, alias_map=alias_map, filename=filename)
+    visitor = _CallEffectVisitor(
+        index=index,
+        alias_map=alias_map,
+        filename=filename,
+        module_fqn=module_fqn,
+    )
     visitor.visit(tree)
     return visitor.entries
 
@@ -263,10 +270,12 @@ class _CallEffectVisitor(ast.NodeVisitor):
         index: dict[str, EffectSignature],
         alias_map: dict[str, str],
         filename: str,
+        module_fqn: str | None,
     ) -> None:
         self._index = index
         self._alias_map = alias_map
         self._filename = filename
+        self._module_fqn = module_fqn
         self._scope_stack: list[str] = []
         self.entries: list[EffectEntry] = []
 
@@ -317,10 +326,12 @@ class _CallEffectVisitor(ast.NodeVisitor):
 
     def _enclosing_fqn(self) -> str:
         if not self._scope_stack:
-            return "<module>"
+            return self._module_fqn or "<module>"
         if self._scope_stack[-1] == "<lambda>":
-            return "<lambda>"
-        return ".".join(self._scope_stack)
+            local_fqn = "<lambda>"
+        else:
+            local_fqn = ".".join(self._scope_stack)
+        return f"{self._module_fqn}.{local_fqn}" if self._module_fqn else local_fqn
 
 
 # --------------------------------------------------------------------- #

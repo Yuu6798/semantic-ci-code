@@ -702,6 +702,31 @@ def run():
     assert entries[0].evidence["resolved_call"] == "print"
 
 
+def test_call_effect_fqn_uses_module_prefix_when_provided():
+    source = """
+def run():
+    print("function")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="pkg/a.py", module_fqn="pkg.a")
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "pkg.a.run"
+    assert entries[0].evidence["resolved_call"] == "print"
+
+
+def test_module_level_call_effect_fqn_uses_module_prefix_when_provided():
+    entries = extract_python_effects(
+        "print('module')\n",
+        filename="pkg/a.py",
+        module_fqn="pkg.a",
+    )
+
+    assert len(entries) == 1
+    assert entries[0].fqn == "pkg.a"
+    assert entries[0].evidence["resolved_call"] == "print"
+
+
 def test_call_effect_fqn_uses_enclosing_method_name():
     source = """
 class Worker:

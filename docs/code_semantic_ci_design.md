@@ -1219,11 +1219,11 @@ generic comparator として設計することの帰結:
 | **Brief 2** | extractor 実装（Python のみ、6 次元） | `codex/code-semantic-ci-py-extractors` | merged (CSCI-5〜9) |
 | **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` | merged (CSCI-10〜14、`brief_3_planning.md` archived) |
 | **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` | merged (CSCI-15〜19、`brief_4_planning.md` 完結) |
-| **Brief 4b** | SARIF 出力（Q9）+ GitHub Actions annotation（Q10）+ **`.pre-commit-hooks.yaml` manifest（Q11）同梱** | `codex/code-semantic-ci-sarif-precommit` | **next**(Brief 4c / 4d と並列発行) |
-| **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/code-semantic-ci-effect-fqn-fix` | **P1 内 hot-fix(優先)**、Brief 4b と並列 |
-| **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/code-semantic-ci-thin-spec` | **Brief 4b / 4c と並列発行可、Brief 5 の前** |
-| **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/code-semantic-ci-adapter-compiler` | planning |
-| **Brief 6** | TypeScript extractor 着手（§22.2、P2.5 並列） | `codex/code-semantic-ci-ts-extractor` | **Brief 5 と並列発行**（§22 設計通り） |
+| **Brief 4b** | SARIF 出力（Q9）+ GitHub Actions annotation（Q10）+ **`.pre-commit-hooks.yaml` manifest（Q11）同梱** | `codex/csci-28-sarif-gh-actions-precommit` | merged (CSCI-28 / PR #40) |
+| **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/csci-29-effect-extractor-fqn-fix` | merged (CSCI-29 / PR #42) |
+| **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/csci-30-init-authorship-severity` | merged (CSCI-30 / PR #43) |
+| **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/code-semantic-ci-adapter-compiler` | planning merged (PR #44)、CSCI-31 未着手 |
+| **Brief 6** | TypeScript extractor 着手（§22.2、P2.5 並列） | `codex/code-semantic-ci-ts-extractor` | planning 未着手、Brief 5 と並列発行可（§22 設計通り） |
 | **P2 Brief 群** | Repair Core Completion (§12 参照) — Brief 3 #5 / #8 / #9 残部を細目として明記:<br>・**Lock violation 即 fail（§8.2 / Brief 3 #8）** を `lock` operator 完全実装の一部として<br>・**Performance budget 部分対応（§18 / Brief 3 #5）**: per-extractor timeout、incremental extraction の foundation<br>・**Hash trail per-extractor version（§10 / Brief 3 #9 残部）**: P3a empirical alignment の reproducibility 担保 | TBD（P2 Brief 化時に分割） | pending |
 | **Brief 7+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`） | TBD | deferred |
 

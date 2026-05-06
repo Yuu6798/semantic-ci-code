@@ -72,7 +72,7 @@ bump beyond the current CLI schema version.
 | `target_authorship` | Target authorship metadata, or `null` when omitted or for `observe`. Semantic CI reports this metadata but does not validate signatures in P1. |
 | `summary` | Counts by repair category plus satisfied and skipped constraints. `null` for `observe`. |
 | `results` | Serialized evaluator `ConstraintResult` entries in evaluation order. |
-| `repair_plan` | Serialized repair plan, or `null` for `observe`. |
+| `repair_plan` | Serialized repair plan, or `null` for `observe`. `verdict == "pass"` does not imply `repair_plan.instructions == []`: violations of `severity: info` constraints surface as `category: "info"` instructions while the verdict stays `pass` (Advisor channel; see `code_semantic_ci_design.md §23.3`). |
 | `code_state` | Full `CodeState` dump for `observe`; otherwise `null`. |
 | `files_touched` | Git diff file count. Zero for `observe` and `compare`. |
 | `loc_delta` | Git diff line count. Zero for `observe` and `compare`. |

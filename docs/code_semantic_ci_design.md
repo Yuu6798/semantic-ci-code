@@ -1108,7 +1108,58 @@ PR は最初の主要ユースケースだが、唯一のユースケースで�
 
 「実コードがそこに存在する」という前提を engine から切り離すことで、AI 時代の vibe coding workflow（§21）と監査・教育・契約テストといった他用途の両方を同一 engine でカバーできる。
 
-### 23.3 Brief 4 設計方針への波及
+### 23.3 Responsibility Boundary: Adherence, not Correctness
+
+**原則**: semantic CI は **入力した declared intent から決定論的に verdict を導出する** ツールであり、 declared intent そのものに関する以下は **判定の対象外** とする:
+
+- intent の **瑕疵** (under-specification / inconsistency / 漏れ)
+- intent からの **逸脱** の意図性 (deviation が意図的か事故か)
+- intent と author の **真意** の一致 (declared が author の本来の目的を表しているか)
+
+Engine は `target.yaml` を ground truth として受け取り、「candidate state は declared intent に adhere しているか」 のみを問う。
+
+これは §23.1 の鏡像である:
+
+| 側 | 不可侵原則 | section |
+|---|---|---|
+| state | engine は state の出自 (real / virtual / mock) を問わない | §23.1 |
+| intent | engine は intent の真意・正しさを問わない | §23.3 |
+
+両者が揃うことで engine は **決定論的・監査可能・LLM 非依存** に保たれる。 片方だけが立つと engine の射程が崩れる:
+
+- §23.1 がなければ pre-generation validation / what-if simulation が成立しない
+- §23.3 がなければ engine は intent 推論を始め、 LLM-as-judge / requirements-analyst に変質する
+
+#### 23.3.1 Adjacent surfaces (verdict 不参加)
+
+intent への補正誘導や入力補足は **検討価値があり**、別 surface として実装可能。 ただし **verdict には決して参加しない**:
+
+| Surface | 役割 | verdict 関与 | 例 |
+|---|---|---|---|
+| **Validator** | declared intent への adherence を判定 | YES (核) | `check`, `compare`, evaluator, constraint engine |
+| **Authoring** | target.yaml の **形式** を書く支援 | NO | `init` (scaffold), template constraints |
+| **Provenance** | intent の declared 経路を記録 | NO | spec authorship anchoring (§17) |
+| **Advisor** | intent 周辺の情報を人間に届ける | NO | `severity: info` constraint, Repair Compiler (§9.3 / §21.4), Vibe Coding Adapter (§21.3) |
+
+#### 23.3.2 設計判断への適用
+
+新機能を追加する際、 brief / planning にどの surface に属するかを明示する。 surface ごとの不可侵制約:
+
+- **Validator surface への変更**: §23.1 / §23.3 の不可侵原則と互換でなければならない
+- **Authoring surface**: target.yaml の文言 / 既定値で intent correctness を暗黙に決め打たない (例: `init` template が `severity: info` を default にすると validator を弱める)
+- **Provenance surface**: 記録のみ、 evaluator から参照不可。 「authorship を読んで verdict を変える」 は §23.3 違反
+- **Advisor surface**: declared intent の意味論を保存する。 adapter / repair compiler は **render** (文字列形式の翻訳) であり **rewrite** (意味論の再解釈) ではない。 declared severity / kind / target を逐語で render する
+
+#### 23.3.3 否定形での要約 (CLAUDE.md scope guard と対応)
+
+Scope guard に肯定形の「何を保証するか」 と並んで、 否定形で 2 つの denial を置く:
+
+- **This is not an intent validator.** declared intent の正しさ・完備性は判定しない (§23.3 瑕疵)
+- **This is not an intent interpreter.** declared を超えた author の真意 / 逸脱の意図性は推論しない (§23.3 真意・逸脱)
+
+「補正誘導・入力補足は検討価値あり」 は denial ではなく Authoring / Advisor surface の許容として §23.3.1 に住む。
+
+### 23.4 Brief 4 設計方針への波及
 
 §24 Brief 4（CLI）は **「PR 専用 CLI」ではなく「2 リビジョン汎用比較器」として設計する**。具体的には:
 
@@ -1132,7 +1183,7 @@ semantic-ci-code check --baseline=HEAD --candidate=staged
 
 Engine 本体は同一で、CLI が baseline/candidate の取得経路を切り替えるだけ。実装コスト差は引数パースの増分のみ。
 
-### 23.4 設計上の含意
+### 23.5 設計上の含意
 
 generic comparator として設計することの帰結:
 

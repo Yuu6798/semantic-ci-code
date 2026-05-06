@@ -408,7 +408,7 @@ def test_evaluator_works_with_virtual_code_state():
 
 ## Brief 4 (CLI) への申し送り
 
-§23.3 で確定した CLI 設計方針:
+§23.4 で確定した CLI 設計方針:
 
 **Brief 4 は「PR 専用 CLI」ではなく「2 リビジョン汎用比較器」として設計する。**
 

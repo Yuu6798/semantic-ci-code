@@ -4,7 +4,7 @@
 
 ## 経緯
 
-`code_semantic_ci_design.md` §23.1 は engine の入力 contract を「`baseline_state` / `candidate_state` は実コード抽出 / 仮想 / mock のいずれも可」と規定している。同 §23.4 は含意として「§21.2 pre-generation validation が core engine 機能として直接成立」と述べる。
+`code_semantic_ci_design.md` §23.1 は engine の入力 contract を「`baseline_state` / `candidate_state` は実コード抽出 / 仮想 / mock のいずれも可」と規定している。同 §23.5 は含意として「§21.2 pre-generation validation が core engine 機能として直接成立」と述べる。
 
 これらは設計上の主張だが、実装が意図通り動くかは個別検証が要る。本観測は本実装を伴わない stub のみの candidate を engine に渡し、判定が想定通りに分離するかを 3 ケースで確かめた記録である。
 

@@ -29,6 +29,11 @@ above. `--strict-repair` changes only REPAIR from exit 0 to exit 1.
 policy; skipped constraints are reported in output but do not contribute to
 PASS, REPAIR, or FAIL.
 
+Constraints with `severity: info` violate as advisory only: they appear in
+output as `category: info` instructions but never change the verdict or the
+exit code, even with `--strict-repair`. This is the Advisor channel defined
+in `docs/code_semantic_ci_design.md §23.3`.
+
 Cache hit, miss, invalidation, write failure, and best-effort eviction do not
 change exit-code policy. Cache write and eviction failures are reported through
 cache stats or verbose diagnostics, then the command continues with the computed

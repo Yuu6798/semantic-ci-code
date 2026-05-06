@@ -88,12 +88,24 @@ core + adapter 群 + pre-generation validation 専用 entry point** の 3 軸に
 
 ### 4.1 責務分離
 
-| layer | 責務 | 触らない |
-|---|---|---|
-| Engine(P1) | verdict 決定、RepairPlan 生成 | adapter / format |
-| Repair Compiler core | RepairPlan + TargetSVP の正規化、adapter dispatch | engine 判定 / adapter 内部 |
-| Adapter | generator-specific format への render | engine 判定 / 別 adapter |
-| CLI(本 brief で拡張) | subcommand 引数 → core dispatch → output | engine 判定 / adapter 内部 |
+| layer | 責務 | 触らない | surface (§23.3) |
+|---|---|---|---|
+| Engine(P1) | verdict 決定、RepairPlan 生成 | adapter / format | Validator |
+| Repair Compiler core | RepairPlan + TargetSVP の正規化、adapter dispatch | engine 判定 / adapter 内部 / declared intent の意味論 | Advisor |
+| Adapter | generator-specific format への **render**(translate ではない) | engine 判定 / 別 adapter / declared intent の意味論変更 | Advisor |
+| CLI(本 brief で拡張) | subcommand 引数 → core dispatch → output | engine 判定 / adapter 内部 | Validator + Advisor |
+
+#### 4.1.1 Adapter invariant: render-not-translate (§23.3 適用)
+
+Adapter の出力は `RepairPlan` / `TargetSVP` の **文字列形式の翻訳**であり、 **意味論の再解釈ではない**。 declared intent の (severity / kind / target / operator / expected) は逐語で render 出力に出現すること。 これは `§23.3` の「engine は intent の真意を問わない」 を adapter 層に展開したもので、 adapter が「これは guidance なので柔軟に対処せよ」 と LLM に伝えると effective severity が adapter 側で勝手に下がり、 verdict と adapter 出力が乖離する。
+
+各 adapter test には以下の assertion を含める:
+
+- 入力 constraint の `severity` 値が rendered string に逐語で出現する
+- 入力 constraint の `target` (例: `api_surface_public`) が rendered string に逐語で出現する
+- 同 input に対して同 output (既存 §14.2 determinism test pattern を踏襲)
+
+determinism test だけでは「rendered 文言が intent を歪めていないか」 は捕捉できないため、 上記 2 つの「逐語出現」 assertion を独立に置く。
 
 ## 5. Repair Compiler core 設計
 

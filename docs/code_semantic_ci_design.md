@@ -1223,7 +1223,7 @@ generic comparator として設計することの帰結:
 > - **Brief 4b に Q11 同梱**: pre-commit framework manifest(`.pre-commit-hooks.yaml`)を SARIF と一括で発行
 > - ~~**Brief 5 と Brief 6 を並列発行**: §22 設計通り(直列の "Brief 5 → Brief 6" を改める)~~ → **2026-05-06 Session 2 で再改定**: Brief 6 (TypeScript) は **凍結**(§12 P3b 参照)、Brief 5 → **Brief 7 (SSP v0.1)** の直列順序に再編。`docs/brief_7_planning.md` §7 参照
 > - **P2 Brief 化時に Brief 3 #5 / #8 / #9 残部を細目として明記**: Lock violation 即 fail / per-extractor timeout / per-extractor version の hash trail 組込
-> - 元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は分解済み — §17 / §18 は本表で行先確定、§19 / §20 のみ Brief 7+ に残置
+> - 元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は分解済み — §17 / §18 は本表で行先確定、§19 / §20 のみ ~~Brief 7+~~ → **Brief 8+ deferred** に残置(2026-05-06 Session 2 で Brief 7 を SSP v0.1 に予約したため、本表 Brief 8+ deferred 行に rename 済み)
 
 | Brief | 範囲 | 想定 PR | Status |
 |---|---|---|---|

@@ -23,7 +23,7 @@ core + adapter 群 + pre-generation validation 専用 entry point** の 3 軸に
 | Brief 3 残課題 #4 | Repair Compiler(§9.3, §21.4)— Repair SVP → generator-specific prompt | **CSCI-31**(core)で解消 |
 | `design.md §21.3` adapter list | Claude Code / Cursor / Codex adapter | **CSCI-32〜34** で解消 |
 | `docs/pre_generation_validation_case.md` 残された問い #4 | `semantic-ci validate-plan` 専用エントリポイント | **CSCI-35** で解消 |
-| `design.md §21.5` IDE / pre-commit integration | pre-commit hook 統合(軽量モード)/ LSP server 化 | **本 brief では pre-commit 連携の最小実装まで**(LSP は Brief 7+ に deferred) |
+| `design.md §21.5` IDE / pre-commit integration | pre-commit hook 統合(軽量モード)/ LSP server 化 | **本 brief では pre-commit 連携の最小実装まで**(LSP は Brief 8+ deferred — Brief 7 は SSP v0.1 で予約済み、`design.md §25` 参照) |
 
 ## 2. Goals
 
@@ -41,7 +41,7 @@ core + adapter 群 + pre-generation validation 専用 entry point** の 3 軸に
 ## 3. Non-goals (本 brief 範囲外)
 
 - **v0 / Lovable / Bolt adapter** — §21.3 に「後続」 と明記、HTTP integration 形式は別 brief
-- **LSP server 化**(§21.5) — IDE 内 real-time gate、Brief 7+ deferred
+- **LSP server 化**(§21.5) — IDE 内 real-time gate、Brief 8+ deferred(Brief 7 は SSP v0.1 で予約)
 - **AI tool auto-detection**(§17.4) — `generation_metadata` field は Brief 4d で受け付け済み
   だが、自動検出ロジックは別 brief
 - **Repair の自動適用**(generator 呼び出し) — Repair Compiler は **prompt/instruction を
@@ -549,7 +549,7 @@ frontmatter dump、本文は string concat で OK。
 
 - ~~**Brief 6** TypeScript extractor — Brief 5 と並列発行可、§22 設計通り~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。P3 以降に再評価。Brief 5 完了後の次は **Brief 7 (SSP v0.1)** 直列発行
 - **v0 / Lovable / Bolt adapter**(§21.3「後続」)— HTTP integration 形式、別 brief
-- **LSP server 化**(§21.5)— IDE 内 real-time gate、Brief 7+ deferred
+- **LSP server 化**(§21.5)— IDE 内 real-time gate、Brief 8+ deferred(Brief 7 は SSP v0.1 で予約、`design.md §25` 参照)
 - **AI tool auto-detection**(§17.4)— `generation_metadata` 自動推定ロジック、別 brief
 - **P2 Brief 化時の細目**: Lock violation 即 fail / per-extractor timeout /
   per-extractor version hash trail(`design.md §12 P2` に明記済み、Brief 5 完了後に着手)

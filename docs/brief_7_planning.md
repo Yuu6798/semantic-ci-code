@@ -47,7 +47,7 @@ Brief 5 が「PR review tool → AI 生成ループの gate + feedback layer」�
 - **TypeScript / 多言語対応** — Brief 6 凍結により Python 限定、TS は P3 以降
 - **Secrets scanning / IaC scanning** — 範囲を SAST + SCA に限定(Q1 の決定)
 - **CodeQL / Bandit adapter** — reference adapter は Semgrep + pip-audit のみ、
-  追加 adapter は Brief 7+(別 brief)
+  追加 adapter は Brief 7 完了後の別 brief(Brief 8+ deferred 候補)
 - **auto-template 化(段階 C)** — `target.yaml` の宣言なしで SSP delta が verdict に
   影響する経路は当面入れない、運用データを集めてから別 brief で判断
 - **core への深い統合** — Issue #48 で reject、SSP envelope と core verdict

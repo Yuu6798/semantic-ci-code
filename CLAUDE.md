@@ -30,14 +30,16 @@ requests while remaining deterministic and auditable.
 
 ## Current Status (snapshot)
 
-- **Phase**: P1 (Python Static Semantic CI MVP) — Exit criteria 達成済み(Brief 1〜4 / CSCI-1〜19 merged、`semantic-ci` CLI 5 subcommand release 可能)
-- **次の並列発行(Brief 4b / 4c / 4d、Brief 5 の前)**:
-  - **Brief 4b**: SARIF(Q9)+ GH Actions annotation(Q10)+ pre-commit manifest(Q11 同梱)
-  - **Brief 4c**: effects extractor `fqn` semantics 修正(P1 内 hot-fix、設計 §3.1 schema 適合)
-  - **Brief 4d**: `semantic-ci init`(Q4)+ spec authorship anchoring(§17 / Brief 3 #7)+ soft / info constraint kind(Brief 3 #2)
-- **Brief 5 / Brief 6 並列発行**(§22 設計通り):
-  - **Brief 5**: Vibe Coding Adapter + Repair Compiler に絞る(P2.5 entry)
-  - **Brief 6**: TypeScript extractor 着手(P2.5 並列)
+- **Phase**: P1 完走 — Brief 1〜4 + 4b / 4c / 4d 全 merged。`semantic-ci` CLI は `init` / `observe` / `compare` / `check` / `pre-commit` / `compile` を持ち、SARIF 2.1.0 / `--format gh-actions` / `.pre-commit-hooks.yaml` 経由の CI 統合まで動作可能
+- **直近 merged**(2026-05-05):
+  - **Brief 4b** (CSCI-28 / PR #40): SARIF + GH Actions annotation + pre-commit manifest 同梱
+  - **Brief 4c** (CSCI-29 / PR #42): effects extractor `fqn` を callee → enclosing function に修正(設計 §3.1 適合)
+  - **Brief 4d** (CSCI-30 / PR #43): `semantic-ci init` + spec authorship anchoring + hard/soft/info severity routing
+  - **Brief 5 planning** (PR #44): `docs/brief_5_planning.md` 起草済み、CSCI-31 未着手
+- **次の発行候補**(2026-05-06 セッション末で整理):
+  - **A. code 側追従の small brief**: evaluator INFO 明示分岐 + `init` template コメント + authorship 不可侵 invariant test(§23.3 追加に対する code 側追従)
+  - **B. CSCI-31** (Brief 5 entry): Vibe Coding Adapter + Repair Compiler、P2.5 entry
+  - **C. Brief 6 planning**: TypeScript extractor、Brief 5 と並列発行可(§22 設計通り)
 - **P2 Brief 化時に細目として明記**: Lock violation 即 fail(§8.2 / Brief 3 #8)/ Performance budget per-extractor timeout(§18 / Brief 3 #5)/ Hash trail per-extractor version(§10 / Brief 3 #9 残部)
 - **Brief 7+ deferred**: spec quality metrics(§19)/ suite packaging(§20)/ override 機構(Brief 3 #3)/ Round-trip log(§10.3 / Brief 3 #10)/ orchestrator 観測応用
 

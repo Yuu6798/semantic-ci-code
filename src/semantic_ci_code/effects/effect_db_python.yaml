@@ -392,6 +392,51 @@ effects:
     access: write
     severity: medium
 
+  # ``os.environ`` is a module-level ``os._Environ`` instance, so dotted
+  # attribute calls on it (``os.environ.get(...)`` etc.) are resolvable
+  # under the P1 direct_call pattern (dotted ``Attribute`` chain rooted in
+  # ``ast.Name``). Subscript reads/writes such as ``os.environ["X"]`` are
+  # ``Subscript`` nodes, not ``Call`` nodes, and remain out of scope here.
+  - id: os_environ_get
+    language: python
+    match:
+      call: os.environ.get
+    effect: env
+    access: read
+    severity: low
+
+  - id: os_environ_setdefault
+    language: python
+    match:
+      call: os.environ.setdefault
+    effect: env
+    access: write
+    severity: medium
+
+  - id: os_environ_pop
+    language: python
+    match:
+      call: os.environ.pop
+    effect: env
+    access: write
+    severity: medium
+
+  - id: os_environ_update
+    language: python
+    match:
+      call: os.environ.update
+    effect: env
+    access: write
+    severity: medium
+
+  - id: os_environ_clear
+    language: python
+    match:
+      call: os.environ.clear
+    effect: env
+    access: write
+    severity: medium
+
   # ------------------------------------------------------- time_random
   - id: time_time
     language: python

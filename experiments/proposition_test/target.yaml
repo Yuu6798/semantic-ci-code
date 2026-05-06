@@ -1,0 +1,35 @@
+intent: fix verify_password handling of long-utf8 passwords (bcrypt 72-byte limit) without weakening security
+change:
+  primary_kind: bugfix
+constraints:
+  - id: bcrypt_import_preserved
+    kind: state
+    target: imports
+    operator: includes_any
+    expected:
+      - module: bcrypt
+        from_: null
+        symbols: []
+    severity: hard
+    unknown_policy: fail
+  - id: no_imports_removed
+    kind: delta
+    target: imports_delta.removed
+    operator: equals
+    expected: []
+    severity: hard
+    unknown_policy: fail
+  - id: no_test_cases_removed
+    kind: delta
+    target: test_surface_delta.removed_cases
+    operator: equals
+    expected: []
+    severity: hard
+    unknown_policy: fail
+  - id: api_surface_no_removals
+    kind: delta
+    target: api_surface_delta.removed
+    operator: equals
+    expected: []
+    severity: hard
+    unknown_policy: fail

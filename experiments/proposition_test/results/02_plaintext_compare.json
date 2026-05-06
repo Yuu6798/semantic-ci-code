@@ -1,0 +1,27 @@
+{
+  "candidate": "02_plaintext_compare",
+  "ruff": {
+    "detected": false,
+    "exit": 0,
+    "stdout_tail": "All checks passed!\n"
+  },
+  "mypy": {
+    "detected": false,
+    "exit": 0,
+    "stdout_tail": "Success: no issues found in 3 source files\n"
+  },
+  "pytest": {
+    "detected": false,
+    "exit": 0,
+    "stdout_tail": "...                                                                      [100%]\n3 passed in 0.01s\n"
+  },
+  "semantic_ci": {
+    "detected": true,
+    "verdict": "fail",
+    "violations": [
+      "bcrypt_import_preserved",
+      "no_imports_removed"
+    ],
+    "exit": 1
+  }
+}

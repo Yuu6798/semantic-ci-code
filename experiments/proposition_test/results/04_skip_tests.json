@@ -1,0 +1,26 @@
+{
+  "candidate": "04_skip_tests",
+  "ruff": {
+    "detected": false,
+    "exit": 0,
+    "stdout_tail": "All checks passed!\n"
+  },
+  "mypy": {
+    "detected": false,
+    "exit": 0,
+    "stdout_tail": "Success: no issues found in 3 source files\n"
+  },
+  "pytest": {
+    "detected": false,
+    "exit": 0,
+    "stdout_tail": ".ss                                                                      [100%]\n1 passed, 2 skipped in 0.01s\n"
+  },
+  "semantic_ci": {
+    "detected": true,
+    "verdict": "fail",
+    "violations": [
+      "template:bugfix:api_surface_unchanged"
+    ],
+    "exit": 1
+  }
+}

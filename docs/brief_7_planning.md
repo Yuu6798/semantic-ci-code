@@ -220,8 +220,18 @@ def sca_fp(package_name: str, installed_version: str, advisory_id: str) -> str:
 
 ### 4.5 Issue 処理(Q5)
 
-**Issue #48 はクローズ + 新規 SSP v0.1 tracking issue 起こし**。
-audit comment は #48 に保存、SSP の文脈は新 issue で進行。
+**現状(PR #50 review 後、 2026-05-06)**: Issue #48 は **クローズ済み**
+(state_reason=`completed`、 SSP 文脈移動 redirect コメント付き)。 audit
+comment は #48 に保存。 SSP v0.1 の tracking は **本 PR (#50) と
+`docs/brief_7_planning.md` 自体**で扱い、 専用の SSP v0.1 tracking issue は
+**Brief 5 完了直前 / Brief 7 (CSCI-36) 着手時に意図的に起こす**(早期に
+立てると stale 化する懸念のため遅延、 §11 着手 checklist 参照)。
+
+> **Brief 7 owner への注記**: 既に open な SSP tracking issue は **存在しない**。
+> 検索しても見つからない場合 duplicate を起こさず、 §11 checklist の手順に
+> 従って tracking issue を起こすこと。 Q5 当初の決定 (#48 close + 新規
+> tracking issue) は維持されているが、 新 issue の作成タイミングは
+> 「Brief 7 着手時」 に pin 済み。
 
 ### 4.6 命名(Q6)
 
@@ -354,7 +364,14 @@ NIST System Security Plan との衝突は accept したが、READMEs / search en
 Brief 5 完了後、Brief 7 を始める際に:
 
 - [ ] 本 planning doc を読み返す(Q1-Q6 の確定 + audit invariants)
-- [ ] CSCI-36 Task Brief を発行(`docs/ssp_protocol.md` v0.1 spec 起こし)
+- [ ] **SSP v0.1 tracking issue を新規起票**(現時点では存在しない、 Q5 §4.5
+  参照)。 起票時のテンプレ:
+  - title: `Brief 7: Semantic Security Protocol (SSP) v0.1 — implementation tracking`
+  - body 冒頭で Issue #48(closed)と PR #50(merged 想定)を ref、
+    `docs/brief_7_planning.md` を spec source として明示
+  - CSCI-36〜40 を sub-task として列挙、 §6 の候補分割表を貼る
+- [ ] CSCI-36 Task Brief を発行(`docs/ssp_protocol.md` v0.1 spec 起こし)、
+  上記 tracking issue 番号を Task Brief 冒頭で ref
 - [ ] 旧 audit fixtures(`/tmp/sci_audit/`)を `experiments/ssp_audit/` に永続化
   検討
 - [ ] Issue #48 の audit comment を spec doc §9(Determinism Requirements)から

@@ -92,6 +92,12 @@ def test_load_effect_db_reads_default_seed():
     assert "urllib_request_urlopen" in ids
     assert "builtin_eval" in ids
     assert "pickle_loads" in ids
+    assert "os_getenv" in ids
+    assert "os_environ_get" in ids
+    assert "os_environ_setdefault" in ids
+    assert "os_environ_pop" in ids
+    assert "os_environ_update" in ids
+    assert "os_environ_clear" in ids
 
     effect_classes = {s.effect_class for s in signatures}
     expected_p1_classes = {

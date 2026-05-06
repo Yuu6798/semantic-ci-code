@@ -1314,3 +1314,48 @@ except* Exception as x:
     assert entries[0].fqn == "module:x"
     assert entries[0].evidence["mutation_kind"] == "module_reassignment"
     assert entries[0].evidence["line"] == 4
+
+
+def test_os_environ_get_resolves_as_env_read():
+    source = """
+import os
+
+os.environ.get("AUTH_FAST_BYPASS")
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+    by_call = _by_resolved_call(entries)
+
+    assert "os.environ.get" in by_call
+    entry = by_call["os.environ.get"]
+    assert entry.effect_class is EffectClass.ENV
+    assert entry.evidence["resolution_level"] == "direct_call"
+
+
+def test_os_environ_write_methods_resolve_as_env():
+    source = """
+import os
+
+os.environ.setdefault("FOO", "1")
+os.environ.pop("BAR", None)
+os.environ.update({"BAZ": "2"})
+os.environ.clear()
+""".lstrip()
+
+    entries = extract_python_effects(source, filename="m.py")
+    resolved = _resolved_calls(entries)
+
+    assert {
+        "os.environ.setdefault",
+        "os.environ.pop",
+        "os.environ.update",
+        "os.environ.clear",
+    } <= resolved
+    by_call = _by_resolved_call(entries)
+    for call in (
+        "os.environ.setdefault",
+        "os.environ.pop",
+        "os.environ.update",
+        "os.environ.clear",
+    ):
+        assert by_call[call].effect_class is EffectClass.ENV

@@ -47,7 +47,7 @@ core + adapter 群 + pre-generation validation 専用 entry point** の 3 軸に
 - **Repair の自動適用**(generator 呼び出し) — Repair Compiler は **prompt/instruction を
   emit するのみ**。実際の patch 適用は外部 generator(Codex / Claude Code)の責務
   (§9.2 維持)
-- **TypeScript extractor** — Brief 6 範囲(P2.5 並列発行、§22)
+- **TypeScript extractor** — ~~Brief 6 範囲(P2.5 並列発行、§22)~~ Brief 6 は **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。P3 以降に再評価
 - **新たな constraint kind / operator** — Brief 4d で `severity: hard/soft/info` の routing
   は完成、本 brief で追加 constraint type は不要
 - **`reduce` / `defer` / `lock` operator の完全実装** — §12 P2 予定、本 brief は
@@ -547,7 +547,7 @@ frontmatter dump、本文は string concat で OK。
 
 ## 14. 残課題 (Brief 5 完了後)
 
-- **Brief 6** TypeScript extractor — Brief 5 と並列発行可、§22 設計通り
+- ~~**Brief 6** TypeScript extractor — Brief 5 と並列発行可、§22 設計通り~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。P3 以降に再評価。Brief 5 完了後の次は **Brief 7 (SSP v0.1)** 直列発行
 - **v0 / Lovable / Bolt adapter**(§21.3「後続」)— HTTP integration 形式、別 brief
 - **LSP server 化**(§21.5)— IDE 内 real-time gate、Brief 7+ deferred
 - **AI tool auto-detection**(§17.4)— `generation_metadata` 自動推定ロジック、別 brief

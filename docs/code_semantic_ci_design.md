@@ -1214,7 +1214,7 @@ generic comparator として設計することの帰結:
 > **現行運用(2026-05 確定、Brief 3/4 未解決の再分配反映済み)**:
 > - **Brief 5 の肥大化を解消**: `semantic-ci init`(Q4)と spec authorship anchoring(§17 / Brief 3 #7)と soft/info constraint kind(Brief 3 #2)は **Brief 4d に独立 thin Brief 化**。Brief 5 本体は Vibe Coding Adapter + Repair Compiler に絞る
 > - **Brief 4b に Q11 同梱**: pre-commit framework manifest(`.pre-commit-hooks.yaml`)を SARIF と一括で発行
-> - **Brief 5 と Brief 6 を並列発行**: §22 設計通り(直列の "Brief 5 → Brief 6" を改める)
+> - ~~**Brief 5 と Brief 6 を並列発行**: §22 設計通り(直列の "Brief 5 → Brief 6" を改める)~~ → **2026-05-06 Session 2 で再改定**: Brief 6 (TypeScript) は **凍結**(§12 P3b 参照)、Brief 5 → **Brief 7 (SSP v0.1)** の直列順序に再編。`docs/brief_7_planning.md` §7 参照
 > - **P2 Brief 化時に Brief 3 #5 / #8 / #9 残部を細目として明記**: Lock violation 即 fail / per-extractor timeout / per-extractor version の hash trail 組込
 > - 元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は分解済み — §17 / §18 は本表で行先確定、§19 / §20 のみ Brief 7+ に残置
 

@@ -24,7 +24,7 @@ Brief 5 が「PR review tool → AI 生成ループの gate + feedback layer」�
 | Issue #48 audit(セッション 2026-05-06) | OSS fingerprint 不在 / line-based fp 不安定 / paths.scanned 突合 / SIGTERM 経路 | SSP §3 / §4 に invariant として明示 |
 | `CLAUDE.md` Scope guard | 「not a linter / not a SAST gateway」を維持 | core に SAST sensor を入れない、SSP 経由で扱う |
 | `design.md §23.3` Adherence-not-Correctness | 「正しさ」判定を core に持ち込まない | SSP は finding 検出を sensor に委譲、delta のみ計算 |
-| `design.md §20.1` layered distribution | core / suite / action の 3 層 | SSP を 4 層目として追加(suite と並列) |
+| `design.md §20.1` layered distribution | ~~core / suite / action の 3 層~~ → 本 PR で **4 層に更新済み**(`semantic-ci-ssp` を `semantic-ci-suite` と並列追加) | SSP を 4 層目として追加(suite と並列) |
 | `pre_generation_validation_case.md` §23.1 invariant | engine は state の出自を問わない | SSP も Sensor Provenance Invariant として鏡像化 |
 
 ## 2. Goals
@@ -80,15 +80,35 @@ Brief 5 が「PR review tool → AI 生成ループの gate + feedback layer」�
 
 **算法骨格を SSP 仕様で固定、言語プロファイルは別添**。
 
+エンコードは **canonical JSON 配列**(`json.dumps(..., ensure_ascii=False,
+sort_keys=False, separators=(",", ":"))`)を使い、 **要素間 delimiter `:` 連結
+は禁止**(injective でないため衝突源)。
+
+```python
+import hashlib, json
+
+def sast_fp(rule_id: str, module_path: str, qualified_name: str,
+            normalized_text: str, ordinal: int) -> str:
+    payload = json.dumps(
+        [rule_id, module_path, qualified_name, normalized_text, ordinal],
+        ensure_ascii=False,
+        sort_keys=False,            # 配列は順序保存
+        separators=(",", ":"),      # 余白なしの canonical 形
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 ```
-fp = sha256(
-    rule_id || ":" ||
-    module_path || ":" ||
-    qualified_name(enclosing_function_or_class) || ":" ||
-    normalized_text(matched_node) || ":" ||
-    ordinal_index_within_scope
-).hexdigest()[:16]
-```
+
+JSON 配列を使う理由(injective + cross-language portable):
+
+- `normalized_text` には Python 文字列リテラル(`"key: value"` 等)経由で `:`
+  が混入し得る。POSIX path / rule_id にも `:` は legal。delimiter 連結は
+  `("a:b", "c")` と `("a", "b:c")` を区別できず衝突源になる
+- JSON は文字列内の特殊文字を `\"` / `\\` / `\u####` で escape するため、
+  array で並べた時点で各要素は再構成可能(injective)
+- `separators=(",", ":")` で空白なしの canonical 形に固定、`ensure_ascii=False`
+  で非 ASCII 文字(コメント / docstring 由来)の表現が確定的
+- 将来 TypeScript profile を起こす際、`JSON.stringify(arr)` で同じ payload を
+  再現できる(言語間 fp 互換)
 
 `module_path` は **repo-relative POSIX path**(`os.sep` を `/` に正規化、`.py`
 拡張子保持)。audit 不変条件 F-3(path repo-relative normalization)と
@@ -107,15 +127,27 @@ walk up、`<module>.<class>...<func>` 形式。module-level は `<module>` の�
 - 前後 whitespace strip、内部 whitespace 連続 → 単一 space
 - comment は `ast.unparse()` 出力に含まれないが、念のため strip
 
-**SCA は別 fingerprint**(自明、SCA は path に依らないので構成は変更なし):
-```
-sca_fp = sha256(package_name || ":" || installed_version || ":" || advisory_id).hexdigest()[:16]
+**SCA は別 fingerprint**(SCA は path / コード内文字列に依らないが、 SAST と同じ
+encode 規則(canonical JSON)を採用して仕様を統一する):
+
+```python
+def sca_fp(package_name: str, installed_version: str, advisory_id: str) -> str:
+    payload = json.dumps(
+        [package_name, installed_version, advisory_id],
+        ensure_ascii=False, sort_keys=False, separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 ```
 
-> **設計改訂履歴**: PR #50 review(2026-05-06、Codex 指摘)で 4 要素 → 5 要素に
-> 拡張。理由: 同 rule_id + 同 normalized_text のマッチが別ファイルで衝突する
-> 問題(同名関数 / module-level マッチが特に危険)。`module_path` を 2 番目に
-> 挿入することで rule × file × function × text × ordinal の 5 軸で衝突回避。
+> **設計改訂履歴**:
+> - PR #50 review #1(2026-05-06、Codex P2 指摘)で 4 要素 → 5 要素に拡張。
+>   理由: 同 rule_id + 同 normalized_text のマッチが別ファイルで衝突する
+>   問題(同名関数 / module-level マッチが特に危険)。`module_path` を 2 番目に
+>   挿入することで rule × file × function × text × ordinal の 5 軸で衝突回避
+> - PR #50 review #2(2026-05-06、Codex P2 指摘)で `:` delimiter 連結 →
+>   canonical JSON 配列に変更。理由: `normalized_text` 内に legal な `:` が
+>   混入し得るため delimiter 連結は injective でなく、別 finding が同 fp に衝突する
+>   可能性があった。SCA 側も同じ encode 規則に統一
 
 ### 4.4 Envelope 設計 + Sensor Provenance Invariant(Q4)
 
@@ -297,7 +329,8 @@ Brief 5 完了後、Brief 7 を始める際に:
   検討
 - [ ] Issue #48 の audit comment を spec doc §9(Determinism Requirements)から
   ref で参照
-- [ ] §20.1 の layered distribution に SSP 行を追加(本 brief とは別 PR でも可)
+- [x] §20.1 の layered distribution に SSP 行を追加 — **本 PR(#50) review で対応済み**
+  (Codex P3 指摘、`semantic-ci-ssp` を `semantic-ci-suite` と並列の 4 層目として追加)
 - [ ] Suite 層との関係(R4)について 1 段落 doc に書く
 
 ## 12. References

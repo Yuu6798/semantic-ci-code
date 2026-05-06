@@ -965,13 +965,20 @@ spec が言及していない次元も extractor は抽出し、evidence chain �
 
 ### 20.1 layered distribution
 
-semantic CI を組織が採用しやすい形で配布するため、3 層構成を採る:
+semantic CI を組織が採用しやすい形で配布するため、4 層構成を採る:
 
 ```
 semantic-ci-code     ← core (本リポジトリ、純粋な intent vs diff)
 semantic-ci-suite    ← meta-package (core + ruff + mypy + pytest の opinionated bundle)
+semantic-ci-ssp      ← Semantic Security Protocol (Brief 7、SAST + SCA、core と並列、独立 envelope)
 semantic-ci-action   ← GitHub Action (suite + workflow yaml + minimal config)
 ```
+
+`semantic-ci-ssp` は `semantic-ci-suite` と**並列**(suite の依存ではない)で、
+core の adherence-not-correctness 判定の隣で security sensor の delta を束ねる
+独立 protocol。詳細は `docs/brief_7_planning.md` 参照。`semantic-ci-action`
+からは suite と SSP の両方を opt-in で呼べる(SSP の verdict は SARIF 並列の
+独立 envelope として出力)。
 
 ### 20.2 core の不変性
 

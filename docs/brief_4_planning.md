@@ -633,9 +633,11 @@ refactor (`compare` は引き続き 0 固定、`check` は git diff 由来)。
 - **Brief 4b**: SARIF 出力 + GitHub Actions annotation
 - **Brief 5**: target.yaml scaffolding (`semantic-ci init`) / Vibe Coding Adapter /
   Repair Compiler (`design.md §17 / §22`)
-- **Brief 6**: TypeScript 経路 (P2.5、`design.md §22`)
+- ~~**Brief 6**: TypeScript 経路 (P2.5、`design.md §22`)~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。P3 以降に再評価
+- **Brief 7**: Semantic Security Protocol (SSP) v0.1 — Issue #48 audit を経て確立、
+  `docs/brief_7_planning.md` 参照、Brief 5 完了後の直列発行
 - **`docs/multi_agent_audit_case.md`** で示唆されている orchestrator 観測の応用は
-  Brief 7+ 候補
+  Brief 8+ 候補
 
 ## 12. 次のアクション
 

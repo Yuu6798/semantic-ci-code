@@ -680,6 +680,11 @@ empirical alignment データ収集を急ぐため、TypeScript 対応より先�
 
 ### P3b: TypeScript Edition（4–6 週）
 
+> **Status: 凍結**(2026-05-06 Session 2、SSP 議論内で確定)。Brief 6 を P3 以降に
+> 後倒し。費用対効果(Python だけで P1〜Brief 5 の射程をまだ広げる余地が大きい
+> こと、TS 向け AST extractor 一式の追加実装コストが Brief 7 / SSP の実装規模を
+> 圧迫すること)を踏まえた判断。再開時期は Brief 7 後に再評価。
+
 - `ts-morph` ベースの extractor 一式
 - TypeScript extension schema
 - TypeScript fixtures
@@ -960,13 +965,20 @@ spec が言及していない次元も extractor は抽出し、evidence chain �
 
 ### 20.1 layered distribution
 
-semantic CI を組織が採用しやすい形で配布するため、3 層構成を採る:
+semantic CI を組織が採用しやすい形で配布するため、4 層構成を採る:
 
 ```
 semantic-ci-code     ← core (本リポジトリ、純粋な intent vs diff)
 semantic-ci-suite    ← meta-package (core + ruff + mypy + pytest の opinionated bundle)
+semantic-ci-ssp      ← Semantic Security Protocol (Brief 7、SAST + SCA、core と並列、独立 envelope)
 semantic-ci-action   ← GitHub Action (suite + workflow yaml + minimal config)
 ```
+
+`semantic-ci-ssp` は `semantic-ci-suite` と**並列**(suite の依存ではない)で、
+core の adherence-not-correctness 判定の隣で security sensor の delta を束ねる
+独立 protocol。詳細は `docs/brief_7_planning.md` 参照。`semantic-ci-action`
+からは suite と SSP の両方を opt-in で呼べる(SSP の verdict は SARIF 並列の
+独立 envelope として出力)。
 
 ### 20.2 core の不変性
 
@@ -1209,9 +1221,9 @@ generic comparator として設計することの帰結:
 > **現行運用(2026-05 確定、Brief 3/4 未解決の再分配反映済み)**:
 > - **Brief 5 の肥大化を解消**: `semantic-ci init`(Q4)と spec authorship anchoring(§17 / Brief 3 #7)と soft/info constraint kind(Brief 3 #2)は **Brief 4d に独立 thin Brief 化**。Brief 5 本体は Vibe Coding Adapter + Repair Compiler に絞る
 > - **Brief 4b に Q11 同梱**: pre-commit framework manifest(`.pre-commit-hooks.yaml`)を SARIF と一括で発行
-> - **Brief 5 と Brief 6 を並列発行**: §22 設計通り(直列の "Brief 5 → Brief 6" を改める)
+> - ~~**Brief 5 と Brief 6 を並列発行**: §22 設計通り(直列の "Brief 5 → Brief 6" を改める)~~ → **2026-05-06 Session 2 で再改定**: Brief 6 (TypeScript) は **凍結**(§12 P3b 参照)、Brief 5 → **Brief 7 (SSP v0.1)** の直列順序に再編。`docs/brief_7_planning.md` §7 参照
 > - **P2 Brief 化時に Brief 3 #5 / #8 / #9 残部を細目として明記**: Lock violation 即 fail / per-extractor timeout / per-extractor version の hash trail 組込
-> - 元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は分解済み — §17 / §18 は本表で行先確定、§19 / §20 のみ Brief 7+ に残置
+> - 元 §25 計画の Brief 5(spec authorship + performance budget)/ Brief 6(spec quality + suite packaging)は分解済み — §17 / §18 は本表で行先確定、§19 / §20 のみ ~~Brief 7+~~ → **Brief 8+ deferred** に残置(2026-05-06 Session 2 で Brief 7 を SSP v0.1 に予約したため、本表 Brief 8+ deferred 行に rename 済み)
 
 | Brief | 範囲 | 想定 PR | Status |
 |---|---|---|---|
@@ -1223,8 +1235,9 @@ generic comparator として設計することの帰結:
 | **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/csci-29-effect-extractor-fqn-fix` | merged (CSCI-29 / PR #42) |
 | **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/csci-30-init-authorship-severity` | merged (CSCI-30 / PR #43) |
 | **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/code-semantic-ci-adapter-compiler` | planning merged (PR #44)、CSCI-31 未着手 |
-| **Brief 6** | TypeScript extractor 着手（§22.2、P2.5 並列） | `codex/code-semantic-ci-ts-extractor` | planning 未着手、Brief 5 と並列発行可（§22 設計通り） |
+| **Brief 6** | ~~TypeScript extractor 着手（§22.2、P2.5 並列）~~ | ~~`codex/code-semantic-ci-ts-extractor`~~ | **凍結**（2026-05-06 Session 2 確定、§12 P3b 参照）。費用対効果再評価のため P3 以降に後倒し |
+| **Brief 7** | **Semantic Security Protocol (SSP) v0.1**（SAST + SCA、Python only、独立 envelope、Sensor Provenance Invariant）— Issue #48 audit を経て core 外の別 protocol として確立 | `codex/csci-36-...`〜`codex/csci-40-...`（CSCI-36〜40 想定） | planning merged 後（`docs/brief_7_planning.md`）、Brief 5 完了待ち |
 | **P2 Brief 群** | Repair Core Completion (§12 参照) — Brief 3 #5 / #8 / #9 残部を細目として明記:<br>・**Lock violation 即 fail（§8.2 / Brief 3 #8）** を `lock` operator 完全実装の一部として<br>・**Performance budget 部分対応（§18 / Brief 3 #5）**: per-extractor timeout、incremental extraction の foundation<br>・**Hash trail per-extractor version（§10 / Brief 3 #9 残部）**: P3a empirical alignment の reproducibility 担保 | TBD（P2 Brief 化時に分割） | pending |
-| **Brief 7+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`） | TBD | deferred |
+| **Brief 8+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`）+ Brief 6 解凍（TypeScript extractor 再開判断） | TBD | deferred |
 
 各 Brief 完了ごとに Claude が Completion Summary を review し、次 Brief を発行する。

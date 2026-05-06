@@ -340,7 +340,7 @@ repos:
 - **Brief 4c (effects extractor `fqn` semantics 修正)** — Brief 4b と並列発行可、独立 PR
 - **Brief 4d (`init` + spec authorship + soft/info constraint kind)** — Brief 4b/4c と並列発行可、独立 PR
 - **Brief 5 planning** — Vibe Coding Adapter + Repair Compiler、Brief 4b/c/d 完了後に着手
-- **Brief 6 (TypeScript)** — Brief 5 と並列発行 (§22 設計通り)
+- ~~**Brief 6 (TypeScript)** — Brief 5 と並列発行 (§22 設計通り)~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。Brief 5 完了後の次は **Brief 7 (SSP v0.1)** の直列発行
 
 ## 14. Task Brief (CSCI-28、AGENTS.md format)
 

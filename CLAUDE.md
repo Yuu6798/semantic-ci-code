@@ -36,12 +36,13 @@ requests while remaining deterministic and auditable.
   - **Brief 4c** (CSCI-29 / PR #42): effects extractor `fqn` を callee → enclosing function に修正(設計 §3.1 適合)
   - **Brief 4d** (CSCI-30 / PR #43): `semantic-ci init` + spec authorship anchoring + hard/soft/info severity routing
   - **Brief 5 planning** (PR #44): `docs/brief_5_planning.md` 起草済み、CSCI-31 未着手
-- **次の発行候補**(2026-05-06 セッション末で整理):
+- **次の発行順序(Brief 5 → Brief 7、Brief 6 は凍結)**:
   - **A. code 側追従の small brief**: evaluator INFO 明示分岐 + `init` template コメント + authorship 不可侵 invariant test(§23.3 追加に対する code 側追従)
-  - **B. CSCI-31** (Brief 5 entry): Vibe Coding Adapter + Repair Compiler、P2.5 entry
-  - **C. Brief 6 planning**: TypeScript extractor、Brief 5 と並列発行可(§22 設計通り)
+  - **B. Brief 5 entry (CSCI-31)**: Vibe Coding Adapter + Repair Compiler、P2.5 entry。planning は PR #44 で merged 済み(`docs/brief_5_planning.md`)
+  - **C. Brief 7 (SSP v0.1)**: Issue #48 audit を経て確立した Semantic Security Protocol。Brief 5 完了後に CSCI-36〜40 で発行予定。planning は `docs/brief_7_planning.md`(本 PR で起草)
+- **Brief 6 凍結**: TypeScript extractor は P3 以降に後倒し(2026-05-06 Session 2 で確定、§12 P3b 参照)。費用対効果を再評価してから解凍判断
 - **P2 Brief 化時に細目として明記**: Lock violation 即 fail(§8.2 / Brief 3 #8)/ Performance budget per-extractor timeout(§18 / Brief 3 #5)/ Hash trail per-extractor version(§10 / Brief 3 #9 残部)
-- **Brief 7+ deferred**: spec quality metrics(§19)/ suite packaging(§20)/ override 機構(Brief 3 #3)/ Round-trip log(§10.3 / Brief 3 #10)/ orchestrator 観測応用
+- **Brief 8+ deferred**: spec quality metrics(§19)/ suite packaging(§20)/ override 機構(Brief 3 #3)/ Round-trip log(§10.3 / Brief 3 #10)/ orchestrator 観測応用 / Brief 6 解凍判断
 
 詳細: phase 定義は `docs/code_semantic_ci_design.md §12`、Brief 進捗と Brief 3/4 残課題の再分配は同 `§25`、直近の決定経緯は `.claude/memory/_index.md`。
 
@@ -98,6 +99,7 @@ docs/
 | `docs/brief_4_planning.md` | (Brief 4 complete; retained for Brief 5 reference) Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR が merge され `semantic-ci` CLI 5 subcommand が release 可能状態。Open Questions 16 件のうち未確定分は Brief 5 / Brief 4b で消化予定 |
 | `docs/brief_4b_planning.md` | Brief 4b (CI integration outputs) を CSCI-28 に集約する planning 文書。SARIF 2.1.0 出力 + GitHub Actions annotation + `.pre-commit-hooks.yaml` manifest を 1 PR で完結させる設計と Task Brief。Brief 4 Open Questions Q9/Q10/Q11 を救済 |
 | `docs/brief_5_planning.md` | Brief 5 (Repair Compiler + Vibe Coding Adapters、P2.5 entry) を CSCI-31〜35 の 5 PR に分割する planning 文書。`RepairPlan` / `TargetSVP` を Claude Code / Cursor / Codex adapter 経由で render、`validate-plan` / `compile-repair` 新規 subcommand を導入。Brief 3 残課題 #4(Repair Compiler)+ §21.3 adapter list + `pre_generation_validation_case.md` 残された問い #4 を救済 |
+| `docs/brief_7_planning.md` | Brief 7 (Semantic Security Protocol / SSP v0.1) を CSCI-36〜40 想定で planning する文書。Issue #48 の Semgrep 統合提案を audit した結果、core への深い統合は reject、SSP として §20.1 layered distribution の 4 層目(suite と並列)に独立配置。SAST + SCA / Python only / 4 要素 fingerprint + 言語プロファイル分離 / 独立 envelope + Sensor Provenance Invariant(§23.1 鏡像)/ Issue #48 クローズ + 新規 tracking issue / NIST SSP との衝突は許容、を 6 論点で確定。Brief 6(TypeScript)凍結に伴い順序は **Brief 5 → 7** |
 | `docs/brief_3_planning.md` | (Archived) Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。CSCI-10〜14 の全 PR が merge され Brief 3 は完結済み。当時の判断履歴として保存 |
 | `docs/multi_agent_audit_case.md` | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
 | `docs/pre_generation_validation_case.md` | 外部 Python リポジトリ上で stub のみの candidate を engine に渡し §23.1 入力 contract が実装で動作することを 3 ケースで確認した観測事例。core scope 外の応用観測 |

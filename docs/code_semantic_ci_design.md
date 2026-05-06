@@ -680,6 +680,11 @@ empirical alignment データ収集を急ぐため、TypeScript 対応より先�
 
 ### P3b: TypeScript Edition（4–6 週）
 
+> **Status: 凍結**(2026-05-06 Session 2、SSP 議論内で確定)。Brief 6 を P3 以降に
+> 後倒し。費用対効果(Python だけで P1〜Brief 5 の射程をまだ広げる余地が大きい
+> こと、TS 向け AST extractor 一式の追加実装コストが Brief 7 / SSP の実装規模を
+> 圧迫すること)を踏まえた判断。再開時期は Brief 7 後に再評価。
+
 - `ts-morph` ベースの extractor 一式
 - TypeScript extension schema
 - TypeScript fixtures
@@ -1223,8 +1228,9 @@ generic comparator として設計することの帰結:
 | **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/csci-29-effect-extractor-fqn-fix` | merged (CSCI-29 / PR #42) |
 | **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/csci-30-init-authorship-severity` | merged (CSCI-30 / PR #43) |
 | **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/code-semantic-ci-adapter-compiler` | planning merged (PR #44)、CSCI-31 未着手 |
-| **Brief 6** | TypeScript extractor 着手（§22.2、P2.5 並列） | `codex/code-semantic-ci-ts-extractor` | planning 未着手、Brief 5 と並列発行可（§22 設計通り） |
+| **Brief 6** | ~~TypeScript extractor 着手（§22.2、P2.5 並列）~~ | ~~`codex/code-semantic-ci-ts-extractor`~~ | **凍結**（2026-05-06 Session 2 確定、§12 P3b 参照）。費用対効果再評価のため P3 以降に後倒し |
+| **Brief 7** | **Semantic Security Protocol (SSP) v0.1**（SAST + SCA、Python only、独立 envelope、Sensor Provenance Invariant）— Issue #48 audit を経て core 外の別 protocol として確立 | `codex/csci-36-...`〜`codex/csci-40-...`（CSCI-36〜40 想定） | planning merged 後（`docs/brief_7_planning.md`）、Brief 5 完了待ち |
 | **P2 Brief 群** | Repair Core Completion (§12 参照) — Brief 3 #5 / #8 / #9 残部を細目として明記:<br>・**Lock violation 即 fail（§8.2 / Brief 3 #8）** を `lock` operator 完全実装の一部として<br>・**Performance budget 部分対応（§18 / Brief 3 #5）**: per-extractor timeout、incremental extraction の foundation<br>・**Hash trail per-extractor version（§10 / Brief 3 #9 残部）**: P3a empirical alignment の reproducibility 担保 | TBD（P2 Brief 化時に分割） | pending |
-| **Brief 7+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`） | TBD | deferred |
+| **Brief 8+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`）+ Brief 6 解凍（TypeScript extractor 再開判断） | TBD | deferred |
 
 各 Brief 完了ごとに Claude が Completion Summary を review し、次 Brief を発行する。

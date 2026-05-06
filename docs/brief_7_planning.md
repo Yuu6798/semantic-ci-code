@@ -53,7 +53,8 @@ Brief 5 が「PR review tool → AI 生成ループの gate + feedback layer」�
 - **core への深い統合** — Issue #48 で reject、SSP envelope と core verdict
   envelope は独立(将来 Suite 層で aggregate するかは別議論)
 - **Pro / 商用 ruleset 依存** — OSS Semgrep の範囲で動かす、`fingerprint` は自前
-  4 要素 fp(本 doc §3.3)で算出
+  5 要素 fp(本 doc §4.3、`rule_id × module_path × qualified_name ×
+  normalized_text × ordinal`)で算出
 - **GitHub Marketplace publication** — SSP は当面 `pip install` + workflow run の
   運用、Action 化は P3a に集約(§12)
 
@@ -82,24 +83,39 @@ Brief 5 が「PR review tool → AI 生成ループの gate + feedback layer」�
 ```
 fp = sha256(
     rule_id || ":" ||
+    module_path || ":" ||
     qualified_name(enclosing_function_or_class) || ":" ||
     normalized_text(matched_node) || ":" ||
     ordinal_index_within_scope
 ).hexdigest()[:16]
 ```
 
+`module_path` は **repo-relative POSIX path**(`os.sep` を `/` に正規化、`.py`
+拡張子保持)。audit 不変条件 F-3(path repo-relative normalization)と
+連動し、virtual mode (CodeState 直接入力)では sensor provenance 内の
+`source_id` に対応する文字列を使う。Python module dotted path
+(`pkg.foo`)ではなく path を採るのは、`__init__.py` / `tests/conftest.py`
+などパッケージ外ファイルでも一意性が確保されるため。
+
+`qualified_name` は最寄りの `FunctionDef` / `AsyncFunctionDef` / `ClassDef` を
+walk up、`<module>.<class>...<func>` 形式。module-level は `<module>` のみ
+(同 path 内では module-level は 1 つのスコープなので衝突しない、別 path 間の
+衝突は `module_path` 成分が解消する)。
+
 `normalized_text` の正規化規則は **Python profile §X.1**(別添)で規定:
 - `ast.unparse()` 経由で AST → text
 - 前後 whitespace strip、内部 whitespace 連続 → 単一 space
 - comment は `ast.unparse()` 出力に含まれないが、念のため strip
 
-`qualified_name` は最寄りの `FunctionDef` / `AsyncFunctionDef` / `ClassDef` を
-walk up、`<module>.<class>...<func>` 形式。module-level は `<module>` のみ。
-
-**SCA は別 fingerprint**(自明):
+**SCA は別 fingerprint**(自明、SCA は path に依らないので構成は変更なし):
 ```
 sca_fp = sha256(package_name || ":" || installed_version || ":" || advisory_id).hexdigest()[:16]
 ```
+
+> **設計改訂履歴**: PR #50 review(2026-05-06、Codex 指摘)で 4 要素 → 5 要素に
+> 拡張。理由: 同 rule_id + 同 normalized_text のマッチが別ファイルで衝突する
+> 問題(同名関数 / module-level マッチが特に危険)。`module_path` を 2 番目に
+> 挿入することで rule × file × function × text × ordinal の 5 軸で衝突回避。
 
 ### 4.4 Envelope 設計 + Sensor Provenance Invariant(Q4)
 
@@ -164,7 +180,7 @@ Issue #48 audit で確定した事実を Brief 7 内で**回帰テスト化必�
 | A2 jobs invariance | PASS | Semgrep adapter で `--jobs` 固定不要(audit で確認済み) |
 | A3 path / rule_id 正規化 | CONDITIONAL PASS | adapter で **`--no-rewrite-rule-ids` hard-code + path repo-relative 正規化**必須 |
 | B1/B2 airgap + telemetry zero | PASS | adapter で `--metrics=off --disable-version-check` hard-code |
-| C1 line-based fp 不安定 | **FAIL** | 自前 4 要素 fp 必須(§4.3)、Semgrep `extra.fingerprint` は OSS で `"requires login"` 返却 |
+| C1 line-based fp 不安定 | **FAIL** | 自前 5 要素 fp 必須(§4.3、`rule_id × module_path × qualified_name × normalized_text × ordinal`)、Semgrep `extra.fingerprint` は OSS で `"requires login"` 返却 |
 | E1 paths.scanned 突合 | NOTE | adapter で **expected file list ↔ scanned 突合、欠損 → unknown 扱い** |
 | E1 SIGTERM / JSON parse 失敗 | NOTE | adapter で exit code != {0,1} → unknown 経路必須 |
 | E2 wall-time variance | PASS(8%) | per-extractor timeout は §18 P2 で別途、SSP 側は **timeout → unknown** |

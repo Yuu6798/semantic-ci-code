@@ -16,6 +16,14 @@ Scope guard:
 - This is not a type checker.
 - This is not a test runner.
 - This is not an LLM-as-judge service.
+- This is not an intent validator.
+- This is not an intent interpreter.
+
+The tool deterministically derives a verdict from the **declared** intent
+(`target.yaml`). Intent flaws, deviation purpose, and the author's true
+intent are out of scope for the verdict. Correction guidance and input
+supplementation may live as separate surfaces (Authoring / Advisor) but
+never participate in the verdict. See `docs/code_semantic_ci_design.md §23.3`.
 
 The product exists to catch intent drift in generated or manually edited pull
 requests while remaining deterministic and auditable.

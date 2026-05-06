@@ -57,6 +57,24 @@ effects:
 movement where public-looking symbols are not production API. `effects.allow_new`
 accepts exact effect FQNs and/or effect classes for feature and bugfix templates.
 
+## Constraint Severity
+
+Each constraint in `target.yaml` carries a `severity` field that decides how
+violations route into the verdict. The default is `hard`.
+
+| `severity` | violated 時の verdict | exit code 影響 | surface (§23.3) |
+|---|---|---|---|
+| `hard` (default) | `fail` | exit 1 | Validator |
+| `soft` | `repair` | exit 0 (or exit 1 with `--strict-repair`) | Validator |
+| `info` | `pass` (verdict 不変) | 影響なし | Advisor channel |
+
+`severity: info` violations are reported as `category: info` repair
+instructions and surfaced in human / SARIF / GitHub Actions output, but they
+do not change the verdict or exit code. Lowering a constraint from `hard` to
+`soft` or `info` weakens the gate; the choice is the spec author's
+responsibility. See `docs/code_semantic_ci_design.md §23.3` for the underlying
+boundary (verdict ≠ intent correctness).
+
 ## Target Authorship
 
 `target.yaml` may include an optional `authorship` section. Semantic CI parses
@@ -133,6 +151,10 @@ semantic-ci init [--path <file>] [--force]
 Scaffolds a commented target file. The default output path is
 `.semantic-ci/target.yaml`; parent directories are created as needed. Existing
 files are not overwritten unless `--force` is provided.
+
+**Surface**: Authoring (§23.3). `init` writes a target.yaml scaffold; it does
+not validate, refine, or interpret intent. The scaffold's defaults do not
+encode opinions about which constraints are correct for a given change.
 
 Examples:
 

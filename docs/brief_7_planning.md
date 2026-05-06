@@ -127,6 +127,31 @@ walk up、`<module>.<class>...<func>` 形式。module-level は `<module>` の�
 - 前後 whitespace strip、内部 whitespace 連続 → 単一 space
 - comment は `ast.unparse()` 出力に含まれないが、念のため strip
 
+`ordinal_index_within_scope` の割り当て規則(SSP 仕様で固定):
+
+1. すべての raw findings を集めた後、 4-tuple
+   `(rule_id, module_path, qualified_name, normalized_text)` で **group**
+2. 各 group 内の finding を **source span tuple** `(start_line, start_col,
+   end_line, end_col)` で **昇順 sort**(整数比較、tie-break は
+   左から右へ)。Semgrep の `start.line` / `start.col` / `end.line` /
+   `end.col` field をそのまま使う(1-indexed のままで OK、相対順序のみ意味を持つ)
+3. sort 済みリストの **0-indexed 位置**を ordinal とする
+4. 完全に同一の source span を持つ重複 finding は **重複排除を ordinal 割当て前に
+   実施**(adapter 実装の責務、`ssp_protocol.md §X.2` で reference 実装を提示)
+5. virtual mode(CodeState 直接入力)で source span が無い場合は、 sensor
+   provenance 内の **stable iteration order** を使い、その順序を CodeState
+   schema で要求(§4.4 envelope の `findings_order_invariant` field 参照)
+
+この規則の含意:
+- **既知の trade-off**: 同 group 内に新規 finding が挿入されると、後続の ordinal
+  が +1 ずれて該当 fp が変わる。これは ordinal の本質的制約であり、 SSP は
+  group 衝突 (同 rule × 同 file × 同 function × 同 normalized_text) は
+  実用上稀という前提で受け入れる。代替案 (ordinal を完全に削除する設計) は
+  別の衝突源を生むため採らない
+- **adapter 実装互換性**: Semgrep adapter / pip-audit adapter / 将来の
+  TypeScript profile が **同じ raw findings 集合**を受けたら **同じ ordinal**
+  を割当てる。adapter ごとの内部 iteration order に依存しない
+
 **SCA は別 fingerprint**(SCA は path / コード内文字列に依らないが、 SAST と同じ
 encode 規則(canonical JSON)を採用して仕様を統一する):
 
@@ -148,6 +173,11 @@ def sca_fp(package_name: str, installed_version: str, advisory_id: str) -> str:
 >   canonical JSON 配列に変更。理由: `normalized_text` 内に legal な `:` が
 >   混入し得るため delimiter 連結は injective でなく、別 finding が同 fp に衝突する
 >   可能性があった。SCA 側も同じ encode 規則に統一
+> - PR #50 review #3(2026-05-06、Codex P2 指摘)で `ordinal_index_within_scope`
+>   の割り当て規則を pin 固定。理由: 同 4-tuple group 内で複数 findings がある
+>   場合、 adapter / Semgrep バージョン差で ordinal が変動すれば fp も変動し、
+>   §4.3 が決定的であるべき算法骨格を spec が保証できなくなる。group → source
+>   span 昇順 sort → 0-indexed 位置で確定
 
 ### 4.4 Envelope 設計 + Sensor Provenance Invariant(Q4)
 

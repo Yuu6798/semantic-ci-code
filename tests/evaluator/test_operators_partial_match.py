@@ -68,6 +68,16 @@ def test_includes_any_partial_record_matches_observed_extra_fields():
     assert result.status is ResultStatus.SATISFIED
 
 
+def test_includes_any_null_optional_key_requires_observed_key_presence():
+    result = _result(
+        Operator.INCLUDES_ANY,
+        ({"fqn": "pkg.maybe_public", "visibility": None},),
+        ({"fqn": "pkg.maybe_public"},),
+    )
+
+    assert result.status is ResultStatus.VIOLATED
+
+
 def test_excludes_all_partial_record_violation_reports_matched_pair():
     result = _result(
         Operator.EXCLUDES_ALL,
@@ -81,6 +91,16 @@ def test_excludes_all_partial_record_violation_reports_matched_pair():
     matched = evidence["matched"][0]
     assert dict(matched)["expected_item"] == (("fqn", "dangerous.api"),)
     assert ("signature", "def dangerous_api(token): ...") in dict(matched)["observed_record"]
+
+
+def test_excludes_all_null_optional_key_requires_observed_key_presence():
+    result = _result(
+        Operator.EXCLUDES_ALL,
+        ({"fqn": "pkg.maybe_public", "visibility": None},),
+        ({"fqn": "pkg.maybe_public"},),
+    )
+
+    assert result.status is ResultStatus.SATISFIED
 
 
 def test_subset_of_treats_expected_records_as_partial_allow_list():

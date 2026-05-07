@@ -129,7 +129,10 @@ def match_item(expected: object, observed: object) -> bool:
     expected_map = mapping_view(expected)
     observed_map = mapping_view(observed)
     if expected_map is not None and observed_map is not None:
-        return all(observed_map.get(key) == value for key, value in expected_map.items())
+        return all(
+            key in observed_map and observed_map[key] == value
+            for key, value in expected_map.items()
+        )
     return expected == observed
 
 

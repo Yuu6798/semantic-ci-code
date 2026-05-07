@@ -278,7 +278,7 @@ brief 着手時に `experiments/ssp_audit/` 等に永続化検討)。
 
 | 順 | Brief | 内容 | 着手条件 |
 |---|---|---|---|
-| 1 | **Brief 5**(✅ 完走 2026-05-07) | Vibe Coding Adapter + Repair Compiler(P2.5 entry) | CSCI-31〜35 全 merged(PR #52〜#56 + 完了宣言 PR #57)、`docs/brief_5_planning.md` を REFERENCE として保存 |
+| 1 | **Brief 5**(✅ 完走 2026-05-07) | Vibe Coding Adapter + Repair Compiler(P2.5 entry) | CSCI-31〜35 全 merged(PR #52〜#56 + 完了宣言 PR #57)、`docs/archive/brief_5_planning.md` を REFERENCE として保存 |
 | 2 | **Brief 6** | TypeScript extractor | **凍結**(P3 以降、費用対効果見直し後に再検討) |
 | 3 | **Brief 7** | SSP v0.1 | Brief 5 完走済 → 本 doc を入力に CSCI-36 から発行可能(§11 checklist 参照) |
 
@@ -290,7 +290,7 @@ Brief 7 着手は順序的に解禁。CSCI-36 起草時は §11 checklist + AGEN
 
 > **Status**: Brief 5 完走済(2026-05-07)。本節は履歴的な事前 invariants として
 > retain。Brief 7 着手前に「Brief 5 が下記 ❌ パターンに踏み込んでいなかったか」
-> を CSCI-36 起草時にレビューすること(`docs/brief_5_planning.md §10` の merged
+> を CSCI-36 起草時にレビューすること(`docs/archive/brief_5_planning.md §10` の merged
 > CSCI 表 + envelope 独立性が確認材料)。
 
 Brief 5 が以下のいずれかに踏み込んだ場合、Brief 7 で再設計が必要になる:
@@ -330,7 +330,7 @@ Brief 5 が以下のいずれかに踏み込んだ場合、Brief 7 で再設計�
 §12. Compatibility and Versioning
 ```
 
-`brief_4_planning.md` と異なり、本 doc は **planning** であって **spec** ではない。
+`docs/archive/brief_4_planning.md` と異なり、本 doc は **planning** であって **spec** ではない。
 spec 本体は Brief 7 着手時の最初の CSCI(CSCI-36)で `docs/ssp_protocol.md` として書く。
 
 ## 10. Risks / Open Questions
@@ -392,7 +392,7 @@ Brief 5 完了後、Brief 7 を始める際に:
 - `.claude/memory/2026-05-06.md` Session 2: 本 planning の議論経緯
 - `docs/code_semantic_ci_design.md` §20.1 layered distribution / §23.1
   engine state provenance / §23.3 adherence-not-correctness
-- `docs/brief_5_planning.md`: 構造の参考(Brief 5 は Repair Compiler + Adapter、
+- `docs/archive/brief_5_planning.md`: 構造の参考(Brief 5 は Repair Compiler + Adapter、
   Brief 7 は SSP で対比的)
 - `docs/pre_generation_validation_case.md`: §23.1 の実証、SSP の Sensor
   Provenance Invariant の前例

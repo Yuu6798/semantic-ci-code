@@ -557,7 +557,7 @@ frontmatter dump、本文は string concat で OK。
 
 > **Status (2026-05-07 Session 4 / 5 時点)**: CSCI-35b sweep の 4 候補のうち 2 件は
 > 単発 PR で先行解消済み(PR #58 / #59)。残 2 件は次の sweep brief で同梱予定。
-> 全体の最新 tracking は `CLAUDE.md` 次の発行順序 §A を参照。
+> 全体の最新 tracking は `.claude/memory/STATUS.md` 次の発行順序 §A を参照。
 
 - **CSCI-35b sweep brief**(残 2 件まで縮小): Brief 5 review で deferred とした技術的負債をまとめて 1 PR で消化:
   - ~~`would_violate` の delta-kind constraint 盲点を `docs/cli_usage.md` に明記~~ → **既明記済**(`docs/cli_usage.md:348-353` で self-comparison 下では delta-kind が `would_violate` に上がらない旨を文書化済、Session 4 で確認、撤回)
@@ -570,11 +570,11 @@ frontmatter dump、本文は string concat で OK。
 - **AI tool auto-detection**(§17.4)— `generation_metadata` 自動推定ロジック、別 brief
 - **P2 Brief 化時の細目**: Lock violation 即 fail / per-extractor timeout /
   per-extractor version hash trail(`design.md §12 P2` に明記済み、Brief 5 完了後に着手)
-- **D1〜D5 dogfood-driven 課題群**(2026-05-07 Session 4 / 5 由来): `target.yaml` authoring guide 新設(D1/D3/D4)、extractor exclude 機構(D2)、set operator partial-match semantics(D5 = FINDING-1、未解決)— 詳細と現行 routing は `CLAUDE.md` 次の発行順序 §A'/§D/§F、`docs/dogfooding_TC10_report.md` 参照
+- **D1〜D5 dogfood-driven 課題群**(2026-05-07 Session 4 / 5 由来): `target.yaml` authoring guide 新設(D1/D3/D4)、extractor exclude 機構(D2)、set operator partial-match semantics(D5 = FINDING-1、未解決)— 詳細と現行 routing は `.claude/memory/STATUS.md` 次の発行順序 §A'/§D/§F、`docs/dogfooding_TC10_report.md` 参照
 
 ## 15. 次のアクション(完了履歴)
 
-1. ✅ 本 planning 文書を `docs/brief_5_planning.md` として merge(PR #44)
+1. ✅ 本 planning 文書を `docs/brief_5_planning.md` として merge(PR #44、現在は `docs/archive/brief_5_planning.md` に移管)
 2. ✅ §12 Open Questions 14 件を planning merge 時点で確定
 3. ✅ CSCI-31〜35 を順次 Task Brief 化 → 全 merge(2026-05-07 完走)
 4. ✅ CSCI-35b sweep #3(symlink escape 防御)を PR #59 で先行解消

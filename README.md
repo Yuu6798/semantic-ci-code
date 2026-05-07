@@ -98,15 +98,12 @@ Planning (open):
 
 - [Brief 7 — Semantic Security Protocol v0.1](docs/brief_7_planning.md) — SAST + SCA, Python only, independent envelope, Sensor Provenance Invariant
 
-Reference (brief complete; retained for context):
+Reference / archived (completed briefs, retained for context — see [`docs/archive/README.md`](docs/archive/README.md)):
 
-- [Brief 5 — Repair Compiler + Vibe Coding Adapters (P2.5 entry)](docs/brief_5_planning.md) — CSCI-31〜35 merged 2026-05-07
-- [Brief 4b — CI integration outputs (SARIF + GH Actions + pre-commit manifest)](docs/brief_4b_planning.md) — CSCI-28 merged 2026-05-05
-- [Brief 4 — CLI / operational entrypoint](docs/brief_4_planning.md) — CSCI-15〜19 merged 2026-05-04
-
-Archived:
-
-- [Brief 3 — Pipeline integration (judgment layer)](docs/brief_3_planning.md) — CSCI-10〜14 merged
+- [Brief 5 — Repair Compiler + Vibe Coding Adapters (P2.5 entry)](docs/archive/brief_5_planning.md) — CSCI-31〜35 merged 2026-05-07
+- [Brief 4b — CI integration outputs (SARIF + GH Actions + pre-commit manifest)](docs/archive/brief_4b_planning.md) — CSCI-28 merged 2026-05-05
+- [Brief 4 — CLI / operational entrypoint](docs/archive/brief_4_planning.md) — CSCI-15〜19 merged 2026-05-04
+- [Brief 3 — Pipeline integration (judgment layer)](docs/archive/brief_3_planning.md) — CSCI-10〜14 merged
 
 Out-of-core observation (case studies and dogfooding):
 

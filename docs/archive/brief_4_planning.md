@@ -631,7 +631,7 @@ refactor (`compare` は引き続き 0 固定、`check` は git diff 由来)。
 ## 11. 残課題 (Brief 4 完了後)
 
 > **Status (2026-05-07 時点)**: 本表の "Brief 4 完了直後の queue" は概ね消化済。
-> 最新の発行順序は `CLAUDE.md` 次の発行順序を一次資料として参照。
+> 最新の発行順序は `.claude/memory/STATUS.md` 次の発行順序を一次資料として参照。
 
 - ✅ **Brief 4b**: SARIF 出力 + GitHub Actions annotation + `.pre-commit-hooks.yaml` manifest — CSCI-28 / PR #40 で完了 (2026-05-05)
 - ✅ **Brief 4c**: effects extractor `fqn` semantics 修正 — CSCI-29 / PR #42 で完了 (2026-05-05)
@@ -645,7 +645,7 @@ refactor (`compare` は引き続き 0 固定、`check` は git diff 由来)。
 
 ## 12. 次のアクション
 
-1. 本 planning 文書を `docs/brief_4_planning.md` として commit
+1. 本 planning 文書を `docs/brief_4_planning.md` として commit(現在は `docs/archive/brief_4_planning.md` に移管)
 2. §10 の Open Questions を確定 (特に Q1, Q2, Q3, Q6, Q7)
 3. Q 確定後、CSCI-15 から順次 Task Brief を切る (CSCI-10〜14 と同じワークフロー)
 4. CSCI-15 merge 後に CSCI-16 brief 起草、以下 forward-only で進む

@@ -663,7 +663,7 @@ svp-rpe-code/
 
 ### P2.5: Vibe Coding Adapter + Repair Compiler + TS extractor 並列（§21 / §22 で前倒し） ✓ 完走 (Brief 5 / 2026-05-07)
 
-§12 元計画(P5 / P3b)から **P2.5 へ前倒し**された統合 phase。Brief 5 (CSCI-31〜35) で完走。詳細は §21・§22 と `docs/brief_5_planning.md`。
+§12 元計画(P5 / P3b)から **P2.5 へ前倒し**された統合 phase。Brief 5 (CSCI-31〜35) で完走。詳細は §21・§22 と `docs/archive/brief_5_planning.md`。
 
 - **Generator Adapter**(§21.3): Claude Code / Cursor / Codex 3 adapter を CSCI-31〜33 で実装。v0 / Lovable / Bolt は HTTP 統合形式で別 brief
 - **Repair Compiler**(§21.4 / §9.3): Repair SVP → generator-specific prompt の compiler。CSCI-31 で core + Adapter Protocol、CSCI-34 で `compile-repair` subcommand
@@ -1226,15 +1226,12 @@ PLANNING (open):
 
 - [`brief_7_planning.md`](./brief_7_planning.md) — Brief 7 (SSP v0.1) Q1〜Q6 確定 + 5 要素 fingerprint + Sensor Provenance Invariant + CSCI-36〜40 候補
 
-REFERENCE (brief complete; downstream context 用):
+REFERENCE / ARCHIVED (`docs/archive/` に集約、[`archive/README.md`](./archive/README.md) 参照):
 
-- [`brief_5_planning.md`](./brief_5_planning.md) — Brief 5 完走 (2026-05-07)
-- [`brief_4b_planning.md`](./brief_4b_planning.md) — Brief 4b 完走 (2026-05-05)
-- [`brief_4_planning.md`](./brief_4_planning.md) — Brief 4 完走 (2026-05-04)
-
-ARCHIVED:
-
-- [`brief_3_planning.md`](./brief_3_planning.md) — Brief 3 完走、判断履歴のみ
+- [`archive/brief_5_planning.md`](./archive/brief_5_planning.md) — Brief 5 完走 (2026-05-07)
+- [`archive/brief_4b_planning.md`](./archive/brief_4b_planning.md) — Brief 4b 完走 (2026-05-05)
+- [`archive/brief_4_planning.md`](./archive/brief_4_planning.md) — Brief 4 完走 (2026-05-04)
+- [`archive/brief_3_planning.md`](./archive/brief_3_planning.md) — Brief 3 完走、判断履歴のみ
 
 CASE STUDY (core scope 外の応用観測):
 
@@ -1262,12 +1259,12 @@ DOGFOOD REPORT:
 |---|---|---|---|
 | **Brief 1** | schema 定義（`CodeState` / `CodeStateDelta` / `Constraint` 型 / `Target SVP` DSL JSON Schema） | `codex/code-semantic-ci-schema` | merged |
 | **Brief 2** | extractor 実装（Python のみ、6 次元） | `codex/code-semantic-ci-py-extractors` | merged (CSCI-5〜9) |
-| **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` | merged (CSCI-10〜14、`brief_3_planning.md` archived) |
-| **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` | merged (CSCI-15〜19、`brief_4_planning.md` 完結) |
+| **Brief 3** | pipeline 統合（compiler / evaluator / diff / repair） | `codex/code-semantic-ci-pipeline` | merged (CSCI-10〜14、`docs/archive/brief_3_planning.md` archived) |
+| **Brief 4** | CLI + JSON report + fixture テスト | `codex/code-semantic-ci-cli` | merged (CSCI-15〜19、`docs/archive/brief_4_planning.md` 完結) |
 | **Brief 4b** | SARIF 出力（Q9）+ GitHub Actions annotation（Q10）+ **`.pre-commit-hooks.yaml` manifest（Q11）同梱** | `codex/csci-28-sarif-gh-actions-precommit` | merged (CSCI-28 / PR #40) |
 | **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/csci-29-effect-extractor-fqn-fix` | merged (CSCI-29 / PR #42) |
 | **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/csci-30-init-authorship-severity` | merged (CSCI-30 / PR #43) |
-| **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/csci-31-…` 〜 `codex/csci-35-…` | merged (CSCI-31 / PR #52, CSCI-32 / #53, CSCI-33 / #54, CSCI-34 / #55, CSCI-35 / #56 + 完了宣言 PR #57、`brief_5_planning.md` を REFERENCE として保存) |
+| **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/csci-31-…` 〜 `codex/csci-35-…` | merged (CSCI-31 / PR #52, CSCI-32 / #53, CSCI-33 / #54, CSCI-34 / #55, CSCI-35 / #56 + 完了宣言 PR #57、`docs/archive/brief_5_planning.md` を REFERENCE として保存) |
 | **Brief 6** | ~~TypeScript extractor 着手（§22.2、P2.5 並列）~~ | ~~`codex/code-semantic-ci-ts-extractor`~~ | **凍結**（2026-05-06 Session 2 確定、§12 P3b 参照）。費用対効果再評価のため P3 以降に後倒し |
 | **Brief 7** | **Semantic Security Protocol (SSP) v0.1**（SAST + SCA、Python only、独立 envelope、Sensor Provenance Invariant）— Issue #48 audit を経て core 外の別 protocol として確立 | `codex/csci-36-...`〜`codex/csci-40-...`（CSCI-36〜40 想定） | planning merged (PR #50、`docs/brief_7_planning.md`)、Brief 5 完走済 → CSCI-36 発行可。AGENTS.md `Forward Design Note` を CSCI-36 起草時に逐語参照 |
 | **P2 Brief 群** | Repair Core Completion (§12 参照) — Brief 3 #5 / #8 / #9 残部を細目として明記:<br>・**Lock violation 即 fail（§8.2 / Brief 3 #8）** を `lock` operator 完全実装の一部として<br>・**Performance budget 部分対応（§18 / Brief 3 #5）**: per-extractor timeout、incremental extraction の foundation<br>・**Hash trail per-extractor version（§10 / Brief 3 #9 残部）**: P3a empirical alignment の reproducibility 担保 | TBD（P2 Brief 化時に分割） | pending |

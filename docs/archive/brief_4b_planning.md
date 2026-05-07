@@ -15,7 +15,7 @@
 
 ## 位置付け
 
-`docs/code_semantic_ci_design.md §25` の Brief 4b 行 + `docs/brief_4_planning.md §11` で
+`docs/code_semantic_ci_design.md §25` の Brief 4b 行 + `docs/archive/brief_4_planning.md §11` で
 予告されていた CI integration 出力を実装する。本 brief 完結で:
 
 - Brief 4 の Open Questions Q9 / Q10 / Q11 が全て resolved
@@ -346,11 +346,11 @@ repos:
 ## 13. 残課題 (Brief 4b 完了後)
 
 > **Status (2026-05-07 時点)**: 本表の queue は概ね消化済。最新の発行順序は
-> `CLAUDE.md` 次の発行順序を一次資料として参照。
+> `.claude/memory/STATUS.md` 次の発行順序を一次資料として参照。
 
 - ✅ **Brief 4c (effects extractor `fqn` semantics 修正)** — CSCI-29 / PR #42 で完了 (2026-05-05)
 - ✅ **Brief 4d (`init` + spec authorship + soft/info constraint kind)** — CSCI-30 / PR #43 で完了 (2026-05-05)
-- ✅ **Brief 5 planning** — `docs/brief_5_planning.md` を PR #44 で merge → CSCI-31〜35 全 merged で Brief 5 完走 (2026-05-07)
+- ✅ **Brief 5 planning** — `docs/archive/brief_5_planning.md` を PR #44 で merge → CSCI-31〜35 全 merged で Brief 5 完走 (2026-05-07)
 - ~~**Brief 6 (TypeScript)** — Brief 5 と並列発行 (§22 設計通り)~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。Brief 5 完走済 → 次は **Brief 7 (SSP v0.1)** の直列発行
 
 ## 14. Task Brief (CSCI-28、AGENTS.md format)
@@ -359,7 +359,7 @@ repos:
 # Task Brief: CSCI-28 - SARIF + GH Actions annotation + pre-commit manifest
 
 ## Phase
-P1 (Brief 4b) — CI integration 出力の追加。`docs/brief_4b_planning.md` 参照。
+P1 (Brief 4b) — CI integration 出力の追加。`docs/archive/brief_4b_planning.md` 参照。
 
 ## Goal
 `semantic-ci` CLI に `--format sarif` と `--format gh-actions` を追加し、

@@ -240,7 +240,7 @@ the CLI surface.
 
 | Priority | Brief candidate | Source | Status |
 |---|---|---|---|
-| H | Set-operator partial-match semantics for user constraints | FINDING-1 | **Open / Unresolved — tracked as D5** in `CLAUDE.md` 次の発行順序 §F (own brief, 1〜2 日規模) |
+| H | Set-operator partial-match semantics for user constraints | FINDING-1 | **Open / Unresolved — tracked as D5** in `.claude/memory/STATUS.md` 次の発行順序 §F (own brief, 1〜2 日規模) |
 | L | Optional `--strict-schema` flag on `compile-repair` (promote warning to error) | FINDING-3 follow-up | Open — small, no brief required |
 
 FINDING-2 was originally listed here but resolved in this PR (see above).
@@ -254,7 +254,7 @@ joining D1〜D4 from the 2026-05-07 Session 4 dogfooding
 split between an authoring guide (`docs/target_yaml_guide.md`, hosting
 D1/D3/D4) and a separate extractor-exclude brief (D2), D5 requires
 operator-level semantics changes and is therefore tracked as its own brief
-candidate at `CLAUDE.md` 次の発行順序 §F.
+candidate at `.claude/memory/STATUS.md` 次の発行順序 §F.
 
 | D# | Source | Subject | Brief slot |
 |---|---|---|---|

@@ -4,7 +4,7 @@
 > 本文書は履歴保存目的で残されている。Brief 3 は CSCI-10 (PR #15) / CSCI-11 (#16) /
 > CSCI-12 (#17) / CSCI-13 (#18) / CSCI-14 (#19) として全 PR が merge 済みで完結した。
 > 後続の Brief 4 (CLI / operational entrypoint) の planning は
-> [`docs/brief_4_planning.md`](./brief_4_planning.md) を参照。
+> [`docs/archive/brief_4_planning.md`](./brief_4_planning.md) を参照。
 >
 > 本文書内に記された operator 5 個案などの **CSCI-12 周りの記述は CSCI-12 brief 段階で
 > 上書き** されている (Operator enum 20 個 / `tolerance` 等の field 受理の方針が正)。

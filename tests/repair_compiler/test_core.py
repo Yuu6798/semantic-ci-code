@@ -18,9 +18,15 @@ class MockAdapter:
         assert plan.instructions
         return "repair output"
 
-    def render_pre_gen(self, target, baseline_state: CodeState):
+    def render_pre_gen(self, target, baseline_state: CodeState, *, risk_summary=None):
         assert target.intent == "Add profile endpoint"
         assert baseline_state == CodeState()
+        assert risk_summary == {
+            "would_violate": [],
+            "forbidden_zones": [],
+            "required_additions": [],
+            "template_implications": [],
+        }
         return "pre-gen output\n"
 
 

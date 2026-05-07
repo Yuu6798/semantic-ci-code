@@ -87,3 +87,24 @@ def _internal_bug(exc: BaseException, args: Any) -> int:
     if args.verbose:
         traceback.print_exc(file=sys.stderr)
     return INTERNAL_BUG
+
+
+stderr = _stderr
+one_line = _one_line
+write_output = _write_output
+exit_code_for = _exit_code_for
+render_payload = _render_payload
+usage_error = _usage_error
+engine_error = _engine_error
+internal_bug = _internal_bug
+
+__all__ = [
+    "engine_error",
+    "exit_code_for",
+    "internal_bug",
+    "one_line",
+    "render_payload",
+    "stderr",
+    "usage_error",
+    "write_output",
+]

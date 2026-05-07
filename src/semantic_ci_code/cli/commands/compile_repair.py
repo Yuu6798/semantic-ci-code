@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from semantic_ci_code.cli.command_support import _internal_bug, _usage_error, _write_output
+from semantic_ci_code.cli.command_support import internal_bug, usage_error, write_output
 from semantic_ci_code.cli.output.json_formatter import dump_json, package_version
 from semantic_ci_code.repair import RepairPlan, deserialize_repair_plan
 from semantic_ci_code.repair_compiler import RepairCompiler, get_adapter
@@ -37,11 +37,11 @@ def run_compile_repair(args: Namespace) -> int:
             if args.format == "json"
             else compiled.rendered
         )
-        return _write_output(output, args.output)
+        return write_output(output, args.output)
     except (RepairCompileUsageError, OSError) as exc:
-        return _usage_error(exc)
+        return usage_error(exc)
     except Exception as exc:
-        return _internal_bug(exc, args)
+        return internal_bug(exc, args)
 
 
 def _read_input(path: str | None) -> dict[str, Any]:

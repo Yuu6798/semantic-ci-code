@@ -9,6 +9,7 @@ from semantic_ci_code.cli.commands.compile import run_compile
 from semantic_ci_code.cli.commands.compile_repair import run_compile_repair
 from semantic_ci_code.cli.commands.observe import run_observe
 from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
+from semantic_ci_code.cli.commands.validate_plan import run_validate_plan
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
 from semantic_ci_code.cli.init_command import run_init
 from semantic_ci_code.cli.output.json_formatter import package_version
@@ -186,6 +187,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="accepted for CLI consistency; compile-repair output is not colorized",
     )
 
+    validate_plan = subcommands.add_parser(
+        "validate-plan",
+        help="render pre-generation plan guidance for a coding adapter",
+    )
+    validate_plan.add_argument("--target", required=True, help="Target SVP YAML file")
+    validate_plan.add_argument(
+        "--adapter",
+        choices=("claude-code", "cursor", "codex"),
+        required=True,
+        help="repair compiler adapter to render with",
+    )
+    validate_plan.add_argument("--baseline-rev", default=None, help="baseline git ref")
+    validate_plan.add_argument("--baseline-dir", default=None, help="baseline directory")
+    validate_plan.add_argument(
+        "--package-root",
+        default=".",
+        help="repo-relative package root inside the baseline tree",
+    )
+    validate_plan.add_argument("--format", choices=("text", "json"), default="text")
+    validate_plan.add_argument(
+        "--output",
+        default=None,
+        help="write rendered output to this file instead of stdout",
+    )
+    validate_plan.add_argument("--no-fetch", action="store_true")
+    validate_plan.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="accepted for CLI consistency; validate-plan reads only the baseline",
+    )
+    validate_plan.add_argument(
+        "--no-color",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="accepted for CLI consistency; validate-plan output is not colorized",
+    )
+
     init = subcommands.add_parser("init", help="scaffold a semantic-ci target.yaml")
     init.add_argument("--path", default=None, help="target.yaml path to create")
     init.add_argument("--force", action="store_true", help="overwrite an existing file")
@@ -214,6 +252,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_compile(args)
     if args.subcommand == "compile-repair":
         return run_compile_repair(args)
+    if args.subcommand == "validate-plan":
+        return run_validate_plan(args)
     if args.subcommand == "init":
         return run_init(args)
 

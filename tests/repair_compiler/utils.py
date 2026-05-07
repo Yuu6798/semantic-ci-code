@@ -8,6 +8,7 @@ from semantic_ci_code.framework.constraint_types import (
     Severity,
     UnknownPolicy,
 )
+from semantic_ci_code.framework.target_svp import parse_target_svp_yaml
 from semantic_ci_code.repair import RepairPlan, emit_repair_plan
 
 
@@ -63,3 +64,51 @@ def sample_repair_plan() -> RepairPlan:
     )
     verdict = Verdict(result=VerdictResult.FAIL, results=(hard, soft, info, skipped))
     return emit_repair_plan(verdict)
+
+
+def pre_gen_risk_target():
+    return parse_target_svp_yaml(
+        """
+intent: validate profile endpoint plan
+change:
+  primary_kind: refactor
+  scope:
+    files:
+      - src/**/*.py
+constraints:
+  - id: lock_api_surface
+    kind: delta
+    target: api_surface
+    operator: equals_baseline
+  - id: require_missing_api
+    kind: state
+    target: api_surface
+    operator: includes_all
+    expected:
+      - pkg.profile
+"""
+    )
+
+
+def pre_gen_risk_summary():
+    return {
+        "would_violate": ["require_missing_api"],
+        "forbidden_zones": [
+            {
+                "constraint_id": "lock_api_surface",
+                "source": "user",
+                "target": "api_surface",
+                "operator": "equals_baseline",
+            }
+        ],
+        "required_additions": [
+            {
+                "constraint_id": "require_missing_api",
+                "source": "user",
+                "target": "api_surface",
+                "operator": "includes_all",
+                "expected": "pkg.profile",
+            }
+        ],
+        "template_implications": ["template:refactor:api_surface_unchanged"],
+    }

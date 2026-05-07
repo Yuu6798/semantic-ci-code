@@ -315,3 +315,47 @@ not reconstruct `target.yaml`, so rendered intent and primary kind are empty,
 and Cursor `globs:` fall back to `**/*.py`. A later CLI integration can pass a
 `TargetSVP` alongside the repair plan when intent and scope-aware rendering are
 needed.
+
+## `semantic-ci validate-plan`
+
+```text
+semantic-ci validate-plan --target <yaml> --adapter {claude-code,cursor,codex}
+                          [--baseline-rev <ref> | --baseline-dir <dir>]
+                          [--package-root <rel>] [--no-fetch] [--allow-dirty]
+                          [--format {text,json}] [--output <file>] [--no-color]
+```
+
+Renders pre-generation guidance from a `target.yaml`. Unlike `compile-repair`,
+this command has the target available, so adapter output includes intent,
+primary kind, target constraints, authorship generation metadata, and Cursor
+`globs:` derived from `change.scope.files`.
+
+Baseline state may come from `--baseline-dir`, from `--baseline-rev`, or from
+the default git ref resolution order `origin/main -> main -> master`. If no git
+baseline can be resolved and no explicit baseline was provided, Semantic CI
+falls back to an empty `CodeState` so plan validation can still render.
+`--package-root` is relative to the baseline directory or git tree.
+
+`validate-plan` computes a deterministic `risk_summary` with four lists:
+`would_violate`, `forbidden_zones`, `required_additions`, and
+`template_implications`. For `required_additions`, `includes_all` constraints
+emit one required item per expected value, while `includes_any` constraints emit
+one `expected_any_of` alternatives group so adapters do not imply that every
+alternative must be added. `--format text` writes adapter text directly.
+`--format json` wraps it in an independent validate-plan envelope with
+`schema_version="1"`.
+
+`would_violate` is computed by re-evaluating user constraints against the
+baseline state as both baseline and candidate. State-kind constraints surface
+naturally, for example an `includes_all` requirement whose item is absent from
+baseline. Delta-kind constraints cannot violate under a self-comparison and are
+not reported in `would_violate`; inspect `forbidden_zones` and
+`required_additions` for their structural intent.
+
+Examples:
+
+```bash
+semantic-ci validate-plan --target target.yaml --adapter claude-code
+semantic-ci validate-plan --target target.yaml --adapter codex --format json
+semantic-ci validate-plan --target target.yaml --adapter cursor --baseline-rev HEAD~1
+```

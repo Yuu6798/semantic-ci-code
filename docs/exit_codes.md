@@ -46,6 +46,11 @@ discovery errors exit 2. Compile errors exit 3.
 Missing input files, invalid JSON, unrecognized input shape, `repair_plan: null`
 verdict envelopes, and unknown adapters exit 2.
 
+`validate-plan` does not compute a verdict. Successful rendering exits 0.
+Missing or invalid targets, invalid explicit baselines, missing adapters, and
+write/path errors exit 2. If no implicit git baseline can be resolved, it
+renders against an empty `CodeState` instead of failing.
+
 ## Error Streams
 
 Stdout is reserved for JSON or human report output. Expected diagnostic messages

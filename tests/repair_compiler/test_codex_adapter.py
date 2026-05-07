@@ -9,7 +9,7 @@ from semantic_ci_code.repair import RepairPlan
 from semantic_ci_code.repair_compiler import RepairCompiler
 from semantic_ci_code.repair_compiler.adapters import CodexAdapter
 
-from .utils import sample_repair_plan
+from .utils import pre_gen_risk_summary, pre_gen_risk_target, sample_repair_plan
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -36,6 +36,19 @@ def test_codex_pre_gen_matches_golden():
     compiled = RepairCompiler(CodexAdapter()).render_pre_gen(sample_target(), CodeState())
 
     assert compiled.rendered == (FIXTURES / "codex_pre_gen_feature.txt").read_text(encoding="utf-8")
+
+
+def test_codex_pre_gen_renders_computed_risk_summary():
+    compiled = RepairCompiler(CodexAdapter()).render_pre_gen(
+        pre_gen_risk_target(),
+        CodeState(),
+        risk_summary=pre_gen_risk_summary(),
+    )
+
+    assert compiled.rendered == (FIXTURES / "codex_pre_gen_with_risk.txt").read_text(
+        encoding="utf-8"
+    )
+    assert compiled.risk_summary == pre_gen_risk_summary()
 
 
 def test_codex_section_labels_are_fixed_and_ordered():

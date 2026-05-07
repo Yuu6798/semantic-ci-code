@@ -188,6 +188,52 @@ Its `schema_version` is not tied to the verdict or compile envelope version.
 | `metadata` | Repair compiler metadata. `input_kind` is `verdict_envelope` or `raw_repair_plan`. |
 | `engine` | Python minor version and package version. |
 
+## Validate-Plan Envelope
+
+`semantic-ci validate-plan --format json` uses an independent Brief 5 envelope.
+Its `schema_version` is not tied to the verdict, compile, or compile-repair
+envelope version.
+
+```jsonc
+{
+  "schema_version": "1",
+  "subcommand": "validate-plan",
+  "adapter_name": "claude-code",
+  "rendered": "# Plan Validation - Pre-Generation Guidance\n...\n",
+  "metadata": {
+    "schema_version": "1",
+    "engine_package_version": "0.1.0",
+    "adapter_name": "claude-code",
+    "adapter_version": "1",
+    "intent": "add profile endpoint",
+    "primary_kind": "feature",
+    "constraint_count": 2,
+    "render_timestamp": null,
+    "input_kind": "target_svp"
+  },
+  "risk_summary": {
+    "would_violate": [],
+    "forbidden_zones": [],
+    "required_additions": [],
+    "template_implications": []
+  },
+  "engine": {
+    "extractor_pyver": "3.11",
+    "package_version": "0.1.0"
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `schema_version` | Validate-plan envelope version. Currently `"1"`. |
+| `subcommand` | Always `validate-plan`. |
+| `adapter_name` | Adapter used for rendering: `claude-code`, `cursor`, or `codex`. |
+| `rendered` | Adapter-rendered text exactly as emitted in `--format text`. |
+| `metadata` | Repair compiler pre-generation metadata. |
+| `risk_summary` | Deterministic projections: `would_violate`, `forbidden_zones`, `required_additions`, and `template_implications`. |
+| `engine` | Python minor version and package version. |
+
 ## Compatibility Policy
 
 Within a given envelope, removing fields, renaming fields, or changing field
@@ -205,6 +251,8 @@ may use the same version when they are explicitly keyed by `subcommand`.
 | `2` | verdict | Clarified that `results[].status == "skipped"` can mean a smoke-mode partial CodeState skipped that constraint's target dimension. |
 | `3` | verdict, compile | Added top-level `cache` stats and aligned both envelopes on schema version `"3"`. |
 | `4` | verdict, compile | Added `target_authorship` to verdict envelopes and `compiled_target.authorship` to compile envelopes. |
+| `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
+| `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 
 ## v2 to v3 Diff
 

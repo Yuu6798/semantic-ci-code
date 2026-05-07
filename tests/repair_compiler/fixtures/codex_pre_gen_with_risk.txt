@@ -1,0 +1,39 @@
+[INTENT]
+validate profile endpoint plan
+
+[PRIMARY KIND]
+refactor
+
+[ALLOWED SECONDARY KINDS]
+(none)
+
+[GENERATION METADATA]
+(none)
+
+[TARGET CONSTRAINTS]
+1. lock_api_surface
+  kind: delta
+  target: api_surface
+  operator: equals_baseline
+  expected: null
+  severity: hard
+  unknown_policy: fail
+2. require_missing_api
+  kind: state
+  target: api_surface
+  operator: includes_all
+  expected: ["pkg.profile"]
+  severity: hard
+  unknown_policy: fail
+
+[RISK AREAS]
+- "require_missing_api"
+
+[FORBIDDEN ZONES]
+- {"constraint_id": "lock_api_surface", "operator": "equals_baseline", "source": "user", "target": "api_surface"}
+
+[REQUIRED ADDITIONS]
+- {"constraint_id": "require_missing_api", "expected": "pkg.profile", "operator": "includes_all", "source": "user", "target": "api_surface"}
+
+[TEMPLATE IMPLICATIONS]
+- "template:refactor:api_surface_unchanged"

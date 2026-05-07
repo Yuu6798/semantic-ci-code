@@ -32,9 +32,10 @@ class MatchSchema:
         return frozenset({self.required_key}) | self.optional_keys
 
 
-@dataclass(frozen=True)
 class MatchSchemaError(Exception):
-    message: str
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
 
     def __str__(self) -> str:
         return self.message

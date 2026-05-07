@@ -6,9 +6,12 @@ from semantic_ci_code.domain.state_schema import (
     ChangeKind,
     CodeState,
     CodeStateDelta,
+    EffectChanges,
+    ImportDelta,
     SymbolDelta,
 )
 from semantic_ci_code.evaluator import ResultStatus, evaluate_constraints
+from semantic_ci_code.evaluator.path_resolver import UNRESOLVED, resolve_path
 from semantic_ci_code.framework.constraint_types import (
     ConstraintKind,
     Operator,
@@ -113,6 +116,19 @@ def test_subset_of_treats_expected_records_as_partial_allow_list():
     assert result.status is ResultStatus.SATISFIED
 
 
+def test_subset_of_allows_multiple_observed_records_matching_one_partial():
+    result = _result(
+        Operator.SUBSET_OF,
+        ({"fqn": "pkg.allowed"},),
+        (
+            _api("pkg.allowed", signature="def allowed_one(): ..."),
+            _api("pkg.allowed", signature="def allowed_two(): ..."),
+        ),
+    )
+
+    assert result.status is ResultStatus.SATISFIED
+
+
 def test_subset_of_violates_when_observed_record_matches_no_expected_partial():
     result = _result(
         Operator.SUBSET_OF,
@@ -162,3 +178,33 @@ def test_flat_projection_alias_resolves_string_set_without_record_matching():
     )
 
     assert verdict.results[0].status is ResultStatus.SATISFIED
+
+
+def test_flat_projection_aliases_are_limited_to_registered_paths():
+    delta = CodeStateDelta(
+        effect_changes=EffectChanges(
+            added=({"fqn": "pkg.effect_added"},),
+            removed=({"fqn": "pkg.effect_removed"},),
+        ),
+        imports_delta=ImportDelta(
+            added=({"module": "pkg.import_added"},),
+            removed=({"module": "pkg.import_removed"},),
+        ),
+    )
+
+    assert resolve_path(delta, ("effect_changes", "added", "fqns")) == (
+        ("pkg.effect_added",),
+        None,
+    )
+    assert resolve_path(delta, ("imports_delta", "added", "modules")) == (
+        ("pkg.import_added",),
+        None,
+    )
+    assert resolve_path(delta, ("effect_changes", "removed", "fqns")) == (
+        UNRESOLVED,
+        "E_PATH_UNRESOLVED",
+    )
+    assert resolve_path(delta, ("imports_delta", "removed", "modules")) == (
+        UNRESOLVED,
+        "E_PATH_UNRESOLVED",
+    )

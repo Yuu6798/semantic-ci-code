@@ -15,12 +15,18 @@ class _Unresolved:
 
 UNRESOLVED: Final = _Unresolved()
 
+_FLAT_PROJECTION_ALIASES: Final = {
+    ("api_surface_delta", "added", "fqns"): "fqn",
+    ("effect_changes", "added", "fqns"): "fqn",
+    ("imports_delta", "added", "modules"): "module",
+}
+
 
 def resolve_path(root: object, segments: tuple[str, ...]) -> tuple[object, str | None]:
     """Resolve dotted target path segments on Pydantic models and JSON mappings."""
 
     current = root
-    for segment in segments:
+    for index, segment in enumerate(segments):
         if current is None:
             return UNRESOLVED, E_PATH_UNRESOLVED
 
@@ -32,20 +38,9 @@ def resolve_path(root: object, segments: tuple[str, ...]) -> tuple[object, str |
             current = _public_api_entries(current.removed)
             continue
 
-        if segment == "fqns" and hasattr(current, "added"):
-            current = _project_added_field(current.added, "fqn")
-            continue
-
-        if segment == "modules" and hasattr(current, "added"):
-            current = _project_added_field(current.added, "module")
-            continue
-
-        if segment == "fqns" and isinstance(current, tuple | list):
-            current = _project_added_field(current, "fqn")
-            continue
-
-        if segment == "modules" and isinstance(current, tuple | list):
-            current = _project_added_field(current, "module")
+        projection_key = _FLAT_PROJECTION_ALIASES.get(segments[: index + 1])
+        if projection_key is not None:
+            current = _project_field(current, projection_key)
             continue
 
         if isinstance(current, BaseModel):
@@ -75,7 +70,7 @@ def _api_visibility(entry: object) -> object:
     return _field(entry, "visibility")
 
 
-def _project_added_field(entries: object, key: str) -> tuple[str, ...]:
+def _project_field(entries: object, key: str) -> tuple[str, ...]:
     if not isinstance(entries, tuple | list):
         return ()
     return tuple(value for entry in entries if isinstance((value := _field(entry, key)), str))

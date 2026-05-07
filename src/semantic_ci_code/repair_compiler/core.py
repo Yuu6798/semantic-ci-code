@@ -5,12 +5,15 @@ from importlib.metadata import PackageNotFoundError, version
 from semantic_ci_code.domain.state_schema import CodeState, JsonValue
 from semantic_ci_code.framework.target_svp import TargetSVP
 from semantic_ci_code.repair import RepairPlan
+from semantic_ci_code.repair_compiler.risk_summary import (
+    normalize_risk_summary,
+    risk_summary_context,
+)
 from semantic_ci_code.repair_compiler.types import (
     REPAIR_COMPILER_SCHEMA_VERSION,
     Adapter,
     CompiledPreGen,
     CompiledRepair,
-    empty_risk_summary,
 )
 
 PACKAGE_NAME = "semantic-ci-code"
@@ -39,10 +42,12 @@ class RepairCompiler:
         self,
         target: TargetSVP,
         baseline_state: CodeState,
+        risk_summary: dict[str, JsonValue] | None = None,
     ) -> CompiledPreGen:
-        risk_summary = empty_risk_summary()
+        risk_summary = normalize_risk_summary(risk_summary)
         metadata = _pre_gen_metadata(self.adapter, target=target)
-        rendered = _ensure_trailing_newline(self.adapter.render_pre_gen(target, baseline_state))
+        with risk_summary_context(risk_summary):
+            rendered = _ensure_trailing_newline(self.adapter.render_pre_gen(target, baseline_state))
         return CompiledPreGen(
             adapter_name=self.adapter.name,
             output_format=self.adapter.output_format,

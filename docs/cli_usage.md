@@ -315,3 +315,37 @@ not reconstruct `target.yaml`, so rendered intent and primary kind are empty,
 and Cursor `globs:` fall back to `**/*.py`. A later CLI integration can pass a
 `TargetSVP` alongside the repair plan when intent and scope-aware rendering are
 needed.
+
+## `semantic-ci validate-plan`
+
+```text
+semantic-ci validate-plan --target <yaml> --adapter {claude-code,cursor,codex}
+                          [--baseline-rev <ref> | --baseline-dir <dir>]
+                          [--package-root <rel>] [--no-fetch] [--allow-dirty]
+                          [--format {text,json}] [--output <file>] [--no-color]
+```
+
+Renders pre-generation guidance from a `target.yaml`. Unlike `compile-repair`,
+this command has the target available, so adapter output includes intent,
+primary kind, target constraints, authorship generation metadata, and Cursor
+`globs:` derived from `change.scope.files`.
+
+Baseline state may come from `--baseline-dir`, from `--baseline-rev`, or from
+the default git ref resolution order `origin/main -> main -> master`. If no git
+baseline can be resolved and no explicit baseline was provided, Semantic CI
+falls back to an empty `CodeState` so plan validation can still render.
+`--package-root` is relative to the baseline directory or git tree.
+
+`validate-plan` computes a deterministic `risk_summary` with four lists:
+`would_violate`, `forbidden_zones`, `required_additions`, and
+`template_implications`. `--format text` writes adapter text directly.
+`--format json` wraps it in an independent validate-plan envelope with
+`schema_version="1"`.
+
+Examples:
+
+```bash
+semantic-ci validate-plan --target target.yaml --adapter claude-code
+semantic-ci validate-plan --target target.yaml --adapter codex --format json
+semantic-ci validate-plan --target target.yaml --adapter cursor --baseline-rev HEAD~1
+```

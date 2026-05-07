@@ -9,7 +9,7 @@ from semantic_ci_code.repair import RepairPlan
 from semantic_ci_code.repair_compiler import RepairCompiler
 from semantic_ci_code.repair_compiler.adapters import CursorAdapter
 
-from .utils import sample_repair_plan
+from .utils import pre_gen_risk_summary, pre_gen_risk_target, sample_repair_plan
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -38,6 +38,19 @@ def test_cursor_pre_gen_matches_golden():
     assert compiled.rendered == (FIXTURES / "cursor_pre_gen_feature.mdc").read_text(
         encoding="utf-8"
     )
+
+
+def test_cursor_pre_gen_renders_computed_risk_summary():
+    compiled = RepairCompiler(CursorAdapter()).render_pre_gen(
+        pre_gen_risk_target(),
+        CodeState(),
+        risk_summary=pre_gen_risk_summary(),
+    )
+
+    assert compiled.rendered == (FIXTURES / "cursor_pre_gen_with_risk.mdc").read_text(
+        encoding="utf-8"
+    )
+    assert compiled.risk_summary == pre_gen_risk_summary()
 
 
 def test_cursor_adapter_renders_kind_severity_target_and_operator_verbatim():

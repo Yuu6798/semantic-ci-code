@@ -8,7 +8,7 @@ from semantic_ci_code.repair import RepairPlan
 from semantic_ci_code.repair_compiler import RepairCompiler
 from semantic_ci_code.repair_compiler.adapters import ClaudeCodeAdapter
 
-from .utils import sample_repair_plan
+from .utils import pre_gen_risk_summary, pre_gen_risk_target, sample_repair_plan
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -58,6 +58,19 @@ def test_claude_code_pre_gen_matches_golden_and_placeholder_risk_summary():
         "required_additions": [],
         "template_implications": [],
     }
+
+
+def test_claude_code_pre_gen_renders_computed_risk_summary():
+    compiled = RepairCompiler(ClaudeCodeAdapter()).render_pre_gen(
+        pre_gen_risk_target(),
+        CodeState(),
+        risk_summary=pre_gen_risk_summary(),
+    )
+
+    assert compiled.rendered == (FIXTURES / "claude_code_pre_gen_with_risk.md").read_text(
+        encoding="utf-8"
+    )
+    assert compiled.risk_summary == pre_gen_risk_summary()
 
 
 def test_claude_code_pre_gen_renders_generation_metadata_when_present():

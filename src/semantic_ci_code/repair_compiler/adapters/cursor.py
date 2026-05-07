@@ -12,7 +12,8 @@ from semantic_ci_code.repair_compiler.adapters.markdown import (
     render_risk_section,
     render_target_constraints,
 )
-from semantic_ci_code.repair_compiler.types import RISK_SUMMARY_KEYS, empty_risk_summary
+from semantic_ci_code.repair_compiler.risk_summary import current_risk_summary
+from semantic_ci_code.repair_compiler.types import RISK_SUMMARY_KEYS
 
 _DEFAULT_PYTHON_GLOBS = ("**/*.py",)
 
@@ -84,7 +85,7 @@ class CursorAdapter:
             "",
         ]
         lines.extend(render_target_constraints(target))
-        risk_summary = empty_risk_summary()
+        risk_summary = current_risk_summary()
         for key in RISK_SUMMARY_KEYS:
             lines.extend(render_risk_section(RISK_SECTION_TITLES[key], risk_summary[key]))
         return finish(lines)

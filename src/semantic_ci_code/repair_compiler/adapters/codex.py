@@ -5,7 +5,8 @@ import json
 from semantic_ci_code.domain.state_schema import CodeState, JsonValue
 from semantic_ci_code.framework.target_svp import TargetSVP
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
-from semantic_ci_code.repair_compiler.types import RISK_SUMMARY_KEYS, empty_risk_summary
+from semantic_ci_code.repair_compiler.risk_summary import current_risk_summary
+from semantic_ci_code.repair_compiler.types import RISK_SUMMARY_KEYS
 
 _CATEGORY_SECTIONS = (
     (RepairCategory.FIX_REQUIRED, "FIX REQUIRED"),
@@ -78,7 +79,7 @@ class CodexAdapter:
             "",
         ]
         lines.extend(_render_target_constraints(target))
-        risk_summary = empty_risk_summary()
+        risk_summary = current_risk_summary()
         for key in RISK_SUMMARY_KEYS:
             lines.extend(_render_value_section(_RISK_SECTION_LABELS[key], risk_summary[key]))
         return _finish(lines)

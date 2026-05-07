@@ -20,7 +20,7 @@ dev = [
     "jsonschema>=4.0,<5.0",
     "pip-audit>=2.7,<3.0",
     "pytest>=7.0,<10.0",
-    "pytest-cov>=4.0,<8.0",
+    "pytest-cov>=5.0,<8.0",
     "ruff>=0.4,<1.0",
 ]
 
@@ -45,10 +45,10 @@ source = ["src/semantic_ci_code"]
 branch = true
 
 [tool.coverage.report]
-# Current measured coverage is ~75%; fail_under is set 5pp below that to
-# gate against significant regressions while leaving room for normal
-# fluctuation. Raise the floor as coverage improves rather than letting
-# the gate erode silently.
+# Branch coverage on current main measures 72.81%. fail_under is held
+# just below that (~3pp margin) to gate against significant regressions
+# while leaving room for normal fluctuation. Raise the floor as coverage
+# improves rather than letting the gate erode silently.
 fail_under = 70
 show_missing = true
 skip_covered = false

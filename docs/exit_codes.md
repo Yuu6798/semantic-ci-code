@@ -42,6 +42,10 @@ verdict.
 `compile` does not compute a verdict. Successful compilation exits 0. Target
 discovery errors exit 2. Compile errors exit 3.
 
+`compile-repair` does not compute a verdict. Successful rendering exits 0.
+Missing input files, invalid JSON, unrecognized input shape, `repair_plan: null`
+verdict envelopes, and unknown adapters exit 2.
+
 ## Error Streams
 
 Stdout is reserved for JSON or human report output. Expected diagnostic messages

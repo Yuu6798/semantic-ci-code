@@ -7,11 +7,13 @@ from semantic_ci_code.repair.emitter import (
     RepairPlan,
     emit_repair_plan,
 )
+from semantic_ci_code.repair.serialization import deserialize_repair_plan
 
 __all__ = [
     "REPAIR_CODES",
     "RepairCategory",
     "RepairInstruction",
     "RepairPlan",
+    "deserialize_repair_plan",
     "emit_repair_plan",
 ]

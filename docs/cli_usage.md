@@ -285,3 +285,33 @@ semantic-ci compile .semantic-ci/target.yaml
 semantic-ci compile --target target.yaml --format json
 semantic-ci compile --target target.yaml --format human --no-color
 ```
+
+## `semantic-ci compile-repair`
+
+```text
+semantic-ci compile-repair --adapter {claude-code,cursor,codex}
+                           [--input <json>] [--output <file>]
+                           [--format {text,json}] [--no-color]
+```
+
+Renders a serialized `RepairPlan` for a coding adapter. Input defaults to stdin
+and may be either a full verdict envelope containing `repair_plan` or a raw
+`RepairPlan` object with `instructions`. This enables direct pipe usage without
+field extraction:
+
+```bash
+semantic-ci check --format json | semantic-ci compile-repair --adapter claude-code
+semantic-ci check --format json | semantic-ci compile-repair --adapter codex --format json
+semantic-ci compile-repair --adapter cursor --input repair-plan.json --output semantic-ci.mdc
+```
+
+`--format text` writes only the rendered adapter text. `--format json` wraps the
+rendered text in a compile-repair envelope with independent
+`schema_version="1"`. A PASS verdict envelope whose `repair_plan` is `null`
+exits with usage error 2 because there is nothing to render.
+
+`compile-repair` renders only what the serialized `RepairPlan` carries. It does
+not reconstruct `target.yaml`, so rendered intent and primary kind are empty,
+and Cursor `globs:` fall back to `**/*.py`. A later CLI integration can pass a
+`TargetSVP` alongside the repair plan when intent and scope-aware rendering are
+needed.

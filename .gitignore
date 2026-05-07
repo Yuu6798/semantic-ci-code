@@ -24,3 +24,6 @@ venv/
 # Env
 .env
 .env.*
+
+# Semantic CI local CodeState cache (per docs/cli_usage.md)
+.semantic-ci/cache/

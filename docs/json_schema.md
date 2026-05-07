@@ -150,6 +150,44 @@ first, then user constraints in YAML order.
 built-in template constraints only. User constraints still observe the original
 semantic state and delta.
 
+## Compile-Repair Envelope
+
+`semantic-ci compile-repair --format json` uses an independent Brief 5 envelope.
+Its `schema_version` is not tied to the verdict or compile envelope version.
+
+```jsonc
+{
+  "schema_version": "1",
+  "subcommand": "compile-repair",
+  "adapter_name": "codex",
+  "rendered": "[INTENT]\n...\n",
+  "metadata": {
+    "schema_version": "1",
+    "engine_package_version": "0.1.0",
+    "adapter_name": "codex",
+    "adapter_version": "1",
+    "intent": "",
+    "primary_kind": "",
+    "constraint_count": 1,
+    "render_timestamp": null,
+    "input_kind": "verdict_envelope"
+  },
+  "engine": {
+    "extractor_pyver": "3.11",
+    "package_version": "0.1.0"
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `schema_version` | Compile-repair envelope version. Currently `"1"`. |
+| `subcommand` | Always `compile-repair`. |
+| `adapter_name` | Adapter used for rendering: `claude-code`, `cursor`, or `codex`. |
+| `rendered` | Adapter-rendered text exactly as emitted in `--format text`. |
+| `metadata` | Repair compiler metadata. `input_kind` is `verdict_envelope` or `raw_repair_plan`. |
+| `engine` | Python minor version and package version. |
+
 ## Compatibility Policy
 
 Within a given envelope, removing fields, renaming fields, or changing field

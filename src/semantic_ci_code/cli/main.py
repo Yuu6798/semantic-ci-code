@@ -6,6 +6,7 @@ import sys
 from semantic_ci_code.cli.commands.check import run_check
 from semantic_ci_code.cli.commands.compare import run_compare
 from semantic_ci_code.cli.commands.compile import run_compile
+from semantic_ci_code.cli.commands.compile_repair import run_compile_repair
 from semantic_ci_code.cli.commands.observe import run_observe
 from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
@@ -161,6 +162,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="disable ANSI color in human output",
     )
 
+    compile_repair = subcommands.add_parser(
+        "compile-repair",
+        help="render a RepairPlan for a coding adapter",
+    )
+    compile_repair.add_argument("--input", default=None, help="input JSON file; stdin by default")
+    compile_repair.add_argument(
+        "--adapter",
+        choices=("claude-code", "cursor", "codex"),
+        required=True,
+        help="repair compiler adapter to render with",
+    )
+    compile_repair.add_argument(
+        "--output",
+        default=None,
+        help="write rendered output to this file instead of stdout",
+    )
+    compile_repair.add_argument("--format", choices=("text", "json"), default="text")
+    compile_repair.add_argument(
+        "--no-color",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="accepted for CLI consistency; compile-repair output is not colorized",
+    )
+
     init = subcommands.add_parser("init", help="scaffold a semantic-ci target.yaml")
     init.add_argument("--path", default=None, help="target.yaml path to create")
     init.add_argument("--force", action="store_true", help="overwrite an existing file")
@@ -187,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_pre_commit(args)
     if args.subcommand == "compile":
         return run_compile(args)
+    if args.subcommand == "compile-repair":
+        return run_compile_repair(args)
     if args.subcommand == "init":
         return run_init(args)
 

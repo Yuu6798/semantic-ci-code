@@ -32,6 +32,22 @@ def resolve_path(root: object, segments: tuple[str, ...]) -> tuple[object, str |
             current = _public_api_entries(current.removed)
             continue
 
+        if segment == "fqns" and hasattr(current, "added"):
+            current = _project_added_field(current.added, "fqn")
+            continue
+
+        if segment == "modules" and hasattr(current, "added"):
+            current = _project_added_field(current.added, "module")
+            continue
+
+        if segment == "fqns" and isinstance(current, tuple | list):
+            current = _project_added_field(current, "fqn")
+            continue
+
+        if segment == "modules" and isinstance(current, tuple | list):
+            current = _project_added_field(current, "module")
+            continue
+
         if isinstance(current, BaseModel):
             if segment not in current.__class__.model_fields:
                 return UNRESOLVED, E_PATH_UNRESOLVED
@@ -56,12 +72,22 @@ def _public_api_entries(entries: object) -> tuple[object, ...]:
 
 
 def _api_visibility(entry: object) -> object:
+    return _field(entry, "visibility")
+
+
+def _project_added_field(entries: object, key: str) -> tuple[str, ...]:
+    if not isinstance(entries, tuple | list):
+        return ()
+    return tuple(value for entry in entries if isinstance((value := _field(entry, key)), str))
+
+
+def _field(entry: object, key: str) -> object:
     if isinstance(entry, BaseModel):
-        return getattr(entry, "visibility", None)
+        return getattr(entry, key, None)
     if isinstance(entry, dict):
-        return entry.get("visibility")
+        return entry.get(key)
     if isinstance(entry, tuple | list):
         for item in entry:
-            if isinstance(item, tuple | list) and len(item) == 2 and item[0] == "visibility":
+            if isinstance(item, tuple | list) and len(item) == 2 and item[0] == key:
                 return item[1]
-    return getattr(entry, "visibility", None)
+    return getattr(entry, key, None)

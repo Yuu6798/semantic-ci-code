@@ -16,7 +16,7 @@ from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
 
-SCHEMA_VERSION = "4"
+SCHEMA_VERSION = "5"
 PACKAGE_NAME = "semantic-ci-code"
 UNKNOWN_VERSION = "0.0.0+unknown"
 
@@ -263,7 +263,16 @@ def _pairs_to_dict(pairs: tuple[tuple[str, Any], ...]) -> dict[str, Any]:
 
 def _json_value(value: Any) -> Any:
     if isinstance(value, tuple | list):
+        if _looks_like_pairs(value):
+            return {str(key): _json_value(item) for key, item in value}
         return [_json_value(item) for item in value]
     if isinstance(value, dict):
         return {key: _json_value(item) for key, item in value.items()}
     return value
+
+
+def _looks_like_pairs(value: tuple[Any, ...] | list[Any]) -> bool:
+    return bool(value) and all(
+        isinstance(item, tuple | list) and len(item) == 2 and isinstance(item[0], str)
+        for item in value
+    )

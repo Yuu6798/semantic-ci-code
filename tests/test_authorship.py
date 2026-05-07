@@ -41,7 +41,7 @@ def test_compile_payload_includes_compiled_target_authorship():
     compiled = compile_target_svp(AUTHORSHIP_YAML)
     payload = build_compile_payload(compiled)
 
-    assert payload["schema_version"] == "4"
+    assert payload["schema_version"] == "5"
     assert payload["compiled_target"]["authorship"] == {
         "authors": [
             {"identity": "alice@example.com", "signature": "sig-1"},
@@ -65,7 +65,7 @@ def test_verdict_payload_carries_target_authorship_or_null():
         repair_plan=plan,
     )
 
-    assert authored["schema_version"] == "4"
+    assert authored["schema_version"] == "5"
     assert authored["target_authorship"]["authors"][0]["identity"] == "alice@example.com"
     assert unauthored["target_authorship"] is None
 

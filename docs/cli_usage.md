@@ -62,18 +62,83 @@ accepts exact effect FQNs and/or effect classes for feature and bugfix templates
 Each constraint in `target.yaml` carries a `severity` field that decides how
 violations route into the verdict. The default is `hard`.
 
-| `severity` | violated 時の verdict | exit code 影響 | surface (§23.3) |
+| `severity` | verdict when violated | exit code impact | surface (§23.3) |
 |---|---|---|---|
 | `hard` (default) | `fail` | exit 1 | Validator |
 | `soft` | `repair` | exit 0 (or exit 1 with `--strict-repair`) | Validator |
-| `info` | `pass` (verdict 不変) | 影響なし | Advisor channel |
+| `info` | `pass` (verdict unchanged) | no impact | Advisor channel |
 
 `severity: info` violations are reported as `category: info` repair
 instructions and surfaced in human / SARIF / GitHub Actions output, but they
 do not change the verdict or exit code. Lowering a constraint from `hard` to
 `soft` or `info` weakens the gate; the choice is the spec author's
 responsibility. See `docs/code_semantic_ci_design.md §23.3` for the underlying
-boundary (verdict ≠ intent correctness).
+boundary (verdict is not intent correctness).
+
+## Set Operator Match Semantics
+
+For collection targets whose elements are records, Semantic CI supports partial
+record matching. An expected record matches an observed record when every key in
+the expected record is equal in the observed record; extra observed keys are
+ignored. This prevents deny / allow gates from silently bypassing just because
+extractors include additional fields such as signatures or evidence.
+
+Formal semantics:
+
+```text
+includes_all(expected, observed):
+  for every E in expected, some O in observed matches E
+
+includes_any(expected, observed):
+  some E in expected matches some O in observed
+
+excludes_all(expected, observed):
+  no E in expected matches any O in observed
+
+superset_of(expected, observed):
+  same as includes_all
+
+subset_of(expected, observed):
+  every O in observed matches at least one E in expected
+```
+
+Match Schema registry:
+
+| Target | Required key | Optional keys | Forbidden keys |
+|---|---|---|---|
+| `api_surface`, `api_surface_public` | `fqn` | `kind`, `visibility` | `signature` |
+| `api_surface_delta.added`, `.removed`, `.changed` | `fqn` | `kind`, `visibility` | `signature` |
+| `effects` | `fqn` | `effect_class` | `confidence`, `evidence` |
+| `effect_changes.added`, `.removed` | `fqn` | `effect_class` | `confidence`, `evidence` |
+| `imports` | `module` | `from` | `symbols` |
+| `imports_delta.added`, `.removed` | `module` | `from` | `symbols` |
+
+Forbidden keys are compile-time errors because they couple policy to unstable
+extractor formatting or list-valued exact equality. `module_graph`,
+`complexity`, `control_flow`, and `test_surface` are not registered for partial
+record matching in this slice.
+
+For registered targets with one required key, bare strings in `expected` are
+desugared at compile time. For example:
+
+```yaml
+target: api_surface_delta.added
+operator: includes_all
+expected:
+  - "src.api.users.fetch_user_profile"
+```
+
+is compiled as:
+
+```yaml
+expected:
+  - fqn: src.api.users.fetch_user_profile
+```
+
+Flat projections are convenience aliases only: `api_surface_delta.added.fqns`,
+`effect_changes.added.fqns`, and `imports_delta.added.modules`. They compare
+plain string sets and do not perform record matching. The safety mechanism for
+partial dict authoring is the Match Schema validation above.
 
 ## Target Authorship
 

@@ -43,6 +43,7 @@ from semantic_ci_code.framework.constraint_types import (
     Severity,
     UnknownPolicy,
 )
+from semantic_ci_code.framework.match_schema import MatchSchemaError, normalize_collection_expected
 from semantic_ci_code.framework.target_svp import TargetSVP, parse_target_svp_yaml
 
 __all__ = [
@@ -274,6 +275,7 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
             allowed = delta_paths
             domain_label = "CodeState/CodeStateDelta"
         if constraint.target in allowed or is_open_path(constraint.target):
+            _validate_match_schema_expected(constraint, index=index, filename=filename)
             continue
         suggestions = suggest_targets(constraint.target, allowed)
         message = f"constraint target {constraint.target!r} does not exist on {domain_label}."
@@ -312,12 +314,21 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
 
 
 def _compile_user_constraint(constraint: Constraint) -> CompiledConstraint:
+    expected = (
+        constraint.expected
+        if constraint.kind == ConstraintKind.REPAIR
+        else normalize_collection_expected(
+            constraint.target,
+            constraint.operator,
+            constraint.expected,
+        )
+    )
     return CompiledConstraint(
         id=constraint.id,
         kind=ConstraintKind(constraint.kind),
         target=constraint.target,
         operator=constraint.operator,
-        expected=_freeze_expected(constraint.expected),
+        expected=_freeze_expected(expected),
         severity=constraint.severity,
         unknown_policy=constraint.unknown_policy,
         tolerance=constraint.tolerance,
@@ -325,6 +336,26 @@ def _compile_user_constraint(constraint: Constraint) -> CompiledConstraint:
         scope=constraint.scope,
         source=ConstraintSource.USER,
     )
+
+
+def _validate_match_schema_expected(
+    constraint: Constraint,
+    *,
+    index: int,
+    filename: str,
+) -> None:
+    try:
+        normalize_collection_expected(
+            constraint.target,
+            constraint.operator,
+            constraint.expected,
+        )
+    except MatchSchemaError as exc:
+        raise CompileError(
+            message=str(exc),
+            filename=filename,
+            path=f"constraints[{index}].expected",
+        ) from exc
 
 
 def _compile_api_surface_allow_changes(

@@ -1,7 +1,7 @@
 # Semantic CI JSON Output Schema
 
 Semantic CI CLI output is JSON by default in non-TTY contexts and when
-`--output` is used. The current schema version is `"4"`.
+`--output` is used. The current schema version is `"5"`.
 
 The CLI has two envelopes:
 
@@ -21,7 +21,7 @@ bump beyond the current CLI schema version.
 
 ```jsonc
 {
-  "schema_version": "4",
+  "schema_version": "5",
   "subcommand": "check",
   "mode": "full",
   "verdict": "pass",
@@ -62,7 +62,7 @@ bump beyond the current CLI schema version.
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | CLI JSON schema version. Currently `"4"`. |
+| `schema_version` | CLI JSON schema version. Currently `"5"`. |
 | `subcommand` | One of `observe`, `compare`, `check`, `pre-commit`. |
 | `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
@@ -86,7 +86,7 @@ compute a verdict.
 
 ```jsonc
 {
-  "schema_version": "4",
+  "schema_version": "5",
   "subcommand": "compile",
   "compiled_target": {
     "intent": "verify refactor target",
@@ -251,6 +251,7 @@ may use the same version when they are explicitly keyed by `subcommand`.
 | `2` | verdict | Clarified that `results[].status == "skipped"` can mean a smoke-mode partial CodeState skipped that constraint's target dimension. |
 | `3` | verdict, compile | Added top-level `cache` stats and aligned both envelopes on schema version `"3"`. |
 | `4` | verdict, compile | Added `target_authorship` to verdict envelopes and `compiled_target.authorship` to compile envelopes. |
+| `5` | verdict, compile | Added Match Schema partial-record semantics for set operators, compile-time validation for partial dict expected records, flat projection aliases, and `evidence.matched` for `excludes_all` violations. |
 | `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 
@@ -274,3 +275,21 @@ may use the same version when they are explicitly keyed by `subcommand`.
   verification, author-count policy, and AI generation detection are deferred to
   opt-in constraints in a later brief.
 - Migration: consumers reading v3 can treat missing authorship fields as `null`.
+
+## v4 to v5 Diff
+
+- Set operators on registered dict-collection targets now use partial-record
+  match semantics. An expected record matches an observed record when every key
+  in the expected record is equal in the observed record; observed extra keys are
+  ignored.
+- `excludes_all`, `includes_all`, `includes_any`, `subset_of`, and `superset_of`
+  verdicts can change for partial dict expected records. This is a gate
+  strengthening fix for silent bypasses.
+- `excludes_all` violations can include `evidence.matched`, a list of
+  `{expected_item, observed_record}` pairs showing which observed record matched
+  a denied expected partial record.
+- The compiler rejects unregistered partial dict expected records and forbidden
+  fields such as `signature`, `confidence`, `evidence`, and `symbols`.
+- Added flat projection aliases:
+  `api_surface_delta.added.fqns`, `effect_changes.added.fqns`, and
+  `imports_delta.added.modules`.

@@ -37,7 +37,7 @@ def test_required_additions_flattens_includes_expected_values():
             "source": "user",
             "target": "api_surface",
             "operator": "includes_all",
-            "expected": "pkg.profile",
+            "expected": {"fqn": "pkg.profile"},
         }
     ]
 
@@ -51,7 +51,7 @@ def test_required_additions_keeps_includes_any_as_alternative_group():
             "source": "user",
             "target": "api_surface",
             "operator": "includes_any",
-            "expected_any_of": ["pkg.profile", "pkg.account"],
+            "expected_any_of": [{"fqn": "pkg.profile"}, {"fqn": "pkg.account"}],
         }
     ]
 

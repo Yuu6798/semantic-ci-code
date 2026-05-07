@@ -19,7 +19,7 @@ exercised directly without git ceremony.
 | TC1 | `compare` | refactor: f-string conversion, API stable | `pass` / exit 0 | `pass`, 4 satisfied, 0 violated | ✅ |
 | TC2 | `compare` | "refactor" silently removes a public function | `fail` / exit 1 | `fail`, `template:refactor:api_surface_unchanged` violated | ✅ |
 | TC3 | `compare` | feature claim, required addition missing | `fail` / exit 1 | `fail`, user `includes_any` violated | ✅ |
-| TC4 | `compare` | feature: required public function added | `pass` / exit 0 | `pass` once user constraint matches full record | ✅ (with FINDING-1) |
+| TC4 | `compare` | feature: required public function added | `pass` / exit 0 | `pass` with Match Schema partial record matching | ✅ (FINDING-1 resolved in CSCI-35c) |
 | TC5 | `compare` | bugfix template flags scope creep (extra public symbol) | `fail` / exit 1, `added` populated post-fix | `fail`, `template:bugfix:api_surface_unchanged` violated, `added=[safe_divide]` after fix | ✅ (drove FINDING-2 fix) |
 | TC6 | `validate-plan` | pre-generation guidance with `would_violate`, `required_additions` | rendered text + 4-list `risk_summary` | rendered, 1 would_violate, 1 required_additions, 2 template_implications | ✅ |
 | TC7 | CLI hardening | malformed YAML / Python tag injection / missing target / unknown adapter / nonexistent dirs | exit 2 or 3 with stderr diagnostic | YAML `!!python` rejected (exit 3); missing target exit 2; unknown adapter exit 2; malformed YAML exit 3 | ✅ |
@@ -240,15 +240,15 @@ the CLI surface.
 
 | Priority | Brief candidate | Source | Status |
 |---|---|---|---|
-| H | Set-operator partial-match semantics for user constraints | FINDING-1 | **Open / Unresolved — tracked as D5** in `.claude/memory/STATUS.md` 次の発行順序 §F (own brief, 1〜2 日規模) |
+| H | Set-operator partial-match semantics for user constraints | FINDING-1 | **Resolved in CSCI-35c** (Match Schema partial matching + flat projection aliases) |
 | L | Optional `--strict-schema` flag on `compile-repair` (promote warning to error) | FINDING-3 follow-up | Open — small, no brief required |
 
 FINDING-2 was originally listed here but resolved in this PR (see above).
 
-### Tracking: D5 (FINDING-1) — Open / Unresolved
+### Tracking: D5 (FINDING-1) — Resolved in CSCI-35c
 
-FINDING-1 is the only finding from this dogfooding pass that remains open
-after PR #61. It is integrated into the dogfood-driven fix plan as **D5**,
+FINDING-1 was the only finding from this dogfooding pass that remained open
+after PR #61. It was integrated into the dogfood-driven fix plan as **D5**,
 joining D1〜D4 from the 2026-05-07 Session 4 dogfooding
 (`.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4"). Unlike D1〜D4, which
 split between an authoring guide (`docs/target_yaml_guide.md`, hosting
@@ -264,10 +264,9 @@ candidate at `.claude/memory/STATUS.md` 次の発行順序 §F.
 | D4 | Session 4 dogfood | config-only PR vacuous PASS | A' (`target_yaml_guide.md`) |
 | **D5** | **Session 5 dogfood (PR #61, FINDING-1)** | **set operator partial-match semantics — false positive on `includes_*` / `subset_of` / `superset_of`, false negative (CI bypass) on `excludes_all`** | **F (own brief)** |
 
-Resolution requires either a partial-key matcher semantics on set operators,
-a flat-projection target like `api_surface_delta.added.fqns`, or both. The
-brief itself will pick between these; this dogfooding pass only documents
-the gap and supplies reproduction conditions in TC4. The brief MUST address
-**both** failure modes — false positives on positive set operators and the
-false negative on `excludes_all` — because partial-key matcher semantics
-need to apply symmetrically to closing the CI bypass.
+CSCI-35c resolves D5 with Match Schema partial-key semantics on set operators,
+compile-time validation for partial dict `expected` records, and three
+flat-projection aliases (`api_surface_delta.added.fqns`,
+`effect_changes.added.fqns`, `imports_delta.added.modules`). The fix addresses
+**both** failure modes: false positives on positive set operators and the false
+negative on `excludes_all` that allowed CI bypass.

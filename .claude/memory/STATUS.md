@@ -109,7 +109,8 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
   と extractor failure に分離。波及範囲は evaluator / risk_summary / adapter
   / cli 出力 / json schema / SARIF / GH Actions、設計議論必要、1〜2 日
 - **F. set operator partial-match semantics**(2026-05-07 Session 5 dogfood
-  D5 = FINDING-1、PR #61 由来、**未解決**): set 系 operator が
+  - Resolved in CSCI-35c: Match Schema partial-record matching, compile-time validation, and flat projection aliases landed.
+  D5 = FINDING-1、PR #61 由来、**resolved in CSCI-35c**): set 系 operator が
   `api_surface_*` / `effects` / `imports` 等の dict 要素 collection に対して
   **完全レコード一致**しか効かない。`target.yaml` で `expected: [{fqn: pkg.foo}]`
   の partial dict を書くと observed の full dict(`fqn` + `kind` + `signature`

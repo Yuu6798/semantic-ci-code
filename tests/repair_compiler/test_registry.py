@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 
 import semantic_ci_code.repair_compiler as registry
-from semantic_ci_code.repair_compiler.adapters import ClaudeCodeAdapter, register_builtin_adapters
+from semantic_ci_code.repair_compiler.adapters import (
+    ClaudeCodeAdapter,
+    CursorAdapter,
+    register_builtin_adapters,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -38,3 +42,16 @@ def test_register_builtin_adapters_registers_claude_code():
     register_builtin_adapters()
 
     assert registry.get_adapter("claude-code").name == "claude-code"
+    assert registry.get_adapter("cursor").name == "cursor"
+    assert tuple(adapter.name for adapter in registry.list_adapters()) == (
+        "claude-code",
+        "cursor",
+    )
+
+
+def test_register_and_get_cursor_adapter():
+    adapter = CursorAdapter()
+
+    registry.register_adapter(adapter)
+
+    assert registry.get_adapter("cursor") is adapter

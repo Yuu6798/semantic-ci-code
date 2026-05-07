@@ -25,8 +25,28 @@ intent are out of scope for the verdict. Correction guidance and input
 supplementation may live as separate surfaces (Authoring / Advisor) but
 never participate in the verdict. See `docs/code_semantic_ci_design.md §23.3`.
 
-The product exists to catch intent drift in generated or manually edited pull
-requests while remaining deterministic and auditable.
+The product exists to catch intent drift between two well-formed code states
+under a declared intent, while remaining deterministic and auditable. The
+engine's input contract is `(intent, baseline_state, candidate_state)`; the
+states do not need to come from real-code extraction. Pull-request review is
+the primary use case, but any setup that can produce a well-formed
+`(intent, state_A, state_B)` triple runs through the same engine path —
+including virtual, predicted, mocked, or hand-built `CodeState` values.
+
+This input-side provenance neutrality is required by
+`docs/code_semantic_ci_design.md` §23.1 (Generic 2-state Comparator) and
+§23.2 (Application Matrix), and is confirmed empirically by:
+
+- `docs/pre_generation_validation_case.md` — stub-only candidates (3 cases)
+  validated through `semantic-ci compare`, reproduction in
+  `experiments/pre_generation_validation/`.
+- `docs/dogfooding_TC10_report.md` — 10 virtual-package cases (TC1〜TC10)
+  exercising `compare` / `validate-plan` / `compile-repair` end-to-end with
+  hand-built `baseline/` and `candidate/` trees; verdict + exit code match
+  the documented contract for every case.
+
+If new feature work weakens this neutrality (e.g. requiring a real git ref
+to compute a verdict), it MUST be flagged as a §23.1 violation in the brief.
 
 ## Current Status
 

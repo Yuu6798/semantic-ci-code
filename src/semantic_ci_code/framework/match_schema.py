@@ -49,6 +49,20 @@ _API_SCHEMA = MatchSchema(
         "signature": "signature is extractor-format coupling and is not stable policy input",
     },
 )
+_API_CHANGED_SCHEMA = MatchSchema(
+    target="api_surface_delta.changed",
+    required_key="fqn",
+    optional_keys=frozenset({"kind"}),
+    forbidden_keys={
+        "signature": "signature is extractor-format coupling and is not stable policy input",
+        "visibility": (
+            "visibility is nested under before/after in changed API delta records; "
+            "top-level matching supports only fqn and kind"
+        ),
+        "before": "before is extractor-format coupling and is not stable policy input",
+        "after": "after is extractor-format coupling and is not stable policy input",
+    },
+)
 _EFFECT_SCHEMA = MatchSchema(
     target="effects",
     required_key="fqn",
@@ -72,7 +86,7 @@ _SCHEMAS: dict[str, MatchSchema] = {
     "api_surface_public": _API_SCHEMA,
     "api_surface_delta.added": _API_SCHEMA,
     "api_surface_delta.removed": _API_SCHEMA,
-    "api_surface_delta.changed": _API_SCHEMA,
+    "api_surface_delta.changed": _API_CHANGED_SCHEMA,
     "effects": _EFFECT_SCHEMA,
     "effect_changes.added": _EFFECT_SCHEMA,
     "effect_changes.removed": _EFFECT_SCHEMA,

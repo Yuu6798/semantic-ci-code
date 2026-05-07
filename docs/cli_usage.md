@@ -107,7 +107,8 @@ Match Schema registry:
 | Target | Required key | Optional keys | Forbidden keys |
 |---|---|---|---|
 | `api_surface`, `api_surface_public` | `fqn` | `kind`, `visibility` | `signature` |
-| `api_surface_delta.added`, `.removed`, `.changed` | `fqn` | `kind`, `visibility` | `signature` |
+| `api_surface_delta.added`, `.removed` | `fqn` | `kind`, `visibility` | `signature` |
+| `api_surface_delta.changed` | `fqn` | `kind` | `signature`, `visibility`, `before`, `after` |
 | `effects` | `fqn` | `effect_class` | `confidence`, `evidence` |
 | `effect_changes.added`, `.removed` | `fqn` | `effect_class` | `confidence`, `evidence` |
 | `imports` | `module` | `from` | `symbols` |
@@ -117,6 +118,9 @@ Forbidden keys are compile-time errors because they couple policy to unstable
 extractor formatting or list-valued exact equality. `module_graph`,
 `complexity`, `control_flow`, and `test_surface` are not registered for partial
 record matching in this slice.
+
+`api_surface_delta.changed` exposes `visibility` only inside its `before` and
+`after` payloads, so D5 does not allow top-level visibility matching there.
 
 For registered targets with one required key, bare strings in `expected` are
 desugared at compile time. For example:

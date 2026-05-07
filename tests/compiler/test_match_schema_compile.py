@@ -58,6 +58,31 @@ def test_full_allowed_record_compiles():
     )
 
 
+def test_api_surface_changed_allows_only_top_level_identity_keys():
+    constraint = _compile_constraint(
+        target="api_surface_delta.changed",
+        expected="""
+      - fqn: myapi.foo
+        kind: function""",
+    )
+
+    assert constraint.expected == ({"fqn": "myapi.foo", "kind": "function"},)
+
+
+def test_api_surface_changed_rejects_visibility_key_with_reason():
+    with pytest.raises(CompileError) as exc_info:
+        _compile_constraint(
+            target="api_surface_delta.changed",
+            expected="""
+      - fqn: myapi.foo
+        visibility: private""",
+        )
+
+    assert exc_info.value.path == "constraints[0].expected"
+    assert "forbidden match key 'visibility'" in exc_info.value.message
+    assert "nested under before/after" in exc_info.value.message
+
+
 def test_signature_key_is_forbidden_with_reason_and_allowed_key_suggestions():
     with pytest.raises(CompileError) as exc_info:
         _compile_constraint(

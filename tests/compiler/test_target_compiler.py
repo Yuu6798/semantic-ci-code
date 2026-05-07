@@ -267,6 +267,49 @@ constraints:
     assert "typescript_specific.anything.deep" in user_targets
 
 
+def test_state_kind_with_delta_path_raises_compile_error():
+    yaml_source = """
+intent: state-kind constraint with a delta-only path
+change:
+  primary_kind: feature
+constraints:
+  - id: state_with_delta_path
+    kind: state
+    target: api_surface_delta.removed
+    operator: equals
+    expected: []
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "api_surface_delta.removed" in exc_info.value.message
+    # Domain label is the narrower CodeState, not the union.
+    assert "does not exist on CodeState." in exc_info.value.message
+    # Suggestions should come from the state-kind corpus, not the union.
+    assert "api_surface_delta" not in exc_info.value.message.split("Did you mean:")[1]
+
+
+def test_delta_kind_with_state_path_compiles():
+    yaml_source = """
+intent: delta-kind with state path uses baseline operator semantics
+change:
+  primary_kind: feature
+constraints:
+  - id: delta_state_baseline
+    kind: delta
+    target: api_surface_public
+    operator: superset_of_baseline
+    severity: hard
+    unknown_policy: fail
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    user_constraints = [c for c in compiled.constraints if c.source.value == "user"]
+    assert any(c.target == "api_surface_public" for c in user_constraints)
+
+
 def test_repair_kind_constraint_skips_path_schema_check():
     yaml_source = """
 intent: repair-kind constraints are skipped at evaluate

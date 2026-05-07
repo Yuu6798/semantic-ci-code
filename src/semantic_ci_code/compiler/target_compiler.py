@@ -31,7 +31,8 @@ from pydantic import ValidationError
 from semantic_ci_code.compiler.path_schema import (
     is_open_path,
     suggest_targets,
-    valid_target_paths,
+    valid_delta_target_paths,
+    valid_state_target_paths,
 )
 from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import (
@@ -243,7 +244,8 @@ def _parse_target_svp(yaml_source: str, *, filename: str) -> TargetSVP:
 
 
 def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None:
-    valid_paths = valid_target_paths()
+    state_paths = valid_state_target_paths()
+    delta_paths = valid_delta_target_paths()
     for index, constraint in enumerate(target_svp.constraints):
         if constraint.target == "":
             raise CompileError(
@@ -259,12 +261,22 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
         # value rather than identity.
         if constraint.kind == ConstraintKind.REPAIR:
             continue
-        if constraint.target in valid_paths or is_open_path(constraint.target):
+        # The evaluator's path domain depends on the constraint kind:
+        # state-kind only resolves CodeState roots, while delta-kind resolves
+        # CodeStateDelta roots and also CodeState roots when used with a
+        # baseline operator. Mirror that asymmetry here so a state-kind
+        # constraint with a delta-only path (or vice versa) fails at compile
+        # rather than as a silent UNKNOWN at evaluate.
+        if constraint.kind == ConstraintKind.STATE:
+            allowed = state_paths
+            domain_label = "CodeState"
+        else:
+            allowed = delta_paths
+            domain_label = "CodeState/CodeStateDelta"
+        if constraint.target in allowed or is_open_path(constraint.target):
             continue
-        suggestions = suggest_targets(constraint.target)
-        message = (
-            f"constraint target {constraint.target!r} does not exist on CodeState/CodeStateDelta."
-        )
+        suggestions = suggest_targets(constraint.target, allowed)
+        message = f"constraint target {constraint.target!r} does not exist on {domain_label}."
         if suggestions:
             message += f" Did you mean: {', '.join(suggestions)}?"
         raise CompileError(

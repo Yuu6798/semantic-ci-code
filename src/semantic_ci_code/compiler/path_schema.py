@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import inspect
 import re
+from collections.abc import Iterable
 from difflib import get_close_matches
+from functools import lru_cache
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
@@ -44,16 +46,49 @@ _REMOVED_PUBLIC_ALIAS: str = "removed_public"
 _OPEN_PREFIXES: frozenset[str] = frozenset({"python_specific", "typescript_specific"})
 
 
-def valid_target_paths() -> frozenset[str]:
-    """Return every dotted path the evaluator can resolve as a target."""
+@lru_cache(maxsize=1)
+def valid_state_target_paths() -> frozenset[str]:
+    """Paths whose first segment is rooted on ``CodeState``.
+
+    The evaluator's ``_evaluate_state_constraint`` only accepts targets whose
+    first segment is in ``CodeState.model_fields`` (plus the ``api_surface_public``
+    alias). State-kind constraints with delta-only roots return UNKNOWN at
+    runtime, which is exactly the silent UNKNOWN path this module is meant
+    to reject at compile time.
+    """
 
     paths: set[str] = set()
     for field_name, field_info in CodeState.model_fields.items():
         _walk(field_name, field_info.annotation, paths)
-    for field_name, field_info in CodeStateDelta.model_fields.items():
-        _walk(field_name, field_info.annotation, paths)
     paths.update(_CODE_STATE_ALIASES)
     return frozenset(paths)
+
+
+@lru_cache(maxsize=1)
+def valid_delta_target_paths() -> frozenset[str]:
+    """Paths the evaluator accepts for delta-kind constraints.
+
+    The evaluator's ``_evaluate_delta_constraint`` accepts paths rooted on
+    either ``CodeStateDelta`` (with pure operators) or ``CodeState`` (with
+    baseline operators). The compile-time check enforces the path-domain
+    side; operator-vs-target compatibility stays in the evaluator.
+    """
+
+    paths: set[str] = set(valid_state_target_paths())
+    for field_name, field_info in CodeStateDelta.model_fields.items():
+        _walk(field_name, field_info.annotation, paths)
+    return frozenset(paths)
+
+
+@lru_cache(maxsize=1)
+def valid_target_paths() -> frozenset[str]:
+    """Union of state and delta target paths.
+
+    Used as the corpus for did-you-mean suggestions when the constraint
+    kind is unknown or when callers want the full address space.
+    """
+
+    return valid_state_target_paths() | valid_delta_target_paths()
 
 
 def is_open_path(target: str) -> bool:
@@ -71,10 +106,21 @@ def is_open_path(target: str) -> bool:
     return head in _OPEN_PREFIXES
 
 
-def suggest_targets(target: str, *, max_suggestions: int = 3) -> tuple[str, ...]:
-    """Return up to ``max_suggestions`` close matches for ``target``."""
+def suggest_targets(
+    target: str,
+    candidates: Iterable[str] | None = None,
+    *,
+    max_suggestions: int = 3,
+) -> tuple[str, ...]:
+    """Return up to ``max_suggestions`` close matches for ``target``.
 
-    return tuple(get_close_matches(target, valid_target_paths(), n=max_suggestions, cutoff=0.6))
+    ``candidates`` defaults to the full union (state + delta paths). Pass
+    a kind-specific corpus to bias suggestions toward paths that the
+    evaluator will actually accept for that constraint kind.
+    """
+
+    pool = list(valid_target_paths()) if candidates is None else list(candidates)
+    return tuple(get_close_matches(target, pool, n=max_suggestions, cutoff=0.6))
 
 
 def _walk(prefix: str, annotation: Any, paths: set[str]) -> None:

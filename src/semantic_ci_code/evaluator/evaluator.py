@@ -515,8 +515,12 @@ def _aggregate(results: tuple[ConstraintResult, ...]) -> VerdictResult:
         if result.status is ResultStatus.VIOLATED:
             if result.severity is Severity.HARD:
                 return VerdictResult.FAIL
-            if result.severity is Severity.SOFT:
+            elif result.severity is Severity.SOFT:
                 has_repair = True
+            elif result.severity is Severity.INFO:
+                pass
+            else:
+                raise NotImplementedError(f"unhandled severity: {result.severity!r}")
         elif result.status is ResultStatus.UNKNOWN:
             if result.unknown_policy is UnknownPolicy.FAIL:
                 return VerdictResult.FAIL

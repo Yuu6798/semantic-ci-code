@@ -16,6 +16,7 @@ authorship:
   authors:
     - identity: ""
   declared_at: ""  # ISO-8601, e.g. 2026-05-05T12:00:00Z
+# constraints: severity defaults to "hard"; "soft" or "info" weakens the gate.
 constraints: []  # user constraints; templates are auto-expanded from primary_kind
 """
 

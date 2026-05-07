@@ -810,6 +810,33 @@ def test_refactor_template_fails_when_api_surface_changes():
     assert verdict.results[0].status is ResultStatus.VIOLATED
 
 
+def test_equals_baseline_violation_emits_added_and_removed_set_diff():
+    result = evaluate_one(
+        baseline_constraint(operator=Operator.EQUALS_BASELINE, target="api_surface"),
+        baseline=CodeState(api_surface=(api("pkg.kept"), api("pkg.gone"))),
+        candidate=CodeState(api_surface=(api("pkg.kept"), api("pkg.added"))),
+    )
+
+    assert result.status is ResultStatus.VIOLATED
+    evidence = dict(result.evidence)
+    assert "added" in evidence
+    assert "removed" in evidence
+    assert any("pkg.added" in repr(item) for item in evidence["added"])
+    assert any("pkg.gone" in repr(item) for item in evidence["removed"])
+
+
+def test_equals_baseline_satisfaction_does_not_emit_set_diff():
+    result = evaluate_one(
+        baseline_constraint(operator=Operator.EQUALS_BASELINE, target="api_surface"),
+        baseline=CodeState(api_surface=(api("pkg.kept"),)),
+        candidate=CodeState(api_surface=(api("pkg.kept"),)),
+    )
+
+    assert result.status is ResultStatus.SATISFIED
+    assert "added" not in dict(result.evidence)
+    assert "removed" not in dict(result.evidence)
+
+
 def test_refactor_template_ignores_private_api_surface_changes():
     compiled = compile_target_svp("intent: refactor\nchange:\n  primary_kind: refactor\n")
     verdict = evaluate_constraints(

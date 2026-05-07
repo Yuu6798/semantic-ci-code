@@ -20,7 +20,7 @@ exercised directly without git ceremony.
 | TC2 | `compare` | "refactor" silently removes a public function | `fail` / exit 1 | `fail`, `template:refactor:api_surface_unchanged` violated | ✅ |
 | TC3 | `compare` | feature claim, required addition missing | `fail` / exit 1 | `fail`, user `includes_any` violated | ✅ |
 | TC4 | `compare` | feature: required public function added | `pass` / exit 0 | `pass` once user constraint matches full record | ✅ (with FINDING-1) |
-| TC5 | `compare` | bugfix template flags scope creep (extra public symbol) | `fail` / exit 1 | `fail`, `template:bugfix:api_surface_unchanged` violated | ✅ (with FINDING-2) |
+| TC5 | `compare` | bugfix template flags scope creep (extra public symbol) | `fail` / exit 1, `added` populated post-fix | `fail`, `template:bugfix:api_surface_unchanged` violated, `added=[safe_divide]` after fix | ✅ (drove FINDING-2 fix) |
 | TC6 | `validate-plan` | pre-generation guidance with `would_violate`, `required_additions` | rendered text + 4-list `risk_summary` | rendered, 1 would_violate, 1 required_additions, 2 template_implications | ✅ |
 | TC7 | CLI hardening | malformed YAML / Python tag injection / missing target / unknown adapter / nonexistent dirs | exit 2 or 3 with stderr diagnostic | YAML `!!python` rejected (exit 3); missing target exit 2; unknown adapter exit 2; malformed YAML exit 3 | ✅ |
 | TC8 | `check` | self-dogfood: this repo HEAD vs HEAD with engine sources | `pass` / exit 0, `files_touched: 0` | `pass`, cache hit/miss `1/1`, schema_version `4` | ✅ |
@@ -105,10 +105,10 @@ such as `api_surface_delta.added.fqns` that yields a flat `tuple[str, ...]`.
 Either path needs a Brief — proposing this be tracked alongside CSCI-35b
 sweep or as a P3 spec-quality brief (§19).
 
-### FINDING-2 — `equals_baseline` violations omit structured `added`/`removed` in repair instruction (severity: medium; scope: adapter UX)
+### FINDING-2 — `equals_baseline` violations omit structured `added`/`removed` in repair instruction (severity: medium; scope: adapter UX) — fixed in this PR
 
-**Symptom.** TC5's `template:bugfix:api_surface_unchanged` violation produced
-a repair instruction with empty arrays:
+**Symptom (before fix).** TC5's `template:bugfix:api_surface_unchanged`
+violation produced a repair instruction with empty arrays:
 
 ```jsonc
 "added": [], "removed": [], "missing": [], "extra": [],
@@ -119,27 +119,42 @@ a repair instruction with empty arrays:
 ```
 
 The `safe_divide` symbol was added (the actual delta), but neither `added`
-nor `extra` carries it. Adapters (`claude-code`, `cursor`, `codex`) that
-render structured added/removed lists therefore have to recompute the diff
-from `extra_evidence.baseline` vs `extra_evidence.candidate` themselves, which
-defeats the point of the repair envelope being a stable interchange format.
+nor `extra` carried it. Adapters (`claude-code`, `cursor`, `codex`) that
+render structured added/removed lists had to recompute the diff from
+`extra_evidence.baseline` vs `extra_evidence.candidate` themselves, which
+defeated the point of the repair envelope being a stable interchange format.
 
-**Root cause hypothesis.** `_baseline_set_outcome` for `EQUALS_BASELINE` /
-`UNCHANGED` calls `_baseline_boolean_outcome` (line 110-115 of
-`evaluator/operators.py`), which only emits `baseline` and `candidate` lists.
-The set-aware operators (`NO_NEW_ITEMS`, `NO_REMOVED_ITEMS`,
-`SUPERSET_OF_BASELINE`) do compute `extra` / `missing` and pass them to
-`_baseline_set_outcome`, but `EQUALS_BASELINE` does not — its evidence is
-*equality*, not a set diff, so the structured fields never receive the diff
-even though the dimension is set-typed.
+**Root cause.** `evaluate_baseline_operator` for `EQUALS_BASELINE` /
+`UNCHANGED` (formerly lines 110-115 of `evaluator/operators.py`) called
+`_baseline_boolean_outcome`, which emits only `baseline` and `candidate`.
+The set-aware sibling operators (`NO_NEW_ITEMS`, `NO_REMOVED_ITEMS`,
+`SUPERSET_OF_BASELINE`) already passed set diffs through
+`_baseline_set_outcome` — `EQUALS_BASELINE` simply did not.
 
-**Suggested resolution (proposal, not in this PR).** When the constraint
-target dimension is set-typed (api_surface_*, effects, imports, etc.), have
-`equals_baseline` compute and attach the symmetric set difference into
-`added`/`removed` on top of its existing `baseline`/`candidate` evidence.
-This needs a Brief decision on whether `equals_baseline` should be promoted
-to a delta-aware operator or whether the repair emitter (separate layer)
-should compute the diff post-hoc. The latter is less invasive.
+**Why this is not a design decision.** The `added` / `removed` fields
+already exist on the repair instruction schema; the existing fields'
+"items in candidate, not baseline" meaning is unchanged. Populating them
+for `equals_baseline` violations does not require a `schema_version` bump
+under the rules in `docs/json_schema.md` (no field added, removed,
+renamed, or repurposed).
+
+**Resolution applied in this PR.** `evaluate_baseline_operator` now
+delegates `EQUALS_BASELINE` / `UNCHANGED` to a new `_equals_baseline`
+helper. When values are equal, behavior is unchanged. When they differ
+**and** both sides are set-like (per `_collection_items`), the helper
+computes the symmetric set difference and routes through
+`_baseline_set_outcome`, populating `added` / `removed` alongside
+`baseline` / `candidate`. Scalar mismatches still fall back to the
+boolean outcome, so the evidence shape for non-collection dimensions is
+unchanged.
+
+Tests added in `tests/evaluator/test_evaluator.py`:
+- `test_equals_baseline_violation_emits_added_and_removed_set_diff`
+- `test_equals_baseline_satisfaction_does_not_emit_set_diff`
+
+Re-running TC2 (`refactor` silently dropping `farewell`) and TC5
+(`bugfix` adding `safe_divide`) post-fix confirms `removed` and `added`
+are populated correctly.
 
 ### FINDING-3 — `compile-repair` accepts arbitrary input `schema_version` without surfacing the mismatch (severity: low; scope: forward-compat / DX)
 
@@ -207,5 +222,6 @@ the CLI surface.
 | Priority | Brief candidate | Source |
 |---|---|---|
 | H | Set-operator partial-match semantics for user constraints | FINDING-1 |
-| M | Structured added/removed in `equals_baseline` repair instructions | FINDING-2 |
 | L | Optional `--strict-schema` flag on `compile-repair` (promote warning to error) | FINDING-3 follow-up |
+
+FINDING-2 was originally listed here but resolved in this PR (see above).

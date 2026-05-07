@@ -108,11 +108,7 @@ def evaluate_baseline_operator(
 ) -> OperatorOutcome:
     try:
         if operator in {Operator.EQUALS_BASELINE, Operator.UNCHANGED}:
-            return _baseline_boolean_outcome(
-                _canon(candidate) == _canon(baseline),
-                baseline=baseline,
-                candidate=candidate,
-            )
+            return _equals_baseline(baseline, candidate)
         if operator in {Operator.NOT_EQUALS_BASELINE, Operator.CHANGED}:
             return _baseline_boolean_outcome(
                 _canon(candidate) != _canon(baseline),
@@ -174,6 +170,24 @@ def _superset_of(resolved: object, expected: object) -> OperatorOutcome:
         return _unknown_type_mismatch(observed=resolved, expected=expected)
     missing = expected_items - observed_items
     return _set_outcome(not missing, observed_items, expected_items, missing=missing)
+
+
+def _equals_baseline(baseline: object, candidate: object) -> OperatorOutcome:
+    if _canon(candidate) == _canon(baseline):
+        return _baseline_boolean_outcome(True, baseline=baseline, candidate=candidate)
+    baseline_items = _collection_items(baseline)
+    candidate_items = _collection_items(candidate)
+    if baseline_items is None or candidate_items is None:
+        return _baseline_boolean_outcome(False, baseline=baseline, candidate=candidate)
+    added = candidate_items - baseline_items
+    removed = baseline_items - candidate_items
+    return _baseline_set_outcome(
+        False,
+        baseline_items,
+        candidate_items,
+        added=added,
+        removed=removed,
+    )
 
 
 def _baseline_superset_of(baseline: object, candidate: object) -> OperatorOutcome:

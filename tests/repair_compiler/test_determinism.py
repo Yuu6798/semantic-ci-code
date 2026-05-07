@@ -17,6 +17,12 @@ def test_cursor_render_repair_is_byte_identical_across_hash_seeds():
     assert outputs[0] == outputs[1] == outputs[2]
 
 
+def test_codex_render_repair_is_byte_identical_across_hash_seeds():
+    outputs = tuple(_run_subprocess(seed, "codex") for seed in ("0", "1", "random"))
+
+    assert outputs[0] == outputs[1] == outputs[2]
+
+
 def _run_subprocess(hash_seed: str, adapter_name: str) -> str:
     script = r"""
 import sys
@@ -31,11 +37,16 @@ from semantic_ci_code.framework.constraint_types import (
 from semantic_ci_code.framework.target_svp import parse_target_svp_yaml
 from semantic_ci_code.repair import emit_repair_plan
 from semantic_ci_code.repair_compiler import RepairCompiler
-from semantic_ci_code.repair_compiler.adapters import ClaudeCodeAdapter, CursorAdapter
+from semantic_ci_code.repair_compiler.adapters import (
+    ClaudeCodeAdapter,
+    CodexAdapter,
+    CursorAdapter,
+)
 
 ADAPTERS = {
     "claude-code": ClaudeCodeAdapter,
     "cursor": CursorAdapter,
+    "codex": CodexAdapter,
 }
 
 result = ConstraintResult(

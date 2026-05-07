@@ -5,6 +5,7 @@ import pytest
 import semantic_ci_code.repair_compiler as registry
 from semantic_ci_code.repair_compiler.adapters import (
     ClaudeCodeAdapter,
+    CodexAdapter,
     CursorAdapter,
     register_builtin_adapters,
 )
@@ -43,8 +44,10 @@ def test_register_builtin_adapters_registers_claude_code():
 
     assert registry.get_adapter("claude-code").name == "claude-code"
     assert registry.get_adapter("cursor").name == "cursor"
+    assert registry.get_adapter("codex").name == "codex"
     assert tuple(adapter.name for adapter in registry.list_adapters()) == (
         "claude-code",
+        "codex",
         "cursor",
     )
 
@@ -55,3 +58,11 @@ def test_register_and_get_cursor_adapter():
     registry.register_adapter(adapter)
 
     assert registry.get_adapter("cursor") is adapter
+
+
+def test_register_and_get_codex_adapter():
+    adapter = CodexAdapter()
+
+    registry.register_adapter(adapter)
+
+    assert registry.get_adapter("codex") is adapter

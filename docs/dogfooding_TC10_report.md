@@ -50,7 +50,7 @@ imports against a different `sys.path`), not a code defect.
 
 ## Findings
 
-### FINDING-1 — `includes_all` / `includes_any` against `api_surface_*` requires exact full-dict match (severity: high; scope: spec authoring UX)
+### FINDING-1 — set operators against `api_surface_*` require exact full-dict match (severity: high; scope: spec authoring UX + CI integrity)
 
 **Symptom.** TC4 declared a feature constraint:
 
@@ -85,17 +85,36 @@ the exact `signature` string (e.g. `"def password_reset(user: str, token: str) -
 `expected: ["src.api.users.fetch_user_profile"]` as a bare string list, which
 likewise fails to match in P1 because elements are full dicts.
 
-**CI integrity impact.** Authors writing user constraints in `target.yaml` will
-either:
-1. write partial-key constraints that *always* report violated even when the
-   target is met (false positive — gates fail and developers learn to ignore
-   the layer), or
-2. paste the exact extractor output (couples spec to extractor format and
-   breaks when the signature canonicalisation changes).
+**Operator-specific outcomes.** The partial-record mismatch produces two
+qualitatively different failure modes depending on the set operator. Both
+are caused by the same canonicalisation, but their CI consequences invert.
+
+| Operator | Partial-dict outcome | Failure mode | Author intent that breaks |
+|---|---|---|---|
+| `includes_all` | `expected − observed` non-empty → violated | **False positive** (silently violated) | "must contain X" — gate fails even when X is present |
+| `includes_any` | `expected ∩ observed` empty → violated | **False positive** (silently violated) | "must contain at least one of X / Y" — gate fails even when matches exist |
+| `superset_of` | `expected − observed` non-empty → violated | **False positive** (silently violated) | "observed must include all of expected" — gate fails even when it does |
+| `subset_of` | `observed − expected` non-empty → violated | **False positive** (silently violated) | "observed must be subset of allow-list" — gate fails because partial-dict expected can't cover full observed |
+| **`excludes_all`** | **`expected ∩ observed` empty → satisfied** | **False negative (CI bypass)** | **"must not contain forbidden X" — gate passes even when X IS present** |
+
+**CI integrity impact.** Two distinct failure modes, with `excludes_all` the
+more severe:
+
+1. **False positive (`includes_all` / `includes_any` / `superset_of` / `subset_of`).**
+   Partial-key constraints *always* report violated even when the target is
+   met. Authors either paste the exact extractor output (coupling spec to
+   extractor format, breaking on signature canonicalisation changes) or
+   learn to ignore the noisy gate.
+2. **False negative (`excludes_all`, CI bypass).** Authors writing forbidden-
+   symbol policies as `excludes_all: [{fqn: "dangerous.api"}]` get a
+   *silently satisfied* gate even when `dangerous.api` is in observed.
+   The forbidden-symbol enforcement effectively does not exist on the user
+   surface. This is the most dangerous of the two modes because it converts
+   a security / policy gate into a no-op.
 
 This silently degrades the trustworthiness of the verdict on the user-author
-surface. Template constraints are unaffected because they use baseline-relative
-operators that compare full records on both sides.
+surface. Template constraints are unaffected because they use baseline-
+relative operators that compare full records on both sides.
 
 **Suggested resolution (proposal, not in this PR).** Either (a) define a
 "matcher" subset semantics for set operators when expected items are partial
@@ -219,9 +238,36 @@ the CLI surface.
 
 ## Next-Brief Candidates
 
-| Priority | Brief candidate | Source |
-|---|---|---|
-| H | Set-operator partial-match semantics for user constraints | FINDING-1 |
-| L | Optional `--strict-schema` flag on `compile-repair` (promote warning to error) | FINDING-3 follow-up |
+| Priority | Brief candidate | Source | Status |
+|---|---|---|---|
+| H | Set-operator partial-match semantics for user constraints | FINDING-1 | **Open / Unresolved — tracked as D5** in `CLAUDE.md` 次の発行順序 §F (own brief, 1〜2 日規模) |
+| L | Optional `--strict-schema` flag on `compile-repair` (promote warning to error) | FINDING-3 follow-up | Open — small, no brief required |
 
 FINDING-2 was originally listed here but resolved in this PR (see above).
+
+### Tracking: D5 (FINDING-1) — Open / Unresolved
+
+FINDING-1 is the only finding from this dogfooding pass that remains open
+after PR #61. It is integrated into the dogfood-driven fix plan as **D5**,
+joining D1〜D4 from the 2026-05-07 Session 4 dogfooding
+(`.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4"). Unlike D1〜D4, which
+split between an authoring guide (`docs/target_yaml_guide.md`, hosting
+D1/D3/D4) and a separate extractor-exclude brief (D2), D5 requires
+operator-level semantics changes and is therefore tracked as its own brief
+candidate at `CLAUDE.md` 次の発行順序 §F.
+
+| D# | Source | Subject | Brief slot |
+|---|---|---|---|
+| D1 | Session 4 dogfood | `--package-root` scope hazard | A' (`target_yaml_guide.md`) |
+| D2 | Session 4 dogfood | extractor crash on `syntax_error/bad.py` | D (extractor exclude brief) |
+| D3 | Session 4 dogfood | template / user constraint duplication | A' (`target_yaml_guide.md`) |
+| D4 | Session 4 dogfood | config-only PR vacuous PASS | A' (`target_yaml_guide.md`) |
+| **D5** | **Session 5 dogfood (PR #61, FINDING-1)** | **set operator partial-match semantics — false positive on `includes_*` / `subset_of` / `superset_of`, false negative (CI bypass) on `excludes_all`** | **F (own brief)** |
+
+Resolution requires either a partial-key matcher semantics on set operators,
+a flat-projection target like `api_surface_delta.added.fqns`, or both. The
+brief itself will pick between these; this dogfooding pass only documents
+the gap and supplies reproduction conditions in TC4. The brief MUST address
+**both** failure modes — false positives on positive set operators and the
+false negative on `excludes_all` — because partial-key matcher semantics
+need to apply symmetrically to closing the CI bypass.

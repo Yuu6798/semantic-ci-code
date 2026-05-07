@@ -15,6 +15,7 @@ compiler can reject authoring errors with a structured ``CompileError``.
 from __future__ import annotations
 
 import inspect
+import re
 from difflib import get_close_matches
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
@@ -22,6 +23,12 @@ from typing import Any, Union, get_args, get_origin
 from pydantic import BaseModel
 
 from semantic_ci_code.domain.state_schema import CodeState, CodeStateDelta
+
+# Mirrors ``evaluator._TARGET_PATTERN``. Open-dimension paths still have
+# to satisfy this dotted-identifier syntax at runtime; we enforce it at
+# compile time too so authoring errors do not slip through the open-prefix
+# exception and resurface as ``E_PATH_UNRESOLVED``.
+_TARGET_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
 # Top-level aliases recognized by the evaluator that do not appear in
 # the Pydantic schema. Keep this list in sync with the special cases in
@@ -50,8 +57,16 @@ def valid_target_paths() -> frozenset[str]:
 
 
 def is_open_path(target: str) -> bool:
-    """Return True when a target lives under an open dict dimension."""
+    """Return True when a target lives under an open dict dimension.
 
+    The whole target must satisfy the evaluator's dotted-identifier
+    syntax: a malformed open-prefix path such as ``python_specific..foo``
+    or ``python_specific.bad-key`` would otherwise pass the compile-time
+    schema check and resurface as ``E_PATH_UNRESOLVED`` at evaluate time.
+    """
+
+    if _TARGET_PATTERN.fullmatch(target) is None:
+        return False
     head, _, _ = target.partition(".")
     return head in _OPEN_PREFIXES
 

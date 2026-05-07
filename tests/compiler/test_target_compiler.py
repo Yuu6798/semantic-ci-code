@@ -203,6 +203,46 @@ constraints:
     assert "test_surface_delta.new_cases" in exc_info.value.message
 
 
+def test_malformed_open_dimension_path_raises_compile_error():
+    yaml_source = """
+intent: bad open prefix syntax
+change:
+  primary_kind: feature
+constraints:
+  - id: bad_hyphen
+    kind: delta
+    target: python_specific.bad-key
+    operator: equals
+    expected: 0
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "python_specific.bad-key" in exc_info.value.message
+
+
+def test_empty_segment_open_dimension_path_raises_compile_error():
+    yaml_source = """
+intent: empty segment under open prefix
+change:
+  primary_kind: feature
+constraints:
+  - id: bad_double_dot
+    kind: delta
+    target: python_specific..foo
+    operator: equals
+    expected: 0
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "python_specific..foo" in exc_info.value.message
+
+
 def test_open_dimension_paths_compile_without_schema_check():
     yaml_source = """
 intent: open dim ok

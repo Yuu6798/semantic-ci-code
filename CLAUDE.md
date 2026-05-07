@@ -31,11 +31,14 @@ requests while remaining deterministic and auditable.
 ## Current Status (snapshot)
 
 - **Phase**: P2.5 完走 — Brief 1〜5 全 merged。`semantic-ci` CLI は `init` / `observe` / `compare` / `check` / `pre-commit` / `compile` / `compile-repair` / `validate-plan` の 8 subcommand を持ち、Vibe Coding Adapter(Claude Code / Cursor / Codex)経由で repair guidance + pre-generation guidance を render 可能
-- **直近 merged**(2026-05-07 Session 4, dogfood-driven hardening):
+- **直近 merged**(2026-05-07 Session 5, TC10 dogfooding + D5 tracking):
+  - **PR #61** (dogfooding TC10): 仮想 Python パッケージ 10 ケースで `compare` / `validate-plan` / `compile-repair` を end-to-end 検証(全 verdict + exit code 契約通り)。FINDING-2(`equals_baseline` violation で `_equals_baseline` ヘルパ追加し structured `added`/`removed` を populate)+ FINDING-3(`compile-repair` 入力 `schema_version` 不一致時の stderr warning)を本 PR で fix、`docs/dogfooding_TC10_report.md` 新設
+  - **PR #62** (D5 tracking): FINDING-1(set operator partial-dict mismatch、未解決)を Session 4 D1〜D4 計画に **D5** として統合、`CLAUDE.md` 次の発行順序 §F + `docs/dogfooding_TC10_report.md` Tracking section に追記
+- **過去 merged**(2026-05-07 Session 4, dogfood-driven hardening):
   - **PR #58** (compiler/path_schema): compile-time path 検証 + did-you-mean 提案、`docs/code_semantic_ci_design.md §4.5` typo 訂正(`api_surface.public_symbols` → `api_surface_public`、`new_test_cases` → `new_cases`)、constraint kind 別 path domain(state vs delta 非対称)、Codex 3 round 消化
   - **PR #59** (cli): `check.py` / `pre_commit.py` の `_resolve_package_root` に `is_relative_to` symlink escape ガード(`validate_plan` 既存パターンを 3 surface 対称化)→ **CSCI-35b sweep #3 完了**
   - **PR #60** (ci): 依存上限ピン × 5(`pydantic<3.0` 等)+ `[tool.coverage.*]` 設定 fail_under=70(branch coverage 73% 実測、~3pp margin)+ `pip-audit --strict .` プロジェクト射程化(env-level CVE 汚染遮断)+ 凍結 dep test 8 ファイル更新
-- **過去 merged**(2026-05-07, Brief 5 / P2.5 完走):
+- **過去 merged**(2026-05-07 Session 1, Brief 5 / P2.5 完走):
   - **Brief 5 entry** (CSCI-31 / PR #52): Repair Compiler core + Adapter Protocol + registry + Claude Code adapter
   - **CSCI-32** (PR #53): Cursor adapter(`.mdc` frontmatter + body)
   - **CSCI-33** (PR #54): Codex adapter(ASCII-safe plain text + 角括弧 section ラベル)
@@ -95,34 +98,91 @@ Default cycle:
 
 ```text
 src/semantic_ci_code/
-  __init__.py
+  __init__.py            # legacy entrypoint (semantic-ci-code script)
   __main__.py
   config.py
   scope.py
+  api_surface/           # Python public-symbol extractor (CSCI-5)
+  cli/                   # CLI surface (Brief 4 / 4b / 4d / 5)
+    main.py              # argparse entry; subparser for 8 subcommands
+    commands/            # one module per subcommand
+      observe.py
+      compare.py
+      check.py
+      pre_commit.py
+      compile.py
+      compile_repair.py  # Brief 5
+      validate_plan.py   # Brief 5
+    output/              # json / human / sarif / gh-actions formatters
+    output_sarif.py
+    output_gh_actions.py
+    init_command.py      # Brief 4d
+    git_runtime.py       # detached worktree materialization
+    code_state_cache.py  # CSCI-26 / 27
+    target_loader.py
+    delta_overlay.py     # files_touched / loc_delta from git numstat
+  compiler/              # target.yaml -> CompiledTarget (CSCI-12)
+    target_compiler.py
+    templates.py         # change_kind template constraints
+    path_schema.py       # PR #58 compile-time path validation
+  complexity/            # cyclomatic / cognitive (CSCI-7)
+  delta/                 # CodeStateDelta (CSCI-11)
+  domain/                # state_schema (CodeState root)
+  effects/               # effect_db + AST visitor (CSCI-2 / 3 / 4 / 29)
+  evaluator/             # constraint evaluator (CSCI-13)
+    operators.py
+    path_resolver.py
+  framework/             # modality-agnostic (TargetSVP, ConstraintKind)
+  imports/               # CSCI-6
+  module_graph/          # CSCI-8
+  pipeline/              # extract_python_code_state (CSCI-10)
+  repair/                # RepairPlan emitter (CSCI-14)
+  repair_compiler/       # Brief 5: Adapter Protocol + adapters
+    core.py
+    types.py
+    risk_summary.py
+    adapters/
+      claude_code.py
+      cursor.py
+      codex.py
+      markdown.py
+  schemas/               # JSON Schema artifacts
+  test_surface/          # CSCI-9
 tests/
-docs/
-  code_semantic_ci_design.md
+  cli/                   # CLI integration tests
+  compiler/              # CSCI-12
+  delta/                 # CSCI-11
+  evaluator/             # CSCI-13
+  pipeline/              # CSCI-10
+  repair/                # CSCI-14
+  repair_compiler/       # Brief 5
+  fixtures/              # hand-built before/after trees + expected verdicts
+docs/                    # see Design Documents table below
+experiments/             # observation-only reproductions (out of core scope)
+.claude/memory/          # session memory (handoff source of truth)
 ```
 
 ## Design Documents
 
-| Document | Purpose |
-|---|---|
-| `docs/code_semantic_ci_design.md` | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop |
-| `docs/cli_usage.md` | User-facing CLI contract for `observe`, `compare`, `check`, `pre-commit`, and `compile`, including target discovery and format selection |
-| `docs/exit_codes.md` | Stable CLI exit code policy for CI integration |
-| `docs/json_schema.md` | CLI JSON `schema_version="1"` envelopes for verdict and compile outputs |
-| `docs/cli_test_inventory.md` | CLI test coverage inventory, runtime notes, and conservative reduction candidates |
-| `docs/brief_4_planning.md` | (Brief 4 complete; retained for Brief 5 reference) Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR が merge され `semantic-ci` CLI 5 subcommand が release 可能状態。Open Questions 16 件のうち未確定分は Brief 5 / Brief 4b で消化予定 |
-| `docs/brief_4b_planning.md` | Brief 4b (CI integration outputs) を CSCI-28 に集約する planning 文書。SARIF 2.1.0 出力 + GitHub Actions annotation + `.pre-commit-hooks.yaml` manifest を 1 PR で完結させる設計と Task Brief。Brief 4 Open Questions Q9/Q10/Q11 を救済 |
-| `docs/brief_5_planning.md` | (Brief 5 complete; retained for Brief 7 reference) Brief 5 (Repair Compiler + Vibe Coding Adapters、P2.5 entry) を CSCI-31〜35 の 5 PR に分割した planning 文書。CSCI-31〜35 全 PR が merge され `compile-repair` / `validate-plan` 2 subcommand + Claude Code / Cursor / Codex 3 adapter が release 可能状態(2026-05-07 完走)。Brief 3 残課題 #4(Repair Compiler)+ §21.3 adapter list + `pre_generation_validation_case.md` 残された問い #4 を救済済み |
-| `docs/brief_7_planning.md` | Brief 7 (Semantic Security Protocol / SSP v0.1) を CSCI-36〜40 想定で planning する文書。Issue #48 の Semgrep 統合提案を audit した結果、core への深い統合は reject、SSP として §20.1 layered distribution の 4 層目(suite と並列)に独立配置。SAST + SCA / Python only / 5 要素 fingerprint(`rule_id × module_path × qualified_name × normalized_text × ordinal`、PR #50 review で 4→5 に拡張)+ 言語プロファイル分離 / 独立 envelope + Sensor Provenance Invariant(§23.1 鏡像)/ Issue #48 クローズ + 新規 tracking issue / NIST SSP との衝突は許容、を 6 論点で確定。Brief 6(TypeScript)凍結に伴い順序は **Brief 5 → 7** |
-| `docs/brief_3_planning.md` | (Archived) Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。CSCI-10〜14 の全 PR が merge され Brief 3 は完結済み。当時の判断履歴として保存 |
-| `docs/multi_agent_audit_case.md` | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
-| `docs/pre_generation_validation_case.md` | 外部 Python リポジトリ上で stub のみの candidate を engine に渡し §23.1 入力 contract が実装で動作することを 3 ケースで確認した観測事例。core scope 外の応用観測 |
-| `docs/dogfooding_TC10_report.md` | 仮想 Python パッケージ 10 ケースで `semantic-ci compare` / `validate-plan` / `compile-repair` を回し PASS / FAIL / REPAIR / Advisor / 入力 hardening を検証したドッグフーディング記録。FINDING-1(`includes_*` の partial-dict 不一致、設計判断要のため Brief 化提案)、FINDING-2(`equals_baseline` の構造化 added/removed 欠落、本 PR で `_equals_baseline` ヘルパ追加により修正)、FINDING-3(`compile-repair` 入力 `schema_version` 検証欠如、本 PR で stderr warning を追加)を記録 |
+Status legend: **ACTIVE** (current spec/contract, AI agents should read first) / **PLANNING** (open / in-progress brief) / **REFERENCE** (brief complete; retained for downstream context) / **ARCHIVED** (history-only, not authoritative) / **CASE STUDY** (out-of-core observation) / **DOGFOOD REPORT** (dogfooding pass record).
 
-When adding a new `docs/<topic>.md`, update this table and the README documentation list.
+| Document | Status | Purpose |
+|---|---|---|
+| `docs/code_semantic_ci_design.md` | ACTIVE | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop. Single source of truth for engine semantics |
+| `docs/cli_usage.md` | ACTIVE | User-facing CLI contract for all 8 subcommands (`observe` / `compare` / `check` / `pre-commit` / `compile` / `init` / `compile-repair` / `validate-plan`), target discovery, format selection, target authorship, severity routing |
+| `docs/exit_codes.md` | ACTIVE | Stable CLI exit code policy (0 / 1 / 2 / 3 / 4) for CI integration, including `--strict-repair`, `severity: info` Advisor channel, and per-subcommand notes |
+| `docs/json_schema.md` | ACTIVE | CLI JSON envelopes — verdict / compile at `schema_version="4"`, compile-repair / validate-plan at independent `schema_version="1"`. Includes compatibility policy and v2→v3 / v3→v4 diffs |
+| `docs/cli_test_inventory.md` | ACTIVE | CLI test coverage inventory, runtime notes, and conservative reduction candidates |
+| `docs/brief_7_planning.md` | PLANNING (open) | Brief 7 (Semantic Security Protocol / SSP v0.1) を CSCI-36〜40 想定で planning する文書。Issue #48 の Semgrep 統合提案を audit した結果、core への深い統合は reject、SSP として §20.1 layered distribution の 4 層目(suite と並列)に独立配置。SAST + SCA / Python only / 5 要素 fingerprint(`rule_id × module_path × qualified_name × normalized_text × ordinal`、PR #50 review で 4→5 に拡張)+ 言語プロファイル分離 / 独立 envelope + Sensor Provenance Invariant(§23.1 鏡像)。Brief 6(TypeScript)凍結に伴い順序は **Brief 5 → 7**。CSCI-36 着手時は本文書 §11 checklist + AGENTS.md `Forward Design Note` を逐語参照 |
+| `docs/brief_5_planning.md` | REFERENCE (Brief 5 完走 2026-05-07) | Brief 5 (Repair Compiler + Vibe Coding Adapters、P2.5 entry) を CSCI-31〜35 の 5 PR に分割した planning 文書。CSCI-31〜35 全 PR merged で `compile-repair` / `validate-plan` 2 subcommand + Claude Code / Cursor / Codex 3 adapter が release 可能。Brief 3 残課題 #4(Repair Compiler)+ §21.3 adapter list + `pre_generation_validation_case.md` 残された問い #4 を救済済み。Brief 7 起草時の参照として保存 |
+| `docs/brief_4b_planning.md` | REFERENCE (Brief 4b 完走 2026-05-05) | Brief 4b (CI integration outputs) を CSCI-28 に集約した planning 文書。SARIF 2.1.0 / GitHub Actions annotation / `.pre-commit-hooks.yaml` manifest を 1 PR で完結。Brief 4 Open Questions Q9/Q10/Q11 を救済 |
+| `docs/brief_4_planning.md` | REFERENCE (Brief 4 完走 2026-05-04) | Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR merged で `semantic-ci` CLI 5 subcommand が release 可能。残 Open Questions は Brief 4b / 4c / 4d / 5 で消化済み |
+| `docs/brief_3_planning.md` | ARCHIVED (Brief 3 完走) | Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。当時の判断履歴として保存(operator 5 個案などの一部記述は CSCI-12 brief で上書き済み) |
+| `docs/dogfooding_TC10_report.md` | DOGFOOD REPORT (2026-05-07 Session 5) | 仮想 Python パッケージ 10 ケースで `compare` / `validate-plan` / `compile-repair` を end-to-end 検証。FINDING-1(set operator partial-dict mismatch、**未解決** = D5、`CLAUDE.md` 次の発行順序 §F)、FINDING-2(`equals_baseline` の structured added/removed 欠落、PR #61 で fix 済)、FINDING-3(`compile-repair` schema_version 不一致 warning 追加、PR #61 で fix 済) |
+| `docs/multi_agent_audit_case.md` | CASE STUDY | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
+| `docs/pre_generation_validation_case.md` | CASE STUDY | stub のみの candidate を engine に渡し §23.1 入力 contract が実装で動作することを 3 ケースで確認した観測事例。再現は `experiments/pre_generation_validation/` で完結。core scope 外の応用観測 |
+
+When adding a new `docs/<topic>.md`, update this table (with status tag) and the README documentation list.
 
 ## Commands
 

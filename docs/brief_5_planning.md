@@ -555,24 +555,30 @@ frontmatter dump、本文は string concat で OK。
 
 ## 14. 残課題 (Brief 5 完了後)
 
-- **CSCI-35b sweep brief**(優先): Brief 5 review で deferred とした技術的負債をまとめて 1 PR で消化:
-  - `would_violate` の delta-kind constraint 盲点を `docs/cli_usage.md` に明記(self-comparison では空 delta となり delta-kind 系は常に拾えない)
-  - `compute_risk_summary` の `target_svp_to_yaml → compile_target_svp` round-trip にコメント追加(将来 `compile_target_svp` に `TargetSVP` 直接受付 overload を入れる前提)
-  - `_resolve_package_root` に `Path.is_relative_to(root.resolve())` で symlink escape 防御深度を追加
-  - Claude Code adapter の `Forbidden Zones` / `Required Additions` を JSON dict dump から markdown human-friendly 表現にするか検討(adapter ごと専用 formatter)
+> **Status (2026-05-07 Session 4 / 5 時点)**: CSCI-35b sweep の 4 候補のうち 2 件は
+> 単発 PR で先行解消済み(PR #58 / #59)。残 2 件は次の sweep brief で同梱予定。
+> 全体の最新 tracking は `CLAUDE.md` 次の発行順序 §A を参照。
+
+- **CSCI-35b sweep brief**(残 2 件まで縮小): Brief 5 review で deferred とした技術的負債をまとめて 1 PR で消化:
+  - ~~`would_violate` の delta-kind constraint 盲点を `docs/cli_usage.md` に明記~~ → **既明記済**(`docs/cli_usage.md:348-353` で self-comparison 下では delta-kind が `would_violate` に上がらない旨を文書化済、Session 4 で確認、撤回)
+  - `compute_risk_summary` の `target_svp_to_yaml → compile_target_svp` round-trip にコメント追加(将来 `compile_target_svp` に `TargetSVP` 直接受付 overload を入れる前提)— **未着手**
+  - ~~`_resolve_package_root` に `Path.is_relative_to(root.resolve())` で symlink escape 防御深度を追加~~ → **完了**(PR #59、CSCI-35b sweep #3、`check.py` / `pre_commit.py` の `_resolve_package_root` を `validate_plan` 既存パターンに対称化)
+  - Claude Code adapter の `Forbidden Zones` / `Required Additions` を JSON dict dump から markdown human-friendly 表現にするか検討(adapter ごと専用 formatter)— **未着手**
 - ~~**Brief 6** TypeScript extractor — Brief 5 と並列発行可、§22 設計通り~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。P3 以降に再評価。Brief 5 完了後の次は **Brief 7 (SSP v0.1)** 直列発行
 - **v0 / Lovable / Bolt adapter**(§21.3「後続」)— HTTP integration 形式、別 brief
 - **LSP server 化**(§21.5)— IDE 内 real-time gate、Brief 8+ deferred(Brief 7 は SSP v0.1 で予約、`design.md §25` 参照)
 - **AI tool auto-detection**(§17.4)— `generation_metadata` 自動推定ロジック、別 brief
 - **P2 Brief 化時の細目**: Lock violation 即 fail / per-extractor timeout /
   per-extractor version hash trail(`design.md §12 P2` に明記済み、Brief 5 完了後に着手)
+- **D1〜D5 dogfood-driven 課題群**(2026-05-07 Session 4 / 5 由来): `target.yaml` authoring guide 新設(D1/D3/D4)、extractor exclude 機構(D2)、set operator partial-match semantics(D5 = FINDING-1、未解決)— 詳細と現行 routing は `CLAUDE.md` 次の発行順序 §A'/§D/§F、`docs/dogfooding_TC10_report.md` 参照
 
 ## 15. 次のアクション(完了履歴)
 
 1. ✅ 本 planning 文書を `docs/brief_5_planning.md` として merge(PR #44)
 2. ✅ §12 Open Questions 14 件を planning merge 時点で確定
 3. ✅ CSCI-31〜35 を順次 Task Brief 化 → 全 merge(2026-05-07 完走)
-4. **次**: §14 の **CSCI-35b sweep brief** を発行 → その後 **Brief 7 (SSP v0.1)** entry
+4. ✅ CSCI-35b sweep #3(symlink escape 防御)を PR #59 で先行解消
+5. **次**: §14 の **CSCI-35b sweep brief 残 2 件**(round-trip コメント + Claude Code adapter human-friendly レンダリング)を発行 → その後 **Brief 7 (SSP v0.1)** entry
 
 ---
 

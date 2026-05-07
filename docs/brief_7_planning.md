@@ -278,14 +278,20 @@ brief 着手時に `experiments/ssp_audit/` 等に永続化検討)。
 
 | 順 | Brief | 内容 | 着手条件 |
 |---|---|---|---|
-| 1 | **Brief 5**(進行中) | Vibe Coding Adapter + Repair Compiler(P2.5 entry) | CSCI-31 〜 35 を順次発行、planning は PR #44 で merged 済み |
+| 1 | **Brief 5**(✅ 完走 2026-05-07) | Vibe Coding Adapter + Repair Compiler(P2.5 entry) | CSCI-31〜35 全 merged(PR #52〜#56 + 完了宣言 PR #57)、`docs/brief_5_planning.md` を REFERENCE として保存 |
 | 2 | **Brief 6** | TypeScript extractor | **凍結**(P3 以降、費用対効果見直し後に再検討) |
-| 3 | **Brief 7** | SSP v0.1 | Brief 5 完了後、本 doc を入力に CSCI-36 から発行 |
+| 3 | **Brief 7** | SSP v0.1 | Brief 5 完走済 → 本 doc を入力に CSCI-36 から発行可能(§11 checklist 参照) |
 
-Brief 5 が 5 PR、Brief 7 が 5 CSCI 想定で並列発行は不可(直列)。Brief 5 中に
-Brief 7 spec 議論を進めることは可能(本 planning doc が既にその出発点)。
+Brief 5 が 5 PR、Brief 7 が 5 CSCI 想定で並列発行は不可(直列)。Brief 5 完走済のため
+Brief 7 着手は順序的に解禁。CSCI-36 起草時は §11 checklist + AGENTS.md
+`Forward Design Note` を逐語参照すること。
 
-## 8. Brief 5 中に Brief 7 を阻害しないこと
+## 8. Brief 5 中に Brief 7 を阻害しないこと(完走後の遵守確認用)
+
+> **Status**: Brief 5 完走済(2026-05-07)。本節は履歴的な事前 invariants として
+> retain。Brief 7 着手前に「Brief 5 が下記 ❌ パターンに踏み込んでいなかったか」
+> を CSCI-36 起草時にレビューすること(`docs/brief_5_planning.md §10` の merged
+> CSCI 表 + envelope 独立性が確認材料)。
 
 Brief 5 が以下のいずれかに踏み込んだ場合、Brief 7 で再設計が必要になる:
 

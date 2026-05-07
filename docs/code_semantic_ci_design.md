@@ -619,11 +619,11 @@ svp-rpe-code/
 
 ## 12. フェーズ計画
 
-> **現在地(2026-05 時点)**: P1 完走間近(Brief 1〜4 merged、Exit criteria 達成済み)。Brief 5 planning に向けて P2 / P2.5 の入口段階。Brief 進捗の詳細は §25 参照。
+> **現在地(2026-05-07 時点)**: **P2.5 完走** — Brief 1〜5 全 merged。`semantic-ci` CLI 8 subcommand release 可能状態(`init` / `observe` / `compare` / `check` / `pre-commit` / `compile` / `compile-repair` / `validate-plan`)。次は **Brief 7 (SSP v0.1)** または P2 残課題(lock / per-extractor timeout / per-extractor version hash)の brief 化。Brief 進捗の詳細は §25 参照。
 >
-> **§21 / §22 による前倒し反映**: Generator Adapter(元 P5)と Repair Compiler は **P2.5** に、TypeScript extractor(元 P3b)は **P2.5 並列** に移動済み。本節の元計画と §21/§22 で記述が分かれている箇所は §21/§22 が優先。
+> **§21 / §22 による前倒し反映**: Generator Adapter(元 P5)と Repair Compiler は **P2.5** に、TypeScript extractor(元 P3b)は **P2.5 並列** に移動済み。後者は 2026-05-06 Session 2 で **凍結**(下記 P3b 参照)。本節の元計画と §21/§22 で記述が分かれている箇所は §21/§22 が優先。
 
-### P1: Python Static Semantic CI MVP（3–4 週） ✓ 完走間近
+### P1: Python Static Semantic CI MVP（3–4 週） ✓ 完走
 
 - Python のみ
 - 静的特徴のみ（coverage は除外）
@@ -640,12 +640,12 @@ svp-rpe-code/
 - `hash_trail`（extractor version 含む）
 - fixtures 6 件で round-trip テスト pass
 
-**Exit criteria**: fixtures 全件で verdict 安定 + 決定論テスト pass + hash trail が再現可能
+**Exit criteria**: fixtures 全件で verdict 安定 + 決定論テスト pass + hash trail が再現可能 ✓
 
-**Status**: Brief 1(schema)/ Brief 2(extractor 6 次元)/ Brief 3(pipeline)/ Brief 4(CLI 5 subcommand)が CSCI-1〜19 として merged。`semantic-ci` CLI release 可能状態。
+**Status**: Brief 1(schema)/ Brief 2(extractor 6 次元)/ Brief 3(pipeline)/ Brief 4(CLI 5 subcommand)/ Brief 4b(SARIF + GH Actions + pre-commit manifest)/ Brief 4c(effects fqn schema fix)/ Brief 4d(`init` + authorship + soft/info severity)が CSCI-1〜30 + CSCI-28 として merged。
 
-**P1 内 hot-fix(優先、Brief 4c で対応)**:
-- **effects slice extractor の `fqn` semantics 修正**: `python_effect_extractor.py` の `EffectEntry.fqn` が現在 callee 名(例: `print`)を保持しているが、§3.1 schema は enclosing function(例: `audit.audit_state`)を要求している。AST `NodeVisitor` 化 + FunctionDef stack 導入で per-fqn 比較を機能させる。半日〜1 日規模、Brief 4b と並列可。詳細は `.claude/memory/2026-05-05.md` Session 2
+**P1 内 hot-fix**: ✓ 完了
+- **effects slice extractor の `fqn` semantics 修正**: Brief 4c (CSCI-29 / PR #42) で完了。`python_effect_extractor.py` を AST `NodeVisitor` 化 + FunctionDef stack 導入し、`EffectEntry.fqn` を enclosing function(例: `audit.audit_state`)に揃えた。
 
 §7.3 の Level 2/3(method call 解決、`Path.write_text` 等)は P2 予定どおり、本 hot-fix のスコープ外。
 
@@ -661,14 +661,14 @@ svp-rpe-code/
 - **Performance budget 部分対応（§18）**: per-extractor timeout、incremental extraction の foundation（Brief 3 残課題 #5 から本フェーズに繰り上げ）
 - **Hash trail per-extractor version（§10 残部）**: extractor 個別 version を hash に組み込み、P3a empirical alignment の reproducibility 担保（Brief 3 残課題 #9 残部から本フェーズに繰り上げ）
 
-### P2.5: Vibe Coding Adapter + Repair Compiler + TS extractor 並列（§21 / §22 で前倒し）
+### P2.5: Vibe Coding Adapter + Repair Compiler + TS extractor 並列（§21 / §22 で前倒し） ✓ 完走 (Brief 5 / 2026-05-07)
 
-§12 元計画(P5 / P3b)から **P2.5 へ前倒し**された統合 phase。詳細は §21・§22。
+§12 元計画(P5 / P3b)から **P2.5 へ前倒し**された統合 phase。Brief 5 (CSCI-31〜35) で完走。詳細は §21・§22 と `docs/brief_5_planning.md`。
 
-- **Generator Adapter**(§21.3): Claude Code / Cursor / Codex / v0 / Lovable / Bolt 等の AI 生成ツール統合
-- **Repair Compiler**(§21.4 / §9.3): Repair SVP → generator-specific prompt の compiler
-- **TypeScript extractor 着手**(§22.2): P3b から並列前倒し
-- **Pre-generation validation 専用 entry point**(候補): `semantic-ci validate-plan` 等(`docs/pre_generation_validation_case.md` 残された問い #4)
+- **Generator Adapter**(§21.3): Claude Code / Cursor / Codex 3 adapter を CSCI-31〜33 で実装。v0 / Lovable / Bolt は HTTP 統合形式で別 brief
+- **Repair Compiler**(§21.4 / §9.3): Repair SVP → generator-specific prompt の compiler。CSCI-31 で core + Adapter Protocol、CSCI-34 で `compile-repair` subcommand
+- **TypeScript extractor 着手**(§22.2): **凍結** (2026-05-06 Session 2 確定、下記 P3b 参照)
+- **Pre-generation validation 専用 entry point**: CSCI-35 で `semantic-ci validate-plan` を実装、`risk_summary` 4 要素(`would_violate` / `forbidden_zones` / `required_additions` / `template_implications`)を deterministic に算出
 
 ### P3a: GitHub Action 配布（Python only）（2–3 週）
 
@@ -1208,11 +1208,44 @@ generic comparator として設計することの帰結:
 
 ## 24. 関連ドキュメント
 
-- [`CLAUDE.md`](../CLAUDE.md) — リポジトリ全体の運用ポリシー
-- [`AGENTS.md`](../AGENTS.md) — Claude × Codex 連絡プロトコル（Task Brief / Completion Summary）
-- [`brief_3_planning.md`](./brief_3_planning.md) — Brief 3 (pipeline 統合) を CSCI-10〜14 の 5 PR に分割する planning（Brief 3 完了時に archive 候補）
+ステータス凡例: **ACTIVE** / **PLANNING** (open) / **REFERENCE** (brief complete) / **ARCHIVED** / **CASE STUDY** / **DOGFOOD REPORT**。完全な一覧と各 doc の責務は [`CLAUDE.md`](../CLAUDE.md) §"Design Documents" を参照。
 
-今後 `docs/<topic>.md` を追加した場合は、本節と README の Documentation 節に追記する。
+運用ポリシー / 連絡プロトコル:
+
+- [`CLAUDE.md`](../CLAUDE.md) — リポジトリ全体の運用ポリシー、Design Documents 一覧
+- [`AGENTS.md`](../AGENTS.md) — Claude × Codex 連絡プロトコル（Task Brief / Completion Summary）+ Brief 7 / SSP 設計申し送り(CSCI-36 着手時必読)
+
+ACTIVE 仕様 / 契約:
+
+- [`cli_usage.md`](./cli_usage.md) — CLI contract (8 subcommand)
+- [`exit_codes.md`](./exit_codes.md) — exit code policy
+- [`json_schema.md`](./json_schema.md) — verdict / compile / compile-repair / validate-plan envelopes
+- [`cli_test_inventory.md`](./cli_test_inventory.md) — CLI test coverage map
+
+PLANNING (open):
+
+- [`brief_7_planning.md`](./brief_7_planning.md) — Brief 7 (SSP v0.1) Q1〜Q6 確定 + 5 要素 fingerprint + Sensor Provenance Invariant + CSCI-36〜40 候補
+
+REFERENCE (brief complete; downstream context 用):
+
+- [`brief_5_planning.md`](./brief_5_planning.md) — Brief 5 完走 (2026-05-07)
+- [`brief_4b_planning.md`](./brief_4b_planning.md) — Brief 4b 完走 (2026-05-05)
+- [`brief_4_planning.md`](./brief_4_planning.md) — Brief 4 完走 (2026-05-04)
+
+ARCHIVED:
+
+- [`brief_3_planning.md`](./brief_3_planning.md) — Brief 3 完走、判断履歴のみ
+
+CASE STUDY (core scope 外の応用観測):
+
+- [`pre_generation_validation_case.md`](./pre_generation_validation_case.md) — §23.1 入力 contract の存在証明、再現は `experiments/pre_generation_validation/`
+- [`multi_agent_audit_case.md`](./multi_agent_audit_case.md) — オーケストレーター盲点の観測
+
+DOGFOOD REPORT:
+
+- [`dogfooding_TC10_report.md`](./dogfooding_TC10_report.md) — TC10 ドッグフーディング、D5 / FINDING-1 (set operator partial-dict semantics) を **未解決** で tracking
+
+今後 `docs/<topic>.md` を追加した場合は、本節と [`CLAUDE.md`](../CLAUDE.md) Design Documents 表 + README の Documentation 節に追記する。
 
 ## 25. 次のアクション
 
@@ -1234,9 +1267,9 @@ generic comparator として設計することの帰結:
 | **Brief 4b** | SARIF 出力（Q9）+ GitHub Actions annotation（Q10）+ **`.pre-commit-hooks.yaml` manifest（Q11）同梱** | `codex/csci-28-sarif-gh-actions-precommit` | merged (CSCI-28 / PR #40) |
 | **Brief 4c** | effect extractor の `fqn` semantics 修正（callee → enclosing function、§3.1 schema 適合） | `codex/csci-29-effect-extractor-fqn-fix` | merged (CSCI-29 / PR #42) |
 | **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/csci-30-init-authorship-severity` | merged (CSCI-30 / PR #43) |
-| **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/code-semantic-ci-adapter-compiler` | planning merged (PR #44)、CSCI-31 未着手 |
+| **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/csci-31-…` 〜 `codex/csci-35-…` | merged (CSCI-31 / PR #52, CSCI-32 / #53, CSCI-33 / #54, CSCI-34 / #55, CSCI-35 / #56 + 完了宣言 PR #57、`brief_5_planning.md` を REFERENCE として保存) |
 | **Brief 6** | ~~TypeScript extractor 着手（§22.2、P2.5 並列）~~ | ~~`codex/code-semantic-ci-ts-extractor`~~ | **凍結**（2026-05-06 Session 2 確定、§12 P3b 参照）。費用対効果再評価のため P3 以降に後倒し |
-| **Brief 7** | **Semantic Security Protocol (SSP) v0.1**（SAST + SCA、Python only、独立 envelope、Sensor Provenance Invariant）— Issue #48 audit を経て core 外の別 protocol として確立 | `codex/csci-36-...`〜`codex/csci-40-...`（CSCI-36〜40 想定） | planning merged 後（`docs/brief_7_planning.md`）、Brief 5 完了待ち |
+| **Brief 7** | **Semantic Security Protocol (SSP) v0.1**（SAST + SCA、Python only、独立 envelope、Sensor Provenance Invariant）— Issue #48 audit を経て core 外の別 protocol として確立 | `codex/csci-36-...`〜`codex/csci-40-...`（CSCI-36〜40 想定） | planning merged (PR #50、`docs/brief_7_planning.md`)、Brief 5 完走済 → CSCI-36 発行可。AGENTS.md `Forward Design Note` を CSCI-36 起草時に逐語参照 |
 | **P2 Brief 群** | Repair Core Completion (§12 参照) — Brief 3 #5 / #8 / #9 残部を細目として明記:<br>・**Lock violation 即 fail（§8.2 / Brief 3 #8）** を `lock` operator 完全実装の一部として<br>・**Performance budget 部分対応（§18 / Brief 3 #5）**: per-extractor timeout、incremental extraction の foundation<br>・**Hash trail per-extractor version（§10 / Brief 3 #9 残部）**: P3a empirical alignment の reproducibility 担保 | TBD（P2 Brief 化時に分割） | pending |
 | **Brief 8+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`）+ Brief 6 解凍（TypeScript extractor 再開判断） | TBD | deferred |
 

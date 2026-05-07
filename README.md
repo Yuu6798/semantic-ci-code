@@ -34,6 +34,12 @@ api_surface:
     - fqn_prefix: tests.helpers.
 ```
 
+Scaffold a commented `target.yaml`:
+
+```bash
+semantic-ci init
+```
+
 Inspect a package without judging it:
 
 ```bash
@@ -64,15 +70,49 @@ Dry-compile a target file:
 semantic-ci compile --target target.yaml --format human
 ```
 
+Render pre-generation guidance for a coding adapter:
+
+```bash
+semantic-ci validate-plan --target target.yaml --adapter claude-code
+```
+
+Render the repair plan from a verdict envelope:
+
+```bash
+semantic-ci check --format json | semantic-ci compile-repair --adapter claude-code
+```
+
 ## Documentation
 
-- [CLI Usage](docs/cli_usage.md) - subcommands, flags, target discovery, and output formats
-- [Exit Codes](docs/exit_codes.md) - CI-facing exit code contract
-- [JSON Output Schema](docs/json_schema.md) - `schema_version="1"` envelopes
-- [CLI Test Inventory](docs/cli_test_inventory.md) - CLI test coverage map and reduction candidates
-- [Code Semantic CI Design](docs/code_semantic_ci_design.md) - Code Edition v0.1 design spec
-- [AGENTS.md](AGENTS.md) - Claude x Codex task handoff protocol
-- [CLAUDE.md](CLAUDE.md) - repository-level agent operating policy
+Active references (current behavior):
+
+- [CLI Usage](docs/cli_usage.md) — all 8 subcommands, flags, target discovery, output formats, severity routing
+- [Exit Codes](docs/exit_codes.md) — CI-facing exit code contract
+- [JSON Output Schema](docs/json_schema.md) — verdict / compile envelopes (`schema_version="4"`) + compile-repair / validate-plan envelopes (independent `schema_version="1"`)
+- [Code Semantic CI Design](docs/code_semantic_ci_design.md) — Code Edition v0.1 design spec (3-state RPE, constraint type system, phase plan)
+- [CLI Test Inventory](docs/cli_test_inventory.md) — CLI test coverage map and reduction candidates
+- [AGENTS.md](AGENTS.md) — Claude × Codex task handoff protocol (includes Brief 7 / SSP forward design note)
+- [CLAUDE.md](CLAUDE.md) — repository-level agent operating policy
+
+Planning (open):
+
+- [Brief 7 — Semantic Security Protocol v0.1](docs/brief_7_planning.md) — SAST + SCA, Python only, independent envelope, Sensor Provenance Invariant
+
+Reference (brief complete; retained for context):
+
+- [Brief 5 — Repair Compiler + Vibe Coding Adapters (P2.5 entry)](docs/brief_5_planning.md) — CSCI-31〜35 merged 2026-05-07
+- [Brief 4b — CI integration outputs (SARIF + GH Actions + pre-commit manifest)](docs/brief_4b_planning.md) — CSCI-28 merged 2026-05-05
+- [Brief 4 — CLI / operational entrypoint](docs/brief_4_planning.md) — CSCI-15〜19 merged 2026-05-04
+
+Archived:
+
+- [Brief 3 — Pipeline integration (judgment layer)](docs/brief_3_planning.md) — CSCI-10〜14 merged
+
+Out-of-core observation (case studies and dogfooding):
+
+- [Dogfooding TC10 Report](docs/dogfooding_TC10_report.md) — 10 virtual-package cases through the CLI; tracks D5 / FINDING-1 (set operator partial-dict semantics, **unresolved**)
+- [Pre-Generation Validation Case](docs/pre_generation_validation_case.md) — observation that stub-only candidates are accepted by the engine input contract; reproduction in `experiments/pre_generation_validation/`
+- [Multi-Agent Audit Case](docs/multi_agent_audit_case.md) — orchestrator-blindspot observation when running parallel agents
 
 ## Development
 

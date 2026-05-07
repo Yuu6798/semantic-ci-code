@@ -6,6 +6,7 @@
 ## Fix Required
 1. **R_USER_VIOLATION** - User constraint hard_api violated: operator=equals, target=api_surface_public.
    - Constraint: `hard_api`
+   - Kind: `delta`
    - Severity: `hard`
    - Target: `api_surface_public`
    - Operator: `equals`
@@ -18,6 +19,7 @@
 ## Suggested
 1. **R_USER_VIOLATION** - User constraint soft_effect violated: operator=equals, target=effect_changes.added.
    - Constraint: `soft_effect`
+   - Kind: `delta`
    - Severity: `soft`
    - Target: `effect_changes.added`
    - Operator: `equals`
@@ -28,6 +30,7 @@
 ## Info
 1. **R_USER_VIOLATION** - User constraint info_imports violated: operator=equals, target=imports_delta.added.
    - Constraint: `info_imports`
+   - Kind: `delta`
    - Severity: `info`
    - Target: `imports_delta.added`
    - Operator: `equals`
@@ -38,6 +41,7 @@
 ## Unresolved
 1. **R_UNSUPPORTED_OPERATOR** - changed_only_in: skipped in P1 (E_OPERATOR_UNSUPPORTED_P1); operator=changed_only_in, kind=delta.
    - Constraint: `changed_only_in`
+   - Kind: `delta`
    - Severity: `hard`
    - Target: `api_surface`
    - Operator: `changed_only_in`

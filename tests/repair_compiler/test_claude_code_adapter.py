@@ -43,6 +43,7 @@ def test_claude_code_adapter_renders_severity_and_target_verbatim():
     )
 
     assert "Severity: `soft`" in rendered
+    assert "Kind: `delta`" in rendered
     assert "Target: `api_surface_public`" in rendered
 
 

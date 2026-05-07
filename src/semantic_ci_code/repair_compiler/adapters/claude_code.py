@@ -81,6 +81,7 @@ def _render_instruction_section(
             [
                 f"{index}. **{instruction.repair_code}** - {instruction.message}",
                 f"   - Constraint: `{instruction.constraint_id}`",
+                f"   - Kind: `{instruction.kind.value}`",
                 f"   - Severity: `{instruction.severity.value}`",
                 f"   - Target: `{instruction.target}`",
                 f"   - Operator: `{instruction.operator.value}`",

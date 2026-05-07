@@ -14,6 +14,7 @@ from semantic_ci_code.compiler import (
 )
 from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
+from semantic_ci_code.evaluator.operators import CanonicalMapping
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
 
 SCHEMA_VERSION = "5"
@@ -270,17 +271,10 @@ def _json_value(value: Any) -> Any:
 
 
 def _json_canonical_value(value: Any) -> Any:
+    if isinstance(value, CanonicalMapping):
+        return {str(key): _json_canonical_value(item) for key, item in value}
     if isinstance(value, tuple | list):
-        if _looks_like_pairs(value):
-            return {str(key): _json_canonical_value(item) for key, item in value}
         return [_json_canonical_value(item) for item in value]
     if isinstance(value, dict):
         return {key: _json_canonical_value(item) for key, item in value.items()}
     return value
-
-
-def _looks_like_pairs(value: tuple[Any, ...] | list[Any]) -> bool:
-    return bool(value) and all(
-        isinstance(item, tuple | list) and len(item) == 2 and isinstance(item[0], str)
-        for item in value
-    )

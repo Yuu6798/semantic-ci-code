@@ -47,6 +47,14 @@ PURE_OPERATORS: Final = frozenset(
 )
 
 
+class CanonicalMapping(tuple):
+    """Tuple marker for dicts canonicalized by evaluator evidence.
+
+    Plain JSON arrays can legitimately contain two-item string tuples. The
+    marker lets renderers reconstruct only dict-origin records as objects.
+    """
+
+
 @dataclass(frozen=True)
 class OperatorOutcome:
     status: str
@@ -386,9 +394,11 @@ def _matched_pairs(
         for observed_item in observed_items:
             if match_item(expected_item, observed_item):
                 pairs.append(
-                    (
-                        ("expected_item", expected_item),
-                        ("observed_record", observed_item),
+                    CanonicalMapping(
+                        (
+                            ("expected_item", expected_item),
+                            ("observed_record", observed_item),
+                        )
                     )
                 )
     return _sorted_values(frozenset(pairs))
@@ -401,10 +411,12 @@ def _sorted_values(values: frozenset[object] | tuple[object, ...]) -> tuple[obje
 def _canon(value: object) -> object:
     if isinstance(value, BaseModel):
         return _canon(value.model_dump(mode="json"))
+    if isinstance(value, CanonicalMapping):
+        return CanonicalMapping((key, _canon(item)) for key, item in value)
     if isinstance(value, list | tuple):
         return tuple(_canon(item) for item in value)
     if isinstance(value, dict):
-        return tuple((key, _canon(item)) for key, item in sorted(value.items()))
+        return CanonicalMapping((key, _canon(item)) for key, item in sorted(value.items()))
     if isinstance(value, set | frozenset):
         return frozenset(_canon(item) for item in value)
     return value

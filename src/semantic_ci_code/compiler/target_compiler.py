@@ -11,9 +11,12 @@ Constraint order is deterministic and fixed as:
 YAML declaration order. P1 does not support template override or merge; duplicate
 constraint ids across the combined sequence are compile errors.
 
-Target strings are not resolved in CSCI-12. Only the empty string is rejected.
-The evaluator owns the meaning of paths such as ``api_surface`` or
-``api_surface_delta.removed``.
+Target strings are validated against the static CodeState / CodeStateDelta
+schema (see ``compiler.path_schema``) so authoring errors fail at compile
+time rather than mixing with extractor failures via ``unknown_policy``.
+Open ``JsonMapping`` dimensions (``python_specific`` / ``typescript_specific``)
+accept any subpath. Operator semantics, runtime resolution, and unknown-policy
+behavior remain the evaluator's responsibility.
 """
 
 from __future__ import annotations
@@ -25,6 +28,11 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from semantic_ci_code.compiler.path_schema import (
+    is_open_path,
+    suggest_targets,
+    valid_target_paths,
+)
 from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import (
     Constraint,
@@ -235,6 +243,7 @@ def _parse_target_svp(yaml_source: str, *, filename: str) -> TargetSVP:
 
 
 def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None:
+    valid_paths = valid_target_paths()
     for index, constraint in enumerate(target_svp.constraints):
         if constraint.target == "":
             raise CompileError(
@@ -242,6 +251,19 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
                 filename=filename,
                 path=f"constraints[{index}].target",
             )
+        if constraint.target in valid_paths or is_open_path(constraint.target):
+            continue
+        suggestions = suggest_targets(constraint.target)
+        message = (
+            f"constraint target {constraint.target!r} does not exist on CodeState/CodeStateDelta."
+        )
+        if suggestions:
+            message += f" Did you mean: {', '.join(suggestions)}?"
+        raise CompileError(
+            message=message,
+            filename=filename,
+            path=f"constraints[{index}].target",
+        )
 
     if target_svp.api_surface is not None:
         for index, rule in enumerate(target_svp.api_surface.allow_changes):

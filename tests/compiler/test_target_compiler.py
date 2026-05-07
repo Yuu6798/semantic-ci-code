@@ -163,6 +163,93 @@ def test_constraint_unknown_field_raises_compile_error():
     assert exc_info.value.path == "constraints[0].extra_field"
 
 
+def test_unknown_constraint_target_path_raises_compile_error_with_suggestion():
+    yaml_source = """
+intent: typo path
+change:
+  primary_kind: feature
+constraints:
+  - id: typo_path
+    kind: delta
+    target: api_surface.public_symbols
+    operator: superset_of_baseline
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "api_surface.public_symbols" in exc_info.value.message
+    assert "api_surface_public" in exc_info.value.message
+
+
+def test_unknown_target_subfield_raises_compile_error_with_suggestion():
+    yaml_source = """
+intent: typo subfield
+change:
+  primary_kind: feature
+constraints:
+  - id: typo_subfield
+    kind: delta
+    target: test_surface_delta.new_test_cases
+    operator: not_equals
+    expected: []
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "test_surface_delta.new_cases" in exc_info.value.message
+
+
+def test_open_dimension_paths_compile_without_schema_check():
+    yaml_source = """
+intent: open dim ok
+change:
+  primary_kind: feature
+constraints:
+  - id: open_dim
+    kind: delta
+    target: python_specific.module_graph_delta.cycles
+    operator: equals
+    expected: []
+  - id: open_ts
+    kind: delta
+    target: typescript_specific.anything.deep
+    operator: equals
+    expected: []
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    user_targets = [c.target for c in compiled.constraints if c.source.value == "user"]
+    assert "python_specific.module_graph_delta.cycles" in user_targets
+    assert "typescript_specific.anything.deep" in user_targets
+
+
+def test_alias_paths_compile_without_error():
+    yaml_source = """
+intent: aliases ok
+change:
+  primary_kind: feature
+constraints:
+  - id: alias_public
+    kind: delta
+    target: api_surface_public
+    operator: superset_of_baseline
+  - id: alias_removed_public
+    kind: delta
+    target: api_surface_delta.removed_public
+    operator: equals
+    expected: []
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    targets = [c.target for c in compiled.constraints if c.source.value == "user"]
+    assert "api_surface_public" in targets
+    assert "api_surface_delta.removed_public" in targets
+
+
 def test_unknown_operator_raises_compile_error_with_constraint_path():
     yaml_source = """
 intent: bad operator

@@ -31,7 +31,11 @@ requests while remaining deterministic and auditable.
 ## Current Status (snapshot)
 
 - **Phase**: P2.5 完走 — Brief 1〜5 全 merged。`semantic-ci` CLI は `init` / `observe` / `compare` / `check` / `pre-commit` / `compile` / `compile-repair` / `validate-plan` の 8 subcommand を持ち、Vibe Coding Adapter(Claude Code / Cursor / Codex)経由で repair guidance + pre-generation guidance を render 可能
-- **直近 merged**(2026-05-07, Brief 5 / P2.5 完走):
+- **直近 merged**(2026-05-07 Session 4, dogfood-driven hardening):
+  - **PR #58** (compiler/path_schema): compile-time path 検証 + did-you-mean 提案、`docs/code_semantic_ci_design.md §4.5` typo 訂正(`api_surface.public_symbols` → `api_surface_public`、`new_test_cases` → `new_cases`)、constraint kind 別 path domain(state vs delta 非対称)、Codex 3 round 消化
+  - **PR #59** (cli): `check.py` / `pre_commit.py` の `_resolve_package_root` に `is_relative_to` symlink escape ガード(`validate_plan` 既存パターンを 3 surface 対称化)→ **CSCI-35b sweep #3 完了**
+  - **PR #60** (ci): 依存上限ピン × 5(`pydantic<3.0` 等)+ `[tool.coverage.*]` 設定 fail_under=70(branch coverage 73% 実測、~3pp margin)+ `pip-audit --strict .` プロジェクト射程化(env-level CVE 汚染遮断)+ 凍結 dep test 8 ファイル更新
+- **過去 merged**(2026-05-07, Brief 5 / P2.5 完走):
   - **Brief 5 entry** (CSCI-31 / PR #52): Repair Compiler core + Adapter Protocol + registry + Claude Code adapter
   - **CSCI-32** (PR #53): Cursor adapter(`.mdc` frontmatter + body)
   - **CSCI-33** (PR #54): Codex adapter(ASCII-safe plain text + 角括弧 section ラベル)
@@ -43,9 +47,12 @@ requests while remaining deterministic and auditable.
   - **Brief 4d** (CSCI-30 / PR #43): `semantic-ci init` + spec authorship anchoring + hard/soft/info severity routing
   - **Brief 5 planning** (PR #44): `docs/brief_5_planning.md` 起草
 - **次の発行順序**:
-  - **A. CSCI-35b sweep brief**(優先): Brief 5 review で deferred とした (1) `would_violate` の delta-kind 盲点 docs 明記、(2) `compile_target_svp` の YAML round-trip コメント追加、(3) `_resolve_package_root` の symlink escape 防御、(4) Claude Code `Forbidden Zones` / `Required Additions` の human-friendly レンダリング、を 1 PR で消化
+  - **A. CSCI-35b sweep brief**(優先、残 2 件まで縮小): Brief 5 review で deferred とした (1) ~~`would_violate` の delta-kind 盲点 docs 明記~~(`docs/cli_usage.md:348-353` で既に明記済と確認、撤回)、(2) `compile_target_svp` の YAML round-trip コメント追加、(3) ~~`_resolve_package_root` の symlink escape 防御~~(**PR #59 で完了**)、(4) Claude Code `Forbidden Zones` / `Required Additions` の human-friendly レンダリング、を 1 PR で消化(残 (2) + (4))
+  - **A'. target.yaml authoring guide 新規**(`docs/target_yaml_guide.md`): 2026-05-07 Session 4 dogfood で発見した hazard 群を集約 — D1: `--package-root` scope 制約、D3: template と user constraint の重複、D4: config-only PR の vacuous PASS。半日〜1 日。CSCI-35b と並列 or 同梱可
   - **B. Brief 7 (SSP v0.1)**: Semantic Security Protocol。Brief 5 完了済 → CSCI-36〜40 として発行可能。planning は `docs/brief_7_planning.md` で merged 済み
   - **C. P2 残課題の brief 化**: Lock violation 即 fail(§8.2)/ Performance budget per-extractor timeout(§18)/ Hash trail per-extractor version(§10)
+  - **D. extractor exclude 機構**(2026-05-07 Session 4 dogfood D2): `tests/fixtures/pipeline/syntax_error/bad.py` のような意図的に壊れた fixture が `--package-root .` で extractor を crash させる、`pyproject.toml` に exclude pattern を持つ仕組みが未実装。半日〜1 日、別 brief
+  - **E. ResultStatus 概念モデル更新**(弱点 ③): `UNKNOWN` を authoring error と extractor failure に分離。波及範囲は evaluator / risk_summary / adapter / cli 出力 / json schema / SARIF / GH Actions、設計議論必要、1〜2 日
 - **Brief 6 凍結**: TypeScript extractor は P3 以降に後倒し(2026-05-06 Session 2 で確定、§12 P3b 参照)。費用対効果を再評価してから解凍判断
 - **Brief 8+ deferred**: spec quality metrics(§19)/ suite packaging(§20)/ override 機構(Brief 3 #3)/ Round-trip log(§10.3 / Brief 3 #10)/ orchestrator 観測応用 / Brief 6 解凍判断
 

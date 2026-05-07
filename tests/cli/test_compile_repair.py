@@ -219,6 +219,47 @@ def test_compile_repair_null_repair_plan_exits_two():
     assert "null repair_plan" in result.stderr
 
 
+def test_compile_repair_warns_when_verdict_envelope_schema_version_unexpected():
+    envelope = verdict_envelope()
+    envelope["schema_version"] = "99"
+    result = run_cli(
+        "compile-repair",
+        "--adapter",
+        "claude-code",
+        input_text=dump_json(envelope),
+    )
+
+    assert result.returncode == 0
+    assert "schema_version='99'" in result.stderr
+    assert "expected '4'" in result.stderr
+
+
+def test_compile_repair_no_warning_when_verdict_envelope_schema_version_matches():
+    result = run_cli(
+        "compile-repair",
+        "--adapter",
+        "claude-code",
+        input_text=dump_json(verdict_envelope()),
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+
+
+def test_compile_repair_no_warning_when_schema_version_absent():
+    envelope = verdict_envelope()
+    del envelope["schema_version"]
+    result = run_cli(
+        "compile-repair",
+        "--adapter",
+        "claude-code",
+        input_text=dump_json(envelope),
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+
+
 def test_compile_repair_unknown_adapter_is_argparse_usage_error():
     result = run_cli("compile-repair", "--adapter", "zzz", input_text=dump_json(repair_plan_dict()))
 

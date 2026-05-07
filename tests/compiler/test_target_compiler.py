@@ -267,6 +267,26 @@ constraints:
     assert "typescript_specific.anything.deep" in user_targets
 
 
+def test_repair_kind_constraint_skips_path_schema_check():
+    yaml_source = """
+intent: repair-kind constraints are skipped at evaluate
+change:
+  primary_kind: feature
+constraints:
+  - id: repair_placeholder
+    kind: repair
+    target: repair
+    operator: equals
+    expected: 0
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    user_constraints = [c for c in compiled.constraints if c.source.value == "user"]
+    assert len(user_constraints) == 1
+    assert user_constraints[0].id == "repair_placeholder"
+    assert user_constraints[0].target == "repair"
+
+
 def test_alias_paths_compile_without_error():
     yaml_source = """
 intent: aliases ok

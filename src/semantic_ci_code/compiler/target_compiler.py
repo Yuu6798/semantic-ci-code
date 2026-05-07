@@ -251,6 +251,14 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
                 filename=filename,
                 path=f"constraints[{index}].target",
             )
+        # Repair-kind constraints are SKIPPED unconditionally by the evaluator
+        # in P1 (E_REPAIR_KIND_UNSUPPORTED_P1), so their target field does not
+        # reference a CodeState path. Schema validation is deferred until the
+        # repair-kind contract is defined in a later phase. Pydantic stores
+        # the kind discriminator as a plain string, so compare via the enum
+        # value rather than identity.
+        if constraint.kind == ConstraintKind.REPAIR:
+            continue
         if constraint.target in valid_paths or is_open_path(constraint.target):
             continue
         suggestions = suggest_targets(constraint.target)

@@ -1,0 +1,58 @@
+[INTENT]
+Add profile endpoint
+
+[CURRENT VERDICT]
+result: fail
+fix_required: 1
+suggested: 1
+info: 1
+unresolved: 1
+
+[FIX REQUIRED]
+1. R_USER_VIOLATION - User constraint hard_api violated: operator=equals, target=api_surface_public.
+  constraint: hard_api
+  kind: delta
+  severity: hard
+  target: api_surface_public
+  operator: equals
+  status: violated
+  error_code: E_VIOLATION
+  observed: ["removed"]
+  expected: []
+  hint: address the constraint or update target.yaml if intent changed.
+
+[SUGGESTED]
+1. R_USER_VIOLATION - User constraint soft_effect violated: operator=equals, target=effect_changes.added.
+  constraint: soft_effect
+  kind: delta
+  severity: soft
+  target: effect_changes.added
+  operator: equals
+  status: violated
+  error_code: E_VIOLATION
+  hint: address the constraint or update target.yaml if intent changed.
+
+[INFO]
+1. R_USER_VIOLATION - User constraint info_imports violated: operator=equals, target=imports_delta.added.
+  constraint: info_imports
+  kind: delta
+  severity: info
+  target: imports_delta.added
+  operator: equals
+  status: violated
+  error_code: E_VIOLATION
+  hint: address the constraint or update target.yaml if intent changed.
+
+[UNRESOLVED]
+1. R_UNSUPPORTED_OPERATOR - changed_only_in: skipped in P1 (E_OPERATOR_UNSUPPORTED_P1); operator=changed_only_in, kind=delta.
+  constraint: changed_only_in
+  kind: delta
+  severity: hard
+  target: api_surface
+  operator: changed_only_in
+  status: skipped
+  error_code: E_OPERATOR_UNSUPPORTED_P1
+  hint: address the constraint or update target.yaml if intent changed.
+
+[HINTS]
+Use instruction-specific hints first; revise target.yaml only when the declared intent changed.

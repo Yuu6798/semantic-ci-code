@@ -1,0 +1,26 @@
+[INTENT]
+Add profile endpoint
+
+[PRIMARY KIND]
+feature
+
+[ALLOWED SECONDARY KINDS]
+test_update
+
+[GENERATION METADATA]
+(none)
+
+[TARGET CONSTRAINTS]
+(none)
+
+[RISK AREAS]
+(none)
+
+[FORBIDDEN ZONES]
+(none)
+
+[REQUIRED ADDITIONS]
+(none)
+
+[TEMPLATE IMPLICATIONS]
+(none)

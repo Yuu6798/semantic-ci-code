@@ -1,0 +1,24 @@
+[INTENT]
+(none)
+
+[CURRENT VERDICT]
+result: pass
+fix_required: 0
+suggested: 0
+info: 0
+unresolved: 0
+
+[FIX REQUIRED]
+(none)
+
+[SUGGESTED]
+(none)
+
+[INFO]
+(none)
+
+[UNRESOLVED]
+(none)
+
+[HINTS]
+Use instruction-specific hints first; revise target.yaml only when the declared intent changed.

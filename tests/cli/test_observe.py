@@ -217,6 +217,6 @@ def test_project_dependencies_are_unchanged():
     text = Path("pyproject.toml").read_text(encoding="utf-8")
     dependencies_block = text.split("dependencies = [", 1)[1].split("]", 1)[0]
 
-    assert '"pydantic>=2.0"' in dependencies_block
-    assert '"PyYAML>=6.0"' in dependencies_block
+    assert '"pydantic>=2.0,<3.0"' in dependencies_block
+    assert '"PyYAML>=6.0,<7.0"' in dependencies_block
     assert len([line for line in dependencies_block.splitlines() if line.strip()]) == 2

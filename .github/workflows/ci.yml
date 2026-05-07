@@ -35,4 +35,10 @@ jobs:
         run: pytest -q --cov=src/semantic_ci_code --cov-report=term
 
       - name: Security audit
-        run: pip-audit
+        # Audit the project's declared dependencies only (pip-audit resolves
+        # pyproject.toml in an isolated env), not the runner's active Python
+        # environment. The runner image's bundled tooling (pip, setuptools,
+        # wheel, etc.) varies by Python version and image refresh date and is
+        # outside this repo's responsibility, so a bare ``pip-audit`` would
+        # fail on host-system CVEs unrelated to our deps.
+        run: pip-audit --strict .

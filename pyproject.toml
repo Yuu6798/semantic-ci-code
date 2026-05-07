@@ -11,15 +11,17 @@ requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "Yuu6798"}]
 dependencies = [
-    "pydantic>=2.0",
-    "PyYAML>=6.0",
+    "pydantic>=2.0,<3.0",
+    "PyYAML>=6.0,<7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "jsonschema>=4.0",
-    "pytest>=7.0",
-    "ruff>=0.4",
+    "jsonschema>=4.0,<5.0",
+    "pip-audit>=2.7,<3.0",
+    "pytest>=7.0,<10.0",
+    "pytest-cov>=4.0,<8.0",
+    "ruff>=0.4,<1.0",
 ]
 
 [project.scripts]
@@ -37,6 +39,23 @@ namespaces = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src/semantic_ci_code"]
+branch = true
+
+[tool.coverage.report]
+# Current measured coverage is ~75%; fail_under is set 5pp below that to
+# gate against significant regressions while leaving room for normal
+# fluctuation. Raise the floor as coverage improves rather than letting
+# the gate erode silently.
+fail_under = 70
+show_missing = true
+skip_covered = false
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
 
 [tool.ruff]
 line-length = 100

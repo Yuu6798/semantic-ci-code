@@ -32,4 +32,7 @@ jobs:
         run: ruff format --check .
 
       - name: Test
-        run: pytest -q
+        run: pytest -q --cov=src/semantic_ci_code --cov-report=term
+
+      - name: Security audit
+        run: pip-audit

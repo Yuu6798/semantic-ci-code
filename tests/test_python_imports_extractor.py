@@ -324,6 +324,6 @@ def test_project_dependencies_are_unchanged():
     pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
     assert pyproject["project"]["dependencies"] == [
-        "pydantic>=2.0",
-        "PyYAML>=6.0",
+        "pydantic>=2.0,<3.0",
+        "PyYAML>=6.0,<7.0",
     ]

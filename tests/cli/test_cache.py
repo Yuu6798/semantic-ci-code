@@ -687,7 +687,7 @@ def test_eviction_unlink_error_is_warning_not_exception(tmp_path: Path, monkeypa
 def test_project_dependencies_are_unchanged():
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["dependencies"] == ["pydantic>=2.0", "PyYAML>=6.0"]
+    assert pyproject["project"]["dependencies"] == ["pydantic>=2.0,<3.0", "PyYAML>=6.0,<7.0"]
 
 
 def _extractor_bomb_env(tmp_path: Path) -> dict[str, str]:

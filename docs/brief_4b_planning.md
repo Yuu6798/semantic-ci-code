@@ -1,5 +1,13 @@
 # Brief 4b Planning — CI integration outputs (SARIF + GH Actions + pre-commit manifest)
 
+> **STATUS: Brief 4b complete (2026-05-05).**
+> CSCI-28 (PR #40) として merged。`semantic-ci compare` / `check` / `pre-commit` で
+> `--format sarif` / `--format gh-actions` が動作し、`.pre-commit-hooks.yaml` manifest
+> もリポジトリ同梱(`semantic-ci` / `semantic-ci-smoke` 2 hook)。Brief 4 Open
+> Questions Q9 / Q10 / Q11 は全て resolved。本文書は Brief 5 / Brief 7 起草時の
+> reference として retain する。後続の dogfooding 結果や hardening は
+> `dogfooding_TC10_report.md` と `.claude/memory/2026-05-07.md` を参照。
+
 > Brief 4 (CSCI-15〜19) で確立した `semantic-ci` CLI 5 subcommand の上に、
 > CI integration 向けの 3 つの追加出力経路を 1 PR で完結させる薄い follow-up brief。
 > Brief 4b 完了で `semantic-ci` は GitHub Actions / pre-commit framework / SARIF

@@ -42,6 +42,20 @@ def test_required_additions_flattens_includes_expected_values():
     ]
 
 
+def test_required_additions_keeps_includes_any_as_alternative_group():
+    summary = compute_risk_summary(includes_any_target(), baseline_state())
+
+    assert summary["required_additions"] == [
+        {
+            "constraint_id": "require_one_entrypoint",
+            "source": "user",
+            "target": "api_surface",
+            "operator": "includes_any",
+            "expected_any_of": ["pkg.profile", "pkg.account"],
+        }
+    ]
+
+
 def test_template_implications_report_template_constraint_ids_in_order():
     summary = compute_risk_summary(risk_target(), baseline_state())
 
@@ -96,5 +110,23 @@ constraints:
     operator: includes_all
     expected:
       - pkg.profile
+"""
+    )
+
+
+def includes_any_target():
+    return parse_target_svp_yaml(
+        """
+intent: validate alternative entrypoint plan
+change:
+  primary_kind: feature
+constraints:
+  - id: require_one_entrypoint
+    kind: state
+    target: api_surface
+    operator: includes_any
+    expected:
+      - pkg.profile
+      - pkg.account
 """
     )

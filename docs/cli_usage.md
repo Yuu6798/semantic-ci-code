@@ -338,7 +338,10 @@ falls back to an empty `CodeState` so plan validation can still render.
 
 `validate-plan` computes a deterministic `risk_summary` with four lists:
 `would_violate`, `forbidden_zones`, `required_additions`, and
-`template_implications`. `--format text` writes adapter text directly.
+`template_implications`. For `required_additions`, `includes_all` constraints
+emit one required item per expected value, while `includes_any` constraints emit
+one `expected_any_of` alternatives group so adapters do not imply that every
+alternative must be added. `--format text` writes adapter text directly.
 `--format json` wraps it in an independent validate-plan envelope with
 `schema_version="1"`.
 

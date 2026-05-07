@@ -87,16 +87,29 @@ def _forbidden_zones(constraints: tuple[CompiledConstraint, ...]) -> list[JsonVa
 def _required_additions(constraints: tuple[CompiledConstraint, ...]) -> list[JsonValue]:
     required: list[JsonValue] = []
     for constraint in constraints:
-        if constraint.operator not in _REQUIRED_ADDITION_OPERATORS:
+        if constraint.operator is Operator.INCLUDES_ALL:
+            for expected in _expected_items(constraint.expected):
+                required.append(
+                    {
+                        "constraint_id": constraint.id,
+                        "source": constraint.source.value,
+                        "target": constraint.target,
+                        "operator": constraint.operator.value,
+                        "expected": _jsonable(expected),
+                    }
+                )
             continue
-        for expected in _expected_items(constraint.expected):
+
+        if constraint.operator is Operator.INCLUDES_ANY:
             required.append(
                 {
                     "constraint_id": constraint.id,
                     "source": constraint.source.value,
                     "target": constraint.target,
                     "operator": constraint.operator.value,
-                    "expected": _jsonable(expected),
+                    "expected_any_of": [
+                        _jsonable(item) for item in _expected_items(constraint.expected)
+                    ],
                 }
             )
     return required

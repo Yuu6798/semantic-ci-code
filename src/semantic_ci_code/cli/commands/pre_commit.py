@@ -219,7 +219,10 @@ def _package_root_relative(raw_path: str) -> Path:
 
 
 def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Path:
-    path = (tree_root / package_root).resolve()
+    resolved_tree_root = tree_root.resolve()
+    path = (resolved_tree_root / package_root).resolve()
+    if not path.is_relative_to(resolved_tree_root):
+        raise ValueError(f"{label} package_root escapes tree: {path}")
     if not path.exists():
         raise ValueError(f"{label} package_root does not exist: {path}")
     if not path.is_dir():

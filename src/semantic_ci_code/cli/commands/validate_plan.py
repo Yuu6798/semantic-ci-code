@@ -5,6 +5,9 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Any
 
+import yaml
+from pydantic import ValidationError
+
 from semantic_ci_code.cli.command_support import (
     engine_error,
     internal_bug,
@@ -23,7 +26,7 @@ from semantic_ci_code.cli.target_loader import TargetUsageError, discover_target
 from semantic_ci_code.cli.worktree import materialize_ref
 from semantic_ci_code.compiler import CompileError
 from semantic_ci_code.domain.state_schema import CodeState
-from semantic_ci_code.framework.target_svp import parse_target_svp_yaml
+from semantic_ci_code.framework.target_svp import TargetSVP, parse_target_svp_yaml
 from semantic_ci_code.pipeline import ExtractorError, extract_python_code_state
 from semantic_ci_code.repair_compiler import RepairCompiler, get_adapter
 from semantic_ci_code.repair_compiler.adapters import register_builtin_adapters
@@ -41,7 +44,7 @@ def run_validate_plan(args: Namespace) -> int:
     try:
         register_builtin_adapters()
         target_path = discover_target(args.target, cwd=Path.cwd())
-        target = parse_target_svp_yaml(target_path)
+        target = _load_target(target_path)
         baseline = _load_baseline_state(args)
         risk_summary = compute_risk_summary(target, baseline)
         adapter = _adapter(args.adapter)
@@ -56,7 +59,7 @@ def run_validate_plan(args: Namespace) -> int:
             else compiled.rendered
         )
         return write_output(output, args.output)
-    except (TargetUsageError, ValidatePlanUsageError, ValueError, OSError, CompileError) as exc:
+    except (TargetUsageError, ValidatePlanUsageError, OSError, CompileError) as exc:
         return usage_error(exc)
     except ExtractorError as exc:
         return engine_error(exc, args, prefix="extractor failed", show_traceback=True)
@@ -66,6 +69,13 @@ def run_validate_plan(args: Namespace) -> int:
         return usage_error(exc)
     except Exception as exc:
         return internal_bug(exc, args)
+
+
+def _load_target(path: Path) -> TargetSVP:
+    try:
+        return parse_target_svp_yaml(path)
+    except (ValueError, ValidationError, yaml.YAMLError) as exc:
+        raise ValidatePlanUsageError(f"invalid target: {exc}") from exc
 
 
 def _load_baseline_state(args: Namespace) -> CodeState:
@@ -117,7 +127,10 @@ def _package_root_relative(raw_path: str) -> Path:
 
 
 def _resolve_package_root(root: Path, package_root: Path) -> Path:
+    root = root.resolve()
     path = (root / package_root).resolve()
+    if not path.is_relative_to(root):
+        raise ValidatePlanUsageError(f"package_root escapes baseline: {path}")
     if not path.exists():
         raise ValidatePlanUsageError(f"baseline package_root does not exist: {path}")
     if not path.is_dir():

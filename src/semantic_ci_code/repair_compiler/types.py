@@ -14,6 +14,7 @@ RISK_SUMMARY_KEYS = (
     "required_additions",
     "template_implications",
 )
+RiskSummary = dict[str, list[JsonValue]]
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,7 @@ class CompiledPreGen:
     output_format: str
     rendered: str
     metadata: dict[str, JsonValue]
-    risk_summary: dict[str, JsonValue]
+    risk_summary: RiskSummary
 
     def __hash__(self) -> int:
         return hash(
@@ -65,10 +66,16 @@ class Adapter(Protocol):
 
     def render_repair(self, plan: RepairPlan, target: TargetSVP | None) -> str: ...
 
-    def render_pre_gen(self, target: TargetSVP, baseline_state: CodeState) -> str: ...
+    def render_pre_gen(
+        self,
+        target: TargetSVP,
+        baseline_state: CodeState,
+        *,
+        risk_summary: RiskSummary | None = None,
+    ) -> str: ...
 
 
-def empty_risk_summary() -> dict[str, JsonValue]:
+def empty_risk_summary() -> RiskSummary:
     return {key: [] for key in RISK_SUMMARY_KEYS}
 
 

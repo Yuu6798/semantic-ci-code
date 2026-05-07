@@ -342,6 +342,13 @@ falls back to an empty `CodeState` so plan validation can still render.
 `--format json` wraps it in an independent validate-plan envelope with
 `schema_version="1"`.
 
+`would_violate` is computed by re-evaluating user constraints against the
+baseline state as both baseline and candidate. State-kind constraints surface
+naturally, for example an `includes_all` requirement whose item is absent from
+baseline. Delta-kind constraints cannot violate under a self-comparison and are
+not reported in `would_violate`; inspect `forbidden_zones` and
+`required_additions` for their structural intent.
+
 Examples:
 
 ```bash

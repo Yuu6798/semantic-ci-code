@@ -73,6 +73,16 @@ def test_claude_code_pre_gen_renders_computed_risk_summary():
     assert compiled.risk_summary == pre_gen_risk_summary()
 
 
+def test_claude_code_adapter_accepts_explicit_risk_summary_without_compiler_context():
+    rendered = ClaudeCodeAdapter().render_pre_gen(
+        pre_gen_risk_target(),
+        CodeState(),
+        risk_summary=pre_gen_risk_summary(),
+    )
+
+    assert '"require_missing_api"' in rendered
+
+
 def test_claude_code_pre_gen_renders_generation_metadata_when_present():
     rendered = (
         RepairCompiler(ClaudeCodeAdapter())

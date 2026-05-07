@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
 from typing import Any
 
 from pydantic import BaseModel
@@ -18,13 +15,10 @@ from semantic_ci_code.domain.state_schema import CodeState, JsonValue
 from semantic_ci_code.evaluator import ResultStatus, evaluate_constraints
 from semantic_ci_code.framework.constraint_types import Operator
 from semantic_ci_code.framework.target_svp import TargetSVP, target_svp_to_yaml
-from semantic_ci_code.repair_compiler.types import RISK_SUMMARY_KEYS, empty_risk_summary
-
-RiskSummary = dict[str, list[JsonValue]]
-
-_CURRENT_RISK_SUMMARY: ContextVar[RiskSummary | None] = ContextVar(
-    "semantic_ci_repair_compiler_risk_summary",
-    default=None,
+from semantic_ci_code.repair_compiler.types import (
+    RISK_SUMMARY_KEYS,
+    RiskSummary,
+    empty_risk_summary,
 )
 
 _FORBIDDEN_ZONE_OPERATORS = frozenset(
@@ -42,6 +36,8 @@ _REQUIRED_ADDITION_OPERATORS = frozenset({Operator.INCLUDES_ALL, Operator.INCLUD
 def compute_risk_summary(target: TargetSVP, baseline_state: CodeState) -> RiskSummary:
     """Compute deterministic pre-generation risk summary projections."""
 
+    # compile_target_svp currently accepts YAML text only. Round-trip TargetSVP
+    # through YAML to reuse the established compiler without changing engine API.
     compiled = compile_target_svp(target_svp_to_yaml(target), filename="<target_svp>")
     return {
         "would_violate": _would_violate(compiled, baseline_state),
@@ -49,22 +45,6 @@ def compute_risk_summary(target: TargetSVP, baseline_state: CodeState) -> RiskSu
         "required_additions": _required_additions(compiled.constraints),
         "template_implications": _template_implications(compiled.constraints),
     }
-
-
-def current_risk_summary() -> RiskSummary:
-    summary = _CURRENT_RISK_SUMMARY.get()
-    if summary is None:
-        return empty_risk_summary()
-    return {key: list(summary.get(key, ())) for key in RISK_SUMMARY_KEYS}
-
-
-@contextmanager
-def risk_summary_context(summary: RiskSummary) -> Iterator[None]:
-    token = _CURRENT_RISK_SUMMARY.set(normalize_risk_summary(summary))
-    try:
-        yield
-    finally:
-        _CURRENT_RISK_SUMMARY.reset(token)
 
 
 def normalize_risk_summary(summary: dict[str, Any] | None) -> RiskSummary:

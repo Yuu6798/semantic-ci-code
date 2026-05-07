@@ -345,10 +345,13 @@ repos:
 
 ## 13. 残課題 (Brief 4b 完了後)
 
-- **Brief 4c (effects extractor `fqn` semantics 修正)** — Brief 4b と並列発行可、独立 PR
-- **Brief 4d (`init` + spec authorship + soft/info constraint kind)** — Brief 4b/4c と並列発行可、独立 PR
-- **Brief 5 planning** — Vibe Coding Adapter + Repair Compiler、Brief 4b/c/d 完了後に着手
-- ~~**Brief 6 (TypeScript)** — Brief 5 と並列発行 (§22 設計通り)~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。Brief 5 完了後の次は **Brief 7 (SSP v0.1)** の直列発行
+> **Status (2026-05-07 時点)**: 本表の queue は概ね消化済。最新の発行順序は
+> `CLAUDE.md` 次の発行順序を一次資料として参照。
+
+- ✅ **Brief 4c (effects extractor `fqn` semantics 修正)** — CSCI-29 / PR #42 で完了 (2026-05-05)
+- ✅ **Brief 4d (`init` + spec authorship + soft/info constraint kind)** — CSCI-30 / PR #43 で完了 (2026-05-05)
+- ✅ **Brief 5 planning** — `docs/brief_5_planning.md` を PR #44 で merge → CSCI-31〜35 全 merged で Brief 5 完走 (2026-05-07)
+- ~~**Brief 6 (TypeScript)** — Brief 5 と並列発行 (§22 設計通り)~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。Brief 5 完走済 → 次は **Brief 7 (SSP v0.1)** の直列発行
 
 ## 14. Task Brief (CSCI-28、AGENTS.md format)
 

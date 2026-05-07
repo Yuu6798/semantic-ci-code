@@ -3,6 +3,10 @@
 **Intent**: Add profile endpoint
 **Primary kind**: feature
 **Allowed secondary kinds**: test_update
+**Generation metadata**: (none)
+
+## Target Constraints
+(none)
 
 ## Risk Areas
 (none)

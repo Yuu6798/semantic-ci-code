@@ -60,8 +60,10 @@ class ClaudeCodeAdapter:
             f"**Intent**: {target.intent}",
             f"**Primary kind**: {target.change.primary_kind.value}",
             f"**Allowed secondary kinds**: {allowed_secondary}",
+            f"**Generation metadata**: {_format_generation_metadata(target)}",
             "",
         ]
+        lines.extend(_render_target_constraints(target))
         risk_summary = empty_risk_summary()
         for key in RISK_SUMMARY_KEYS:
             lines.extend(_render_risk_section(_RISK_SECTION_TITLES[key], risk_summary[key]))
@@ -114,11 +116,48 @@ def _render_optional_evidence(instruction: RepairInstruction) -> list[str]:
     return lines
 
 
+def _render_target_constraints(target: TargetSVP) -> list[str]:
+    lines = ["## Target Constraints"]
+    if not target.constraints:
+        return [*lines, "(none)", ""]
+
+    for index, constraint in enumerate(target.constraints, start=1):
+        lines.extend(
+            [
+                f"{index}. `{constraint.id}`",
+                f"   - Kind: `{_enum_value(constraint.kind)}`",
+                f"   - Target: `{constraint.target}`",
+                f"   - Operator: `{_enum_value(constraint.operator)}`",
+                f"   - Expected: {_format_value(constraint.expected)}",
+                f"   - Severity: `{_enum_value(constraint.severity)}`",
+                f"   - Unknown policy: `{_enum_value(constraint.unknown_policy)}`",
+            ]
+        )
+        if constraint.tolerance is not None:
+            lines.append(f"   - Tolerance: {_format_value(constraint.tolerance)}")
+        if constraint.evidence_required:
+            lines.append("   - Evidence required: true")
+        if constraint.scope is not None:
+            lines.append(f"   - Scope: {_format_value(constraint.scope)}")
+    lines.append("")
+    return lines
+
+
 def _render_risk_section(title: str, values: list[JsonValue]) -> list[str]:
     lines = [f"## {title}"]
     if not values:
         return [*lines, "(none)", ""]
     return [*lines, *(f"- {_format_value(value)}" for value in values), ""]
+
+
+def _format_generation_metadata(target: TargetSVP) -> str:
+    if target.authorship is None or target.authorship.generation_metadata is None:
+        return "(none)"
+    return _format_value(target.authorship.generation_metadata)
+
+
+def _enum_value(value: object) -> object:
+    return value.value if hasattr(value, "value") else value
 
 
 def _format_value(value: JsonValue) -> str:

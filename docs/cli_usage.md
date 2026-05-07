@@ -107,7 +107,7 @@ Match Schema registry:
 | Target | Required key | Optional keys | Forbidden keys |
 |---|---|---|---|
 | `api_surface`, `api_surface_public` | `fqn` | `kind`, `visibility` | `signature` |
-| `api_surface_delta.added`, `.removed` | `fqn` | `kind`, `visibility` | `signature` |
+| `api_surface_delta.added`, `.removed`, `.removed_public` | `fqn` | `kind`, `visibility` | `signature` |
 | `api_surface_delta.changed` | `fqn` | `kind` | `signature`, `visibility`, `before`, `after` |
 | `effects` | `fqn` | `effect_class` | `confidence`, `evidence` |
 | `effect_changes.added`, `.removed` | `fqn` | `effect_class` | `confidence`, `evidence` |

@@ -20,12 +20,17 @@ from semantic_ci_code.framework.constraint_types import (
 )
 
 
-def _api(fqn: str, *, signature: str = "def f(): ...") -> APISurfaceEntry:
+def _api(
+    fqn: str,
+    *,
+    signature: str = "def f(): ...",
+    visibility: str = "public",
+) -> APISurfaceEntry:
     return APISurfaceEntry(
         fqn=fqn,
         kind="function",
         signature=signature,
-        visibility="public",
+        visibility=visibility,
     )
 
 
@@ -178,6 +183,54 @@ def test_flat_projection_alias_resolves_string_set_without_record_matching():
     )
 
     assert verdict.results[0].status is ResultStatus.SATISFIED
+
+
+def test_removed_public_alias_matches_public_removed_api_records():
+    verdict = evaluate_constraints(
+        CompiledTarget(
+            intent="removed public partial match",
+            primary_kind=ChangeKind.REFACTOR,
+            allowed_secondary_kinds=(),
+            scope=(),
+            constraints=(
+                CompiledConstraint(
+                    id="removed_public",
+                    kind=ConstraintKind.DELTA,
+                    target="api_surface_delta.removed_public",
+                    operator=Operator.INCLUDES_ALL,
+                    expected=({"fqn": "pkg.public_removed"},),
+                    severity=Severity.HARD,
+                    unknown_policy=UnknownPolicy.FAIL,
+                    tolerance=None,
+                    evidence_required=False,
+                    scope=None,
+                    source=ConstraintSource.USER,
+                ),
+            ),
+        ),
+        CodeStateDelta(
+            api_surface_delta=SymbolDelta(
+                removed=(
+                    _api("pkg.public_removed", visibility="public"),
+                    _api("pkg.private_removed", visibility="private"),
+                )
+            )
+        ),
+        baseline=CodeState(),
+        candidate=CodeState(),
+    )
+
+    result = verdict.results[0]
+
+    assert result.status is ResultStatus.SATISFIED
+    assert dict(result.evidence)["observed"] == (
+        (
+            ("fqn", "pkg.public_removed"),
+            ("kind", "function"),
+            ("signature", "def f(): ..."),
+            ("visibility", "public"),
+        ),
+    )
 
 
 def test_flat_projection_aliases_are_limited_to_registered_paths():

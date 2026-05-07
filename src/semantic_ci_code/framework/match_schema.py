@@ -86,6 +86,7 @@ _SCHEMAS: dict[str, MatchSchema] = {
     "api_surface_public": _API_SCHEMA,
     "api_surface_delta.added": _API_SCHEMA,
     "api_surface_delta.removed": _API_SCHEMA,
+    "api_surface_delta.removed_public": _API_SCHEMA,
     "api_surface_delta.changed": _API_CHANGED_SCHEMA,
     "effects": _EFFECT_SCHEMA,
     "effect_changes.added": _EFFECT_SCHEMA,

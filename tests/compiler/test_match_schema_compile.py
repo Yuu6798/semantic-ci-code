@@ -35,6 +35,15 @@ def test_bare_string_desugars_to_required_key_record_for_dict_collection_target(
     assert constraint.expected == ({"fqn": "myapi.foo"},)
 
 
+def test_removed_public_alias_uses_api_match_schema():
+    constraint = _compile_constraint(
+        target="api_surface_delta.removed_public",
+        expected='      - "myapi.public_removed"',
+    )
+
+    assert constraint.expected == ({"fqn": "myapi.public_removed"},)
+
+
 def test_bare_string_is_not_desugared_for_flat_projection_target():
     constraint = _compile_constraint(
         target="api_surface_delta.added.fqns",

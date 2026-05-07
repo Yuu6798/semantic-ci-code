@@ -1,12 +1,20 @@
 # Brief 5 Planning — Repair Compiler + Vibe Coding Adapters (P2.5 Entry)
 
+> **Status: Brief 5 完走(2026-05-07)。** CSCI-31〜35 全 PR が merge され、`compile-repair` /
+> `validate-plan` 2 subcommand + Claude Code / Cursor / Codex 3 adapter が release 可能
+> 状態。`risk_summary` 4 要素(`would_violate` / `forbidden_zones` /
+> `required_additions` / `template_implications`)が deterministic に計算され、Adapter
+> Protocol は明示引数経由(CSCI-35 で ContextVar 案を撤回し `risk_summary` を
+> `render_pre_gen` の named arg に追加)で risk_summary を受ける。Brief 5 完了に伴い
+> semantic-ci は「PR review tool」から「**AI 生成ループの一部として動作する gate +
+> feedback layer**」に昇格。Brief 7(SSP v0.1)と CSCI-35b sweep brief が次の発行候補。
+> 本文書は Brief 7 / 関連 brief 起草時の参照として保存する。
+>
 > Brief 1〜4d で確立した P1 MVP(`semantic-ci` CLI 5 subcommand + SARIF/GH Actions/
 > pre-commit manifest + effects fqn schema 適合 + `init` + authorship + soft/info
 > severity)の上に、**Repair SVP を generator-specific prompt/instruction に変換する
 > 層**(`design.md §9.3 / §21.4`)と **vibe coding ツール統合 adapter 群**
-> (`design.md §21.3`)を追加する **P2.5 entry** brief。本 brief 完了で semantic-ci は
-> 「PR review tool」 から「**AI 生成ループの一部として動作する gate + feedback layer**」
-> に昇格する。
+> (`design.md §21.3`)を追加した **P2.5 entry** brief。
 
 ## 位置付け
 
@@ -438,17 +446,17 @@ hint。`metadata` schema は planning §5.3 を拡張。
 - verdict envelope(`compare`/`check`/`pre-commit`)— **影響なし**
 - compile envelope(`compile`)— **影響なし**
 
-## 10. CSCI 分割案(5 PR)
+## 10. CSCI 分割案(5 PR — 全 merged)
 
-| CSCI | スコープ | LoC 想定 | 依存 |
-|---|---|---|---|
-| **CSCI-31** | Repair Compiler core + Adapter Protocol + registry + 1 reference adapter(Claude Code) | ~600 | Brief 4d |
-| **CSCI-32** | Cursor adapter | ~200 | CSCI-31 |
-| **CSCI-33** | Codex adapter | ~200 | CSCI-31 |
-| **CSCI-34** | `compile-repair` subcommand + JSON envelope + pipe 連携 | ~300 | CSCI-31〜33 |
-| **CSCI-35** | `validate-plan` subcommand + risk_summary 計算 + 全 adapter で pre_gen render | ~400 | CSCI-31〜33 |
+| CSCI | スコープ | 状態 |
+|---|---|---|
+| **CSCI-31** | Repair Compiler core + Adapter Protocol + registry + 1 reference adapter(Claude Code) | ✅ merged (PR #52) |
+| **CSCI-32** | Cursor adapter | ✅ merged (PR #53) |
+| **CSCI-33** | Codex adapter | ✅ merged (PR #54) |
+| **CSCI-34** | `compile-repair` subcommand + JSON envelope + pipe 連携 | ✅ merged (PR #55) |
+| **CSCI-35** | `validate-plan` subcommand + risk_summary 計算 + 全 adapter で pre_gen render | ✅ merged (PR #56) |
 
-合計 ~1,700 LoC、tests 込み。Brief 3(CSCI-10〜14)/ Brief 4(CSCI-15〜19)と同規模。
+合計 ~1,700 LoC、tests 込み(2026-05-07 merge 完了時点で 793 passed)。Brief 3(CSCI-10〜14)/ Brief 4(CSCI-15〜19)と同規模。
 
 CSCI-32 / 33 は CSCI-31 完了後に **並列発行可**。CSCI-34 / 35 は 3 adapter 揃った後。
 
@@ -547,6 +555,11 @@ frontmatter dump、本文は string concat で OK。
 
 ## 14. 残課題 (Brief 5 完了後)
 
+- **CSCI-35b sweep brief**(優先): Brief 5 review で deferred とした技術的負債をまとめて 1 PR で消化:
+  - `would_violate` の delta-kind constraint 盲点を `docs/cli_usage.md` に明記(self-comparison では空 delta となり delta-kind 系は常に拾えない)
+  - `compute_risk_summary` の `target_svp_to_yaml → compile_target_svp` round-trip にコメント追加(将来 `compile_target_svp` に `TargetSVP` 直接受付 overload を入れる前提)
+  - `_resolve_package_root` に `Path.is_relative_to(root.resolve())` で symlink escape 防御深度を追加
+  - Claude Code adapter の `Forbidden Zones` / `Required Additions` を JSON dict dump から markdown human-friendly 表現にするか検討(adapter ごと専用 formatter)
 - ~~**Brief 6** TypeScript extractor — Brief 5 と並列発行可、§22 設計通り~~ → **凍結**(2026-05-06 Session 2 確定、`design.md §12 P3b` / `docs/brief_7_planning.md` 参照)。P3 以降に再評価。Brief 5 完了後の次は **Brief 7 (SSP v0.1)** 直列発行
 - **v0 / Lovable / Bolt adapter**(§21.3「後続」)— HTTP integration 形式、別 brief
 - **LSP server 化**(§21.5)— IDE 内 real-time gate、Brief 8+ deferred(Brief 7 は SSP v0.1 で予約、`design.md §25` 参照)
@@ -554,14 +567,13 @@ frontmatter dump、本文は string concat で OK。
 - **P2 Brief 化時の細目**: Lock violation 即 fail / per-extractor timeout /
   per-extractor version hash trail(`design.md §12 P2` に明記済み、Brief 5 完了後に着手)
 
-## 15. 次のアクション
+## 15. 次のアクション(完了履歴)
 
-1. 本 planning 文書を `docs/brief_5_planning.md` として merge
-2. §12 Open Questions 14 件の確認(必要なら user 確認、推奨で問題なければ確定)
-3. CSCI-31 から順次 Task Brief を切る(Brief 3/4 と同じワークフロー)
-   - CSCI-31 完了後、CSCI-32 / 33 を **並列発行**(adapter は互いに独立)
-   - CSCI-34 / 35 は CSCI-31〜33 完了後
+1. ✅ 本 planning 文書を `docs/brief_5_planning.md` として merge(PR #44)
+2. ✅ §12 Open Questions 14 件を planning merge 時点で確定
+3. ✅ CSCI-31〜35 を順次 Task Brief 化 → 全 merge(2026-05-07 完走)
+4. **次**: §14 の **CSCI-35b sweep brief** を発行 → その後 **Brief 7 (SSP v0.1)** entry
 
 ---
 
-**この planning 文書は Brief 5 完了(CSCI-31〜35 merge)で役割を終える。完了後は archive 候補。**
+**この planning 文書は Brief 5 完走(2026-05-07、CSCI-31〜35 全 merge)で役割を終えた。Brief 7 起草時の参照として保存。**

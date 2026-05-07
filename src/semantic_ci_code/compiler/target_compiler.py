@@ -11,9 +11,12 @@ Constraint order is deterministic and fixed as:
 YAML declaration order. P1 does not support template override or merge; duplicate
 constraint ids across the combined sequence are compile errors.
 
-Target strings are not resolved in CSCI-12. Only the empty string is rejected.
-The evaluator owns the meaning of paths such as ``api_surface`` or
-``api_surface_delta.removed``.
+Target strings are validated against the static CodeState / CodeStateDelta
+schema (see ``compiler.path_schema``) so authoring errors fail at compile
+time rather than mixing with extractor failures via ``unknown_policy``.
+Open ``JsonMapping`` dimensions (``python_specific`` / ``typescript_specific``)
+accept any subpath. Operator semantics, runtime resolution, and unknown-policy
+behavior remain the evaluator's responsibility.
 """
 
 from __future__ import annotations
@@ -25,6 +28,12 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from semantic_ci_code.compiler.path_schema import (
+    is_open_path,
+    suggest_targets,
+    valid_delta_target_paths,
+    valid_state_target_paths,
+)
 from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import (
     Constraint,
@@ -235,6 +244,8 @@ def _parse_target_svp(yaml_source: str, *, filename: str) -> TargetSVP:
 
 
 def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None:
+    state_paths = valid_state_target_paths()
+    delta_paths = valid_delta_target_paths()
     for index, constraint in enumerate(target_svp.constraints):
         if constraint.target == "":
             raise CompileError(
@@ -242,6 +253,37 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
                 filename=filename,
                 path=f"constraints[{index}].target",
             )
+        # Repair-kind constraints are SKIPPED unconditionally by the evaluator
+        # in P1 (E_REPAIR_KIND_UNSUPPORTED_P1), so their target field does not
+        # reference a CodeState path. Schema validation is deferred until the
+        # repair-kind contract is defined in a later phase. Pydantic stores
+        # the kind discriminator as a plain string, so compare via the enum
+        # value rather than identity.
+        if constraint.kind == ConstraintKind.REPAIR:
+            continue
+        # The evaluator's path domain depends on the constraint kind:
+        # state-kind only resolves CodeState roots, while delta-kind resolves
+        # CodeStateDelta roots and also CodeState roots when used with a
+        # baseline operator. Mirror that asymmetry here so a state-kind
+        # constraint with a delta-only path (or vice versa) fails at compile
+        # rather than as a silent UNKNOWN at evaluate.
+        if constraint.kind == ConstraintKind.STATE:
+            allowed = state_paths
+            domain_label = "CodeState"
+        else:
+            allowed = delta_paths
+            domain_label = "CodeState/CodeStateDelta"
+        if constraint.target in allowed or is_open_path(constraint.target):
+            continue
+        suggestions = suggest_targets(constraint.target, allowed)
+        message = f"constraint target {constraint.target!r} does not exist on {domain_label}."
+        if suggestions:
+            message += f" Did you mean: {', '.join(suggestions)}?"
+        raise CompileError(
+            message=message,
+            filename=filename,
+            path=f"constraints[{index}].target",
+        )
 
     if target_svp.api_surface is not None:
         for index, rule in enumerate(target_svp.api_surface.allow_changes):

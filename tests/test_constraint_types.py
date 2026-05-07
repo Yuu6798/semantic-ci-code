@@ -46,7 +46,7 @@ def test_constraint_union_dispatches_by_kind():
         {
             "id": "public_api_preserved",
             "kind": "delta",
-            "target": "api_surface.public_symbols",
+            "target": "api_surface_public",
             "operator": "equals_baseline",
             "expected": "baseline",
             "severity": "hard",

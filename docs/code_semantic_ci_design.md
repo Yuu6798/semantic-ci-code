@@ -164,7 +164,7 @@ change:
   primary_kind: refactor
 
 # が宣言されると、ConstraintTemplate(refactor) が以下を自動展開:
-#   - api_surface.public_symbols equals_baseline (hard, fail on unknown)
+#   - api_surface_public equals_baseline (hard, fail on unknown)
 #   - type_signatures equals_baseline (hard)
 #   - effects equals_baseline (hard)
 #   - test_expectations unchanged (hard)
@@ -213,7 +213,7 @@ constraints:
 
   - id: no_other_api_changes
     kind: delta
-    target: api_surface.public_symbols
+    target: api_surface_public
     operator: superset_of_baseline
     severity: hard
     unknown_policy: fail
@@ -236,9 +236,9 @@ constraints:
 
   - id: test_added
     kind: delta
-    target: test_surface_delta.new_test_cases
-    operator: greater_than_or_equal
-    expected: 1
+    target: test_surface_delta.new_cases
+    operator: not_equals
+    expected: []
     severity: hard
     unknown_policy: fail
 ```
@@ -312,7 +312,7 @@ result:
   constraint_id: public_api_preserved
   status: violated | satisfied | unknown
   severity: hard | soft | info
-  target: api_surface.public_symbols
+  target: api_surface_public
   expected: baseline
   observed_added: []
   observed_removed:
@@ -320,7 +320,7 @@ result:
   evidence:
     extractor: griffe
     extractor_version: "0.42.0"
-    field: api_surface.public_symbols
+    field: api_surface_public
     source_location:
       file: src/api/users.py
       line: 12

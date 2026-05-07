@@ -163,6 +163,196 @@ def test_constraint_unknown_field_raises_compile_error():
     assert exc_info.value.path == "constraints[0].extra_field"
 
 
+def test_unknown_constraint_target_path_raises_compile_error_with_suggestion():
+    yaml_source = """
+intent: typo path
+change:
+  primary_kind: feature
+constraints:
+  - id: typo_path
+    kind: delta
+    target: api_surface.public_symbols
+    operator: superset_of_baseline
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "api_surface.public_symbols" in exc_info.value.message
+    assert "api_surface_public" in exc_info.value.message
+
+
+def test_unknown_target_subfield_raises_compile_error_with_suggestion():
+    yaml_source = """
+intent: typo subfield
+change:
+  primary_kind: feature
+constraints:
+  - id: typo_subfield
+    kind: delta
+    target: test_surface_delta.new_test_cases
+    operator: not_equals
+    expected: []
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "test_surface_delta.new_cases" in exc_info.value.message
+
+
+def test_malformed_open_dimension_path_raises_compile_error():
+    yaml_source = """
+intent: bad open prefix syntax
+change:
+  primary_kind: feature
+constraints:
+  - id: bad_hyphen
+    kind: delta
+    target: python_specific.bad-key
+    operator: equals
+    expected: 0
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "python_specific.bad-key" in exc_info.value.message
+
+
+def test_empty_segment_open_dimension_path_raises_compile_error():
+    yaml_source = """
+intent: empty segment under open prefix
+change:
+  primary_kind: feature
+constraints:
+  - id: bad_double_dot
+    kind: delta
+    target: python_specific..foo
+    operator: equals
+    expected: 0
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "python_specific..foo" in exc_info.value.message
+
+
+def test_open_dimension_paths_compile_without_schema_check():
+    yaml_source = """
+intent: open dim ok
+change:
+  primary_kind: feature
+constraints:
+  - id: open_dim
+    kind: delta
+    target: python_specific.module_graph_delta.cycles
+    operator: equals
+    expected: []
+  - id: open_ts
+    kind: delta
+    target: typescript_specific.anything.deep
+    operator: equals
+    expected: []
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    user_targets = [c.target for c in compiled.constraints if c.source.value == "user"]
+    assert "python_specific.module_graph_delta.cycles" in user_targets
+    assert "typescript_specific.anything.deep" in user_targets
+
+
+def test_state_kind_with_delta_path_raises_compile_error():
+    yaml_source = """
+intent: state-kind constraint with a delta-only path
+change:
+  primary_kind: feature
+constraints:
+  - id: state_with_delta_path
+    kind: state
+    target: api_surface_delta.removed
+    operator: equals
+    expected: []
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "api_surface_delta.removed" in exc_info.value.message
+    # Domain label is the narrower CodeState, not the union.
+    assert "does not exist on CodeState." in exc_info.value.message
+    # Suggestions should come from the state-kind corpus, not the union.
+    assert "api_surface_delta" not in exc_info.value.message.split("Did you mean:")[1]
+
+
+def test_delta_kind_with_state_path_compiles():
+    yaml_source = """
+intent: delta-kind with state path uses baseline operator semantics
+change:
+  primary_kind: feature
+constraints:
+  - id: delta_state_baseline
+    kind: delta
+    target: api_surface_public
+    operator: superset_of_baseline
+    severity: hard
+    unknown_policy: fail
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    user_constraints = [c for c in compiled.constraints if c.source.value == "user"]
+    assert any(c.target == "api_surface_public" for c in user_constraints)
+
+
+def test_repair_kind_constraint_skips_path_schema_check():
+    yaml_source = """
+intent: repair-kind constraints are skipped at evaluate
+change:
+  primary_kind: feature
+constraints:
+  - id: repair_placeholder
+    kind: repair
+    target: repair
+    operator: equals
+    expected: 0
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    user_constraints = [c for c in compiled.constraints if c.source.value == "user"]
+    assert len(user_constraints) == 1
+    assert user_constraints[0].id == "repair_placeholder"
+    assert user_constraints[0].target == "repair"
+
+
+def test_alias_paths_compile_without_error():
+    yaml_source = """
+intent: aliases ok
+change:
+  primary_kind: feature
+constraints:
+  - id: alias_public
+    kind: delta
+    target: api_surface_public
+    operator: superset_of_baseline
+  - id: alias_removed_public
+    kind: delta
+    target: api_surface_delta.removed_public
+    operator: equals
+    expected: []
+"""
+
+    compiled = compile_target_svp(yaml_source, filename="target.yaml")
+    targets = [c.target for c in compiled.constraints if c.source.value == "user"]
+    assert "api_surface_public" in targets
+    assert "api_surface_delta.removed_public" in targets
+
+
 def test_unknown_operator_raises_compile_error_with_constraint_path():
     yaml_source = """
 intent: bad operator

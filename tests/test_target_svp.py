@@ -30,7 +30,7 @@ constraints:
 
   - id: no_other_api_changes
     kind: delta
-    target: api_surface.public_symbols
+    target: api_surface_public
     operator: superset_of_baseline
     severity: hard
     unknown_policy: fail
@@ -53,9 +53,9 @@ constraints:
 
   - id: test_added
     kind: delta
-    target: test_surface_delta.new_test_cases
-    operator: greater_than_or_equal
-    expected: 1
+    target: test_surface_delta.new_cases
+    operator: not_equals
+    expected: []
     severity: hard
     unknown_policy: fail
 """

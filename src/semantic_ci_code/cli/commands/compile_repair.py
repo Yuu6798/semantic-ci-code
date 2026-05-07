@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from semantic_ci_code.cli.command_support import internal_bug, usage_error, write_output
-from semantic_ci_code.cli.output.json_formatter import dump_json, package_version
+from semantic_ci_code.cli.output.json_formatter import (
+    SCHEMA_VERSION as _VERDICT_SCHEMA_VERSION,
+)
+from semantic_ci_code.cli.output.json_formatter import (
+    dump_json,
+    package_version,
+)
 from semantic_ci_code.repair import RepairPlan, deserialize_repair_plan
 from semantic_ci_code.repair_compiler import RepairCompiler, get_adapter
 from semantic_ci_code.repair_compiler.adapters import register_builtin_adapters
@@ -73,6 +79,7 @@ def _extract_repair_plan(payload: dict[str, Any]) -> tuple[RepairPlan, str]:
             )
         if not isinstance(repair_plan, dict):
             raise RepairCompileUsageError("verdict envelope repair_plan must be a JSON object")
+        _warn_on_unexpected_verdict_schema_version(payload.get("schema_version"))
         return _deserialize_plan(repair_plan), "verdict_envelope"
 
     if "instructions" in payload and "subcommand" not in payload:
@@ -89,6 +96,16 @@ def _deserialize_plan(payload: dict[str, Any]) -> RepairPlan:
         return deserialize_repair_plan(payload)
     except ValueError as exc:
         raise RepairCompileUsageError(f"invalid repair_plan: {exc}") from exc
+
+
+def _warn_on_unexpected_verdict_schema_version(value: Any) -> None:
+    if value is None or value == _VERDICT_SCHEMA_VERSION:
+        return
+    print(
+        f"warning: input verdict envelope schema_version={value!r} differs from "
+        f"expected {_VERDICT_SCHEMA_VERSION!r}; rendering may be incomplete",
+        file=sys.stderr,
+    )
 
 
 def _adapter(name: str) -> Adapter:

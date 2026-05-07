@@ -108,6 +108,7 @@ docs/
 | `docs/brief_3_planning.md` | (Archived) Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。CSCI-10〜14 の全 PR が merge され Brief 3 は完結済み。当時の判断履歴として保存 |
 | `docs/multi_agent_audit_case.md` | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
 | `docs/pre_generation_validation_case.md` | 外部 Python リポジトリ上で stub のみの candidate を engine に渡し §23.1 入力 contract が実装で動作することを 3 ケースで確認した観測事例。core scope 外の応用観測 |
+| `docs/dogfooding_TC10_report.md` | 仮想 Python パッケージ 10 ケースで `semantic-ci compare` / `validate-plan` / `compile-repair` を回し PASS / FAIL / REPAIR / Advisor / 入力 hardening を検証したドッグフーディング記録。FINDING-1(`includes_*` の partial-dict 不一致)、FINDING-2(`equals_baseline` の構造化 added/removed 欠落)、FINDING-3(`compile-repair` 入力 `schema_version` 検証欠如、本 PR で stderr warning を追加)を記録 |
 
 When adding a new `docs/<topic>.md`, update this table and the README documentation list.
 

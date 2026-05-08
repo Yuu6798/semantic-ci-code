@@ -93,7 +93,11 @@ def _load_baseline_state(args: Namespace) -> CodeState:
     if args.baseline_dir is not None:
         baseline_dir = _resolve_dir(args.baseline_dir, "baseline")
         baseline_root = _resolve_package_root(baseline_dir, package_root)
-        extract_config = load_extract_config_for_cli(baseline_root, args)
+        extract_config = load_extract_config_for_cli(
+            baseline_root,
+            args,
+            search_boundary=baseline_dir,
+        )
         return extract_python_code_state(
             baseline_root,
             extract_config=extract_config,
@@ -120,7 +124,11 @@ def _load_baseline_state(args: Namespace) -> CodeState:
 def _extract_ref_state(root: Path, ref: str, package_root: Path, args: Namespace) -> CodeState:
     with materialize_ref(root, ref, prefix="semantic-ci-baseline-") as baseline_dir:
         baseline_root = _resolve_package_root(baseline_dir, package_root)
-        extract_config = load_extract_config_for_cli(baseline_root, args)
+        extract_config = load_extract_config_for_cli(
+            baseline_root,
+            args,
+            search_boundary=baseline_dir,
+        )
         return extract_python_code_state(
             baseline_root,
             extract_config=extract_config,

@@ -14,8 +14,13 @@ from semantic_ci_code.framework.extract_config import (
 ExcludeReporter = Callable[[tuple[ExcludedPath, ...]], None]
 
 
-def load_extract_config_for_cli(package_root: Path, args: Any) -> ExtractConfig:
-    config = load_extract_config(package_root)
+def load_extract_config_for_cli(
+    package_root: Path,
+    args: Any,
+    *,
+    search_boundary: Path | None = None,
+) -> ExtractConfig:
+    config = load_extract_config(package_root, search_boundary=search_boundary)
     if getattr(args, "verbose", False):
         if config.source_path is None:
             stderr("loaded extract config: 0 patterns (no pyproject.toml)")

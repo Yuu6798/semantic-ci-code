@@ -101,8 +101,16 @@ def run_check(args: Namespace) -> int:
             with candidate_context as candidate_dir:
                 baseline_root = _resolve_package_root(baseline_dir, package_root, "baseline")
                 candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
-                baseline_config = load_extract_config_for_cli(baseline_root, args)
-                candidate_config = load_extract_config_for_cli(candidate_root, args)
+                baseline_config = load_extract_config_for_cli(
+                    baseline_root,
+                    args,
+                    search_boundary=baseline_dir,
+                )
+                candidate_config = load_extract_config_for_cli(
+                    candidate_root,
+                    args,
+                    search_boundary=candidate_dir,
+                )
                 if args.verbose:
                     _stderr(f"extracting baseline package_root={baseline_root}")
                 baseline = _extract_code_state(

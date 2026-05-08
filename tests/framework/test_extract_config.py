@@ -34,6 +34,43 @@ exclude = ["generated", "**/*_pb2.py"]
     assert config.source_path == (tmp_path / "pyproject.toml").resolve()
 
 
+def test_load_extract_config_respects_search_boundary(tmp_path: Path):
+    tree_root = tmp_path / "tree"
+    package_root = tree_root / "src" / "pkg"
+    package_root.mkdir(parents=True)
+    _write_pyproject(
+        tmp_path,
+        """
+[tool.semantic_ci_code.extract]
+exclude = ["outside"]
+""".strip(),
+    )
+
+    config = load_extract_config(package_root, search_boundary=tree_root)
+
+    assert config.patterns == ()
+    assert config.source_path is None
+    assert config.config_root == package_root.resolve()
+
+
+def test_load_extract_config_finds_pyproject_at_search_boundary(tmp_path: Path):
+    tree_root = tmp_path / "tree"
+    package_root = tree_root / "src" / "pkg"
+    package_root.mkdir(parents=True)
+    _write_pyproject(
+        tree_root,
+        """
+[tool.semantic_ci_code.extract]
+exclude = ["src/generated"]
+""".strip(),
+    )
+
+    config = load_extract_config(package_root, search_boundary=tree_root)
+
+    assert config.patterns == ("src/generated",)
+    assert config.source_path == (tree_root / "pyproject.toml").resolve()
+
+
 def test_missing_extract_section_is_empty_config(tmp_path: Path):
     package_root = tmp_path / "pkg"
     package_root.mkdir()

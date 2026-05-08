@@ -32,10 +32,15 @@ class ExtractConfigError(Exception):
     """Raised when ``[tool.semantic_ci_code.extract]`` cannot be loaded."""
 
 
-def load_extract_config(package_root: Path) -> ExtractConfig:
+def load_extract_config(
+    package_root: Path,
+    *,
+    search_boundary: Path | None = None,
+) -> ExtractConfig:
     root = package_root.resolve()
     search_dir = root if root.is_dir() else root.parent
-    pyproject = _find_nearest_pyproject(search_dir)
+    boundary = search_boundary.resolve() if search_boundary is not None else None
+    pyproject = _find_nearest_pyproject(search_dir, boundary=boundary)
     if pyproject is None:
         return ExtractConfig(patterns=(), config_root=search_dir, source_path=None)
 
@@ -87,12 +92,14 @@ def filter_excluded_paths(
     return tuple(kept), tuple(excluded)
 
 
-def _find_nearest_pyproject(start: Path) -> Path | None:
+def _find_nearest_pyproject(start: Path, *, boundary: Path | None) -> Path | None:
     current = start.resolve()
     while True:
         candidate = current / "pyproject.toml"
         if candidate.exists():
             return candidate
+        if boundary is not None and current == boundary:
+            return None
         if current.parent == current:
             return None
         current = current.parent

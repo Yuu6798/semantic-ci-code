@@ -298,9 +298,15 @@ exempt, and the rest of the surface is still locked.
 
 - **Whether your declared intent is the right intent.** Semantic CI does not
   check that. The engine takes `target.yaml` as ground truth and reports
-  adherence. If the spec says nothing about `effects` and the PR adds an
-  `os.system` call, the verdict will pass — and that is by design
-  (`design.md §23.3` — Adherence, not Correctness).
+  adherence. For example, no template gates `complexity_delta` or `imports`
+  against arbitrary additions, so a `primary_kind: bugfix` target without an
+  explicit complexity / imports constraint passes a candidate that doubles
+  cyclomatic complexity or pulls in a new third-party dependency. Whether
+  that matches your *real* intent is out of scope (`design.md §23.3` —
+  Adherence, not Correctness). Note this is not the situation for effects:
+  every current template installs an `effect_changes` invariant, so adding
+  a known effect like `os.system` will route to fail or repair unless you
+  whitelist it via `effects.allow_new`.
 - **Reviewing the candidate code itself.** Semantic CI does not lint, type
   check, or run tests. Use those tools alongside it.
 - **Producing or refining the target file.** `init` scaffolds a syntactic

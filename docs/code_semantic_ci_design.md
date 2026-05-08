@@ -1226,6 +1226,7 @@ ACTIVE 仕様 / 契約:
 - [`exit_codes.md`](./exit_codes.md) — exit code policy
 - [`json_schema.md`](./json_schema.md) — verdict / compile / compile-repair / validate-plan envelopes
 - [`cli_test_inventory.md`](./cli_test_inventory.md) — CLI test coverage map
+- [`target_yaml_guide.md`](./target_yaml_guide.md) — `target.yaml` authoring guide（hazards D1/D3/D4）
 
 PLANNING (open):
 

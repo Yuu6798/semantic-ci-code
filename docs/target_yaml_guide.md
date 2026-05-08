@@ -191,12 +191,31 @@ duplicate keeps firing the old contract silently.
   template-supplied or user-authored, with stable IDs. A duplicate ID pair
   with identical `target`+`operator`+`expected` is redundancy you can remove.
 
-## Hazard 3 — Out-of-scope diffs return vacuous PASS (D4)
+## Hazard 3 — Out-of-scope diffs can return vacuous PASS (D4)
 
 A PR that touches only configuration, documentation, or workflow files
-(`pyproject.toml`, `.github/workflows/*`, `README.md`, etc.) has an empty
-`CodeStateDelta` under any reasonable `--package-root`. Every constraint
-trivially holds; the verdict is `pass` with `exit 0`.
+(`pyproject.toml`, `.github/workflows/*`, `README.md`, etc.) produces an
+empty `CodeStateDelta` under any reasonable `--package-root`.
+
+Whether that empty delta passes depends on the *shape* of the target's
+constraints:
+
+- **Lock-only targets pass vacuously.** Template-installed invariants and
+  user-authored baseline-lock constraints (`equals_baseline`,
+  `no_new_items`, `no_removed_items`, `effect_changes.added == ()`, etc.)
+  are all satisfied by an empty delta — there is nothing to violate. The
+  verdict is `pass` with `exit 0` even though the engine never inspected
+  the diff.
+- **Targets with positive delta expectations do *not* pass vacuously.**
+  A constraint like the `feature_added` example above
+  (`api_surface_delta.added includes_all ["src.api.users.fetch_user_profile"]`)
+  reports the expected item as missing on an empty delta and fails as a
+  hard violation. `includes_any`, `not_equals expected: []`, and
+  `equals expected: <non-empty>` behave the same way.
+
+So D4 is specifically a hazard for **targets whose constraints are entirely
+locks** — and those are exactly the targets `primary_kind: refactor` /
+`bugfix` / `test_update` produce by default if you do not add anything.
 
 This is the engine behaving correctly — Semantic CI does not claim to gate
 non-Python artifacts (see `design.md §13` on out-of-scope items). It is
@@ -204,9 +223,13 @@ non-Python artifacts (see `design.md §13` on out-of-scope items). It is
 
 **What this means for authors:**
 
-- A green Semantic CI verdict on a config-only PR is silence, not approval.
-  Pair it with the appropriate gate for that artifact class (lint, schema
-  check, workflow validator).
+- A green Semantic CI verdict on a config-only PR with a lock-only target is
+  silence, not approval. Pair it with the appropriate gate for that
+  artifact class (lint, schema check, workflow validator).
+- If your target carries a positive delta expectation tied to the diff, you
+  will see that constraint fail loudly on a config-only PR — that is the
+  engine telling you the work it expected was not done in the Python slice.
+  Either move the work or relax / remove the expectation for that target.
 - If you want config-shaped invariants enforced, that is a different protocol
   (`docs/brief_7_planning.md` covers the SSP direction; SCA / SAST live there,
   not in core).

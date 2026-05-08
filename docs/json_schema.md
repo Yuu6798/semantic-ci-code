@@ -82,7 +82,9 @@ bump beyond the current CLI schema version.
 Extractor exclude config changes cache identity but not the JSON envelope shape.
 `check` and `pre-commit` include the effective exclude key in their internal
 CodeState cache key; schema version `"5"` is unchanged by this operational
-cache-key extension.
+cache-key extension. The first run after upgrading from a version without this
+cache-key axis will rebuild CodeState cache entries once, even when no exclude
+patterns are configured.
 
 ## Compile Envelope
 

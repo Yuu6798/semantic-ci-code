@@ -163,7 +163,7 @@ def _validate_patterns(raw_patterns: Any, *, source_path: Path) -> tuple[str, ..
 
 def _relative_candidate(candidate: Path, config: ExtractConfig) -> PurePosixPath | None:
     try:
-        relative = candidate.resolve().relative_to(config.config_root.resolve())
+        relative = candidate.resolve().relative_to(config.config_root)
     except ValueError:
         return None
     return PurePosixPath(relative.as_posix())

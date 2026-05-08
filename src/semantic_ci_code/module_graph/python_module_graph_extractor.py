@@ -118,6 +118,9 @@ def _discover_module_paths(
     extract_config: ExtractConfig | None,
 ) -> tuple[Path, ...]:
     paths = tuple(sorted(package_root.rglob("*.py"), key=lambda path: str(path.resolve())))
+    # ``python_code_state`` filters once before per-dimension extractors, but
+    # module graph is also public as a direct extractor. Keep this second filter
+    # here so direct callers get the same node/edge surface.
     kept, _excluded = filter_excluded_paths(paths, extract_config)
     return kept
 

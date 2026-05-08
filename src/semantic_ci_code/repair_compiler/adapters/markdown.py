@@ -12,6 +12,14 @@ RISK_SECTION_TITLES = {
     "required_additions": "Required Additions",
     "template_implications": "Template Implications",
 }
+RISK_FIELD_ORDER = (
+    ("source", "Source"),
+    ("target", "Target"),
+    ("operator", "Operator"),
+)
+_RISK_RENDERED_KEYS = frozenset(
+    {"constraint_id", "source", "target", "operator", "expected", "expected_any_of"}
+)
 
 
 def render_instruction_section(
@@ -92,6 +100,55 @@ def render_risk_section(title: str, values: list[JsonValue]) -> list[str]:
     if not values:
         return [*lines, "(none)", ""]
     return [*lines, *(f"- {format_value(value)}" for value in values), ""]
+
+
+def render_risk_section_structured(title: str, values: list[JsonValue]) -> list[str]:
+    lines = [f"## {title}"]
+    if not values:
+        return [*lines, "(none)", ""]
+    for index, value in enumerate(values, start=1):
+        lines.extend(_render_risk_item_block(index, value))
+    lines.append("")
+    return lines
+
+
+def _render_risk_item_block(index: int, value: JsonValue) -> list[str]:
+    if not isinstance(value, dict):
+        return [f"- {_format_risk_scalar(value)}"]
+
+    constraint_id = value.get("constraint_id")
+    if not isinstance(constraint_id, str) or not constraint_id:
+        return [f"- {format_value(value)}"]
+
+    lines = [f"{index}. `{constraint_id}`"]
+    for key, label in RISK_FIELD_ORDER:
+        if key in value:
+            lines.append(f"   - {label}: `{value[key]}`")
+
+    if "expected" in value:
+        lines.append(f"   - Expected: {format_value(value['expected'])}")
+
+    if "expected_any_of" in value:
+        lines.append("   - Any of:")
+        for item in _as_list(value["expected_any_of"]):
+            lines.append(f"     - {format_value(item)}")
+
+    for key in sorted(set(value) - _RISK_RENDERED_KEYS):
+        lines.append(f"   - {key}: {format_value(value[key])}")
+
+    return lines
+
+
+def _format_risk_scalar(value: JsonValue) -> str:
+    return value if isinstance(value, str) else format_value(value)
+
+
+def _as_list(value: JsonValue) -> list[JsonValue]:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
 
 
 def format_generation_metadata(target: TargetSVP) -> str:

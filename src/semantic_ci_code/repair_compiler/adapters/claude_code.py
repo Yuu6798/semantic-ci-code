@@ -8,7 +8,7 @@ from semantic_ci_code.repair_compiler.adapters.markdown import (
     finish,
     format_generation_metadata,
     render_instruction_section,
-    render_risk_section,
+    render_risk_section_structured,
     render_target_constraints,
 )
 from semantic_ci_code.repair_compiler.risk_summary import normalize_risk_summary
@@ -72,5 +72,7 @@ class ClaudeCodeAdapter:
         lines.extend(render_target_constraints(target))
         risk_summary = normalize_risk_summary(risk_summary)
         for key in RISK_SUMMARY_KEYS:
-            lines.extend(render_risk_section(RISK_SECTION_TITLES[key], risk_summary[key]))
+            lines.extend(
+                render_risk_section_structured(RISK_SECTION_TITLES[key], risk_summary[key])
+            )
         return finish(lines)

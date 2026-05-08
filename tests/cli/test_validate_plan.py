@@ -46,7 +46,7 @@ def test_validate_plan_outputs_text_for_claude_code_with_baseline_dir(tmp_path: 
     assert result.returncode == 0
     assert "# Plan Validation - Pre-Generation Guidance" in result.stdout
     assert "## Risk Areas" in result.stdout
-    assert '"require_missing_api"' in result.stdout
+    assert "- require_missing_api" in result.stdout
     assert result.stderr == ""
 
 

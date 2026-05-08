@@ -36,8 +36,14 @@ _REQUIRED_ADDITION_OPERATORS = frozenset({Operator.INCLUDES_ALL, Operator.INCLUD
 def compute_risk_summary(target: TargetSVP, baseline_state: CodeState) -> RiskSummary:
     """Compute deterministic pre-generation risk summary projections."""
 
-    # compile_target_svp currently accepts YAML text only. Round-trip TargetSVP
-    # through YAML to reuse the established compiler without changing engine API.
+    # compile_target_svp currently accepts YAML text only, so this path serializes
+    # TargetSVP and re-parses it to reuse the established compiler. That costs an
+    # extra YAML round-trip, but it keeps validate-plan on the same normalization
+    # and template-expansion path as the rest of the engine. A future
+    # compile_target_svp_from_model overload, or a private shared compile core,
+    # can remove this cost. Until that exists, do not bypass the round-trip here:
+    # doing so risks drift between pre-generation risk rendering and real target
+    # compilation (Brief 5 sweep tail / AGENTS handoff).
     compiled = compile_target_svp(target_svp_to_yaml(target), filename="<target_svp>")
     return {
         "would_violate": _would_violate(compiled, baseline_state),

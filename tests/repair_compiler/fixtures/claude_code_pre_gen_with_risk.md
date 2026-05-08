@@ -22,13 +22,20 @@
    - Unknown policy: `fail`
 
 ## Risk Areas
-- "require_missing_api"
+- require_missing_api
 
 ## Forbidden Zones
-- {"constraint_id": "lock_api_surface", "operator": "equals_baseline", "source": "user", "target": "api_surface"}
+1. `lock_api_surface`
+   - Source: `user`
+   - Target: `api_surface`
+   - Operator: `equals_baseline`
 
 ## Required Additions
-- {"constraint_id": "require_missing_api", "expected": "pkg.profile", "operator": "includes_all", "source": "user", "target": "api_surface"}
+1. `require_missing_api`
+   - Source: `user`
+   - Target: `api_surface`
+   - Operator: `includes_all`
+   - Expected: "pkg.profile"
 
 ## Template Implications
-- "template:refactor:api_surface_unchanged"
+- template:refactor:api_surface_unchanged

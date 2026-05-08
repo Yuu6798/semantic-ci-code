@@ -76,17 +76,59 @@ Three things are doing real work here:
 ## Choosing `primary_kind`
 
 `primary_kind` is not a label. It expands a default constraint set, so it
-materially changes what passes and fails. The §4.3 quick table:
+materially changes what passes and fails.
 
-| `primary_kind` | Required (auto) | Forbidden (auto) |
-|---|---|---|
-| `feature` | declared API additions, new tests | removing existing public API, undeclared effects |
-| `bugfix` | public API unchanged, regression tests added | new public API, large structural change, undeclared effects |
-| `refactor` | public API / type signatures / effects unchanged | API change, type change, new effect, test expectation change |
-| `test_update` | tests added/modified | semantic change to production code |
+Templates install **lock invariants** (negative gates) only. They do not
+require additions. Concretely, what the current compiler installs (see
+`src/semantic_ci_code/compiler/templates.py`):
 
-You only need to write **additions** in `constraints:` — the template provides
-the floor.
+| `primary_kind` | Auto-installed invariants (all `kind: delta`, `severity: hard`) |
+|---|---|
+| `feature` | `api_surface_delta.removed_public == ()` (no public API removed); `effect_changes.added == ()` (no new effects) |
+| `bugfix` | `api_surface_public equals_baseline`; `effect_changes.added == ()` |
+| `refactor` | `api_surface_public equals_baseline`; `type_relations equals_baseline`; `effect_changes == {added: (), removed: ()}`; `test_surface equals_baseline` |
+| `test_update` | `api_surface_public equals_baseline`; `effect_changes == {added: (), removed: ()}`; `imports equals_baseline` |
+
+This means:
+
+- **No template requires that a new symbol be declared.** A `primary_kind:
+  feature` candidate that adds nothing public still passes the template.
+  If you want adherence to a specific addition, write it as a user
+  constraint:
+
+  ```yaml
+  - id: feature_added
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_all
+    expected: ["src.api.users.fetch_user_profile"]
+    severity: hard
+    unknown_policy: fail
+  ```
+
+- **No template requires that a test be added.** `primary_kind: bugfix`
+  does not auto-gate regression tests; `primary_kind: test_update` does
+  not auto-gate that any test was actually modified. If a test addition
+  is part of your contract, declare it:
+
+  ```yaml
+  - id: regression_test_added
+    kind: delta
+    target: test_surface_delta.new_cases
+    operator: not_equals
+    expected: []
+    severity: hard
+    unknown_policy: fail
+  ```
+
+  (Pair this with a `--package-root` that actually covers the test tree —
+  see the next section.)
+
+In short, the template establishes a *floor* of what cannot change. Anything
+positive ("this addition must be present", "this test must be added") is
+your responsibility to author. The §4.3 design table in
+`code_semantic_ci_design.md` lists positive expectations under "必須" — that
+column is the design intent, not what the engine currently enforces.
 
 ## Hazard 1 — `--package-root` decides what is observed (D1)
 

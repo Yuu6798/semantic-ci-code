@@ -31,7 +31,17 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 直近 merged
 
-### 2026-05-08 — D5 解消 + Brief 5 sweep tail + D2 解消
+### 2026-05-08 Session 2 — target.yaml authoring guide 新設
+
+- **本セッション (docs only)**: `docs/target_yaml_guide.md` を新規作成し、
+  2026-05-07 Session 4 dogfood で抽出された D1/D3/D4 (`--package-root` scope
+  制約 / template と user constraint の重複 / config-only PR の vacuous PASS)
+  を authoring hazard 章として集約。CLAUDE.md docs table + design.md §24
+  ACTIVE 仕様一覧 + README documentation 一覧を追従、§23.3 boundary を冒頭
+  reminder に pin、§4 / §13 / cli_usage.md / dogfooding_TC10_report.md への
+  cross-ref を整備。`次の発行順序` から A' (authoring guide) を削除
+
+### 2026-05-08 Session 1 — D5 解消 + Brief 5 sweep tail + D2 解消
 
 - **PR #65** (CSCI-35c / set operator partial-match semantics): D5 = FINDING-1
   解消。`framework/match_schema.py` 新設で `api_surface` / `effects` / `imports`
@@ -121,10 +131,6 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 次の発行順序
 
-- **A'. target.yaml authoring guide 新規**(`docs/target_yaml_guide.md`):
-  2026-05-07 Session 4 dogfood で発見した hazard 群を集約 — D1:
-  `--package-root` scope 制約、D3: template と user constraint の重複、D4:
-  config-only PR の vacuous PASS。半日〜1 日
 - **B. Brief 7 (SSP v0.1)**: Semantic Security Protocol。Brief 5 完了済 →
   CSCI-36〜40 として発行可能。planning は `docs/brief_7_planning.md` で
   merged 済み

@@ -91,6 +91,7 @@ Active references (current behavior):
 - [JSON Output Schema](docs/json_schema.md) — verdict / compile envelopes (`schema_version="4"`) + compile-repair / validate-plan envelopes (independent `schema_version="1"`)
 - [Code Semantic CI Design](docs/code_semantic_ci_design.md) — Code Edition v0.1 design spec (3-state RPE, constraint type system, phase plan)
 - [CLI Test Inventory](docs/cli_test_inventory.md) — CLI test coverage map and reduction candidates
+- [target.yaml Authoring Guide](docs/target_yaml_guide.md) — practical authoring guide; centralises hazards D1/D3/D4 (`--package-root` scope, template/user constraint duplication, config-only vacuous PASS)
 - [AGENTS.md](AGENTS.md) — Claude × Codex task handoff protocol (includes Brief 7 / SSP forward design note)
 - [CLAUDE.md](CLAUDE.md) — repository-level agent operating policy
 

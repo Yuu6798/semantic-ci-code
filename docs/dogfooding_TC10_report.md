@@ -19,7 +19,7 @@ exercised directly without git ceremony.
 | TC1 | `compare` | refactor: f-string conversion, API stable | `pass` / exit 0 | `pass`, 4 satisfied, 0 violated | ✅ |
 | TC2 | `compare` | "refactor" silently removes a public function | `fail` / exit 1 | `fail`, `template:refactor:api_surface_unchanged` violated | ✅ |
 | TC3 | `compare` | feature claim, required addition missing | `fail` / exit 1 | `fail`, user `includes_any` violated | ✅ |
-| TC4 | `compare` | feature: required public function added | `pass` / exit 0 | `pass` with Match Schema partial record matching | ✅ (FINDING-1 resolved in CSCI-35c) |
+| TC4 | `compare` | feature: required public function added | `pass` / exit 0 | `pass` once user constraint matches full record | ✅ (with FINDING-1) |
 | TC5 | `compare` | bugfix template flags scope creep (extra public symbol) | `fail` / exit 1, `added` populated post-fix | `fail`, `template:bugfix:api_surface_unchanged` violated, `added=[safe_divide]` after fix | ✅ (drove FINDING-2 fix) |
 | TC6 | `validate-plan` | pre-generation guidance with `would_violate`, `required_additions` | rendered text + 4-list `risk_summary` | rendered, 1 would_violate, 1 required_additions, 2 template_implications | ✅ |
 | TC7 | CLI hardening | malformed YAML / Python tag injection / missing target / unknown adapter / nonexistent dirs | exit 2 or 3 with stderr diagnostic | YAML `!!python` rejected (exit 3); missing target exit 2; unknown adapter exit 2; malformed YAML exit 3 | ✅ |
@@ -240,33 +240,42 @@ the CLI surface.
 
 | Priority | Brief candidate | Source | Status |
 |---|---|---|---|
-| H | Set-operator partial-match semantics for user constraints | FINDING-1 | **Resolved in CSCI-35c** (Match Schema partial matching + flat projection aliases) |
+| H | Set-operator partial-match semantics for user constraints | FINDING-1 | **Resolved in PR #65 (CSCI-35c, 2026-05-08)** — Match Schema partial-record matching, compile-time validation, flat projection aliases, `evidence.matched` for `excludes_all`, schema bump v4→v5 |
 | L | Optional `--strict-schema` flag on `compile-repair` (promote warning to error) | FINDING-3 follow-up | Open — small, no brief required |
 
 FINDING-2 was originally listed here but resolved in this PR (see above).
 
-### Tracking: D5 (FINDING-1) — Resolved in CSCI-35c
+### Tracking: D5 (FINDING-1) — Resolved (PR #65, CSCI-35c, 2026-05-08)
 
 FINDING-1 was the only finding from this dogfooding pass that remained open
 after PR #61. It was integrated into the dogfood-driven fix plan as **D5**,
 joining D1〜D4 from the 2026-05-07 Session 4 dogfooding
-(`.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4"). Unlike D1〜D4, which
-split between an authoring guide (`docs/target_yaml_guide.md`, hosting
-D1/D3/D4) and a separate extractor-exclude brief (D2), D5 requires
-operator-level semantics changes and is therefore tracked as its own brief
-candidate at `.claude/memory/STATUS.md` 次の発行順序 §F.
+(`.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4"), and resolved on
+2026-05-08 via PR #65 (CSCI-35c).
 
 | D# | Source | Subject | Brief slot |
 |---|---|---|---|
-| D1 | Session 4 dogfood | `--package-root` scope hazard | A' (`target_yaml_guide.md`) |
-| D2 | Session 4 dogfood | extractor crash on `syntax_error/bad.py` | D (extractor exclude brief) |
-| D3 | Session 4 dogfood | template / user constraint duplication | A' (`target_yaml_guide.md`) |
-| D4 | Session 4 dogfood | config-only PR vacuous PASS | A' (`target_yaml_guide.md`) |
-| **D5** | **Session 5 dogfood (PR #61, FINDING-1)** | **set operator partial-match semantics — false positive on `includes_*` / `subset_of` / `superset_of`, false negative (CI bypass) on `excludes_all`** | **F (own brief)** |
+| D1 | Session 4 dogfood | `--package-root` scope hazard | A' (`target_yaml_guide.md`) — open |
+| D2 | Session 4 dogfood | extractor crash on `syntax_error/bad.py` | **Resolved in PR #67 (CSCI-35e, 2026-05-08)** — `[tool.semantic_ci_code.extract] exclude` loaded from nearest `pyproject.toml` and applied before AST parse |
+| D3 | Session 4 dogfood | template / user constraint duplication | A' (`target_yaml_guide.md`) — open |
+| D4 | Session 4 dogfood | config-only PR vacuous PASS | A' (`target_yaml_guide.md`) — open |
+| **D5** | **Session 5 dogfood (PR #61, FINDING-1)** | **set operator partial-match semantics — false positive on `includes_*` / `subset_of` / `superset_of`, false negative (CI bypass) on `excludes_all`** | **Resolved in PR #65 (CSCI-35c, 2026-05-08)** |
 
-CSCI-35c resolves D5 with Match Schema partial-key semantics on set operators,
-compile-time validation for partial dict `expected` records, and three
-flat-projection aliases (`api_surface_delta.added.fqns`,
-`effect_changes.added.fqns`, `imports_delta.added.modules`). The fix addresses
-**both** failure modes: false positives on positive set operators and the false
-negative on `excludes_all` that allowed CI bypass.
+Resolution chose option (c) — both partial-key matcher semantics on set
+operators **and** flat-projection targets. The chosen mechanism is the
+**Match Schema** registry in `framework/match_schema.py` keyed per dict
+collection target (`api_surface*`, `effects*`, `imports*`) with a
+`required_key` (e.g. `fqn` / `module`), a closed `optional_keys` allow-list
+(`kind`, `visibility`, `effect_class`, `from`), and `forbidden_keys` that
+reject extractor-coupling fields (`signature`, `confidence`, `evidence`,
+`symbols`) at compile time. The five set operators now use partial-record
+matching via a shared `match_item(expected, observed)` predicate, and
+`excludes_all` violations report `evidence.matched` `{expected_item,
+observed_record}` pairs to make the closed CI bypass auditable. Bare-string
+`expected` items desugar to `{required_key: <string>}` and three flat
+projection aliases (`api_surface_delta.added.fqns`,
+`effect_changes.added.fqns`, `imports_delta.added.modules`) are registered
+for plain string-set authoring. The verdict / compile JSON envelope was
+bumped from `schema_version="4"` to `"5"` to reflect the gate-strengthening
+behavior change (existing partial-dict authoring that previously silently
+satisfied `excludes_all` will now correctly fail).

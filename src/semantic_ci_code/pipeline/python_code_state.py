@@ -38,11 +38,17 @@ from semantic_ci_code.domain.state_schema import (
     TestSurfaceEntry,
 )
 from semantic_ci_code.effects import extract_python_effects
+from semantic_ci_code.framework.extract_config import (
+    ExcludedPath,
+    ExtractConfig,
+    filter_excluded_paths,
+)
 from semantic_ci_code.imports import extract_python_imports_from_paths
 from semantic_ci_code.module_graph import extract_python_module_graph
 from semantic_ci_code.test_surface import extract_python_test_surface_from_paths
 
 T = TypeVar("T")
+ExcludeReporter = Callable[[tuple[ExcludedPath, ...]], None]
 
 DIMENSION_API_SURFACE = "api_surface"
 DIMENSION_EFFECTS = "effects"
@@ -87,6 +93,8 @@ def extract_python_code_state(
     package_root: Path,
     *,
     dimensions: frozenset[str] | None = None,
+    extract_config: ExtractConfig | None = None,
+    exclude_reporter: ExcludeReporter | None = None,
 ) -> CodeState:
     """Assemble a whole-package Python ``CodeState`` from ``package_root``.
 
@@ -98,7 +106,17 @@ def extract_python_code_state(
     """
     root = _resolve_package_root(package_root)
     paths = _python_paths_from_inputs((root,), package_root=root)
-    return _assemble_code_state(paths=paths, package_root=root, dimensions=dimensions)
+    paths = _filter_excluded(
+        paths,
+        extract_config=extract_config,
+        exclude_reporter=exclude_reporter,
+    )
+    return _assemble_code_state(
+        paths=paths,
+        package_root=root,
+        dimensions=dimensions,
+        extract_config=extract_config,
+    )
 
 
 def extract_python_code_state_from_paths(
@@ -106,6 +124,8 @@ def extract_python_code_state_from_paths(
     *,
     package_root: Path,
     dimensions: frozenset[str] | None = None,
+    extract_config: ExtractConfig | None = None,
+    exclude_reporter: ExcludeReporter | None = None,
 ) -> CodeState:
     """Assemble a Python ``CodeState`` with per-file fields limited to ``paths``.
 
@@ -119,7 +139,17 @@ def extract_python_code_state_from_paths(
     root = _resolve_package_root(package_root)
     selected_paths = tuple(paths)
     expanded_paths = _python_paths_from_inputs(selected_paths, package_root=root)
-    return _assemble_code_state(paths=expanded_paths, package_root=root, dimensions=dimensions)
+    expanded_paths = _filter_excluded(
+        expanded_paths,
+        extract_config=extract_config,
+        exclude_reporter=exclude_reporter,
+    )
+    return _assemble_code_state(
+        paths=expanded_paths,
+        package_root=root,
+        dimensions=dimensions,
+        extract_config=extract_config,
+    )
 
 
 def _assemble_code_state(
@@ -127,6 +157,7 @@ def _assemble_code_state(
     paths: tuple[Path, ...],
     package_root: Path,
     dimensions: frozenset[str] | None,
+    extract_config: ExtractConfig | None,
 ) -> CodeState:
     return CodeState(
         api_surface=(
@@ -155,7 +186,7 @@ def _assemble_code_state(
             else ()
         ),
         module_graph=(
-            _extract_module_graph(package_root)
+            _extract_module_graph(package_root, extract_config=extract_config)
             if _should_extract(DIMENSION_MODULE_GRAPH, dimensions)
             else ()
         ),
@@ -237,11 +268,15 @@ def _extract_test_surface(
     )
 
 
-def _extract_module_graph(package_root: Path) -> tuple[ModuleGraphEntry, ...]:
+def _extract_module_graph(
+    package_root: Path,
+    *,
+    extract_config: ExtractConfig | None,
+) -> tuple[ModuleGraphEntry, ...]:
     return _run_extractor(
         "module_graph",
         package_root,
-        lambda: extract_python_module_graph(package_root),
+        lambda: extract_python_module_graph(package_root, extract_config=extract_config),
     )
 
 
@@ -266,6 +301,18 @@ def _path_from_exception(exc: Exception) -> Path | None:
     if isinstance(filename, str) and filename:
         return Path(filename)
     return None
+
+
+def _filter_excluded(
+    paths: tuple[Path, ...],
+    *,
+    extract_config: ExtractConfig | None,
+    exclude_reporter: ExcludeReporter | None,
+) -> tuple[Path, ...]:
+    kept, excluded = filter_excluded_paths(paths, extract_config)
+    if exclude_reporter is not None and extract_config is not None and extract_config.patterns:
+        exclude_reporter(excluded)
+    return kept
 
 
 def _python_paths_from_inputs(

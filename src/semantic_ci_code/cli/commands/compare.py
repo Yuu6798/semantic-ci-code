@@ -12,6 +12,10 @@ from semantic_ci_code.cli.command_support import (
     _usage_error,
     _write_output,
 )
+from semantic_ci_code.cli.extract_config_runtime import (
+    load_extract_config_for_cli,
+    make_exclude_reporter,
+)
 from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.cli.target_loader import (
     TargetUsageError,
@@ -21,6 +25,7 @@ from semantic_ci_code.cli.target_loader import (
 from semantic_ci_code.compiler import CompileError
 from semantic_ci_code.delta import compute_code_state_delta
 from semantic_ci_code.evaluator import evaluate_constraints
+from semantic_ci_code.framework.extract_config import ExtractConfigError
 from semantic_ci_code.pipeline import ExtractorError, extract_python_code_state
 from semantic_ci_code.repair import emit_repair_plan
 
@@ -39,10 +44,20 @@ def run_compare(args: Namespace) -> int:
 
         if args.verbose:
             _stderr(f"extracting baseline package_root={baseline_root}")
-        baseline = extract_python_code_state(baseline_root)
+        baseline_config = load_extract_config_for_cli(baseline_root, args)
+        baseline = extract_python_code_state(
+            baseline_root,
+            extract_config=baseline_config,
+            exclude_reporter=make_exclude_reporter(args),
+        )
         if args.verbose:
             _stderr(f"extracting candidate package_root={candidate_root}")
-        candidate = extract_python_code_state(candidate_root)
+        candidate_config = load_extract_config_for_cli(candidate_root, args)
+        candidate = extract_python_code_state(
+            candidate_root,
+            extract_config=candidate_config,
+            exclude_reporter=make_exclude_reporter(args),
+        )
         delta = compute_code_state_delta(baseline, candidate)
         verdict = evaluate_constraints(compiled, delta, baseline=baseline, candidate=candidate)
         repair_plan = emit_repair_plan(verdict)
@@ -67,6 +82,8 @@ def run_compare(args: Namespace) -> int:
         return _usage_error(exc)
     except CompileError as exc:
         return _engine_error(exc, args, show_traceback=True)
+    except ExtractConfigError as exc:
+        return _engine_error(exc, args, prefix="extract config error", show_traceback=True)
     except ExtractorError as exc:
         return _engine_error(exc, args, prefix="extractor failed", show_traceback=True)
     except Exception as exc:

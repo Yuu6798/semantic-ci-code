@@ -14,6 +14,10 @@ from semantic_ci_code.cli.command_support import (
     usage_error,
     write_output,
 )
+from semantic_ci_code.cli.extract_config_runtime import (
+    load_extract_config_for_cli,
+    make_exclude_reporter,
+)
 from semantic_ci_code.cli.git_runtime import (
     GitError,
     GitNotFoundError,
@@ -26,6 +30,7 @@ from semantic_ci_code.cli.target_loader import TargetUsageError, discover_target
 from semantic_ci_code.cli.worktree import materialize_ref
 from semantic_ci_code.compiler import CompileError
 from semantic_ci_code.domain.state_schema import CodeState
+from semantic_ci_code.framework.extract_config import ExtractConfigError
 from semantic_ci_code.framework.target_svp import TargetSVP, parse_target_svp_yaml
 from semantic_ci_code.pipeline import ExtractorError, extract_python_code_state
 from semantic_ci_code.repair_compiler import RepairCompiler, get_adapter
@@ -61,6 +66,8 @@ def run_validate_plan(args: Namespace) -> int:
         return write_output(output, args.output)
     except (TargetUsageError, ValidatePlanUsageError, OSError, CompileError) as exc:
         return usage_error(exc)
+    except ExtractConfigError as exc:
+        return engine_error(exc, args, prefix="extract config error", show_traceback=True)
     except ExtractorError as exc:
         return engine_error(exc, args, prefix="extractor failed", show_traceback=True)
     except GitNotFoundError as exc:
@@ -85,13 +92,19 @@ def _load_baseline_state(args: Namespace) -> CodeState:
 
     if args.baseline_dir is not None:
         baseline_dir = _resolve_dir(args.baseline_dir, "baseline")
-        return extract_python_code_state(_resolve_package_root(baseline_dir, package_root))
+        baseline_root = _resolve_package_root(baseline_dir, package_root)
+        extract_config = load_extract_config_for_cli(baseline_root, args)
+        return extract_python_code_state(
+            baseline_root,
+            extract_config=extract_config,
+            exclude_reporter=make_exclude_reporter(args),
+        )
 
     if args.baseline_rev is not None:
         if not is_git_available():
             raise GitNotFoundError("git is required for --baseline-rev")
         root = repo_root(Path.cwd())
-        return _extract_ref_state(root, args.baseline_rev, package_root)
+        return _extract_ref_state(root, args.baseline_rev, package_root, args)
 
     if not is_git_available():
         return CodeState()
@@ -101,12 +114,18 @@ def _load_baseline_state(args: Namespace) -> CodeState:
         baseline_ref = resolve_baseline(None, repo_root=root, no_fetch=args.no_fetch)
     except GitError:
         return CodeState()
-    return _extract_ref_state(root, baseline_ref, package_root)
+    return _extract_ref_state(root, baseline_ref, package_root, args)
 
 
-def _extract_ref_state(root: Path, ref: str, package_root: Path) -> CodeState:
+def _extract_ref_state(root: Path, ref: str, package_root: Path, args: Namespace) -> CodeState:
     with materialize_ref(root, ref, prefix="semantic-ci-baseline-") as baseline_dir:
-        return extract_python_code_state(_resolve_package_root(baseline_dir, package_root))
+        baseline_root = _resolve_package_root(baseline_dir, package_root)
+        extract_config = load_extract_config_for_cli(baseline_root, args)
+        return extract_python_code_state(
+            baseline_root,
+            extract_config=extract_config,
+            exclude_reporter=make_exclude_reporter(args),
+        )
 
 
 def _package_root_relative(raw_path: str) -> Path:

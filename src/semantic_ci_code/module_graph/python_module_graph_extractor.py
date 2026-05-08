@@ -62,13 +62,18 @@ from pathlib import Path
 
 from semantic_ci_code.api_surface.python_api_extractor import _module_fqn_from_path
 from semantic_ci_code.domain.state_schema import ImportEntry, ModuleGraphEntry
+from semantic_ci_code.framework.extract_config import ExtractConfig, filter_excluded_paths
 from semantic_ci_code.imports import extract_python_imports
 
 
-def extract_python_module_graph(package_root: Path) -> tuple[ModuleGraphEntry, ...]:
+def extract_python_module_graph(
+    package_root: Path,
+    *,
+    extract_config: ExtractConfig | None = None,
+) -> tuple[ModuleGraphEntry, ...]:
     """Extract a deterministic repo-internal Python module graph."""
     root = package_root.resolve()
-    module_paths = _discover_module_paths(root)
+    module_paths = _discover_module_paths(root, extract_config=extract_config)
     modules_by_path = {
         path: _module_fqn_from_path(path, package_root=root) for path in module_paths
     }
@@ -107,8 +112,14 @@ def extract_python_module_graph(package_root: Path) -> tuple[ModuleGraphEntry, .
     )
 
 
-def _discover_module_paths(package_root: Path) -> tuple[Path, ...]:
-    return tuple(sorted(package_root.rglob("*.py"), key=lambda path: str(path.resolve())))
+def _discover_module_paths(
+    package_root: Path,
+    *,
+    extract_config: ExtractConfig | None,
+) -> tuple[Path, ...]:
+    paths = tuple(sorted(package_root.rglob("*.py"), key=lambda path: str(path.resolve())))
+    kept, _excluded = filter_excluded_paths(paths, extract_config)
+    return kept
 
 
 def _resolve_internal_modules(

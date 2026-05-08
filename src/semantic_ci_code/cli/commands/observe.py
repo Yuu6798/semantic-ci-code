@@ -10,8 +10,13 @@ from semantic_ci_code.cli.command_support import (
     _usage_error,
     _write_output,
 )
+from semantic_ci_code.cli.extract_config_runtime import (
+    load_extract_config_for_cli,
+    make_exclude_reporter,
+)
 from semantic_ci_code.cli.output import dump_json
 from semantic_ci_code.cli.output.json_formatter import build_payload
+from semantic_ci_code.framework.extract_config import ExtractConfigError
 from semantic_ci_code.pipeline import (
     ExtractorError,
     extract_python_code_state,
@@ -40,6 +45,8 @@ def run_observe(args: Namespace) -> int:
         return _usage_error(exc)
     except OSError as exc:
         return _usage_error(exc)
+    except ExtractConfigError as exc:
+        return _engine_error(exc, args, prefix="extract config error", show_traceback=True)
     except ExtractorError as exc:
         return _engine_error(exc, args, prefix="extractor failed")
     except Exception as exc:
@@ -47,10 +54,21 @@ def run_observe(args: Namespace) -> int:
 
 
 def _extract_state(args: Namespace, *, root: Path):
+    extract_config = load_extract_config_for_cli(root, args)
+    exclude_reporter = make_exclude_reporter(args)
     if args.paths is None:
-        return extract_python_code_state(root)
+        return extract_python_code_state(
+            root,
+            extract_config=extract_config,
+            exclude_reporter=exclude_reporter,
+        )
     paths = tuple(_path_from_cli(raw_path, package_root=root) for raw_path in args.paths)
-    return extract_python_code_state_from_paths(paths, package_root=root)
+    return extract_python_code_state_from_paths(
+        paths,
+        package_root=root,
+        extract_config=extract_config,
+        exclude_reporter=exclude_reporter,
+    )
 
 
 def _resolve_package_root(path: Path) -> Path:

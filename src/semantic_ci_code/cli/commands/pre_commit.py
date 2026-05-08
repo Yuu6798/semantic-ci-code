@@ -11,6 +11,7 @@ from semantic_ci_code.cli.code_state_cache import (
     cache_disabled,
     current_python_xy,
     dimensions_for_cache,
+    effective_exclude_key,
     key_for_state,
     key_meta,
     package_root_cache_path,
@@ -29,6 +30,10 @@ from semantic_ci_code.cli.command_support import (
     _write_output,
 )
 from semantic_ci_code.cli.delta_overlay import overlay_delta, summarize_numstat
+from semantic_ci_code.cli.extract_config_runtime import (
+    load_extract_config_for_cli,
+    make_exclude_reporter,
+)
 from semantic_ci_code.cli.git_diff import numstat_cached, staged_paths
 from semantic_ci_code.cli.git_runtime import (
     GitCommandError,
@@ -52,6 +57,7 @@ from semantic_ci_code.cli.worktree import materialize_ref
 from semantic_ci_code.compiler import CompiledTarget, CompileError
 from semantic_ci_code.delta import compute_code_state_delta
 from semantic_ci_code.evaluator import Verdict, VerdictResult, evaluate_constraints
+from semantic_ci_code.framework.extract_config import ExtractConfig, ExtractConfigError
 from semantic_ci_code.pipeline import ExtractorError, extract_python_code_state
 from semantic_ci_code.repair import RepairPlan, emit_repair_plan
 
@@ -89,11 +95,15 @@ def run_pre_commit(args: Namespace) -> int:
             with _export_index(root, prefix="semantic-ci-candidate-") as candidate_dir:
                 baseline_root = _resolve_package_root(baseline_dir, package_root, "baseline")
                 candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
+                baseline_config = load_extract_config_for_cli(baseline_root, args)
+                candidate_config = load_extract_config_for_cli(candidate_root, args)
                 if args.verbose:
                     _stderr(f"extracting baseline package_root={baseline_root}")
                 baseline = _extract_code_state(
                     package_root=package_root,
                     resolved_package_root=baseline_root,
+                    tree_root=baseline_dir,
+                    extract_config=baseline_config,
                     repo_root=root,
                     ref="HEAD",
                     mode=mode,
@@ -110,6 +120,8 @@ def run_pre_commit(args: Namespace) -> int:
                 candidate = _extract_code_state(
                     package_root=package_root,
                     resolved_package_root=candidate_root,
+                    tree_root=candidate_dir,
+                    extract_config=candidate_config,
                     repo_root=root,
                     ref=staged_tree,
                     mode=mode,
@@ -152,6 +164,8 @@ def run_pre_commit(args: Namespace) -> int:
         return _usage_error(exc)
     except CompileError as exc:
         return _engine_error(exc, args, show_traceback=True)
+    except ExtractConfigError as exc:
+        return _engine_error(exc, args, prefix="extract config error", show_traceback=True)
     except ExtractorError as exc:
         return _engine_error(exc, args, prefix="extractor failed", show_traceback=True)
     except GitNotFoundError as exc:
@@ -234,6 +248,8 @@ def _extract_code_state(
     *,
     package_root: Path,
     resolved_package_root: Path,
+    tree_root: Path,
+    extract_config: ExtractConfig,
     repo_root: Path,
     ref: str,
     mode,
@@ -246,16 +262,23 @@ def _extract_code_state(
     verbose: bool,
 ):
     if not use_cache:
-        return extract_python_code_state(resolved_package_root, dimensions=dimensions)
+        return extract_python_code_state(
+            resolved_package_root,
+            dimensions=dimensions,
+            extract_config=extract_config,
+            exclude_reporter=make_exclude_reporter(Namespace(verbose=verbose)),
+        )
 
     package_root_posix = package_root_cache_path(package_root)
     tree_id = tree_object_id(ref, package_root_posix.as_posix(), cwd=repo_root)
     python_xy = current_python_xy()
+    exclude_key = effective_exclude_key(extract_config, tree_root=tree_root)
     key = key_for_state(
         tree_object_id=tree_id,
         package_root_relpath_posix=package_root_posix,
         mode=mode,
         dimensions_sorted_tuple=dimensions_tuple,
+        effective_exclude_key_value=exclude_key,
         python_xy=python_xy,
     )
     log = _stderr if verbose else None
@@ -263,7 +286,12 @@ def _extract_code_state(
     if cached is not None:
         return cached
 
-    state = extract_python_code_state(resolved_package_root, dimensions=dimensions)
+    state = extract_python_code_state(
+        resolved_package_root,
+        dimensions=dimensions,
+        extract_config=extract_config,
+        exclude_reporter=make_exclude_reporter(Namespace(verbose=verbose)),
+    )
     write_cached_code_state(
         cache_root,
         key,
@@ -273,6 +301,7 @@ def _extract_code_state(
             package_root_relpath_posix=package_root_posix,
             mode=mode,
             dimensions_sorted_tuple=dimensions_tuple,
+            effective_exclude_key_value=exclude_key,
             python_xy=python_xy,
         ),
         stats=cache_stats,

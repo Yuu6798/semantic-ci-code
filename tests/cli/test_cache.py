@@ -13,12 +13,14 @@ from semantic_ci_code.cli.code_state_cache import (
     CODE_STATE_SCHEMA_VERSION,
     CacheStats,
     cache_key,
+    effective_exclude_key,
     evict_to_budget,
     key_meta,
     write_cached_code_state,
 )
 from semantic_ci_code.cli.modes import ExecutionMode
 from semantic_ci_code.domain.state_schema import CodeState
+from semantic_ci_code.framework.extract_config import ExtractConfig
 
 from .git_helpers import (
     CANDIDATE_SOURCE,
@@ -169,11 +171,36 @@ def test_cache_key_changes_for_each_axis():
         {"python_xy": "3.12"},
         {"package_version_value": "0.2.0"},
         {"cache_format_version": CACHE_FORMAT_VERSION + 1},
+        {"effective_exclude_key_value": (".", ("generated",))},
     ]
 
     for variant in variants:
         changed = {**base, **variant}
         assert cache_key(**changed) != baseline
+
+
+def test_effective_exclude_key_is_tree_relative_and_pattern_order_insensitive(tmp_path: Path):
+    tree_root = tmp_path / "tree"
+    config_root = tree_root / "src"
+    config_root.mkdir(parents=True)
+    config = ExtractConfig(
+        patterns=("**/*_pb2.py", "generated"),
+        config_root=config_root,
+        source_path=config_root / "pyproject.toml",
+    )
+
+    first = effective_exclude_key(config, tree_root=tree_root)
+    reordered = effective_exclude_key(
+        ExtractConfig(
+            patterns=("generated", "**/*_pb2.py"),
+            config_root=config_root,
+            source_path=config_root / "pyproject.toml",
+        ),
+        tree_root=tree_root,
+    )
+
+    assert first == ("src", ("**/*_pb2.py", "generated"))
+    assert reordered == first
 
 
 def test_cache_package_version_uses_source_fingerprint_when_metadata_is_unknown(monkeypatch):

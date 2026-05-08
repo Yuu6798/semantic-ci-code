@@ -31,6 +31,31 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 直近 merged
 
+### 2026-05-08 — D5 解消 + Brief 5 sweep tail
+
+- **PR #65** (CSCI-35c / set operator partial-match semantics): D5 = FINDING-1
+  解消。`framework/match_schema.py` 新設で `api_surface` / `effects` / `imports`
+  系 dict-collection target に **Match Schema**(`required_key` /
+  `optional_keys` / `forbidden_keys`)を導入、`includes_all` / `includes_any` /
+  `excludes_all` / `subset_of` / `superset_of` を partial-record match に切替、
+  `excludes_all` violation で `evidence.matched` `{expected_item,
+  observed_record}` pair を report。bare-string desugar(`"pkg.foo"` →
+  `{fqn: "pkg.foo"}`)+ 平坦投影 alias(`api_surface_delta.added.fqns` 等
+  3 個)+ compile-time validation(`signature` / `confidence` / `evidence` /
+  `symbols` を forbidden、unknown key did-you-mean、空 `excludes_all` /
+  `includes_any` を reject)。verdict / compile JSON envelope を
+  `schema_version="4"` → `"5"` bump。merge 過程で 5 件の follow-up fix
+  (`acfc03e` partial-match key presence / `3b047b2` follow-ups /
+  `d83f365` changed API key / `783afa3` evidence pair JSON / `5eb7526`
+  removed_public schema)を取り込み、false-negative CI bypass を closure
+- **PR #66** (CSCI-35d / Brief 5 sweep tail): CSCI-35b sweep 残 2 件を 1 PR で
+  消化 — (a) `compile_target_svp` YAML round-trip コメント拡張(なぜ engine
+  normalization parity のために round-trip が必要かを implementer 向けに pin)、
+  (b) Claude Code adapter の `Forbidden Zones` / `Required Additions` を
+  `render_risk_section_structured` で human-friendly な numbered nested bullet
+  に切替(Cursor / Codex は据え置き、§21.3 adapter divergence の許容範囲)。
+  Cursor 移行 + 旧 flat 形式 docs 更新は follow-up
+
 ### 2026-05-07 Session 5 — TC10 dogfooding + D5 tracking
 
 - **PR #61** (dogfooding TC10): 仮想 Python パッケージ 10 ケースで `compare` /
@@ -85,52 +110,28 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 次の発行順序
 
-- **A. CSCI-35b sweep brief**(優先、残 2 件まで縮小): Brief 5 review で
-  deferred とした (1) ~~`would_violate` の delta-kind 盲点 docs 明記~~
-  (`docs/cli_usage.md:348-353` で既に明記済と確認、撤回)、(2)
-  `compile_target_svp` の YAML round-trip コメント追加、(3) ~~`_resolve_package_root`
-  の symlink escape 防御~~(**PR #59 で完了**)、(4) Claude Code
-  `Forbidden Zones` / `Required Additions` の human-friendly レンダリング、を
-  1 PR で消化(残 (2) + (4))
 - **A'. target.yaml authoring guide 新規**(`docs/target_yaml_guide.md`):
   2026-05-07 Session 4 dogfood で発見した hazard 群を集約 — D1:
   `--package-root` scope 制約、D3: template と user constraint の重複、D4:
-  config-only PR の vacuous PASS。半日〜1 日。CSCI-35b と並列 or 同梱可
+  config-only PR の vacuous PASS。半日〜1 日
 - **B. Brief 7 (SSP v0.1)**: Semantic Security Protocol。Brief 5 完了済 →
   CSCI-36〜40 として発行可能。planning は `docs/brief_7_planning.md` で
   merged 済み
 - **C. P2 残課題の brief 化**: Lock violation 即 fail(§8.2)/ Performance
   budget per-extractor timeout(§18)/ Hash trail per-extractor version(§10)
-- **D. extractor exclude 機構**(2026-05-07 Session 4 dogfood D2):
-  `tests/fixtures/pipeline/syntax_error/bad.py` のような意図的に壊れた
-  fixture が `--package-root .` で extractor を crash させる、`pyproject.toml`
-  に exclude pattern を持つ仕組みが未実装。半日〜1 日、別 brief
+- **D. extractor exclude 機構**(2026-05-07 Session 4 dogfood D2、
+  **PR #67 in review**): `pyproject.toml` の `[tool.semantic_ci_code.extract]
+  exclude = [...]` を `framework/extract_config.py` で load し、`observe` /
+  `compare` / `check` / `pre-commit` / `validate-plan` baseline 抽出経路で
+  AST parse 前に filter する実装。pattern matcher は stdlib `fnmatch` のみ
+  (リテラル / 末尾 `/**` / `**/basename` 略記 / 同 segment 数の path glob)、
+  `..` / 絶対 path / backslash / 不明 key は engine error。cache key に
+  `effective_exclude` 軸追加(現行 v2 cache が一度だけ rebuild される副作用、
+  release note に追記検討)。`compile` / `compile-repair` / `init` は本 config
+  を load しない
 - **E. ResultStatus 概念モデル更新**(弱点 ③): `UNKNOWN` を authoring error
   と extractor failure に分離。波及範囲は evaluator / risk_summary / adapter
   / cli 出力 / json schema / SARIF / GH Actions、設計議論必要、1〜2 日
-- **F. set operator partial-match semantics**(2026-05-07 Session 5 dogfood
-  - Resolved in CSCI-35c: Match Schema partial-record matching, compile-time validation, and flat projection aliases landed.
-  D5 = FINDING-1、PR #61 由来、**resolved in CSCI-35c**): set 系 operator が
-  `api_surface_*` / `effects` / `imports` 等の dict 要素 collection に対して
-  **完全レコード一致**しか効かない。`target.yaml` で `expected: [{fqn: pkg.foo}]`
-  の partial dict を書くと observed の full dict(`fqn` + `kind` + `signature`
-  + `visibility`)と非マッチで以下の operator-specific 結果になる:
-  - **false positive(silently violated)**: `includes_all` / `includes_any` /
-    `superset_of` / `subset_of` — 期待要素が「missing」と判定され、実際は
-    存在していても violated 扱い。user constraint surface の信頼性を毀損
-  - **false negative(silently satisfied = CI bypass)**: `excludes_all` —
-    禁止要素として書いた partial dict が full record と交差せず、**禁止記号が
-    実在しても constraint は satisfied**。allow-list / deny-list 用途で gate
-    が無声化、`excludes_all` を使った forbidden-symbol policy は実質無効化
-    される最も危険な失敗モード
-
-  設計サンプル(`docs/code_semantic_ci_design.md §4.5` の bare 文字列 list)
-  も同様に不一致。Session 4 D1〜D4 と同じ dogfood-driven fix plan の一員と
-  して **D5** に位置付け、解消方針候補は (a) partial-key matcher セマンティクス
-  導入 / (b) 派生 target 追加(`api_surface_delta.added.fqns` 等) / (c)
-  両併用。設計判断+実装で 1〜2 日規模、operator semantics 変更を伴うため別
-  brief。詳細・evidence・root cause・再現条件は
-  `docs/dogfooding_TC10_report.md §FINDING-1`(TC4 reproduction)
 
 ## Frozen / Deferred
 

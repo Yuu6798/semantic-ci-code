@@ -6,38 +6,54 @@ identifies safe follow-up work, but does not delete tests.
 
 Snapshot:
 
-- Date: 2026-05-05
-- Command: `python -m pytest tests\cli -q --durations=25`
-- Result: `125 passed in 190.60s (0:03:10)`
-- Scope: CLI tests only
+- Date: 2026-05-09
+- Command: `python -m pytest -q --no-cov tests/cli`
+- Result: `230 passed, 4 skipped, 1 deselected in 264.92s` on Windows Codex desktop
+- Scope: CLI tests only; default run excludes the single `slow` smoke/full benchmark
 
 ## File Map
 
-| File | Tests | Primary role | Keep rationale |
-|---|---:|---|---|
-| `tests/cli/test_observe.py` | 21 | `observe` command contract, legacy entrypoint, basic output schema, path mode, usage errors | First CLI slice. Guards `semantic-ci` and `python -m semantic_ci_code.cli` entrypoint behavior. |
-| `tests/cli/test_compare.py` | 40 | `compare` command, target discovery, full JSON/human rendering, output routing, config errors | Broadest non-git command surface. Several assertions are reduction candidates. |
-| `tests/cli/test_check.py` | 25 | git ref resolution, worktree materialization, dirty handling, check overlay, cleanup | Slow but high-value. Exercises real git worktrees and failure cleanup. |
-| `tests/cli/test_pre_commit.py` | 12 | staged-index export, overlay, dirty unstaged behavior, pre-commit exit matrix | Slow but covers a separate candidate materialization path from `check`. |
-| `tests/cli/test_compile.py` | 12 | `compile` command, compile envelope, policy serialization, target errors | Mostly command-level wrapper around compiler and formatter behavior. |
-| `tests/cli/test_e2e.py` | 8 | smoke coverage for all five subcommands and docs links | Useful as a release sanity layer, but should remain shallow. |
-| `tests/cli/test_overlay.py` | 7 | pure `numstat` parser and delta overlay unit tests | Fast, focused, keep as-is. |
+| File | Tests | Default invocation | Subprocess retained for | Primary role |
+|---|---:|---|---|---|
+| `tests/cli/test_cache.py` | 28 | in-process | 2 sitecustomize cache-hit sentinels | CodeState cache hit/miss, eviction, cache key axes |
+| `tests/cli/test_check.py` | 25 | in-process | PYTHONHASHSEED determinism | git ref resolution, worktree materialization, dirty handling, cleanup |
+| `tests/cli/test_compare.py` | 40 | in-process | PYTHONHASHSEED determinism | `compare` contract, target discovery, JSON/human rendering, output routing |
+| `tests/cli/test_compare_partial_match.py` | 1 | in-process | none | partial-match end-to-end regression |
+| `tests/cli/test_compile.py` | 13 | in-process | PYTHONHASHSEED determinism | `compile` envelope, policy serialization, target errors |
+| `tests/cli/test_compile_repair.py` | 15 | in-process | none | `compile-repair` pipe/input/output behavior |
+| `tests/cli/test_e2e.py` | 8 | in-process | `--version` and `--help` console-script smoke | shallow release sanity layer |
+| `tests/cli/test_extract_config_cli.py` | 3 | in-process | none | extractor exclude CLI integration and error routing |
+| `tests/cli/test_helpers.py` | 1 | in-process | none | in-process CLI invoker smoke coverage |
+| `tests/cli/test_init_command.py` | 5 | in-process | none | `init` scaffold and overwrite behavior |
+| `tests/cli/test_json_formatter.py` | 2 | direct unit | none | JSON formatter edge behavior |
+| `tests/cli/test_modes.py` | 10 | in-process | slow benchmark opt-in uses subprocess | smoke/full mode behavior and benchmark |
+| `tests/cli/test_observe.py` | 21 | in-process | console script, python module, legacy script, PYTHONHASHSEED determinism | `observe` contract, entrypoints, output schema |
+| `tests/cli/test_output_gh_actions.py` | 12 | in-process | PYTHONHASHSEED determinism | GitHub Actions annotation output |
+| `tests/cli/test_output_sarif.py` | 13 | in-process | PYTHONHASHSEED determinism | SARIF output |
+| `tests/cli/test_overlay.py` | 7 | direct unit | none | `numstat` parser and delta overlay |
+| `tests/cli/test_pre_commit.py` | 12 | in-process | PYTHONHASHSEED determinism | staged-index export and pre-commit semantics |
+| `tests/cli/test_pre_commit_manifest.py` | 2 | direct unit | none | static pre-commit manifest validation |
+| `tests/cli/test_resolve_package_root.py` | 3 | direct unit | none | package-root path guard behavior |
+| `tests/cli/test_validate_plan.py` | 9 | in-process | none | `validate-plan` baseline/input/output behavior |
 
 ## Runtime Findings
 
-The slowest tests are dominated by real git worktree and subprocess flows.
+D2-1 switched `run_semantic_ci` to in-process `cli.main(...)` by default.
+Subprocess is now limited to cases that need process-start semantics
+(`PYTHONHASHSEED`), console-script entrypoints, or `sitecustomize` import-time
+sentinels. The single smoke/full performance comparison is marked `slow` and
+is excluded by default.
 
-Top slow categories from the duration sample:
+Remaining wallclock is dominated by real git operations and extraction, not CLI
+process startup:
 
-- `test_check.py`: most of the top 25 durations, usually around 3-5 seconds
-  each. These tests create git repositories and materialize worktrees.
-- `test_pre_commit.py`: staged-index export tests often take about 3 seconds
-  each.
-- `test_e2e.py`: `check` and `pre-commit` smoke tests are also git-backed and
-  appear in the top 25.
-
-The pure parser layer (`test_overlay.py`) is not the source of CLI-suite cost.
-The cost is subprocess + git + extraction.
+- `test_check.py` creates git repositories, materializes worktrees, and verifies
+  cleanup and shallow-clone behavior.
+- `test_cache.py` and `test_pre_commit.py` exercise real cache files and staged
+  index export.
+- Direct parser/helper layers (`test_overlay.py`, `test_json_formatter.py`,
+  `test_pre_commit_manifest.py`, `test_resolve_package_root.py`) are not the
+  source of CLI-suite cost.
 
 ## Coverage Categories
 

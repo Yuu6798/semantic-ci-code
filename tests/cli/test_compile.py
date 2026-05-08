@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .helpers import parse_json, payload, run_semantic_ci
+from .helpers import parse_json, payload, run_semantic_ci, run_semantic_ci_subprocess
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compile"
 
@@ -248,8 +248,8 @@ def test_compile_subprocess_determinism_across_hash_seeds():
         "json",
     )
 
-    first = run_semantic_ci(FIXTURES, *args, hash_seed="1")
-    second = run_semantic_ci(FIXTURES, *args, hash_seed="2")
+    first = run_semantic_ci_subprocess(FIXTURES, *args, hash_seed="1")
+    second = run_semantic_ci_subprocess(FIXTURES, *args, hash_seed="2")
 
     assert first.returncode == 0
     assert first.stdout == second.stdout

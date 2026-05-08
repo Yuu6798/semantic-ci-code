@@ -20,7 +20,7 @@ from .git_helpers import (
     run,
     write_file,
 )
-from .helpers import parse_json, payload, run_semantic_ci
+from .helpers import parse_json, payload, run_semantic_ci, run_semantic_ci_subprocess
 
 
 def test_check_pass_fixture_exits_zero_with_json_verdict_pass(tmp_path: Path):
@@ -284,8 +284,12 @@ def test_invalid_explicit_baseline_ref_exits_engine_error(tmp_path: Path):
 def test_subprocess_determinism_across_hash_seeds(tmp_path: Path):
     repo = init_repo(tmp_path)
 
-    first = run_semantic_ci(repo, "check", "--format", "json", "--no-cache", hash_seed="1")
-    second = run_semantic_ci(repo, "check", "--format", "json", "--no-cache", hash_seed="2")
+    first = run_semantic_ci_subprocess(
+        repo, "check", "--format", "json", "--no-cache", hash_seed="1"
+    )
+    second = run_semantic_ci_subprocess(
+        repo, "check", "--format", "json", "--no-cache", hash_seed="2"
+    )
 
     assert first.returncode == 0
     assert first.stdout == second.stdout

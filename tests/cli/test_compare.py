@@ -4,7 +4,7 @@ from pathlib import Path
 
 from semantic_ci_code.api_surface import extract_python_api_surface
 
-from .helpers import parse_json, payload, run_console
+from .helpers import parse_json, payload, run_semantic_ci, run_semantic_ci_subprocess
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compare"
 BASELINE = FIXTURES / "baseline_pkg"
@@ -18,13 +18,11 @@ INVALID_TARGET = FIXTURES / "target_invalid.yaml"
 def run_cli(
     *args: str,
     cwd: Path | None = None,
-    hash_seed: str = "1",
     extra_env: dict[str, str] | None = None,
 ):
-    return run_console(
+    return run_semantic_ci(
         cwd or Path.cwd(),
         *args,
-        hash_seed=hash_seed,
         extra_env=extra_env,
     )
 
@@ -445,8 +443,12 @@ def test_same_fixture_stdout_is_byte_identical():
 
 
 def test_subprocess_determinism_across_hash_seeds():
-    first = run_cli(*compare_args(PASS_TARGET), "--format", "json", hash_seed="1")
-    second = run_cli(*compare_args(PASS_TARGET), "--format", "json", hash_seed="2")
+    first = run_semantic_ci_subprocess(
+        Path.cwd(), *compare_args(PASS_TARGET), "--format", "json", hash_seed="1"
+    )
+    second = run_semantic_ci_subprocess(
+        Path.cwd(), *compare_args(PASS_TARGET), "--format", "json", hash_seed="2"
+    )
 
     assert first.stdout == second.stdout
 

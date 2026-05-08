@@ -5,18 +5,24 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .helpers import parse_json, run_console, run_module
+from .helpers import (
+    parse_json,
+    run_console,
+    run_module,
+    run_semantic_ci,
+    run_semantic_ci_subprocess,
+)
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli"
 OBSERVE_PKG = FIXTURES / "observe_pkg"
 
 
-def run_cli(*args: str, hash_seed: str = "1", cwd: Path | None = None):
-    return run_console(cwd or Path.cwd(), *args, hash_seed=hash_seed)
+def run_cli(*args: str, cwd: Path | None = None):
+    return run_semantic_ci(cwd or Path.cwd(), *args)
 
 
 def test_console_script_version_exits_zero():
-    result = run_cli("--version")
+    result = run_console(Path.cwd(), "--version")
 
     assert result.returncode == 0
     assert result.stdout.strip()
@@ -196,8 +202,12 @@ def test_same_fixture_stdout_is_byte_identical():
 
 
 def test_subprocess_determinism_across_hash_seeds():
-    first = run_cli("observe", "--package-root", str(OBSERVE_PKG), hash_seed="1")
-    second = run_cli("observe", "--package-root", str(OBSERVE_PKG), hash_seed="2")
+    first = run_semantic_ci_subprocess(
+        Path.cwd(), "observe", "--package-root", str(OBSERVE_PKG), hash_seed="1"
+    )
+    second = run_semantic_ci_subprocess(
+        Path.cwd(), "observe", "--package-root", str(OBSERVE_PKG), hash_seed="2"
+    )
 
     assert first.returncode == 0
     assert second.returncode == 0

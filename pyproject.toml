@@ -39,6 +39,10 @@ namespaces = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: tests with non-trivial wallclock cost; opt-in via -m slow",
+]
 
 [tool.coverage.run]
 source = ["src/semantic_ci_code"]

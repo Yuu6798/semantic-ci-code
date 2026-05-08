@@ -8,7 +8,7 @@ from .git_helpers import (
     init_repo_without_candidate_commit,
     stage_changes,
 )
-from .helpers import payload, run_console
+from .helpers import payload, run_console, run_semantic_ci
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli"
 OBSERVE_PKG = FIXTURES / "observe_pkg"
@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_e2e_observe_subcommand():
-    result = run_console(OBSERVE_PKG, "observe", "--package-root", str(OBSERVE_PKG))
+    result = run_semantic_ci(OBSERVE_PKG, "observe", "--package-root", str(OBSERVE_PKG))
     data = payload(result)
 
     assert result.returncode == 0
@@ -27,7 +27,7 @@ def test_e2e_observe_subcommand():
 
 
 def test_e2e_compare_subcommand():
-    result = run_console(
+    result = run_semantic_ci(
         COMPARE,
         "compare",
         "--baseline-dir",
@@ -47,7 +47,7 @@ def test_e2e_compare_subcommand():
 def test_e2e_check_subcommand(tmp_path: Path):
     repo = init_repo(tmp_path)
 
-    result = run_console(repo, "check", "--format", "json")
+    result = run_semantic_ci(repo, "check", "--format", "json")
     data = payload(result)
 
     assert result.returncode in {0, 1}
@@ -59,7 +59,7 @@ def test_e2e_pre_commit_subcommand(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
 
-    result = run_console(repo, "pre-commit", "--format", "json")
+    result = run_semantic_ci(repo, "pre-commit", "--format", "json")
     data = payload(result)
 
     assert result.returncode in {0, 1}
@@ -68,7 +68,7 @@ def test_e2e_pre_commit_subcommand(tmp_path: Path):
 
 
 def test_e2e_compile_subcommand():
-    result = run_console(
+    result = run_semantic_ci(
         COMPILE,
         "compile",
         "--target",

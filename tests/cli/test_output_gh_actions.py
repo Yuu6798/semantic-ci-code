@@ -12,7 +12,7 @@ from .git_helpers import (
     stage_changes,
     write_file,
 )
-from .helpers import run_semantic_ci
+from .helpers import run_semantic_ci, run_semantic_ci_subprocess
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compare"
 BASELINE = FIXTURES / "baseline_pkg"
@@ -190,14 +190,14 @@ def test_gh_actions_output_file_is_usage_error(tmp_path: Path):
 
 
 def test_gh_actions_is_byte_identical_across_hash_seeds():
-    first = run_semantic_ci(
+    first = run_semantic_ci_subprocess(
         Path.cwd(),
         *compare_args(REPAIR_TARGET),
         "--format",
         "gh-actions",
         hash_seed="1",
     )
-    second = run_semantic_ci(
+    second = run_semantic_ci_subprocess(
         Path.cwd(),
         *compare_args(REPAIR_TARGET),
         "--format",

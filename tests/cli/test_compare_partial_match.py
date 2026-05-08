@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .helpers import payload, run_console
+from .helpers import payload, run_semantic_ci
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compare"
 BASELINE = FIXTURES / "baseline_pkg"
@@ -27,7 +27,7 @@ constraints:
         encoding="utf-8",
     )
 
-    result = run_console(
+    result = run_semantic_ci(
         Path.cwd(),
         "compare",
         "--baseline-dir",

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from semantic_ci_code.domain.state_schema import JsonValue
 from semantic_ci_code.framework.constraint_types import Operator
+from semantic_ci_code.framework.match_schema import match_item
 
 STATUS_SATISFIED: Final = "satisfied"
 STATUS_VIOLATED: Final = "violated"
@@ -44,6 +45,14 @@ PURE_OPERATORS: Final = frozenset(
         Operator.WITHIN_RANGE,
     }
 )
+
+
+class CanonicalMapping(tuple):
+    """Tuple marker for dicts canonicalized by evaluator evidence.
+
+    Plain JSON arrays can legitimately contain two-item string tuples. The
+    marker lets renderers reconstruct only dict-origin records as objects.
+    """
 
 
 @dataclass(frozen=True)
@@ -132,7 +141,11 @@ def _includes_all(resolved: object, expected: object) -> OperatorOutcome:
     expected_items = _collection_items(expected)
     if observed_items is None or expected_items is None:
         return _unknown_type_mismatch(observed=resolved, expected=expected)
-    missing = expected_items - observed_items
+    missing = tuple(
+        expected_item
+        for expected_item in expected_items
+        if not _any_observed_matches(expected_item, observed_items)
+    )
     return _set_outcome(not missing, observed_items, expected_items, missing=missing)
 
 
@@ -141,7 +154,11 @@ def _includes_any(resolved: object, expected: object) -> OperatorOutcome:
     expected_items = _collection_items(expected)
     if observed_items is None or expected_items is None:
         return _unknown_type_mismatch(observed=resolved, expected=expected)
-    common = observed_items & expected_items
+    common = tuple(
+        expected_item
+        for expected_item in expected_items
+        if _any_observed_matches(expected_item, observed_items)
+    )
     return _set_outcome(bool(common), observed_items, expected_items, common=common)
 
 
@@ -150,8 +167,8 @@ def _excludes_all(resolved: object, expected: object) -> OperatorOutcome:
     expected_items = _collection_items(expected)
     if observed_items is None or expected_items is None:
         return _unknown_type_mismatch(observed=resolved, expected=expected)
-    common = observed_items & expected_items
-    return _set_outcome(not common, observed_items, expected_items, common=common)
+    matched = _matched_pairs(expected_items, observed_items)
+    return _set_outcome(not matched, observed_items, expected_items, matched=matched)
 
 
 def _subset_of(resolved: object, expected: object) -> OperatorOutcome:
@@ -159,7 +176,11 @@ def _subset_of(resolved: object, expected: object) -> OperatorOutcome:
     expected_items = _collection_items(expected)
     if observed_items is None or expected_items is None:
         return _unknown_type_mismatch(observed=resolved, expected=expected)
-    extra = observed_items - expected_items
+    extra = tuple(
+        observed_item
+        for observed_item in observed_items
+        if not _any_expected_matches(observed_item, expected_items)
+    )
     return _set_outcome(not extra, observed_items, expected_items, extra=extra)
 
 
@@ -168,7 +189,11 @@ def _superset_of(resolved: object, expected: object) -> OperatorOutcome:
     expected_items = _collection_items(expected)
     if observed_items is None or expected_items is None:
         return _unknown_type_mismatch(observed=resolved, expected=expected)
-    missing = expected_items - observed_items
+    missing = tuple(
+        expected_item
+        for expected_item in expected_items
+        if not _any_observed_matches(expected_item, observed_items)
+    )
     return _set_outcome(not missing, observed_items, expected_items, missing=missing)
 
 
@@ -179,8 +204,8 @@ def _equals_baseline(baseline: object, candidate: object) -> OperatorOutcome:
     candidate_items = _collection_items(candidate)
     if baseline_items is None or candidate_items is None:
         return _baseline_boolean_outcome(False, baseline=baseline, candidate=candidate)
-    added = candidate_items - baseline_items
-    removed = baseline_items - candidate_items
+    added = tuple(item for item in candidate_items if item not in baseline_items)
+    removed = tuple(item for item in baseline_items if item not in candidate_items)
     return _baseline_set_outcome(
         False,
         baseline_items,
@@ -195,7 +220,7 @@ def _baseline_superset_of(baseline: object, candidate: object) -> OperatorOutcom
     candidate_items = _collection_items(candidate)
     if baseline_items is None or candidate_items is None:
         return _unknown_type_mismatch(baseline=baseline, candidate=candidate)
-    missing = baseline_items - candidate_items
+    missing = tuple(item for item in baseline_items if item not in candidate_items)
     return _baseline_set_outcome(not missing, baseline_items, candidate_items, missing=missing)
 
 
@@ -204,7 +229,7 @@ def _no_new_items(baseline: object, candidate: object) -> OperatorOutcome:
     candidate_items = _collection_items(candidate)
     if baseline_items is None or candidate_items is None:
         return _unknown_type_mismatch(baseline=baseline, candidate=candidate)
-    extra = candidate_items - baseline_items
+    extra = tuple(item for item in candidate_items if item not in baseline_items)
     return _baseline_set_outcome(not extra, baseline_items, candidate_items, extra=extra)
 
 
@@ -213,7 +238,7 @@ def _no_removed_items(baseline: object, candidate: object) -> OperatorOutcome:
     candidate_items = _collection_items(candidate)
     if baseline_items is None or candidate_items is None:
         return _unknown_type_mismatch(baseline=baseline, candidate=candidate)
-    missing = baseline_items - candidate_items
+    missing = tuple(item for item in baseline_items if item not in candidate_items)
     return _baseline_set_outcome(not missing, baseline_items, candidate_items, missing=missing)
 
 
@@ -295,9 +320,9 @@ def _baseline_boolean_outcome(
 
 def _set_outcome(
     satisfied: bool,
-    observed_items: frozenset[object],
-    expected_items: frozenset[object],
-    **details: frozenset[object],
+    observed_items: tuple[object, ...],
+    expected_items: tuple[object, ...],
+    **details: tuple[object, ...],
 ) -> OperatorOutcome:
     status = STATUS_SATISFIED if satisfied else STATUS_VIOLATED
     error_code = None if satisfied else E_VIOLATION
@@ -311,9 +336,9 @@ def _set_outcome(
 
 def _baseline_set_outcome(
     satisfied: bool,
-    baseline_items: frozenset[object],
-    candidate_items: frozenset[object],
-    **details: frozenset[object],
+    baseline_items: tuple[object, ...],
+    candidate_items: tuple[object, ...],
+    **details: tuple[object, ...],
 ) -> OperatorOutcome:
     status = STATUS_SATISFIED if satisfied else STATUS_VIOLATED
     error_code = None if satisfied else E_VIOLATION
@@ -333,14 +358,14 @@ def _unknown_type_mismatch(**evidence: object) -> OperatorOutcome:
     )
 
 
-def _collection_items(value: object) -> frozenset[object] | None:
+def _collection_items(value: object) -> tuple[object, ...] | None:
     canon = _canon(value)
     if isinstance(canon, str | bytes):
         return None
     if isinstance(canon, tuple):
-        return frozenset(canon)
+        return _sorted_values(frozenset(canon))
     if isinstance(canon, frozenset):
-        return canon
+        return _sorted_values(canon)
     return None
 
 
@@ -352,17 +377,46 @@ def _evidence(**items: object) -> tuple[tuple[str, JsonValue], ...]:
     return tuple((key, _canon(value)) for key, value in sorted(items.items()))
 
 
-def _sorted_values(values: frozenset[object]) -> tuple[object, ...]:
+def _any_observed_matches(expected_item: object, observed_items: tuple[object, ...]) -> bool:
+    return any(match_item(expected_item, observed_item) for observed_item in observed_items)
+
+
+def _any_expected_matches(observed_item: object, expected_items: tuple[object, ...]) -> bool:
+    return any(match_item(expected_item, observed_item) for expected_item in expected_items)
+
+
+def _matched_pairs(
+    expected_items: tuple[object, ...],
+    observed_items: tuple[object, ...],
+) -> tuple[object, ...]:
+    pairs = []
+    for expected_item in expected_items:
+        for observed_item in observed_items:
+            if match_item(expected_item, observed_item):
+                pairs.append(
+                    CanonicalMapping(
+                        (
+                            ("expected_item", expected_item),
+                            ("observed_record", observed_item),
+                        )
+                    )
+                )
+    return _sorted_values(frozenset(pairs))
+
+
+def _sorted_values(values: frozenset[object] | tuple[object, ...]) -> tuple[object, ...]:
     return tuple(sorted(values, key=repr))
 
 
 def _canon(value: object) -> object:
     if isinstance(value, BaseModel):
         return _canon(value.model_dump(mode="json"))
+    if isinstance(value, CanonicalMapping):
+        return CanonicalMapping((key, _canon(item)) for key, item in value)
     if isinstance(value, list | tuple):
         return tuple(_canon(item) for item in value)
     if isinstance(value, dict):
-        return tuple((key, _canon(item)) for key, item in sorted(value.items()))
+        return CanonicalMapping((key, _canon(item)) for key, item in sorted(value.items()))
     if isinstance(value, set | frozenset):
         return frozenset(_canon(item) for item in value)
     return value

@@ -14,9 +14,10 @@ from semantic_ci_code.compiler import (
 )
 from semantic_ci_code.domain.state_schema import CodeState, LocDelta
 from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
+from semantic_ci_code.evaluator.operators import CanonicalMapping
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
 
-SCHEMA_VERSION = "4"
+SCHEMA_VERSION = "5"
 PACKAGE_NAME = "semantic-ci-code"
 UNKNOWN_VERSION = "0.0.0+unknown"
 
@@ -225,12 +226,12 @@ def _serialize_repair_instruction(instruction: RepairInstruction) -> dict[str, A
         "repair_code": instruction.repair_code,
         "category": instruction.category.value,
         "message": instruction.message,
-        "observed": _json_value(instruction.observed),
-        "expected": _json_value(instruction.expected),
-        "added": [_json_value(item) for item in instruction.added],
-        "removed": [_json_value(item) for item in instruction.removed],
-        "missing": [_json_value(item) for item in instruction.missing],
-        "extra": [_json_value(item) for item in instruction.extra],
+        "observed": _json_canonical_value(instruction.observed),
+        "expected": _json_canonical_value(instruction.expected),
+        "added": [_json_canonical_value(item) for item in instruction.added],
+        "removed": [_json_canonical_value(item) for item in instruction.removed],
+        "missing": [_json_canonical_value(item) for item in instruction.missing],
+        "extra": [_json_canonical_value(item) for item in instruction.extra],
         "extra_evidence": _pairs_to_dict(instruction.extra_evidence),
     }
 
@@ -258,7 +259,7 @@ def _serialize_cache_stats(stats: Any | None) -> dict[str, Any]:
 
 
 def _pairs_to_dict(pairs: tuple[tuple[str, Any], ...]) -> dict[str, Any]:
-    return {key: _json_value(value) for key, value in pairs}
+    return {key: _json_canonical_value(value) for key, value in pairs}
 
 
 def _json_value(value: Any) -> Any:
@@ -266,4 +267,14 @@ def _json_value(value: Any) -> Any:
         return [_json_value(item) for item in value]
     if isinstance(value, dict):
         return {key: _json_value(item) for key, item in value.items()}
+    return value
+
+
+def _json_canonical_value(value: Any) -> Any:
+    if isinstance(value, CanonicalMapping):
+        return {str(key): _json_canonical_value(item) for key, item in value}
+    if isinstance(value, tuple | list):
+        return [_json_canonical_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _json_canonical_value(item) for key, item in value.items()}
     return value

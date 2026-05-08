@@ -41,6 +41,16 @@ _CODE_STATE_ALIASES: frozenset[str] = frozenset({"api_surface_public"})
 # (SymbolDelta and lookalikes). Mirrors ``resolve_path`` line 31-33.
 _REMOVED_PUBLIC_ALIAS: str = "removed_public"
 
+# Flat projection aliases recognized by ``path_resolver.resolve_path`` for
+# string-set gating surfaces. These do not appear in the Pydantic schema.
+_DELTA_FLAT_PROJECTION_ALIASES: frozenset[str] = frozenset(
+    {
+        "api_surface_delta.added.fqns",
+        "effect_changes.added.fqns",
+        "imports_delta.added.modules",
+    }
+)
+
 # Dimensions whose values are open ``JsonMapping``s; any subpath under
 # these prefixes is a syntactically valid authoring target.
 _OPEN_PREFIXES: frozenset[str] = frozenset({"python_specific", "typescript_specific"})
@@ -77,6 +87,7 @@ def valid_delta_target_paths() -> frozenset[str]:
     paths: set[str] = set(valid_state_target_paths())
     for field_name, field_info in CodeStateDelta.model_fields.items():
         _walk(field_name, field_info.annotation, paths)
+    paths.update(_DELTA_FLAT_PROJECTION_ALIASES)
     return frozenset(paths)
 
 

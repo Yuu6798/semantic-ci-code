@@ -243,6 +243,11 @@ constraints:
     unknown_policy: fail
 ```
 
+`api_surface_delta.added` is a record collection. Bare string `expected` items
+are compile-time sugar for `{fqn: "<value>"}`, so the sample above matches the
+observed API record even when the extractor includes extra fields such as
+`kind`, `visibility`, or `signature`.
+
 ### 4.6 サンプル: リファクタリング
 
 ```yaml

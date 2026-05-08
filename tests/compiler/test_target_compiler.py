@@ -470,7 +470,7 @@ def test_design_feature_sample_compiles_and_preserves_optional_fields():
     assert complexity_budget.tolerance == 0.5
     assert no_new_io.unknown_policy is UnknownPolicy.REPAIR
     assert no_new_io.scope == "src.models.*"
-    assert feature_added.expected == ("src.api.users.fetch_user_profile",)
+    assert feature_added.expected == ({"fqn": "src.api.users.fetch_user_profile"},)
     assert hash(compiled)
 
 
@@ -652,7 +652,7 @@ constraints:
 
     compiled = compile_target_svp(yaml_source)
 
-    assert compiled.constraints[-1].expected == ("a", ("b",))
+    assert compiled.constraints[-1].expected == ({"fqn": "a"}, ("b",))
     assert hash(compiled.constraints[-1])
 
 

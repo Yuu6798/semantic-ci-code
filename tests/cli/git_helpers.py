@@ -45,9 +45,6 @@ constraints:
     expected:
       - fqn: mod.added
         kind: function
-        signature: |-
-          def added() -> int:
-              ...
         visibility: public
 """
 

@@ -256,7 +256,7 @@ joining D1〜D4 from the 2026-05-07 Session 4 dogfooding
 | D# | Source | Subject | Brief slot |
 |---|---|---|---|
 | D1 | Session 4 dogfood | `--package-root` scope hazard | A' (`target_yaml_guide.md`) — open |
-| D2 | Session 4 dogfood | extractor crash on `syntax_error/bad.py` | D (extractor exclude brief) — **PR #67 in review** |
+| D2 | Session 4 dogfood | extractor crash on `syntax_error/bad.py` | **Resolved in PR #67 (CSCI-35e, 2026-05-08)** — `[tool.semantic_ci_code.extract] exclude` loaded from nearest `pyproject.toml` and applied before AST parse |
 | D3 | Session 4 dogfood | template / user constraint duplication | A' (`target_yaml_guide.md`) — open |
 | D4 | Session 4 dogfood | config-only PR vacuous PASS | A' (`target_yaml_guide.md`) — open |
 | **D5** | **Session 5 dogfood (PR #61, FINDING-1)** | **set operator partial-match semantics — false positive on `includes_*` / `subset_of` / `superset_of`, false negative (CI bypass) on `excludes_all`** | **Resolved in PR #65 (CSCI-35c, 2026-05-08)** |

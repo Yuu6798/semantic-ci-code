@@ -31,7 +31,7 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 直近 merged
 
-### 2026-05-08 — D5 解消 + Brief 5 sweep tail
+### 2026-05-08 — D5 解消 + Brief 5 sweep tail + D2 解消
 
 - **PR #65** (CSCI-35c / set operator partial-match semantics): D5 = FINDING-1
   解消。`framework/match_schema.py` 新設で `api_surface` / `effects` / `imports`
@@ -55,6 +55,17 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
   `render_risk_section_structured` で human-friendly な numbered nested bullet
   に切替(Cursor / Codex は据え置き、§21.3 adapter divergence の許容範囲)。
   Cursor 移行 + 旧 flat 形式 docs 更新は follow-up
+- **PR #67** (CSCI-35e / extractor exclude 機構、D2 解消):
+  `pyproject.toml` の `[tool.semantic_ci_code.extract] exclude = [...]` を
+  `framework/extract_config.py` で load し、`observe` / `compare` / `check` /
+  `pre-commit` / `validate-plan` baseline 抽出経路で AST parse 前に filter。
+  matcher は stdlib `fnmatch` のみ(リテラル / 末尾 `/**` / `**/basename`
+  略記 / 同 segment 数 path glob)、`..` / 絶対 path / backslash / 不明 key
+  は engine error。cache key に `effective_exclude` 軸追加、baseline /
+  candidate 独立 config load。`compile` / `compile-repair` / `init` は本
+  config を load しない。merge 過程で 2 件の follow-up(`24225e1`
+  docs(cache 無効化 + deep-recursion glob 制約 docs 明記) / `2fa07f6`
+  config search を tree root 境界で打ち切る fix)を取り込み
 
 ### 2026-05-07 Session 5 — TC10 dogfooding + D5 tracking
 
@@ -119,16 +130,6 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
   merged 済み
 - **C. P2 残課題の brief 化**: Lock violation 即 fail(§8.2)/ Performance
   budget per-extractor timeout(§18)/ Hash trail per-extractor version(§10)
-- **D. extractor exclude 機構**(2026-05-07 Session 4 dogfood D2、
-  **PR #67 in review**): `pyproject.toml` の `[tool.semantic_ci_code.extract]
-  exclude = [...]` を `framework/extract_config.py` で load し、`observe` /
-  `compare` / `check` / `pre-commit` / `validate-plan` baseline 抽出経路で
-  AST parse 前に filter する実装。pattern matcher は stdlib `fnmatch` のみ
-  (リテラル / 末尾 `/**` / `**/basename` 略記 / 同 segment 数の path glob)、
-  `..` / 絶対 path / backslash / 不明 key は engine error。cache key に
-  `effective_exclude` 軸追加(現行 v2 cache が一度だけ rebuild される副作用、
-  release note に追記検討)。`compile` / `compile-repair` / `init` は本 config
-  を load しない
 - **E. ResultStatus 概念モデル更新**(弱点 ③): `UNKNOWN` を authoring error
   と extractor failure に分離。波及範囲は evaluator / risk_summary / adapter
   / cli 出力 / json schema / SARIF / GH Actions、設計議論必要、1〜2 日

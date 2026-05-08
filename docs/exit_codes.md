@@ -39,6 +39,10 @@ change exit-code policy. Cache write and eviction failures are reported through
 cache stats or verbose diagnostics, then the command continues with the computed
 verdict.
 
+Malformed `[tool.semantic_ci_code.extract]` config in `pyproject.toml` is an
+engine error (exit 3) for commands that extract code. Non-extraction commands do
+not load this config.
+
 `compile` does not compute a verdict. Successful compilation exits 0. Target
 discovery errors exit 2. Compile errors exit 3.
 
@@ -61,6 +65,7 @@ go to stderr.
 | Missing target | 2 | `target.yaml not found; tried ./target.yaml and ./.semantic-ci/target.yaml. Use --target.` |
 | Ambiguous target | 2 | `ambiguous target.yaml location: both ./target.yaml and ./.semantic-ci/target.yaml exist; use --target.` |
 | Compile error | 3 | One-line `CompileError` with filename and path/line where available. |
+| Extract config error | 3 | `extract config error: <pyproject.toml>: <reason>` |
 | Extractor error | 3 | `extractor failed: <name> at <path>: <reason>` |
 | Git unavailable | 3 | `git is required for 'check'; install git or use 'compare'` or the subcommand-specific equivalent. |
 | Dirty working tree in `check` | 0/1 | Warning, unless `--allow-dirty` is used. |

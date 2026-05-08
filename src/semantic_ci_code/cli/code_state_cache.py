@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from semantic_ci_code.cli.modes import ExecutionMode
 from semantic_ci_code.cli.output.json_formatter import UNKNOWN_VERSION, package_version
 from semantic_ci_code.domain.state_schema import CodeState
+from semantic_ci_code.framework.extract_config import ExtractConfig
 
 CACHE_FORMAT_VERSION = 2
 CODE_STATE_SCHEMA_VERSION = "1"
@@ -77,6 +78,21 @@ def dimensions_for_cache(dimensions: frozenset[str] | None) -> tuple[str, ...] |
     return tuple(sorted(dimensions))
 
 
+def effective_exclude_key(
+    extract_config: ExtractConfig | None,
+    *,
+    tree_root: Path,
+) -> tuple[str, tuple[str, ...]]:
+    if extract_config is None or not extract_config.patterns:
+        return ("", ())
+    try:
+        config_root = extract_config.config_root.resolve().relative_to(tree_root.resolve())
+        config_root_posix = PurePosixPath(config_root.as_posix()).as_posix() or "."
+    except ValueError:
+        config_root_posix = extract_config.config_root.resolve().as_posix()
+    return (config_root_posix, tuple(sorted(extract_config.patterns)))
+
+
 def current_python_xy() -> str:
     return f"{sys.version_info.major}.{sys.version_info.minor}"
 
@@ -105,6 +121,7 @@ def cache_key(
     dimensions_sorted_tuple: tuple[str, ...] | None,
     python_xy: str,
     package_version_value: str,
+    effective_exclude_key_value: tuple[str, tuple[str, ...]] = ("", ()),
     code_state_schema_version: str = CODE_STATE_SCHEMA_VERSION,
     cache_format_version: int = CACHE_FORMAT_VERSION,
 ) -> str:
@@ -114,6 +131,10 @@ def cache_key(
         "dimensions": (
             list(dimensions_sorted_tuple) if dimensions_sorted_tuple is not None else None
         ),
+        "effective_exclude": {
+            "config_root": effective_exclude_key_value[0],
+            "patterns": list(effective_exclude_key_value[1]),
+        },
         "mode": mode.value,
         "package_root": package_root_relpath_posix.as_posix(),
         "package_version": package_version_value,
@@ -130,6 +151,7 @@ def key_meta(
     package_root_relpath_posix: PurePosixPath,
     mode: ExecutionMode,
     dimensions_sorted_tuple: tuple[str, ...] | None,
+    effective_exclude_key_value: tuple[str, tuple[str, ...]] = ("", ()),
     python_xy: str | None = None,
     package_version_value: str | None = None,
 ) -> dict[str, Any]:
@@ -140,6 +162,10 @@ def key_meta(
         "dimensions": (
             list(dimensions_sorted_tuple) if dimensions_sorted_tuple is not None else None
         ),
+        "effective_exclude": {
+            "config_root": effective_exclude_key_value[0],
+            "patterns": list(effective_exclude_key_value[1]),
+        },
         "python_xy": python_xy or current_python_xy(),
         "package_version": package_version_value or cache_package_version(),
     }
@@ -151,6 +177,7 @@ def key_for_state(
     package_root_relpath_posix: PurePosixPath,
     mode: ExecutionMode,
     dimensions_sorted_tuple: tuple[str, ...] | None,
+    effective_exclude_key_value: tuple[str, tuple[str, ...]] = ("", ()),
     python_xy: str | None = None,
     package_version_value: str | None = None,
     code_state_schema_version: str = CODE_STATE_SCHEMA_VERSION,
@@ -163,6 +190,7 @@ def key_for_state(
         dimensions_sorted_tuple=dimensions_sorted_tuple,
         python_xy=python_xy or current_python_xy(),
         package_version_value=package_version_value or cache_package_version(),
+        effective_exclude_key_value=effective_exclude_key_value,
         code_state_schema_version=code_state_schema_version,
         cache_format_version=cache_format_version,
     )

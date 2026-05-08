@@ -24,6 +24,13 @@ from semantic_ci_code.cli.commands.pre_commit import (
 )
 
 
+def _symlink_or_skip(target: Path, link: Path) -> None:
+    try:
+        os.symlink(target, link)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink creation is not available in this environment: {exc}")
+
+
 @pytest.mark.parametrize(
     "resolver",
     [check_resolve_package_root, pre_commit_resolve_package_root],
@@ -38,7 +45,7 @@ def test_symlink_escape_in_package_root_is_rejected(tmp_path: Path, resolver) ->
 
     # Attacker-controlled symlink at the package_root location pointing outside.
     escape_link = tree_root / "pkg"
-    os.symlink(outside, escape_link)
+    _symlink_or_skip(outside, escape_link)
 
     with pytest.raises(ValueError, match=r"escapes tree"):
         resolver(tree_root, Path("pkg"), "baseline")
@@ -68,7 +75,7 @@ def test_symlink_inside_tree_resolves_normally(tmp_path: Path, resolver) -> None
     real_pkg.mkdir(parents=True)
 
     inside_link = tree_root / "pkg"
-    os.symlink(real_pkg, inside_link)
+    _symlink_or_skip(real_pkg, inside_link)
 
     resolved = resolver(tree_root, Path("pkg"), "baseline")
     assert resolved == real_pkg.resolve()

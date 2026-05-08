@@ -32,6 +32,51 @@ Subcommands that need a target use this order:
 If both implicit locations exist, the command exits with usage error 2 and asks
 the user to pass `--target`.
 
+## Excluding Files From Extraction
+
+Extractor commands (`observe`, `compare`, `check`, `pre-commit`, and the
+baseline-reading paths of `validate-plan`) read optional operational extraction
+config from the nearest `pyproject.toml` found by walking upward from the
+package root:
+
+```toml
+[tool.semantic_ci_code.extract]
+exclude = [
+  "tests/fixtures/pipeline/syntax_error",
+  "examples/broken/**",
+  "**/*_pb2.py",
+  "**/*_pb2_grpc.py",
+]
+```
+
+Patterns are interpreted relative to the `pyproject.toml` parent directory,
+not the current working directory and not the package root. `compare`, `check`,
+and `pre-commit` discover config independently for baseline and candidate
+trees, so historical config changes are respected.
+
+This is not `.gitignore` syntax. Patterns are stdlib-only `fnmatch` with
+limited recursive support. For recursive subtree exclusion, prefer literal
+directory patterns or trailing `/**`. For generated Python files, prefer
+`**/*_pb2.py`-style basename patterns.
+Patterns like `src/**/generated.py` are not recursive in this implementation;
+use a basename shortcut such as `**/generated.py` or a literal directory rule
+instead.
+
+Matcher rules, in order:
+
+| Pattern type | Example | Meaning |
+|---|---|---|
+| Literal directory or file | `tests/fixtures/syntax_error` | Excludes that exact path and all descendants when it is a directory. |
+| Trailing `/**` | `examples/broken/**` | Equivalent to a literal directory subtree. |
+| Basename glob shortcut | `**/*_pb2.py` | Matches the basename at any depth. |
+| Full-path `fnmatch` fallback | `src/pkg/*.gen.py` | Matches the POSIX path relative to config root, segment by segment, without crossing `/`. |
+
+Invalid patterns are engine errors (exit 3): empty strings, absolute paths,
+parent traversal (`..`), Windows backslashes, non-string values, and unknown keys
+under `[tool.semantic_ci_code.extract]` such as `exlude` or `excludes`.
+Commands that do not extract code (`compile`, `compile-repair`, `init`) do not
+load this config.
+
 ## Target Policies
 
 `target.yaml` can carry narrow allow-list policies for template constraints.
@@ -279,10 +324,13 @@ the `HEAD` commit. With `--allow-dirty`, the working tree is used as candidate.
 `check` caches ref-backed `CodeState` extraction under
 `<repo>/.semantic-ci/cache/code_state/` by default. The cache key includes the
 package subtree object id, package root, execution mode, extracted dimensions,
-Python minor version, package version, CodeState schema version, and cache format
-version. If package metadata is unavailable during source-tree execution, the
-cache key uses a deterministic fingerprint of the `semantic_ci_code` Python
-sources instead of the constant unknown version fallback. `--no-cache` or
+effective extract exclude key, Python minor version, package version, CodeState
+schema version, and cache format version. Adding the effective extract exclude
+axis causes a one-time cache miss after upgrading from versions that did not
+include that axis, even when no exclude patterns are configured. If package
+metadata is unavailable during source-tree execution, the cache key uses a
+deterministic fingerprint of the `semantic_ci_code` Python sources instead of
+the constant unknown version fallback. `--no-cache` or
 `SEMANTIC_CI_NO_CACHE=1` disables both reads and writes. `--cache-dir <dir>`
 changes the cache root; relative paths are resolved from the invoking working
 directory. `--cache-max-bytes <int>` controls size-based eviction; the default

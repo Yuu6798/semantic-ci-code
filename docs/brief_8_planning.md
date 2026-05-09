@@ -285,7 +285,7 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 |---|---|---|
 | `feature:add-api` | `--add-api FQN+`, optional `--test-case FQN*` | `api_surface_delta.added.fqns includes_all [FQN…]`, `test_surface_delta.new_cases not_equals []` (test-case 指定時) |
 | `bugfix:regression-test` | optional `--test-case FQN*` | `test_surface_delta.new_cases not_equals []`, template により `api_surface_delta.removed_public == []` |
-| `refactor:preserve-api-with-allowlist` | optional `--allow-add FQN*`, `--allow-remove FQN*` | allowlist 無し: `api_surface_public.equals_baseline`(strict)/ allowlist 有り: 既存 operator の組合せで表現(下表) |
+| `refactor:preserve-api-with-allowlist` | optional `--allow-fqn FQN*`, `--allow-fqn-prefix PREFIX*` | `change.primary_kind: refactor` + `api_surface.allow_changes` rule list(下表) |
 | `test-update:add-test-case` | optional `--test-case FQN*` | `test_surface_delta.new_cases not_equals []`(`primary_kind=test_update` で template 展開) |
 
 各 recipe は `change.primary_kind` を必ず設定し、template 展開は engine
@@ -294,22 +294,35 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 
 **`refactor:preserve-api-with-allowlist` の constraint 展開**:
 
-allowlist semantic は **新規 operator を追加せず**、既存 set operator
-(`subset_of` — PR #65 / CSCI-35c で確定)で表現する:
+`refactor` template は compiler で `template:refactor:api_surface_unchanged`
+(`compiler/templates.py:43`) を auto-expand し、evaluator はこれを
+**`api_surface.allow_changes` rule 経由でのみ緩和する**
+(`evaluator/evaluator.py:76-78`、`_filter_code_state_api_surface`)。
+user constraint を後付けしても template の strict equals_baseline は
+緩まないため、recipe は **既存の policy escape hatch である
+`api_surface.allow_changes`** にルールを書く方式とする。これは新 operator
+の追加ではなく、現行 Target SVP schema に既に存在する narrow policy
+escape hatch(`evaluator/evaluator.py:17` のコメントが明示)の活用であり、
+本 brief Non-goals「新 operator 追加なし」を遵守する。
 
-| `--allow-*` 指定 | 生成される constraint |
+| `--allow-*` 指定 | 生成される target.yaml fragment |
 |---|---|
-| 両方 unset | `api_surface_public equals_baseline`(strict baseline lock) |
-| `--allow-remove` のみ | `api_surface_delta.removed_public subset_of [<allow-remove>]` |
-| `--allow-add` のみ | `api_surface_delta.added.fqns subset_of [<allow-add>]` |
-| 両方指定 | 上記 2 constraint を併記 |
+| 両方 unset | `api_surface.allow_changes` を生成しない(template が strict baseline lock を強制) |
+| `--allow-fqn FQN+` | `api_surface.allow_changes: [{fqn: FQN1}, {fqn: FQN2}, …]` |
+| `--allow-fqn-prefix PREFIX+` | `api_surface.allow_changes: [{fqn_prefix: PREFIX1}, …]` |
+| 両方併用 | 上記 rule を併記(各 rule は `fqn` または `fqn_prefix` のいずれか 1 つ、`compiler/target_compiler.py:291` の制約に従う) |
 
-`subset_of` は「実際の delta が allowlist の **部分集合**である」ことを
-要求するため、「allowlist 内の API 変更のみ許可、それ以外は不許可」
-という refactor invariant を新 operator なしで表現できる。
-**equals_baseline operator に allowlist semantics を後付けしない**
-(operators.py:200 の `_equals_baseline` は strict 等価のみ、本 brief
-Non-goals 「新 operator 追加なし」を遵守)。
+旧版(2026-05-09 review #1 で Codex が指摘、本 brief 確定前に撤回):
+~~`api_surface_delta.removed_public subset_of [...]` / `api_surface_delta.added.fqns subset_of [...]` を user constraint として併記する案~~ は、refactor template の auto-expand が user 構文では緩まない(allowed change が strict template で fail)ため **無効**。recipe は必ず `api_surface.allow_changes` 経由とする。
+
+**direction(add のみ許可 / remove のみ許可)区別について**:
+`api_surface.allow_changes` rule は `fqn` / `fqn_prefix` のみで方向性
+(add 限定 / remove 限定)を区別しない。これは現行 DSL の制約であり、
+本 brief で direction 区別 operator を追加することは Non-goals 違反。
+recipe は「指定 FQN(あるいは prefix 配下)の **add も remove も**
+許す」semantics に絞る。direction 別 allowlist が必要なケースは
+hand-written に逃がし、target-doctor で advisory を出す方向は将来 brief
+で検討。
 
 **test-update recipe の表現範囲**:
 
@@ -360,15 +373,18 @@ Invariant を **運用側で可視化**する(false が固定値である設計�
 - [ ] 4 recipe すべてが決定論的(同 input → byte-identical YAML、3 回繰返
       テスト)
 - [ ] 生成 YAML は `compile` を pass(構文 / path / operator すべて妥当)
-- [ ] **recipe が参照する path / operator が現行 schema に実在する**ことを
-      cross-test:
+- [ ] **recipe が参照する path / operator / policy hatch が現行 schema に
+      実在する**ことを cross-test:
   - `test_surface_delta.*` は `new_files` / `new_cases` / `removed_cases`
     のみ(`domain/state_schema.py:144` `TestSurfaceDelta`)
-  - allowlist は `subset_of` で表現(`equals_baseline` に allowlist
-    semantics を期待しない、`evaluator/operators.py:200` `_equals_baseline`
-    は strict 等価のみ)
-  - すべての recipe 出力で `compiler/path_schema.py` の path validation を
-    pass
+  - refactor allowlist は **`api_surface.allow_changes` rule** で表現
+    (`compiler/target_compiler.py:291` の `fqn` / `fqn_prefix` 制約に従う、
+    `evaluator/evaluator.py:76-78` で template 緩和される箇所)
+  - user constraint 側で template strict 展開を緩めようとしない
+    (refactor template の `equals_baseline` は `api_surface.allow_changes`
+    経由でしか緩まないことを test fixture で確認)
+  - すべての recipe 出力で `compiler/path_schema.py` の path validation +
+    `target_compiler` の `allow_changes` validation を pass
 - [ ] `init` の既存 behavior(引数なし呼び出し)は不変、既存テスト全 pass
 - [ ] LLM / network 呼び出しゼロ(`socket` / `httpx` / `requests` を import
       しないことを import-graph test で確認、§7 不変条件 #4)
@@ -583,10 +599,19 @@ populate)。
 
 実装で**構造的に保証する**5 つの不変条件:
 
-1. **Verdict bytes invariant**:
+1. **Verdict bytes invariant**(narrow scope):
    `check` / `compare` / `validate-plan` / `compile-repair` の JSON envelope
-   は本 brief の全変更後も既存 fixture で byte-identical。
-   → CSCI-42〜44 すべての acceptance に「verdict 不変条件テスト」を含める。
+   のうち、**evaluator が決定する field**(`verdict` / `repair_plan` /
+   `summary` および同等の per-subcommand evaluator output)は本 brief の
+   全変更後も既存 fixture で byte-identical。`target_authorship` field は
+   既存仕様で authorship 情報を **意図的に reflect する**設計
+   (`cli/output/json_formatter.py:32-58` `build_payload`、既存
+   `tests/test_authorship.py:73` で `verdict` / `repair_plan` / `summary`
+   のみ stable とアサート済み)であり、本不変条件は **`target_authorship`
+   field を含まない**。
+   → CSCI-42〜44 すべての acceptance に「verdict / repair_plan / summary
+   不変条件テスト」を含める。比較は `target_authorship` を除外して行う
+   ヘルパを `tests/architecture/test_verdict_bytes_invariant.py` に置く。
 
 2. **`check` does not generate target invariant**:
    `check` 経路から `init` / `target-doctor` / `target-catalog` の
@@ -594,11 +619,16 @@ populate)。
    → import-graph test を `tests/architecture/test_surface_isolation.py`
    (CSCI-43 で新設)で固定。
 
-3. **Provenance non-participation invariant**:
+3. **Provenance non-participation invariant**(narrow scope):
    target.yaml の `authorship.generation_metadata` を任意に書き換えても
-   verdict envelope は byte-identical。
+   evaluator-derived field(`verdict` / `repair_plan` / `summary`)は
+   byte-identical。`target_authorship` field は authorship を逐語に reflect
+   する既存仕様のため、generation_metadata 変更で **当該 field のみが変わる**
+   ことは設計上正しく、本不変条件はこれを fail としない(`tests/
+   test_authorship.py:73` の既存挙動と整合)。
    → fixture を 1 つ作り、generation_metadata の有無 / 値違いで verdict
-   を回し、出力 hash を比較する(CSCI-42 acceptance)。
+   を回し、`target_authorship` を除外した比較で hash 一致を確認
+   (CSCI-42 acceptance)。
 
 4. **No-LLM / no-network invariant**:
    本 brief で追加・変更されたすべての subcommand 経路で `httpx` /
@@ -680,8 +710,10 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
       `直近 merged` に移動。Brief 7(SSP)発行を本 brief 後に置く順序が
       `docs/code_semantic_ci_design.md §25` に反映される
 - [ ] `ruff check .` / `pytest -q` 全 pass
-- [ ] verdict envelope の既存 fixture が **すべて byte-identical**
-      (本 brief は verdict 不変が大原則)
+- [ ] verdict envelope の **evaluator-derived field**(`verdict` /
+      `repair_plan` / `summary`)が既存 fixture で byte-identical
+      (`target_authorship` field は authorship を reflect する既存仕様
+      なので比較から除外。`tests/test_authorship.py:73` と一貫)
 - [ ] LLM / network 呼び出しがゼロであることが import-graph で固定
       (本 brief 完全決定論)
 
@@ -697,7 +729,8 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
 | **R6 recipe 不足で結局手書き** | 4 recipe で大半の PR をカバーできない | session 2026-05-09 議論で「4 recipe で大半 cover」の見積、§9.3 dogfood で経験的検証、不足時は CSCI-42 follow-up で追加 recipe を増やす(後方互換破壊なし) |
 | **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken | CSCI-42 acceptance に「既存 behavior 不変」を test で固定 |
 | **R8 PR body parser の脆弱性** | non-structured な PR body で誤動作 / クラッシュ | structured section が存在しない場合は **graceful degrade**(明示 user input + recipe default のみで生成、source surface に該当 source を含めない)、CSCI-42 acceptance に明記 |
-| **R9 recipe schema grounding ずれ** | recipe が現行 schema に存在しない path / operator semantics を生成し、`compile` で fail(初稿で `test_surface_delta.changed_or_added` / `equals_baseline + allowlist` の 2 件発覚、PR #73 codex review で指摘) | recipe 表は **必ず実 schema を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `compiler/path_schema.py`)、CSCI-42 acceptance に schema cross-test を含める、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
+| **R9 recipe schema grounding ずれ** | recipe が現行 schema に存在しない path / operator semantics / template 緩和経路を生成し、`compile` または evaluator で fail。PR #73 codex review で 3 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ | recipe 表は **必ず実 schema + evaluator path を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py`)、CSCI-42 acceptance に schema + template-relaxation cross-test を含める、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
+| **R10 envelope-wide byte-identical の過剰要求** | §7 invariant #1 / #3 を envelope 全体に拡張すると `target_authorship` field の既存仕様(authorship を reflect)と矛盾、既存 `tests/test_authorship.py:73` を破る | 不変条件は **evaluator-derived field**(`verdict` / `repair_plan` / `summary`)に narrow、`target_authorship` を比較から除外するヘルパを `tests/architecture/` に置く |
 
 ## 12. 順序 / 依存
 

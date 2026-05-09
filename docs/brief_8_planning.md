@@ -285,12 +285,42 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 |---|---|---|
 | `feature:add-api` | `--add-api FQN+`, optional `--test-case FQN*` | `api_surface_delta.added.fqns includes_all [FQN…]`, `test_surface_delta.new_cases not_equals []` (test-case 指定時) |
 | `bugfix:regression-test` | optional `--test-case FQN*` | `test_surface_delta.new_cases not_equals []`, template により `api_surface_delta.removed_public == []` |
-| `refactor:preserve-api-with-allowlist` | optional `--allow-add FQN*`, `--allow-remove FQN*` | `api_surface_public.equals_baseline` を allowlist で緩和 |
-| `test-update:add-or-change-test` | optional `--test-case FQN*` | `test_surface_delta.changed_or_added not_equals []` |
+| `refactor:preserve-api-with-allowlist` | optional `--allow-add FQN*`, `--allow-remove FQN*` | allowlist 無し: `api_surface_public.equals_baseline`(strict)/ allowlist 有り: 既存 operator の組合せで表現(下表) |
+| `test-update:add-test-case` | optional `--test-case FQN*` | `test_surface_delta.new_cases not_equals []`(`primary_kind=test_update` で template 展開) |
 
 各 recipe は `change.primary_kind` を必ず設定し、template 展開は engine
 側に委ねる(本コマンドは template constraint を **重複生成しない** ——
 これが ADVISORY-D3 を踏まないための実装側保証)。
+
+**`refactor:preserve-api-with-allowlist` の constraint 展開**:
+
+allowlist semantic は **新規 operator を追加せず**、既存 set operator
+(`subset_of` — PR #65 / CSCI-35c で確定)で表現する:
+
+| `--allow-*` 指定 | 生成される constraint |
+|---|---|
+| 両方 unset | `api_surface_public equals_baseline`(strict baseline lock) |
+| `--allow-remove` のみ | `api_surface_delta.removed_public subset_of [<allow-remove>]` |
+| `--allow-add` のみ | `api_surface_delta.added.fqns subset_of [<allow-add>]` |
+| 両方指定 | 上記 2 constraint を併記 |
+
+`subset_of` は「実際の delta が allowlist の **部分集合**である」ことを
+要求するため、「allowlist 内の API 変更のみ許可、それ以外は不許可」
+という refactor invariant を新 operator なしで表現できる。
+**equals_baseline operator に allowlist semantics を後付けしない**
+(operators.py:200 の `_equals_baseline` は strict 等価のみ、本 brief
+Non-goals 「新 operator 追加なし」を遵守)。
+
+**test-update recipe の表現範囲**:
+
+`TestSurfaceDelta` の現行 schema(`new_files` / `new_cases` /
+`removed_cases` の 3 field、`domain/state_schema.py:144`)で表現可能な
+範囲に限定し、存在しない path(`changed_or_added` 等)は使わない。
+「既存 test case の修正(削除なし、追加なし)」は CodeState 上は
+`new_cases` / `removed_cases` ともに空となるため delta では検知不能だが、
+これは本 brief の射程外(`docs/target_yaml_guide.md` D4 と同型の構造的
+限界)。test 修正 PR 全般を gate したいユーザーには target-doctor で
+ADVISORY を出す方向は将来 brief で検討。
 
 **Source 強度ポリシー**:
 
@@ -330,6 +360,15 @@ Invariant を **運用側で可視化**する(false が固定値である設計�
 - [ ] 4 recipe すべてが決定論的(同 input → byte-identical YAML、3 回繰返
       テスト)
 - [ ] 生成 YAML は `compile` を pass(構文 / path / operator すべて妥当)
+- [ ] **recipe が参照する path / operator が現行 schema に実在する**ことを
+      cross-test:
+  - `test_surface_delta.*` は `new_files` / `new_cases` / `removed_cases`
+    のみ(`domain/state_schema.py:144` `TestSurfaceDelta`)
+  - allowlist は `subset_of` で表現(`equals_baseline` に allowlist
+    semantics を期待しない、`evaluator/operators.py:200` `_equals_baseline`
+    は strict 等価のみ)
+  - すべての recipe 出力で `compiler/path_schema.py` の path validation を
+    pass
 - [ ] `init` の既存 behavior(引数なし呼び出し)は不変、既存テスト全 pass
 - [ ] LLM / network 呼び出しゼロ(`socket` / `httpx` / `requests` を import
       しないことを import-graph test で確認、§7 不変条件 #4)
@@ -658,6 +697,7 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
 | **R6 recipe 不足で結局手書き** | 4 recipe で大半の PR をカバーできない | session 2026-05-09 議論で「4 recipe で大半 cover」の見積、§9.3 dogfood で経験的検証、不足時は CSCI-42 follow-up で追加 recipe を増やす(後方互換破壊なし) |
 | **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken | CSCI-42 acceptance に「既存 behavior 不変」を test で固定 |
 | **R8 PR body parser の脆弱性** | non-structured な PR body で誤動作 / クラッシュ | structured section が存在しない場合は **graceful degrade**(明示 user input + recipe default のみで生成、source surface に該当 source を含めない)、CSCI-42 acceptance に明記 |
+| **R9 recipe schema grounding ずれ** | recipe が現行 schema に存在しない path / operator semantics を生成し、`compile` で fail(初稿で `test_surface_delta.changed_or_added` / `equals_baseline + allowlist` の 2 件発覚、PR #73 codex review で指摘) | recipe 表は **必ず実 schema を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `compiler/path_schema.py`)、CSCI-42 acceptance に schema cross-test を含める、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
 
 ## 12. 順序 / 依存
 

@@ -49,7 +49,9 @@ def test_compare_sarif_outputs_sarif_210_document():
 
 def test_check_sarif_outputs_sarif_document(tmp_path: Path):
     repo = init_repo(tmp_path)
-    result = run_semantic_ci(repo, "check", "--format", "sarif", "--no-cache")
+    result = run_semantic_ci(
+        repo, "check", "--mode", "smoke", "--no-fetch", "--format", "sarif", "--no-cache"
+    )
 
     assert result.returncode == 0
     assert json.loads(result.stdout)["version"] == "2.1.0"
@@ -58,7 +60,9 @@ def test_check_sarif_outputs_sarif_document(tmp_path: Path):
 def test_pre_commit_sarif_outputs_sarif_document(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
-    result = run_semantic_ci(repo, "pre-commit", "--format", "sarif", "--no-cache")
+    result = run_semantic_ci(
+        repo, "pre-commit", "--mode", "smoke", "--format", "sarif", "--no-cache"
+    )
 
     assert result.returncode == 0
     assert json.loads(result.stdout)["version"] == "2.1.0"

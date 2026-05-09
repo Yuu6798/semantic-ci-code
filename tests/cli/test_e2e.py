@@ -47,7 +47,7 @@ def test_e2e_compare_subcommand():
 def test_e2e_check_subcommand(tmp_path: Path):
     repo = init_repo(tmp_path)
 
-    result = run_semantic_ci(repo, "check", "--format", "json")
+    result = run_semantic_ci(repo, "check", "--mode", "smoke", "--no-fetch", "--format", "json")
     data = payload(result)
 
     assert result.returncode in {0, 1}
@@ -59,7 +59,7 @@ def test_e2e_pre_commit_subcommand(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
 
-    result = run_semantic_ci(repo, "pre-commit", "--format", "json")
+    result = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
     data = payload(result)
 
     assert result.returncode in {0, 1}

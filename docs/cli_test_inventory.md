@@ -8,22 +8,22 @@ Snapshot:
 
 - Date: 2026-05-09
 - Command: `python -m pytest -q --no-cov tests/cli`
-- Result: `230 passed, 4 skipped, 1 deselected in 264.92s` on Windows Codex desktop
+- Result: `232 passed, 4 skipped, 1 deselected in 161.18s` on Windows Codex desktop
 - Scope: CLI tests only; default run excludes the single `slow` smoke/full benchmark
 
 ## File Map
 
 | File | Tests | Default invocation | Subprocess retained for | Primary role |
 |---|---:|---|---|---|
-| `tests/cli/test_cache.py` | 28 | in-process | 2 sitecustomize cache-hit sentinels | CodeState cache hit/miss, eviction, cache key axes |
+| `tests/cli/test_cache.py` | 28 | in-process | none | CodeState cache hit/miss, eviction, cache key axes |
 | `tests/cli/test_check.py` | 25 | in-process | PYTHONHASHSEED determinism | git ref resolution, worktree materialization, dirty handling, cleanup |
 | `tests/cli/test_compare.py` | 40 | in-process | PYTHONHASHSEED determinism | `compare` contract, target discovery, JSON/human rendering, output routing |
 | `tests/cli/test_compare_partial_match.py` | 1 | in-process | none | partial-match end-to-end regression |
 | `tests/cli/test_compile.py` | 13 | in-process | PYTHONHASHSEED determinism | `compile` envelope, policy serialization, target errors |
-| `tests/cli/test_compile_repair.py` | 15 | in-process | none | `compile-repair` pipe/input/output behavior |
+| `tests/cli/test_compile_repair.py` | 17 | in-process | none | `compile-repair` pipe/input/output behavior |
 | `tests/cli/test_e2e.py` | 8 | in-process | `--version` and `--help` console-script smoke | shallow release sanity layer |
 | `tests/cli/test_extract_config_cli.py` | 3 | in-process | none | extractor exclude CLI integration and error routing |
-| `tests/cli/test_helpers.py` | 1 | in-process | none | in-process CLI invoker smoke coverage |
+| `tests/cli/test_helpers.py` | 3 | in-process | none | in-process CLI invoker and git-template isolation coverage |
 | `tests/cli/test_init_command.py` | 5 | in-process | none | `init` scaffold and overwrite behavior |
 | `tests/cli/test_json_formatter.py` | 2 | direct unit | none | JSON formatter edge behavior |
 | `tests/cli/test_modes.py` | 10 | in-process | slow benchmark opt-in uses subprocess | smoke/full mode behavior and benchmark |
@@ -33,16 +33,25 @@ Snapshot:
 | `tests/cli/test_overlay.py` | 7 | direct unit | none | `numstat` parser and delta overlay |
 | `tests/cli/test_pre_commit.py` | 12 | in-process | PYTHONHASHSEED determinism | staged-index export and pre-commit semantics |
 | `tests/cli/test_pre_commit_manifest.py` | 2 | direct unit | none | static pre-commit manifest validation |
-| `tests/cli/test_resolve_package_root.py` | 3 | direct unit | none | package-root path guard behavior |
+| `tests/cli/test_resolve_package_root.py` | 6 | direct unit | none | package-root path guard behavior |
 | `tests/cli/test_validate_plan.py` | 9 | in-process | none | `validate-plan` baseline/input/output behavior |
 
 ## Runtime Findings
 
 D2-1 switched `run_semantic_ci` to in-process `cli.main(...)` by default.
 Subprocess is now limited to cases that need process-start semantics
-(`PYTHONHASHSEED`), console-script entrypoints, or `sitecustomize` import-time
-sentinels. The single smoke/full performance comparison is marked `slow` and
-is excluded by default.
+(`PYTHONHASHSEED`) or console-script entrypoints. D2-2 removed the remaining
+`sitecustomize` cache-hit sentinels by using in-process monkeypatching instead.
+The single smoke/full performance comparison is marked `slow` and is excluded
+by default.
+
+D2-2 also installs session-scoped git template repositories for the standard
+CLI fixtures. `init_repo`, `init_repo_without_candidate_commit`, and
+`init_topic_only_repo` now clone or copy one of three prebuilt templates into
+each test's `tmp_path` instead of running the full `git init`/commit sequence
+per test. On Windows, the helper uses `shutil.copytree` first because local
+`git clone` is slower for these tiny repositories; on POSIX it uses
+`git clone --local --no-hardlinks` with a `copytree` fallback.
 
 Remaining wallclock is dominated by real git operations and extraction, not CLI
 process startup:
@@ -51,9 +60,21 @@ process startup:
   cleanup and shallow-clone behavior.
 - `test_cache.py` and `test_pre_commit.py` exercise real cache files and staged
   index export.
+- D2-2 migrated the verdict-shape `check` cases to `compare`, but the retained
+  `check` tests are intentionally git-specific.
+- Some retained git-specific smoke tests pass `--mode smoke` and `--no-fetch`
+  when their assertion is about ref selection, worktree cleanup, dirty handling,
+  file counts, or formatter plumbing rather than full-dimension extraction or
+  fetch behavior. Fetch-specific tests and subprocess determinism tests keep the
+  default/full path.
 - Direct parser/helper layers (`test_overlay.py`, `test_json_formatter.py`,
   `test_pre_commit_manifest.py`, `test_resolve_package_root.py`) are not the
   source of CLI-suite cost.
+
+The Windows local target of `<150s` was not reached by D2-2 alone. The measured
+improvement was roughly 39.2% (`264.92s` to `161.18s`). Further reduction now
+requires either parallel execution (`pytest-xdist`) or a deeper split between
+real-git smoke tests and direct unit tests for cache/check internals.
 
 ## Coverage Categories
 
@@ -149,12 +170,27 @@ public-looking Python symbols, so refactors in test helper plumbing can trip the
 refactor API template. That behavior is useful signal for production packages,
 but too strict for internal test modules.
 
+## Session Template Repo Strategy
+
+The session fixture in `tests/cli/conftest.py` builds three immutable template
+repositories once per `tests/cli` run:
+
+- `full`: baseline commit on `main`, remote-tracking `origin/main`, and a
+  feature commit.
+- `short`: baseline commit only, used by staged-index `pre-commit` tests.
+- `topic_only`: no default baseline branch, used by missing-baseline tests.
+
+Tests continue to call the existing `init_repo` helpers. Those helpers clone or
+copy the template into each test directory, so mutations stay local to that
+test. The fixture finalizer checks that the templates remain clean.
+
 ## Next Safe Step
 
 The next PR should target one narrow reduction:
 
-- either consolidate the duplicated dependency invariant test, or
-- move compare JSON shape micro-tests to formatter-level unit tests.
+- add `pytest-xdist`/parallel execution for Windows local runs, or
+- move another narrow group of real-git assertions to direct unit coverage where
+  the command behavior is already covered by smoke tests.
 
 Avoid deleting git-backed cleanup, shallow clone, staged-index, or determinism
 tests until replacement coverage is explicit.

@@ -287,7 +287,7 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 
 | Recipe ID | 必須引数 | 生成される positive expectation |
 |---|---|---|
-| `feature:add-api` | `--add-api FQN+`, optional `--test-case FQN*` | `api_surface_delta.added.fqns includes_all [FQN…]`、`--test-case` 指定時は `test_surface_delta.new_cases includes_all [<test FQN…>]`(明示 FQN 保持)、未指定時は test_surface 制約なし |
+| `feature:add-api` | **以下のいずれか必須**: `--add-api FQN+` / `--from-pr-body` の `## Expected public API` セクションから FQN+ 抽出。optional `--test-case FQN*` | `api_surface_delta.added.fqns includes_all [<merged FQN…>]`(`--add-api` を逐語保持、不足時のみ PR body 抽出を merge)、`--test-case` 指定時は `test_surface_delta.new_cases includes_all [<test FQN…>]`、未指定時は test_surface 制約なし |
 | `bugfix:regression-test` | optional `--test-case FQN*` | `--test-case` 指定時 `test_surface_delta.new_cases includes_all [<test FQN…>]`、未指定時 `test_surface_delta.new_cases not_equals []`、いずれも template により `api_surface_delta.removed_public == []` |
 | `refactor:preserve-api-with-allowlist` | optional `--allow-fqn FQN*`, `--allow-fqn-prefix PREFIX*` | `change.primary_kind: refactor` + `api_surface.allow_changes` rule list(下表) |
 | `test-update:add-test-case` | optional `--test-case FQN*` | `--test-case` 指定時 `test_surface_delta.new_cases includes_all [<test FQN…>]`、未指定時 `test_surface_delta.new_cases not_equals []`(`primary_kind=test_update` で template 展開) |
@@ -356,10 +356,29 @@ ADVISORY を出す方向は将来 brief で検討。
 |---|---|---|
 | `--add-api` / `--test-case` / `--remove-api` / `--allow-fqn` / `--allow-fqn-prefix` / `--declared-at`(明示 user input) | strong | positive expectation / authorship の確定値、逐語保持 |
 | labels(`kind:feature` 等) | strong | `change.primary_kind` 決定 |
-| PR body の structured section(`## Expected public API\n- FQN1\n- FQN2`) | strong | positive expectation の hint(明示 user input が無い時のみ採用) |
-| issue acceptance criteria の structured section | medium | 同上 |
+| PR body の structured section(`## Expected public API\n- FQN1\n- FQN2`) | strong | positive expectation の値そのもの(`feature:add-api` の必須引数を満たす源として採用可、明示 user input と **union** で merge し重複は dedup) |
+| issue acceptance criteria の structured section(`## Acceptance Criteria` 等) | medium | 同上(PR body より弱い、PR body と user input が空のときのみ参照) |
 | commit message(Conventional Commits prefix) | medium | `primary_kind` の hint(labels が無い時のみ採用) |
 | **candidate code body / observed semantic delta** | **本 brief で非実装** | tautology 化リスクのため、`--allow-candidate-derived-expectations` flag は **存在しない** |
+
+**「以下のいずれか必須」semantics**:
+
+`feature:add-api` のように recipe contract で **API FQN のいずれかを必須**
+としているケースでは、CLI 引数の有無で先に reject せず、**source merge
+後に positive expectation の FQN list が空かどうかを検証**する。具体的には:
+
+1. CLI parse: `--add-api` を **optional** として受け取る
+2. PR body / issue parse: structured section から FQN list を抽出
+3. merge: user input(strong)を base に、PR body(strong)→ issue
+   (medium)の順に **union 追加**(重複は dedup)
+4. 検証: merge 後の FQN list が空ならエラー(`feature:add-api` recipe は
+   API 追加を表現できないと宣言、適切な exit code + 明示 message)
+
+これにより recipe contract と source 強度ポリシーが整合し、user が
+`--add-api` を一切渡さずに `--from-pr-body pr.md` だけで recipe を満たす
+flow が成立する(`docs/target_authoring_surface.md` の AI assistant 経由
+authoring シナリオ)。CSCI-42 acceptance に当該 flow の golden fixture
+を含める。
 
 **Provenance metadata**(必ず生成、ただし wall-clock を埋め込まない):
 
@@ -426,6 +445,12 @@ declared_at field が **存在しない**」 + 「同 input 3 回で byte-identi
 - [ ] PR body / issue に structured section が無い場合は **degrade** して
       動作(明示 user input + recipe default のみで YAML 生成)、source
       surface に該当 source を含めない
+- [ ] **recipe contract の「いずれか必須」 検証は source merge 後**:
+      `feature:add-api` で `--add-api` を渡さず `--from-pr-body pr.md` の
+      `## Expected public API` セクションだけで FQN を供給する flow が
+      動作する(golden fixture)。CLI parse 段階で `--add-api` 不在を理由
+      に reject しない。merge 後 FQN list が空のときのみエラー(明示
+      message + 適切な exit code)。
 - [ ] generation_metadata.candidate_code_used が **常に false**(test で
       固定)、`--allow-candidate-derived-expectations` flag が**存在しない**
       ことを CLI argparse spec で確認
@@ -445,8 +470,8 @@ declared_at field が **存在しない**」 + 「同 input 3 回で byte-identi
 - `src/semantic_ci_code/cli/main.py` (UPDATE): subparser 追加
 - `src/semantic_ci_code/authoring/` (UPDATE): advisory 検出ロジック追加
   (CSCI-42 で初出した `authoring/` directory を共有)
-  - `hazards.py` (NEW): 各 hazard 検出関数(D1 / D3 / D4 / D5-legacy / P1 /
-    P2 / S1)
+  - `hazards.py` (NEW): 各 hazard 検出関数(D1 / D3 / D4 / P1 /
+    P2 / S1。D5 は本 brief で advisor 化しない、§5.3 / R9 (g) 参照)
   - `advisory.py` (NEW): `Advisory` dataclass(`code`, `severity`,
     `message`, `evidence`)
 - `src/semantic_ci_code/cli/output/doctor_human.py` (NEW)
@@ -770,7 +795,7 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
 | **R6 recipe 不足で結局手書き** | 4 recipe で大半の PR をカバーできない | session 2026-05-09 議論で「4 recipe で大半 cover」の見積、§9.3 dogfood で経験的検証、不足時は CSCI-42 follow-up で追加 recipe を増やす(後方互換破壊なし) |
 | **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken | CSCI-42 acceptance に「既存 behavior 不変」を test で固定 |
 | **R8 PR body parser の脆弱性** | non-structured な PR body で誤動作 / クラッシュ | structured section が存在しない場合は **graceful degrade**(明示 user input + recipe default のみで生成、source surface に該当 source を含めない)、CSCI-42 acceptance に明記 |
-| **R9 recipe / catalog / advisor schema grounding ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照し、`compile` で fail もしくは valid YAML を warn(false positive)。PR #73 codex review で計 7 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除) | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + match-schema-parity + advisor-no-false-positive cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
+| **R9 recipe / catalog / advisor schema grounding + contract 整合ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照する、または recipe contract と source 強度ポリシーが矛盾して PR body 経由 flow を reject する、または削除済 advisor が file 列挙に取り残される。PR #73 codex review で計 9 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除)、(h) D5 削除後も `hazards.py` 列挙に `D5-legacy` が残存し実装側で false positive を再導入する罠、(i) `feature:add-api` の必須引数を `--add-api FQN+` に固定すると `--from-pr-body` の `## Expected public API` セクションだけで recipe を満たす flow が CLI parse 段階で reject される(source 強度ポリシーと recipe contract の矛盾) | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + match-schema-parity + advisor-no-false-positive + source-merge-validation cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、recipe contract の必須性は **source merge 後**に検証(CLI parse 段階で reject しない)、advisor を削除する際は **file 列挙 / 関数 stub / acceptance count をすべて grep して整合化**、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
 | **R10 envelope-wide byte-identical の過剰要求** | §7 invariant #1 / #3 を envelope 全体に拡張すると `target_authorship` field の既存仕様(authorship を reflect)と矛盾、既存 `tests/test_authorship.py:73` を破る | 不変条件は **evaluator-derived field**(`verdict` / `repair_plan` / `summary`)に narrow、`target_authorship` を比較から除外するヘルパを `tests/architecture/` に置く |
 | **R11 wall-clock 由来の非決定性** | recipe が `declared_at` を `datetime.now()` で埋めると同 input → 異 output となり determinism acceptance を violate(PR #73 round-3 codex review 指摘) | `declared_at` は **default omit**(`Authorship.declared_at: str \| None = None` を活用)、`--declared-at ISO8601` で明示指定時のみ書き出す。`tool_version` は `importlib.metadata.version` から静的解決。CSCI-42 acceptance に「`--declared-at` 未指定時は declared_at field 不在」「同 input 3 回 byte-identical」を含める |
 

@@ -347,9 +347,6 @@ def test_subprocess_determinism_across_hash_seeds(tmp_path: Path):
     first = run_semantic_ci_subprocess(
         repo,
         "check",
-        "--mode",
-        "smoke",
-        "--no-fetch",
         "--format",
         "json",
         "--no-cache",
@@ -358,9 +355,6 @@ def test_subprocess_determinism_across_hash_seeds(tmp_path: Path):
     second = run_semantic_ci_subprocess(
         repo,
         "check",
-        "--mode",
-        "smoke",
-        "--no-fetch",
         "--format",
         "json",
         "--no-cache",
@@ -413,23 +407,19 @@ def test_package_root_relative_path_is_applied_inside_each_worktree(tmp_path: Pa
 
 
 def test_missing_package_root_exits_usage_error(tmp_path: Path):
+    repo = init_repo(tmp_path)
+
     result = run_semantic_ci(
-        REPO_ROOT,
-        "compare",
-        "--baseline-dir",
-        str(COMPARE_BASELINE),
-        "--candidate-dir",
-        str(COMPARE_CANDIDATE),
-        "--package-root-baseline",
-        str(tmp_path / "missing"),
-        "--target",
-        str(COMPARE_PASS_TARGET),
+        repo,
+        "check",
+        "--package-root",
+        "missing",
         "--format",
         "json",
     )
 
     assert result.returncode == 2
-    assert "baseline directory does not exist" in result.stderr
+    assert "baseline package_root does not exist" in result.stderr
 
 
 def test_git_command_error_is_pickle_compatible(tmp_path: Path):

@@ -8,7 +8,7 @@ Snapshot:
 
 - Date: 2026-05-09
 - Command: `python -m pytest -q --no-cov tests/cli`
-- Result: `232 passed, 4 skipped, 1 deselected in 181.61s` on Windows Codex desktop
+- Result: `232 passed, 4 skipped, 1 deselected in 161.18s` on Windows Codex desktop
 - Scope: CLI tests only; default run excludes the single `slow` smoke/full benchmark
 
 ## File Map
@@ -62,12 +62,17 @@ process startup:
   index export.
 - D2-2 migrated the verdict-shape `check` cases to `compare`, but the retained
   `check` tests are intentionally git-specific.
+- Some retained git-specific smoke tests pass `--mode smoke` and `--no-fetch`
+  when their assertion is about ref selection, worktree cleanup, dirty handling,
+  file counts, or formatter plumbing rather than full-dimension extraction or
+  fetch behavior. Fetch-specific tests and subprocess determinism tests keep the
+  default/full path.
 - Direct parser/helper layers (`test_overlay.py`, `test_json_formatter.py`,
   `test_pre_commit_manifest.py`, `test_resolve_package_root.py`) are not the
   source of CLI-suite cost.
 
 The Windows local target of `<150s` was not reached by D2-2 alone. The measured
-improvement was roughly 31.4% (`264.92s` to `181.61s`). Further reduction now
+improvement was roughly 39.2% (`264.92s` to `161.18s`). Further reduction now
 requires either parallel execution (`pytest-xdist`) or a deeper split between
 real-git smoke tests and direct unit tests for cache/check internals.
 

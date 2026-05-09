@@ -157,8 +157,6 @@ def test_pre_commit_subprocess_determinism_across_hash_seeds(tmp_path: Path):
     first = run_semantic_ci_subprocess(
         repo,
         "pre-commit",
-        "--mode",
-        "smoke",
         "--format",
         "json",
         "--no-cache",
@@ -167,8 +165,6 @@ def test_pre_commit_subprocess_determinism_across_hash_seeds(tmp_path: Path):
     second = run_semantic_ci_subprocess(
         repo,
         "pre-commit",
-        "--mode",
-        "smoke",
         "--format",
         "json",
         "--no-cache",

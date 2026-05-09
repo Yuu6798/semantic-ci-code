@@ -45,7 +45,16 @@ def test_compare_gh_actions_outputs_workflow_commands():
 def test_check_gh_actions_outputs_workflow_commands(tmp_path: Path):
     repo = init_repo(tmp_path)
     write_file(repo / "target.yaml", TARGET_FAIL)
-    result = run_semantic_ci(repo, "check", "--format", "gh-actions", "--no-cache")
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--mode",
+        "smoke",
+        "--no-fetch",
+        "--format",
+        "gh-actions",
+        "--no-cache",
+    )
 
     assert result.returncode == 1
     assert result.stdout.startswith("::error")
@@ -55,7 +64,9 @@ def test_pre_commit_gh_actions_outputs_workflow_commands(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     write_file(repo / "target.yaml", TARGET_FAIL)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
-    result = run_semantic_ci(repo, "pre-commit", "--format", "gh-actions", "--no-cache")
+    result = run_semantic_ci(
+        repo, "pre-commit", "--mode", "smoke", "--format", "gh-actions", "--no-cache"
+    )
 
     assert result.returncode == 1
     assert result.stdout.startswith("::error")

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
@@ -80,6 +82,9 @@ constraints:
     expected: []
 """
 
+TemplateKind = Literal["full", "short", "topic_only"]
+_TEMPLATES: dict[str, Path] | None = None
+
 
 def run(
     args: list[str],
@@ -122,7 +127,63 @@ def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
     return run(["git", *args], cwd=repo, check=check)
 
 
+def _set_session_templates(templates: dict[str, Path] | None) -> None:
+    global _TEMPLATES
+    _TEMPLATES = templates
+
+
+def clone_template_repo(
+    kind: TemplateKind,
+    tmp_path: Path,
+    *,
+    templates: dict[str, Path] | None = None,
+) -> Path:
+    resolved_templates = templates if templates is not None else _TEMPLATES
+    if resolved_templates is None:
+        raise AssertionError("session template repositories are not installed")
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    repo = tmp_path / "repo"
+    source = resolved_templates[kind]
+    if os.name == "nt":
+        shutil.copytree(source, repo)
+        return repo
+
+    try:
+        run(
+            ["git", "clone", "--local", "--no-hardlinks", str(source), str(repo)],
+            cwd=tmp_path,
+        )
+    except AssertionError:
+        shutil.rmtree(repo, ignore_errors=True)
+        shutil.copytree(source, repo)
+
+    git(repo, "config", "user.name", "Semantic CI")
+    git(repo, "config", "user.email", "semantic-ci@example.invalid")
+    if (
+        git(
+            repo, "show-ref", "--verify", "--quiet", "refs/remotes/origin/main", check=False
+        ).returncode
+        == 0
+    ):
+        if (
+            git(repo, "show-ref", "--verify", "--quiet", "refs/heads/main", check=False).returncode
+            != 0
+        ):
+            git(repo, "branch", "main", "origin/main")
+    return repo
+
+
 def init_repo(tmp_path: Path, *, origin_ref: bool = True) -> Path:
+    if _TEMPLATES is not None:
+        repo = clone_template_repo("full", tmp_path)
+        if not origin_ref:
+            git(repo, "update-ref", "-d", "refs/remotes/origin/main")
+        return repo
+    return _init_repo_legacy(tmp_path, origin_ref=origin_ref)
+
+
+def _init_repo_legacy(tmp_path: Path, *, origin_ref: bool = True) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir(parents=True)
     git(repo, "init", "-b", "main")
@@ -143,8 +204,17 @@ def init_repo(tmp_path: Path, *, origin_ref: bool = True) -> Path:
 
 
 def init_repo_without_candidate_commit(tmp_path: Path, *, origin_ref: bool = True) -> Path:
+    if _TEMPLATES is not None:
+        repo = clone_template_repo("short", tmp_path)
+        if not origin_ref:
+            git(repo, "update-ref", "-d", "refs/remotes/origin/main")
+        return repo
+    return _init_repo_without_candidate_commit_legacy(tmp_path, origin_ref=origin_ref)
+
+
+def _init_repo_without_candidate_commit_legacy(tmp_path: Path, *, origin_ref: bool = True) -> Path:
     repo = tmp_path / "repo"
-    repo.mkdir()
+    repo.mkdir(parents=True)
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.name", "Semantic CI")
     git(repo, "config", "user.email", "semantic-ci@example.invalid")
@@ -160,8 +230,14 @@ def init_repo_without_candidate_commit(tmp_path: Path, *, origin_ref: bool = Tru
 
 
 def init_topic_only_repo(tmp_path: Path) -> Path:
+    if _TEMPLATES is not None:
+        return clone_template_repo("topic_only", tmp_path)
+    return _init_topic_only_repo_legacy(tmp_path)
+
+
+def _init_topic_only_repo_legacy(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
-    repo.mkdir()
+    repo.mkdir(parents=True)
     git(repo, "init", "-b", "topic")
     git(repo, "config", "user.name", "Semantic CI")
     git(repo, "config", "user.email", "semantic-ci@example.invalid")

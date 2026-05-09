@@ -197,7 +197,13 @@ def test_smoke_human_output_marks_partial_mode_and_skipped_constraints(tmp_path:
     stage_changes(repo, {"mod.py": "VALUE = 1\n\ndef existing():\n    return VALUE\n"})
 
     no_color = run_semantic_ci(
-        repo, "pre-commit", "--mode", "smoke", "--format", "human", "--no-color"
+        repo,
+        "pre-commit",
+        "--mode",
+        "smoke",
+        "--format",
+        "human",
+        "--no-color",
     )
     color = run_semantic_ci(
         repo,

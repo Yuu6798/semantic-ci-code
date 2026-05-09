@@ -4,7 +4,6 @@ import json
 import os
 import time
 import tomllib
-from os import pathsep
 from pathlib import Path
 
 from semantic_ci_code.cli import code_state_cache
@@ -18,6 +17,8 @@ from semantic_ci_code.cli.code_state_cache import (
     key_meta,
     write_cached_code_state,
 )
+from semantic_ci_code.cli.commands import check as check_command
+from semantic_ci_code.cli.commands import pre_commit as pre_commit_command
 from semantic_ci_code.cli.modes import ExecutionMode
 from semantic_ci_code.domain.state_schema import CodeState
 from semantic_ci_code.framework.extract_config import ExtractConfig
@@ -29,31 +30,38 @@ from .git_helpers import (
     stage_changes,
     write_file,
 )
-from .helpers import REPO_ROOT, payload, run_semantic_ci, run_semantic_ci_subprocess
+from .helpers import REPO_ROOT, payload, run_semantic_ci
 
 
-def test_check_uses_cached_codestate_without_calling_extractor_on_second_run(tmp_path: Path):
+def test_check_uses_cached_codestate_without_calling_extractor_on_second_run(
+    tmp_path: Path,
+    monkeypatch,
+):
     repo = init_repo(tmp_path)
     cache_dir = tmp_path / "cache"
 
     first = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
         "--cache-dir",
         str(cache_dir),
     )
-    second = run_semantic_ci_subprocess(
+    monkeypatch.setattr(check_command, "extract_python_code_state", _boom_extractor)
+    second = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
         "--cache-dir",
         str(cache_dir),
-        extra_env=_extractor_bomb_env(tmp_path),
     )
 
     assert first.returncode == 0
@@ -77,6 +85,7 @@ def test_check_uses_cached_codestate_without_calling_extractor_on_second_run(tmp
 
 def test_pre_commit_uses_cached_codestate_without_calling_extractor_on_second_run(
     tmp_path: Path,
+    monkeypatch,
 ):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
@@ -85,19 +94,23 @@ def test_pre_commit_uses_cached_codestate_without_calling_extractor_on_second_ru
     first = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
         str(cache_dir),
     )
-    second = run_semantic_ci_subprocess(
+    monkeypatch.setattr(pre_commit_command, "extract_python_code_state", _boom_extractor)
+    second = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
         str(cache_dir),
-        extra_env=_extractor_bomb_env(tmp_path),
     )
 
     assert first.returncode == 0
@@ -113,6 +126,8 @@ def test_pre_commit_staged_tree_change_misses_candidate_cache(tmp_path: Path):
     first = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
@@ -121,6 +136,8 @@ def test_pre_commit_staged_tree_change_misses_candidate_cache(tmp_path: Path):
     second = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
@@ -131,6 +148,8 @@ def test_pre_commit_staged_tree_change_misses_candidate_cache(tmp_path: Path):
     third = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
@@ -244,10 +263,14 @@ def test_cache_verdict_matches_no_cache_byte_for_byte(tmp_path: Path):
     repo = init_repo(tmp_path)
     cache_dir = tmp_path / "cache"
 
-    uncached = run_semantic_ci(repo, "check", "--format", "json", "--no-fetch", "--no-cache")
+    uncached = run_semantic_ci(
+        repo, "check", "--mode", "smoke", "--format", "json", "--no-fetch", "--no-cache"
+    )
     cached = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -302,6 +325,8 @@ def test_no_cache_flag_and_env_skip_cache_file_creation(tmp_path: Path):
     flag = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -312,6 +337,8 @@ def test_no_cache_flag_and_env_skip_cache_file_creation(tmp_path: Path):
     env = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -337,6 +364,8 @@ def test_pre_commit_no_cache_flag_and_env_skip_cache_file_creation(tmp_path: Pat
     flag = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-cache",
@@ -346,6 +375,8 @@ def test_pre_commit_no_cache_flag_and_env_skip_cache_file_creation(tmp_path: Pat
     env = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
@@ -369,6 +400,8 @@ def test_cache_dir_override_accepts_relative_and_absolute_paths(tmp_path: Path):
     relative = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -378,6 +411,8 @@ def test_cache_dir_override_accepts_relative_and_absolute_paths(tmp_path: Path):
     absolute = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -400,6 +435,8 @@ def test_pre_commit_cache_dir_override_accepts_relative_and_absolute_paths(tmp_p
     relative = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
@@ -408,6 +445,8 @@ def test_pre_commit_cache_dir_override_accepts_relative_and_absolute_paths(tmp_p
     absolute = run_semantic_ci(
         repo,
         "pre-commit",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-dir",
@@ -427,6 +466,8 @@ def test_package_root_is_normalized_before_tree_object_id(tmp_path: Path):
     result = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -446,6 +487,8 @@ def test_package_root_cannot_escape_repo_for_cache_key(tmp_path: Path):
     result = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -463,6 +506,8 @@ def test_corrupt_cache_is_miss_and_overwritten(tmp_path: Path):
     first = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -476,6 +521,8 @@ def test_corrupt_cache_is_miss_and_overwritten(tmp_path: Path):
         repo,
         "--verbose",
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -570,6 +617,8 @@ def test_allow_dirty_skips_candidate_cache_but_keeps_baseline_cache(tmp_path: Pa
     result = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--no-fetch",
@@ -588,7 +637,7 @@ def test_other_subcommands_do_not_create_cache_files(tmp_path: Path):
     cache_root = repo / ".semantic-ci" / "cache"
 
     observe = run_semantic_ci(repo, "observe", "--package-root", ".", "--format", "json")
-    pre_commit = run_semantic_ci(repo, "pre-commit", "--format", "json")
+    pre_commit = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
 
     assert observe.returncode == 0
     assert pre_commit.returncode == 0
@@ -625,7 +674,7 @@ def test_non_cache_subcommands_emit_disabled_cache_stats(tmp_path: Path):
         "--format",
         "json",
     )
-    pre_commit = run_semantic_ci(repo, "pre-commit", "--format", "json")
+    pre_commit = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
 
     for result in (compare, observe, compile_result, pre_commit):
         assert result.returncode == 0
@@ -670,6 +719,8 @@ def test_negative_cache_max_bytes_is_usage_error(tmp_path: Path):
     result = run_semantic_ci(
         repo,
         "check",
+        "--mode",
+        "smoke",
         "--format",
         "json",
         "--cache-max-bytes",
@@ -717,23 +768,8 @@ def test_project_dependencies_are_unchanged():
     assert pyproject["project"]["dependencies"] == ["pydantic>=2.0,<3.0", "PyYAML>=6.0,<7.0"]
 
 
-def _extractor_bomb_env(tmp_path: Path) -> dict[str, str]:
-    root = tmp_path / "sitecustomize"
-    root.mkdir(exist_ok=True)
-    (root / "sitecustomize.py").write_text(
-        """
-from semantic_ci_code import pipeline
-
-
-def _boom(*args, **kwargs):
+def _boom_extractor(*args, **kwargs):
     raise RuntimeError("extractor should not be called on cache hit")
-
-
-pipeline.extract_python_code_state = _boom
-""",
-        encoding="utf-8",
-    )
-    return {"PYTHONPATH": f"{root}{pathsep}{REPO_ROOT / 'src'}"}
 
 
 def _write_cache_blob(path: Path, content: str, *, mtime: float) -> Path:

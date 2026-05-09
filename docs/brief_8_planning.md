@@ -72,7 +72,7 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 | `docs/target_yaml_guide.md` D3(template と user constraint の重複) | 同上 | **CSCI-43** target-doctor の `ADVISORY-D3` |
 | `docs/target_yaml_guide.md` D4(config-only PR の vacuous PASS) | 同上 | **CSCI-43** target-doctor の `ADVISORY-D4`(advisory のみ、verdict は変えない) |
 | `docs/target_yaml_guide.md` D5(set operator partial-match) | PR #65 で Validator 側で完全解消、bare-string は `normalize_collection_expected()` (`framework/match_schema.py:137-139`) で `{required_key: item}` に desugar されるため現行でも valid な shorthand。target-doctor 側で追加検知すべき残存パターンは無し | **target-doctor では advisory を出さない**(PR #73 round-4 codex review の指摘で false positive リスク確定、`TargetSVP` に target-level `schema_version` field も存在せず legacy 形を識別できない) |
-| 設計 §23.3.1 Authoring surface | scaffold だけでは authoring 行為(constraint DSL 落とし込み)を支援しきれない | **CSCI-42** init `--kind --recipe --from-pr-body --from-labels --from-commits` で recipe-driven 生成 + PR metadata 取り込みへ昇格 |
+| 設計 §23.3.1 Authoring surface | scaffold だけでは authoring 行為(constraint DSL 落とし込み)を支援しきれない | **CSCI-42** init `--recipe --from-pr-body --from-labels --from-commits` で recipe-driven 生成 + PR metadata 取り込みへ昇格 |
 | 設計 §23.3.1 Provenance surface | `authorship.generation_metadata` を parse するが書き出しコマンドが無い | **CSCI-42** init recipe が generation_metadata(`source_surfaces`, `candidate_code_used: false`)を自動記録 |
 | 設計 §23.3.1 Advisor surface | 既存 `validate-plan` は target.yaml が**正しく書かれている**前提。書く前段階の advisor が無い | **CSCI-43** target-doctor + **CSCI-44** target-catalog で穴埋め |
 | session 2026-05-09 議論 | 「target.yaml は人間手書きである必要はない」を **設計文書に明記**する必要 | **CSCI-41**(docs)で `docs/target_authoring_surface.md` 新設 + 既存 docs cross-ref |
@@ -84,7 +84,7 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
    構造的に保証する(後述 §7 の不変条件 5 つ)。
 2. **target.yaml 生成経路を 3 つに拡張**:
    - 手書き(現行)
-   - **recipe + PR metadata**(`init --kind <K> --recipe <R> --from-pr-body
+   - **recipe + PR metadata**(`init --recipe <R> --from-pr-body
      pr.md --from-labels labels.json --from-commits commits.txt` から決定論的
      生成)
    - **catalog 参照**(AI assistant / IDE / 外部 tool が `target-catalog` の
@@ -157,7 +157,7 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 │                                                          │
 │   user input ─┐                                          │
 │   PR body ────┤                                          │
-│   labels ─────┼──▶ init --kind --recipe ──▶ target.yaml  │
+│   labels ─────┼──▶ init --recipe ──▶ target.yaml         │
 │   commits ────┤    (CSCI-42)                (declared    │
 │                                              intent +    │
 │                                              provenance) │
@@ -251,7 +251,7 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 **Surface**: docs only。実装変更なし。
 **Brief size**: 0.5 日。
 
-### 5.2 CSCI-42 (P1): `semantic-ci init --kind --recipe --from-*`
+### 5.2 CSCI-42 (P1): `semantic-ci init --recipe --from-*`
 
 **Goal**: 現行 `init` の skeleton 出力を壊さずに、recipe mode と PR metadata
 取り込み(deterministic-only)を追加する。LLM / network 不使用、ユーザー
@@ -259,8 +259,8 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 
 **追加 / 変更ファイル**:
 
-- `src/semantic_ci_code/cli/init_command.py` (UPDATE): `--kind` /
-  `--recipe` / `--add-api` / `--test-case` / `--remove-api` /
+- `src/semantic_ci_code/cli/init_command.py` (UPDATE):
+  `--recipe` / `--add-api` / `--test-case` /
   `--allow-fqn` / `--allow-fqn-prefix` /
   `--declared-at` + `--from-pr-body` / `--from-labels` /
   `--from-commits` / `--from-issue` 引数を追加。`--declared-at` は
@@ -362,7 +362,7 @@ ADVISORY を出す方向は将来 brief で検討。
 
 | Source | 強さ | 役割 |
 |---|---|---|
-| `--add-api` / `--test-case` / `--remove-api` / `--allow-fqn` / `--allow-fqn-prefix` / `--declared-at`(明示 user input) | strong | positive expectation / authorship の確定値、逐語保持 |
+| `--add-api` / `--test-case` / `--allow-fqn` / `--allow-fqn-prefix` / `--declared-at`(明示 user input) | strong | positive expectation / authorship の確定値、逐語保持 |
 | labels(`kind:feature` 等) | strong | `change.primary_kind` 決定 |
 | PR body の structured section(`## Expected public API\n- FQN1\n- FQN2`) | strong | positive expectation の値そのもの(`feature:add-api` の必須引数を満たす源として採用可、明示 user input と **union** で merge し重複は dedup) |
 | issue acceptance criteria の structured section(`## Acceptance Criteria` 等) | medium | 同上(PR body より弱い、PR body と user input が空のときのみ参照) |
@@ -399,7 +399,7 @@ flag も渡されないケース)は **既存の `TARGET_TEMPLATE` を逐語維�
 1. `--recipe <ID>` が指定された
 2. `--from-pr-body` / `--from-labels` / `--from-commits` / `--from-issue` の
    いずれかが指定された
-3. `--add-api` / `--test-case` / `--remove-api` / `--allow-fqn` /
+3. `--add-api` / `--test-case` / `--allow-fqn` /
    `--allow-fqn-prefix` / `--declared-at` のいずれかが指定された
 
 上記いずれも未指定なら **generation_metadata block を一切書かず**、`init`
@@ -857,7 +857,7 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
 | **R6 recipe 不足で結局手書き** | 4 recipe で大半の PR をカバーできない | session 2026-05-09 議論で「4 recipe で大半 cover」の見積、§9.3 dogfood で経験的検証、不足時は CSCI-42 follow-up で追加 recipe を増やす(後方互換破壊なし) |
 | **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken。特に「provenance metadata は必ず生成」を全呼び出しに適用すると plain `init` 出力が変わり `tests/cli/test_init_command.py:24` を破る(PR #73 round-6 codex review 指摘) | CSCI-42 acceptance に「既存 behavior 不変」+「plain `init` 出力に generation_metadata を含めない」を test で固定。Provenance metadata 生成は **recipe / source / explicit-input flag が 1 つでも発火した時のみ** に scope する(§5.2 Provenance metadata セクション) |
 | **R8 PR body parser の脆弱性** | non-structured な PR body で誤動作 / クラッシュ | structured section が存在しない場合は **graceful degrade**(明示 user input + recipe default のみで生成、source surface に該当 source を含めない)、CSCI-42 acceptance に明記 |
-| **R9 recipe / catalog / advisor schema grounding + contract 整合ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照する、または recipe contract と source 強度ポリシーが矛盾して PR body 経由 flow を reject する、または削除済 advisor が file 列挙に取り残される、または recipe の template 説明が実 templates.py と乖離する、または authoring intent (例: "**public** API") を捨てる平坦投影で constraint を生成する、または定義のない CLI flag を file list に列挙する。PR #73 codex review で計 12 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除)、(h) D5 削除後も `hazards.py` 列挙に `D5-legacy` が残存し実装側で false positive を再導入する罠、(i) `feature:add-api` の必須引数を `--add-api FQN+` に固定すると `--from-pr-body` の `## Expected public API` セクションだけで recipe を満たす flow が CLI parse 段階で reject される(source 強度ポリシーと recipe contract の矛盾)、(j) `bugfix:regression-test` recipe の template 説明が実 templates.py と異なる(brief は `api_surface_delta.removed_public == []` と書いたが実際は `api_surface_public equals_baseline`(=追加も削除も全禁止)+ `effect_changes.added equals ()`、`compiler/templates.py:64-76`)、(k) `feature:add-api` で `api_surface_delta.added.fqns includes_all` の平坦投影 alias を使うと `## Expected **public** API` 由来の visibility 情報を捨て、non-public 追加でも satisfy される。record match `{fqn, visibility: "public"}` で強制すべき(`framework/match_schema.py:47` `_API_SCHEMA.optional_keys` に `visibility` 登録済み)、(l) `--allowed-import` flag が CSCI-42 ファイル list に列挙されているが merge ロジック / 消費する recipe / generation_metadata 発火条件のいずれも定義されていない幽霊 flag(削除) | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field + template 展開ルール を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + template-expansion-parity + match-schema-parity + advisor-no-false-positive + source-merge-validation + visibility-preservation cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、recipe contract の必須性は **source merge 後**に検証(CLI parse 段階で reject しない)、advisor を削除する際は **file 列挙 / 関数 stub / acceptance count をすべて grep して整合化**、recipe の template 説明は **実 templates.py の TEMPLATE_CONSTRAINTS dict を逐語参照**(brief 起草時に思い込みで書かない)、authoring intent に visibility / kind / scope などの修飾子が含まれる場合は **平坦投影 alias を避け record match で強制**(match_schema registry の optional_keys を活用)、CLI flag を file list に追加する際は **merge / consumption / provenance trigger の 3 点をすべて定義**(未定義なら削除)、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
+| **R9 recipe / catalog / advisor schema grounding + contract 整合ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照する、または recipe contract と source 強度ポリシーが矛盾して PR body 経由 flow を reject する、または削除済 advisor が file 列挙に取り残される、または recipe の template 説明が実 templates.py と乖離する、または authoring intent (例: "**public** API") を捨てる平坦投影で constraint を生成する、または定義のない CLI flag を file list に列挙する。PR #73 codex review で計 14 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除)、(h) D5 削除後も `hazards.py` 列挙に `D5-legacy` が残存し実装側で false positive を再導入する罠、(i) `feature:add-api` の必須引数を `--add-api FQN+` に固定すると `--from-pr-body` の `## Expected public API` セクションだけで recipe を満たす flow が CLI parse 段階で reject される(source 強度ポリシーと recipe contract の矛盾)、(j) `bugfix:regression-test` recipe の template 説明が実 templates.py と異なる(brief は `api_surface_delta.removed_public == []` と書いたが実際は `api_surface_public equals_baseline`(=追加も削除も全禁止)+ `effect_changes.added equals ()`、`compiler/templates.py:64-76`)、(k) `feature:add-api` で `api_surface_delta.added.fqns includes_all` の平坦投影 alias を使うと `## Expected **public** API` 由来の visibility 情報を捨て、non-public 追加でも satisfy される。record match `{fqn, visibility: "public"}` で強制すべき(`framework/match_schema.py:47` `_API_SCHEMA.optional_keys` に `visibility` 登録済み)、(l) `--allowed-import` flag が CSCI-42 ファイル list に列挙されているが merge ロジック / 消費する recipe / generation_metadata 発火条件のいずれも定義されていない幽霊 flag(削除)、(m) `--kind` flag が CSCI-42 init に列挙されているが、`change.primary_kind` は recipe ID で固定され labels / commits も独立に推論する経路があり、`--kind` を消費する recipe / merge ルールがない幽霊 flag(削除、target-catalog の `--kind` は別 subcommand の保持された flag)、(n) `--remove-api` flag が CSCI-42 init / source 強度表 / provenance trigger に列挙されているが、4 recipe いずれも `--remove-api` を constraint に変換しない幽霊 flag(削除) | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field + template 展開ルール を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + template-expansion-parity + match-schema-parity + advisor-no-false-positive + source-merge-validation + visibility-preservation cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、recipe contract の必須性は **source merge 後**に検証(CLI parse 段階で reject しない)、advisor を削除する際は **file 列挙 / 関数 stub / acceptance count をすべて grep して整合化**、recipe の template 説明は **実 templates.py の TEMPLATE_CONSTRAINTS dict を逐語参照**(brief 起草時に思い込みで書かない)、authoring intent に visibility / kind / scope などの修飾子が含まれる場合は **平坦投影 alias を避け record match で強制**(match_schema registry の optional_keys を活用)、CLI flag を file list に追加する際は **merge / consumption / provenance trigger の 3 点をすべて定義**(未定義なら削除)、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
 | **R10 envelope-wide byte-identical の過剰要求** | §7 invariant #1 / #3 を envelope 全体 / 全 subcommand に拡張すると 2 領域で既存仕様と矛盾: (a) `target_authorship` field は authorship を reflect する設計(既存 `tests/test_authorship.py:73` を破る)、(b) `validate-plan` adapter `render_pre_gen` は `generation_metadata` を逐語 render する設計(`repair_compiler/adapters/{codex,claude_code,cursor,markdown}.py` の `format_generation_metadata`、provenance を generator に伝える Advisor surface 要件、PR #73 round-7 codex review 指摘) | 不変条件は **evaluator-derived field**(`verdict` / `repair_plan` / `summary`)に narrow、`target_authorship` を比較から除外し、`validate-plan` を invariant 対象 subcommand から除外するヘルパを `tests/architecture/` に置く。一般原則: **adapter / output layer が provenance / authorship を意図的に reflect する surface は invariant 対象外**(rendered/serialized 側で reflect することがその surface の存在理由) |
 | **R11 wall-clock 由来の非決定性** | recipe が `declared_at` を `datetime.now()` で埋めると同 input → 異 output となり determinism acceptance を violate(PR #73 round-3 codex review 指摘) | `declared_at` は **default omit**(`Authorship.declared_at: str \| None = None` を活用)、`--declared-at ISO8601` で明示指定時のみ書き出す。`tool_version` は `importlib.metadata.version` から静的解決。CSCI-42 acceptance に「`--declared-at` 未指定時は declared_at field 不在」「同 input 3 回 byte-identical」を含める |
 

@@ -117,7 +117,11 @@ def run_semantic_ci_inproc(
 ) -> InprocResult:
     # PYTHONHASHSEED only takes effect at process startup. Tests that vary it
     # should call run_semantic_ci_subprocess explicitly.
-    del hash_seed
+    if hash_seed != "1":
+        raise TypeError(
+            "hash_seed has no effect in-process; use run_semantic_ci_subprocess "
+            "for PYTHONHASHSEED determinism tests"
+        )
     from semantic_ci_code.cli.main import main
 
     saved_cwd = Path.cwd()

@@ -192,10 +192,15 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 各 CSCI は acceptance criteria に以下を**必ず含める**:
 
 - **不変条件テスト**: 当該 subcommand を経由しても `check` / `compare` /
-  `validate-plan` / `compile-repair` の verdict 出力が **byte-identical**
-  であることを、共通 fixture で確認する(§7 不変条件 #1 の回帰)。
+  `compile-repair` の JSON envelope が **byte-identical** であることを、
+  共通 fixture で確認する(§7 不変条件 #1 の回帰)。`validate-plan` は
+  対象外(adapter `render_pre_gen` が `generation_metadata` を逐語 render
+  する設計のため、generation_metadata 書き換えで `rendered` field が変わる
+  のは正しい挙動。詳細 §7 不変条件 #1)。
 - **provenance 非参照テスト**: target.yaml に generation_metadata を
-  書き換えても verdict envelope が変わらないことを確認(§7 不変条件 #3)。
+  書き換えても `check` / `compare` / `compile-repair` の verdict envelope が
+  変わらないことを確認(§7 不変条件 #3)。`validate-plan.rendered` は
+  対象外(同上)。
 - **no-LLM / no-network テスト**: 本 brief の全 subcommand 経路で `httpx` /
   `requests` / 外部 API client を import しないことを import-graph で確認
   (§7 不変条件 #4)。
@@ -694,18 +699,32 @@ populate)。
 実装で**構造的に保証する**5 つの不変条件:
 
 1. **Verdict bytes invariant**(narrow scope):
-   `check` / `compare` / `validate-plan` / `compile-repair` の JSON envelope
-   のうち、**evaluator が決定する field**(`verdict` / `repair_plan` /
-   `summary` および同等の per-subcommand evaluator output)は本 brief の
-   全変更後も既存 fixture で byte-identical。`target_authorship` field は
-   既存仕様で authorship 情報を **意図的に reflect する**設計
-   (`cli/output/json_formatter.py:32-58` `build_payload`、既存
-   `tests/test_authorship.py:73` で `verdict` / `repair_plan` / `summary`
-   のみ stable とアサート済み)であり、本不変条件は **`target_authorship`
-   field を含まない**。
+   `check` / `compare` / `compile-repair` の JSON envelope のうち、
+   **evaluator が決定する field**(`verdict` / `repair_plan` / `summary`
+   および同等の per-subcommand evaluator output)は本 brief の全変更後も
+   既存 fixture で byte-identical。
+
+   除外する 2 領域:
+
+   - `target_authorship` field(`cli/output/json_formatter.py:32-58`
+     `build_payload`、既存 `tests/test_authorship.py:73` で `verdict` /
+     `repair_plan` / `summary` のみ stable とアサート済み)— authorship
+     情報を **意図的に reflect する**既存仕様。
+   - `validate-plan` の出力全体 — adapter `render_pre_gen` が
+     `generation_metadata` を逐語 render する設計
+     (`repair_compiler/adapters/codex.py:83-84` `[GENERATION METADATA]`
+     section、`claude_code.py:69` / `cursor.py:90`
+     `**Generation metadata**: ...`、共有ヘルパ
+     `markdown.py:154-157 format_generation_metadata`)。`validate-plan`
+     は **provenance を generator に伝える**ことが Advisor surface 仕様
+     上の明示要件であり、generation_metadata 書き換えで `rendered` /
+     JSON payload が変わるのは正しい挙動。本不変条件はこれを対象外と
+     する(PR #73 round-7 codex review 指摘)。
+
    → CSCI-42〜44 すべての acceptance に「verdict / repair_plan / summary
-   不変条件テスト」を含める。比較は `target_authorship` を除外して行う
-   ヘルパを `tests/architecture/test_verdict_bytes_invariant.py` に置く。
+   不変条件テスト」を含める。比較は `target_authorship` を除外し、
+   `validate-plan` envelope は invariant 対象から外したヘルパを
+   `tests/architecture/test_verdict_bytes_invariant.py` に置く。
 
 2. **`check` does not generate target invariant**:
    `check` 経路から `init` / `target-doctor` / `target-catalog` の
@@ -715,14 +734,25 @@ populate)。
 
 3. **Provenance non-participation invariant**(narrow scope):
    target.yaml の `authorship.generation_metadata` を任意に書き換えても
-   evaluator-derived field(`verdict` / `repair_plan` / `summary`)は
-   byte-identical。`target_authorship` field は authorship を逐語に reflect
-   する既存仕様のため、generation_metadata 変更で **当該 field のみが変わる**
-   ことは設計上正しく、本不変条件はこれを fail としない(`tests/
-   test_authorship.py:73` の既存挙動と整合)。
-   → fixture を 1 つ作り、generation_metadata の有無 / 値違いで verdict
-   を回し、`target_authorship` を除外した比較で hash 一致を確認
-   (CSCI-42 acceptance)。
+   `check` / `compare` / `compile-repair` の **evaluator-derived field**
+   (`verdict` / `repair_plan` / `summary`)は byte-identical。
+
+   除外する 2 領域(不変条件 #1 と同型):
+
+   - `target_authorship` field — authorship を逐語に reflect する既存仕様
+     のため、generation_metadata 変更で **当該 field のみが変わる**ことは
+     設計上正しい(`tests/test_authorship.py:73` の既存挙動と整合)。
+   - `validate-plan` の `rendered` / JSON payload — adapter
+     `render_pre_gen` が `generation_metadata` を逐語 render する設計
+     (`repair_compiler/adapters/{codex,claude_code,cursor,markdown}.py`、
+     共有ヘルパ `format_generation_metadata`)。`validate-plan` は
+     provenance を generator に伝えることが Advisor surface の明示要件で
+     ある(`§23.3.1`)。
+
+   → fixture を 1 つ作り、generation_metadata の有無 / 値違いで
+   `check` / `compare` / `compile-repair` を回し、`target_authorship` を
+   除外した比較で hash 一致を確認(CSCI-42 acceptance)。`validate-plan`
+   は本不変条件から除外。
 
 4. **No-LLM / no-network invariant**:
    本 brief で追加・変更されたすべての subcommand 経路で `httpx` /
@@ -804,10 +834,14 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
       `直近 merged` に移動。Brief 7(SSP)発行を本 brief 後に置く順序が
       `docs/code_semantic_ci_design.md §25` に反映される
 - [ ] `ruff check .` / `pytest -q` 全 pass
-- [ ] verdict envelope の **evaluator-derived field**(`verdict` /
-      `repair_plan` / `summary`)が既存 fixture で byte-identical
-      (`target_authorship` field は authorship を reflect する既存仕様
-      なので比較から除外。`tests/test_authorship.py:73` と一貫)
+- [ ] `check` / `compare` / `compile-repair` の **evaluator-derived
+      field**(`verdict` / `repair_plan` / `summary`)が既存 fixture で
+      byte-identical(比較から除外: (a) `target_authorship` field は
+      authorship を reflect する既存仕様、`tests/test_authorship.py:73`
+      と一貫。(b) `validate-plan` envelope は adapter `render_pre_gen` が
+      `generation_metadata` を逐語 render する設計のため invariant 対象外、
+      `repair_compiler/adapters/*.py` の `format_generation_metadata`
+      呼び出しが provenance を generator に伝える明示要件)
 - [ ] LLM / network 呼び出しがゼロであることが import-graph で固定
       (本 brief 完全決定論)
 
@@ -824,7 +858,7 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
 | **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken。特に「provenance metadata は必ず生成」を全呼び出しに適用すると plain `init` 出力が変わり `tests/cli/test_init_command.py:24` を破る(PR #73 round-6 codex review 指摘) | CSCI-42 acceptance に「既存 behavior 不変」+「plain `init` 出力に generation_metadata を含めない」を test で固定。Provenance metadata 生成は **recipe / source / explicit-input flag が 1 つでも発火した時のみ** に scope する(§5.2 Provenance metadata セクション) |
 | **R8 PR body parser の脆弱性** | non-structured な PR body で誤動作 / クラッシュ | structured section が存在しない場合は **graceful degrade**(明示 user input + recipe default のみで生成、source surface に該当 source を含めない)、CSCI-42 acceptance に明記 |
 | **R9 recipe / catalog / advisor schema grounding + contract 整合ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照する、または recipe contract と source 強度ポリシーが矛盾して PR body 経由 flow を reject する、または削除済 advisor が file 列挙に取り残される、または recipe の template 説明が実 templates.py と乖離する。PR #73 codex review で計 10 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除)、(h) D5 削除後も `hazards.py` 列挙に `D5-legacy` が残存し実装側で false positive を再導入する罠、(i) `feature:add-api` の必須引数を `--add-api FQN+` に固定すると `--from-pr-body` の `## Expected public API` セクションだけで recipe を満たす flow が CLI parse 段階で reject される(source 強度ポリシーと recipe contract の矛盾)、(j) `bugfix:regression-test` recipe の template 説明が実 templates.py と異なる(brief は `api_surface_delta.removed_public == []` と書いたが実際は `api_surface_public equals_baseline`(=追加も削除も全禁止)+ `effect_changes.added equals ()`、`compiler/templates.py:64-76`) | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field + template 展開ルール を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + template-expansion-parity + match-schema-parity + advisor-no-false-positive + source-merge-validation cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、recipe contract の必須性は **source merge 後**に検証(CLI parse 段階で reject しない)、advisor を削除する際は **file 列挙 / 関数 stub / acceptance count をすべて grep して整合化**、recipe の template 説明は **実 templates.py の TEMPLATE_CONSTRAINTS dict を逐語参照**(brief 起草時に思い込みで書かない)、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
-| **R10 envelope-wide byte-identical の過剰要求** | §7 invariant #1 / #3 を envelope 全体に拡張すると `target_authorship` field の既存仕様(authorship を reflect)と矛盾、既存 `tests/test_authorship.py:73` を破る | 不変条件は **evaluator-derived field**(`verdict` / `repair_plan` / `summary`)に narrow、`target_authorship` を比較から除外するヘルパを `tests/architecture/` に置く |
+| **R10 envelope-wide byte-identical の過剰要求** | §7 invariant #1 / #3 を envelope 全体 / 全 subcommand に拡張すると 2 領域で既存仕様と矛盾: (a) `target_authorship` field は authorship を reflect する設計(既存 `tests/test_authorship.py:73` を破る)、(b) `validate-plan` adapter `render_pre_gen` は `generation_metadata` を逐語 render する設計(`repair_compiler/adapters/{codex,claude_code,cursor,markdown}.py` の `format_generation_metadata`、provenance を generator に伝える Advisor surface 要件、PR #73 round-7 codex review 指摘) | 不変条件は **evaluator-derived field**(`verdict` / `repair_plan` / `summary`)に narrow、`target_authorship` を比較から除外し、`validate-plan` を invariant 対象 subcommand から除外するヘルパを `tests/architecture/` に置く。一般原則: **adapter / output layer が provenance / authorship を意図的に reflect する surface は invariant 対象外**(rendered/serialized 側で reflect することがその surface の存在理由) |
 | **R11 wall-clock 由来の非決定性** | recipe が `declared_at` を `datetime.now()` で埋めると同 input → 異 output となり determinism acceptance を violate(PR #73 round-3 codex review 指摘) | `declared_at` は **default omit**(`Authorship.declared_at: str \| None = None` を活用)、`--declared-at ISO8601` で明示指定時のみ書き出す。`tool_version` は `importlib.metadata.version` から静的解決。CSCI-42 acceptance に「`--declared-at` 未指定時は declared_at field 不在」「同 input 3 回 byte-identical」を含める |
 
 ## 12. 順序 / 依存

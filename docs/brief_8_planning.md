@@ -1,164 +1,88 @@
 # Brief 8 Planning — Authoring Surface (target.yaml provenance neutrality 実装)
 
-> **Status: PLANNING (open, scope confirmed 2026-05-09)**.
+> **Status: PLANNING (open, scope confirmed 2026-05-09).** 4 PR 構成、完全
+> 決定論。LLM / network / API key を一切導入しない。Brief 5 と同等サイズ。
 >
-> Brief 5(Vibe Coding Adapter + Repair Compiler、P2.5 entry)で確立した
-> **§23.3 surface 区分**(Validator / Authoring / Provenance / Advisor)のうち、
-> 実装が `init` scaffold 1 点だけにとどまっている **Authoring + Advisor +
-> Provenance** の 3 surface を実コマンドに展開する brief。**完全決定論**で
-> 設計し、LLM / network / API key を一切導入しない。
->
-> 設計動機は session 2026-05-09 の議論で確定した次の最終決定:
->
-> > target.yaml の難解さは Semantic CI core の本質的欠陥ではない。
-> > core は declared intent に対する adherence を決定論的に判定する Validator
-> > であり、intent の正しさ・完備性・作者の真意は判定しない。
-> >
-> > 改善対象は target.yaml を書く前後の Authoring / Advisor / Provenance
-> > surface である。target.yaml は人間手書きである必要はなく、recipe、template、
-> > PR metadata、commit message、label などから生成してよい。ただし、生成結果は
-> > verdict 前に明示的な declared intent として固定され、生成経路・provenance・
-> > advice は evaluator に参加してはならない。
->
-> 初稿の draft 段階で 5 つの異論が出され、本 planning に **すべて反映済み**:
->
-> 1. **LLM 経路を Brief 8 から完全除外**: `draft-target --llm-assist` は
->    `CLAUDE.md` の「LLM / network / API key を explicit Brief decision なしに
->    入れない」 default に抵触するため、本 brief から削除。LLM authoring は
->    **Brief 8b** として独立 brief で API key / network policy / vendor coupling /
->    failure semantics / process isolation / Authoring-only guarantee を個別設計
->    する。
-> 2. **`target-doctor --strict-advice` を削除**: advisory output で exit 1 を
->    返すと §23.3.1 Advisor non-participation invariant を実態として破る。
->    target-doctor の **advisory presence は exit 0**(verdict 不参加)、
->    ただし usage / config error は **2**、engine / git error は **3**、
->    internal は **4**(`docs/exit_codes.md` repo-wide policy 整合、§5.3
->    Exit code 規約参照、round-18 / round-19 / round-20 で更新)。CI gate
->    が必要な
->    ユーザーは `--format json` を外部 workflow policy で処理する。
-> 3. **Brief 8 を Brief 7(SSP)より先行**を明示。adoption bottleneck は
->    target.yaml authoring friction であり、SSP は Brief 8 完了後に発行する
->    (詳細 §12)。
-> 4. **`compile --explain` を削除**: 既存 `compile --format human` /
->    `target-doctor` / `target-catalog` の 3 系統で十分。説明 command を
->    増やすと「どれを叩けば良いか分からない」 UX 退行を招く。
-> 5. **`draft-target` を独立 subcommand として削除し、`init --recipe` に
->    統合**: deterministic-only なら両者の差分は薄い。`init` に
->    `--from-pr-body` / `--from-labels` / `--from-commits` を flag として
->    吸収し、subcommand 数を抑える。
->
-> 結果として Brief 8 は **CSCI-41〜44 の 4 PR** に圧縮、Brief 5 と同等サイズ。
+> 設計動機: target.yaml の難解さは Semantic CI core の本質的欠陥ではない。
+> core は declared intent に対する adherence を決定論的に判定する Validator
+> であり、intent の正しさ・完備性・作者の真意は判定しない(`docs/code_semantic_ci_design.md §23.3`)。
+> 改善対象は target.yaml を書く前後の **Authoring / Advisor / Provenance**
+> 3 surface であり、target.yaml は人間手書き必須ではない。recipe / template /
+> PR metadata / commit message / label から生成してよい。生成結果は verdict
+> 前に明示的な declared intent として固定され、生成経路・provenance・advice は
+> evaluator に参加しない。LLM 経路は **Brief 8b** で別途扱う(本 brief は
+> 完全決定論)。
 
-## 位置付け
+---
+
+## 1. 位置付け
 
 `docs/code_semantic_ci_design.md §23.3.1` の Adjacent surfaces 表に対する
-**実装側のキャッチアップ**。設計上は 2026-05-04 時点で 4 surface の境界が
-確定しており、`§23.3.2` で各 surface の不可侵制約も明記されているが、
-実装は以下の状態:
+**実装側のキャッチアップ**。設計上は 4 surface 境界が確定しているが、実装は:
 
 | Surface | 設計上の許可 | 実装の現状 |
 |---|---|---|
-| **Validator** | core engine | 完全実装(Brief 1〜5 で完走) |
-| **Authoring** | target.yaml 形式の作成支援 | `semantic-ci init` の skeleton 出力**だけ** |
-| **Provenance** | intent の declared 経路記録 | `authorship` block の **parse のみ**、生成 metadata の自動記録は無し |
-| **Advisor** | intent 周辺情報の human 向け配信 | `validate-plan` / `compile-repair` の repair guidance のみ。authoring hazard の advisor 化は未実装 |
+| **Validator** | core engine | 完全実装(Brief 1〜5) |
+| **Authoring** | target.yaml 形式の作成支援 | `init` の skeleton 出力**だけ** |
+| **Provenance** | intent の declared 経路記録 | `authorship` block の **parse のみ** |
+| **Advisor** | intent 周辺情報の human 向け配信 | `validate-plan` / `compile-repair` のみ |
 
-session 2026-05-08 で `docs/target_yaml_guide.md` を新設し D1〜D5 を
-authoring hazard として **文書化**したが、ガイドを読まないと回避できない
-状態は **設計が許容している surface を実装で塞いでいる**ことの裏返し。
-本 brief はその surface ギャップを埋める。
-
-## 1. 救済される未解決項目
-
-| 出典 | 項目 | 本 brief での扱い |
-|---|---|---|
-| `docs/target_yaml_guide.md` D1(`--package-root` scope vs `tests/`) | authoring hazard の機械化 | **CSCI-43** target-doctor の `ADVISORY-D1` |
-| `docs/target_yaml_guide.md` D3(template と user constraint の重複) | 同上 | **CSCI-43** target-doctor の `ADVISORY-D3` |
-| `docs/target_yaml_guide.md` D4(config-only PR の vacuous PASS) | 同上 | **CSCI-43** target-doctor の `ADVISORY-D4`(advisory のみ、verdict は変えない) |
-| `docs/target_yaml_guide.md` D5(set operator partial-match) | PR #65 で Validator 側で完全解消、bare-string は `normalize_collection_expected()` (`framework/match_schema.py:137-139`) で `{required_key: item}` に desugar されるため現行でも valid な shorthand。target-doctor 側で追加検知すべき残存パターンは無し | **target-doctor では advisory を出さない**(PR #73 round-4 codex review の指摘で false positive リスク確定、`TargetSVP` に target-level `schema_version` field も存在せず legacy 形を識別できない) |
-| 設計 §23.3.1 Authoring surface | scaffold だけでは authoring 行為(constraint DSL 落とし込み)を支援しきれない | **CSCI-42** init `--recipe --from-pr-body --from-labels --from-commits` で recipe-driven 生成 + PR metadata 取り込みへ昇格 |
-| 設計 §23.3.1 Provenance surface | `authorship.generation_metadata` を parse するが書き出しコマンドが無い | **CSCI-42** init recipe が generation_metadata(`source_surfaces`, `candidate_code_used: false`)を自動記録 |
-| 設計 §23.3.1 Advisor surface | 既存 `validate-plan` は target.yaml が**正しく書かれている**前提。書く前段階の advisor が無い | **CSCI-43** target-doctor + **CSCI-44** target-catalog で穴埋め |
-| session 2026-05-09 議論 | 「target.yaml は人間手書きである必要はない」を **設計文書に明記**する必要 | **CSCI-41**(docs)で `docs/target_authoring_surface.md` 新設 + 既存 docs cross-ref |
+`docs/target_yaml_guide.md` で D1〜D5 を **文書化** したが、ガイドを読まないと
+回避できない状態は設計の許容を実装で塞いでいる。本 brief はそのギャップを
+埋める。
 
 ## 2. Goals
 
-1. **§23.3.1 surface 境界を実装まで貫徹**: Authoring / Provenance / Advisor
-   surface が verdict path に **絶対に介入しない**ことを CLI subcommand 単位で
-   構造的に保証する(後述 §7 の不変条件 5 つ)。
-2. **target.yaml 生成経路を 3 つに拡張**:
-   - 手書き(現行)
-   - **recipe + PR metadata**(`init --recipe <R> --from-pr-body
-     pr.md --from-labels labels.json --from-commits commits.txt` から決定論的
-     生成)
-   - **catalog 参照**(AI assistant / IDE / 外部 tool が `target-catalog` の
-     機械可読出力を見て生成する)
-3. **authoring hazard を Advisor 化**: D1 / D3 / D4 + positive expectation
-   欠落 + severity downgrade 等を `target-doctor` で検出、verdict には
-   参加しない(advisory presence は exit 0、ただし usage/config = 2、
-   engine/git = 3、internal = 4 の repo-wide policy に従う、§5.3 Exit
-   code 規約参照、`--strict-advice` は **実装しない**)。D5 は PR #65
-   で Validator 側に完全吸収済み(bare-string desugar)で、target-doctor
-   側に追加検知すべき残存 pattern が無いため対象外。
-4. **Provenance metadata の自動記録**: `init --recipe` 系コマンド
-   (recipe / source flag のいずれかが渡された呼び出し)が
-   `authorship.generation_metadata` を逐語で書き、`candidate_code_used: false`
-   を default にする。candidate code 由来 expectation の生成経路は本 brief
-   では一切実装しない。**plain `init`(引数なし)の出力は既存
-   `TARGET_TEMPLATE` を逐語維持する**(generation_metadata は書かない、
-   既存テスト不変、§5.2 Provenance metadata セクションで詳述)。
-5. **完全決定論**:
-   - recipe / catalog / doctor / metadata 記録のすべてが LLM / network / API
-     key を使用しない
-   - 同 input → byte-identical output(各 CSCI の acceptance に明記)
-6. **`semantic-ci check` の挙動を一切変更しない**: 既存 envelope schema /
-   exit code / verdict 計算は本 brief で触らない(§7 不変条件 #1)。
+1. **§23.3.1 surface 境界を実装まで貫徹**: Authoring / Provenance / Advisor が
+   verdict path に絶対介入しないことを CSCI 単位で構造保証(§5 不変条件
+   INV-1〜INV-5)。
+2. **target.yaml 生成経路を 3 つに拡張**: 手書き / recipe + PR metadata
+   (`init --recipe --from-*`)/ catalog 参照(AI assistant 経路)。
+3. **authoring hazard を Advisor 化**: D1 / D3 / D4 + P1 / P2 / S1 を
+   `target-doctor` で検出。advisory presence は exit 0(verdict 不参加)、
+   ただし usage/config / engine/git / internal error は repo-wide policy
+   (`docs/exit_codes.md`)に従う(§6.3 Exit code 規約)。
+4. **Provenance metadata の自動記録**: `--recipe <ID>` 指定時のみ
+   `authorship.generation_metadata` を deterministic に記録。`candidate_code_used:
+   false` を default にし、LLM 経路は本 brief で実装しない。**plain `init`(引数なし)
+   の出力は既存 `TARGET_TEMPLATE` を逐語維持**。
+5. **完全決定論**: 全 subcommand で LLM / network / API key 不使用。同 input →
+   byte-identical output(§5 INV-4)。
+6. **`semantic-ci check` の verdict 計算は不変**: envelope schema / exit code /
+   verdict ロジックは本 brief で触らない(§5 INV-1)。
 
-## 3. Non-goals(本 brief 範囲外)
+## 3. Non-goals
 
-- **`semantic-ci check --auto-target`** — `check` 内で target を生成する経路は
-  作らない(§23.3 違反、§7 不変条件 #2 で排除)。
-- **LLM-assisted authoring(`--llm-assist` 系)** — 本 brief から完全除外。
-  **Brief 8b** として独立 brief で扱う。Brief 8b で扱うべき論点:
-  - API key / 環境変数管理(OPENAI_API_KEY / ANTHROPIC_API_KEY 等)
-  - network 依存による install profile 変化
-  - LLM provider 選定の vendor coupling
-  - 「LLM 経路は authoring 限定」を構造的に保証する仕組み(import-graph では
-    不十分、process / dependency 分離が必要)
-  - 失敗時の semantics(API down / rate limit / hallucination → draft yaml
-    不正の扱い)
-- **candidate code から expected constraint を無条件生成** — `init --recipe`
-  の default は `candidate_code_used: false`。opt-in flag は本 brief では
-  実装しない(別 brief で安全策込みで議論)。
-- **任意 Python 式 / 独自 DSL** — `target.yaml` は YAML + typed operator の
-  ままにする(設計 §4 不変)。「authoring が難しいから DSL を自由化」は本
-  brief で却下する選択肢として明記。
-- **LLM-as-judge** — verdict path への LLM 混入は永続的に non-goal
-  (`docs/code_semantic_ci_design.md §23.3` / Scope guard)。
-- **intent の正しさ判定** — target-doctor は authoring hazard を出すが、
-  「この intent は正しい / 間違っている」は判定しない(設計 §23.3.3)。
-- **target-doctor `--strict-advice`** — advisory output で exit 1 を返す
-  flag は実装しない。advisory presence は exit 0(verdict 不参加)だが
-  usage/config error = 2、engine/git error = 3、internal error = 4 の
-  repo-wide policy(`docs/exit_codes.md`)に従う(§5.3 Exit code 規約参照)。
-  CI gate が必要な
-  場合は `--format json` を外部 workflow policy で処理する運用とする。
-- **`compile --explain`** — 既存 `compile --format human` / `target-doctor` /
-  `target-catalog` の 3 系統で説明用途は十分。subcommand 過密を避けるため
-  本 brief では追加しない。
-- **standalone `draft-target` subcommand** — `init --recipe` に PR metadata
-  flag を統合することで吸収。subcommand を独立させない。
-- **non-Python artifact gating** — config / docs / workflow 専用の意味検証は
-  Brief 7(SSP)/ 別 protocol の責務。本 brief では target-doctor が D4
-  vacuous PASS を **advisory として教える**だけにとどめる。
-- **新たな constraint kind / operator** — 本 brief は authoring 経路の整備
-  であり、constraint DSL 自体は不変。
-- **TypeScript / 多言語 catalog** — Brief 6 凍結に従い Python のみ。
-  `target-catalog` の出力スキーマは多言語拡張を想定して設計するが、Python
-  以外の populate は本 brief で行わない。
-- **GitHub App / Action 化** — Brief 8 完了後、別 brief でパッケージング。
+- `semantic-ci check --auto-target`(`check` 内 target 生成、§23.3 違反)
+- LLM 経路全般(`--llm-assist` 系) → **Brief 8b**
+- candidate code 由来 expectation 生成 → 本 brief 非実装、`candidate_code_used: false` 固定
+- 任意 Python 式 / 独自 DSL 化(`target.yaml` は YAML + typed operator のまま)
+- LLM-as-judge(永続的 non-goal)
+- intent の正しさ判定(`docs/code_semantic_ci_design.md §23.3.3`)
+- `target-doctor --strict-advice`(advisor surface に verdict 圧力をかけない)
+- `compile --explain`(既存 `compile --format human` で十分)
+- standalone `draft-target` subcommand(`init --recipe + --from-*` に統合)
+- non-Python artifact gating(SSP 範疇)
+- 新 constraint kind / operator(本 brief は authoring 経路の整備のみ)
+- TypeScript / 多言語 catalog(Brief 6 凍結)
+- GitHub App / Action 化(別 brief)
 
-## 4. アーキテクチャ全体像
+## 4. 救済される未解決項目
+
+| 出典 | 項目 | 本 brief での扱い |
+|---|---|---|
+| `docs/target_yaml_guide.md` D1 / D3 / D4 | authoring hazard の機械化 | **CSCI-43** target-doctor の `ADVISORY-D1` / `D3` / `D4` |
+| 同 D5(set operator partial-match) | PR #65 で Validator 側で完全解消 | target-doctor 側で追加検知すべき残存 pattern なし(§6.3 注記参照) |
+| 設計 §23.3.1 Authoring | scaffold だけでは constraint DSL 落とし込みを支援しきれない | **CSCI-42** init `--recipe --from-pr-body --from-labels --from-commits --from-issue` |
+| 設計 §23.3.1 Provenance | `authorship.generation_metadata` を parse するが書き出しコマンドが無い | **CSCI-42** init recipe が generation_metadata を deterministic に記録 |
+| 設計 §23.3.1 Advisor | 既存 `validate-plan` は target.yaml が正しく書かれている前提 | **CSCI-43** target-doctor + **CSCI-44** target-catalog |
+| 「target.yaml は手書き必須でない」 を設計文書に明記 | doc gap | **CSCI-41** で `docs/target_authoring_surface.md` 新設 |
+
+---
+
+## 5. アーキテクチャ
+
+### 5.1 Surface 配属
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -166,15 +90,14 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 │                                                          │
 │   user input ─┐                                          │
 │   PR body ────┤                                          │
-│   labels ─────┼──▶ init --recipe ──▶ target.yaml         │
-│   commits ────┤    (CSCI-42)                (declared    │
-│                                              intent +    │
-│                                              provenance) │
+│   issue ──────┼──▶ init --kind --recipe ──▶ target.yaml  │
+│   labels ─────┤    (CSCI-42)              (declared      │
+│   commits ────┘                            intent +      │
+│                                            provenance)   │
 │                                                          │
 │   AI assistant ──▶ target-catalog (CSCI-44, JSON)        │
 │                                                          │
-│   target.yaml ──▶ target-doctor (CSCI-43)                │
-│                   (ADVISORY のみ、exit 0 固定)            │
+│   target.yaml ──▶ target-doctor (CSCI-43, advisory)      │
 └──────────────────────────────────────────────────────────┘
                             │
                             ▼ ★ verdict 入口で固定
@@ -183,487 +106,324 @@ authoring hazard として **文書化**したが、ガイドを読まないと�
 │                                                          │
 │   target.yaml + baseline + candidate                     │
 │      ──▶ check / compare / validate-plan / compile-repair│
-│                  (Brief 1〜5 で完走、本 brief で不変)   │
+│                  (Brief 1〜5、本 brief で不変)          │
 └──────────────────────────────────────────────────────────┘
 ```
 
-### 4.1 責務分離(本 brief 内 surface 配属)
-
-| CSCI | 追加 surface | 役割 | verdict 関与 |
+| CSCI | Surface | 役割 | verdict 関与 |
 |---|---|---|---|
-| CSCI-41 (docs) | (docs) | §23.3.1 surface 区分の **設計文書側追記** + cross-ref | NO |
-| CSCI-42 init `--recipe` + sources | Authoring + Provenance | recipe + user input + PR metadata → target.yaml(決定論)+ generation_metadata 自動記録 | NO |
-| CSCI-43 target-doctor | Advisor | target.yaml の hazard を render(verdict 不変、exit 0 固定) | NO |
+| CSCI-41 (docs) | (docs) | §23.3.1 surface 区分の文書側追記 | NO |
+| CSCI-42 init `--recipe` + sources | Authoring + Provenance | recipe + user input + PR metadata → target.yaml + generation_metadata 自動記録 | NO |
+| CSCI-43 target-doctor | Advisor | target.yaml の hazard を render | NO |
 | CSCI-44 target-catalog | Authoring(meta) | target / operator / template / match schema を機械可読出力 | NO |
 
-#### 4.1.1 surface invariant の test での担保
+### 5.2 不変条件(INV-1〜INV-5)
 
-各 CSCI は acceptance criteria に以下を**必ず含める**:
+実装で **構造的に保証する** 5 つの不変条件。各 CSCI acceptance に対応番号を
+明記する。
 
-- **不変条件テスト**: 当該 subcommand を経由しても `check` / `compare` /
-  `compile-repair` の JSON envelope が **byte-identical** であることを、
-  共通 fixture で確認する(§7 不変条件 #1 の回帰)。`validate-plan` は
-  対象外(adapter `render_pre_gen` が `generation_metadata` を逐語 render
-  する設計のため、generation_metadata 書き換えで `rendered` field が変わる
-  のは正しい挙動。詳細 §7 不変条件 #1)。
-- **provenance 非参照テスト**: target.yaml に generation_metadata を
-  書き換えても `check` / `compare` / `compile-repair` の verdict envelope が
-  変わらないことを確認(§7 不変条件 #3)。`validate-plan.rendered` は
-  対象外(同上)。
-- **no-LLM / no-network テスト**: 本 brief の全 subcommand 経路で `httpx` /
-  `requests` / 外部 API client を import しないことを import-graph で確認
-  (§7 不変条件 #4)。
+**INV-1 — Verdict bytes invariant** (narrow scope):
+`check` / `compare` / `compile-repair` の JSON envelope のうち、**evaluator が
+決定する field**(`verdict` / `repair_plan` / `summary` および同等の
+per-subcommand evaluator output)は本 brief の全変更後も既存 fixture で
+byte-identical。
 
-## 5. CSCI 分割
+除外する 2 領域:
+- `target_authorship` field(`cli/output/json_formatter.py:32-58` `build_payload`、
+  `tests/test_authorship.py:73` で stable と既定済)— authorship を意図的に
+  reflect する既存仕様。
+- `validate-plan` envelope 全体 — adapter `render_pre_gen` が
+  `generation_metadata` を逐語 render する設計
+  (`repair_compiler/adapters/{markdown,codex,claude_code,cursor}.py` の
+  `format_generation_metadata`)、provenance を generator に伝えるのが
+  Advisor surface の明示要件(`§23.3.1`)。
 
-合計 4 PR、おおむね各 0.5〜2 日。Brief 5 同等サイズ。
+→ `tests/architecture/test_verdict_bytes_invariant.py` で除外 helper を提供。
 
-### 5.1 CSCI-41 (P0): 設計文書追記
+**INV-2 — `check` does not generate target invariant** (semantic layer only):
+**`cli/commands/check.py` および `check` subcommand handler が再帰的に import
+する verdict 経路の module 集合** が `init` / `target-doctor` /
+`target-catalog` のいずれの module も import しない。
 
-**Goal**: target.yaml が hand-written 必須でないことを設計側で固定し、
-今後の実装判断の前提を明文化する。
+`cli/main.py` の subparser registration は CLI dispatcher の事務的 import
+であり、verdict 計算意味論の越境ではないため対象外(`cli/main.py:6-14` で
+全 subcommand handler が module load 時に import される設計)。
 
-**追加 / 変更ファイル**:
+→ `tests/architecture/test_surface_isolation.py` で `cli.commands.check` を
+root とした transitive import-graph を walk、対象 module 名が closure に
+現れたら fail。
 
-- `docs/target_authoring_surface.md` (NEW): §23.3.1 を実装側から再記述。
-  「declared intent は固定入力であり、生成経路は engine の関知外」を中心に、
-  recipe / catalog 参照 / hand-written の 3 経路を一覧化。LLM 経路は
-  Brief 8b で別途扱うことを脚注で明記。
-- `docs/target_yaml_guide.md` (UPDATE): 冒頭に「target.yaml は人間が直接
-  書く前提ではない」「複数の authoring 経路が許容されている」を pin、
-  D1〜D5 の章末に「target-doctor で機械化予定」cross-ref を追記。
-- `docs/code_semantic_ci_design.md §23.3.1` (UPDATE): Adjacent surfaces 表に
-  `init --recipe` / `target-doctor` / `target-catalog` を追記、各々が
-  verdict 不参加であることを脚注で明記。LLM 経路の Brief 8b 切り出しを
-  脚注で補足。
-- `CLAUDE.md` Required Reading 章 (UPDATE): Brief 8 着手前に
-  `docs/target_authoring_surface.md` を読むよう追加。
-- `README.md` (UPDATE): documentation 一覧に新規 doc を追加。
-- `docs/cli_usage.md` (UPDATE): 「Authoring subcommands(verdict 不参加)」
-  という新節を追加(具体的内容は CSCI-42〜44 で順次埋める、CSCI-41 では
-  節見出しと §23.3.1 への cross-ref のみ)。
+**INV-3 — Provenance non-participation invariant** (narrow scope):
+target.yaml の `authorship.generation_metadata` を任意に書き換えても
+`check` / `compare` / `compile-repair` の **evaluator-derived field**
+(`verdict` / `repair_plan` / `summary`)は byte-identical。除外領域は INV-1
+と同じ(`target_authorship` field、`validate-plan` envelope)。
 
-**Acceptance criteria**:
+→ fixture を 1 つ作り、generation_metadata の値違いで verdict を回し、
+除外 helper 経由で hash 一致を確認(CSCI-42 acceptance)。
 
-- [ ] `docs/target_authoring_surface.md` が以下 6 点を明記:
+**INV-4 — No-LLM / no-network invariant**:
+本 brief で追加・変更されたすべての subcommand 経路で `httpx` / `requests` /
+`openai` / `anthropic` / `urllib3` 等の network/LLM client を import しない。
+
+→ `tests/architecture/test_surface_isolation.py` で全 authoring subcommand
+module の transitive imports を assert。
+
+**INV-5 — Catalog ↔ implementation parity invariant**:
+`target-catalog` の出力に登録された target / operator / template / match schema
+が `compiler/templates.py` / `evaluator/operators.py` / `framework/match_schema.py`
+の実体と一致する。
+
+→ `tests/architecture/test_catalog_implementation_parity.py` で cross-test。
+
+---
+
+## 6. CSCI 分割
+
+合計 4 PR、約 4.5〜5 日。各 CSCI を AGENTS.md Task Brief 形式で記述。
+
+### 6.1 CSCI-41 (P0): 設計文書追記
+
+**Phase**: Brief 8 / Authoring surface(documentation)
+
+**Goal**: target.yaml が hand-written 必須でないことを設計側で固定し、今後の
+実装判断の前提を明文化する。
+
+**Acceptance Criteria**:
+- [ ] `docs/target_authoring_surface.md` (NEW) が以下 6 点を明記:
   (a) target.yaml は hand-written 必須でない
-  (b) Brief 8 で実装される生成経路の 3 通り(recipe + sources / catalog
-      参照 / hand-written)
-  (c) LLM 経路は Brief 8b で別途扱う(本 brief では非導入)
+  (b) 生成経路の 3 通り(recipe + sources / catalog 参照 / hand-written)
+  (c) LLM 経路は Brief 8b で別途扱う(本 brief 非導入)
   (d) 全経路は verdict 前に declared intent として固定される
   (e) Authoring / Advisor / Provenance surface は evaluator から参照不可
   (f) candidate-derived expectation は本 brief で実装しない、provenance
-      `candidate_code_used` field は **必ず false** で記録
-- [ ] CLAUDE.md docs table に新規 doc が status `ACTIVE` で登録
-- [ ] `ruff check .` / `pytest -q` 通過(コード変更なし、docs only)
+      `candidate_code_used` は **必ず false** で記録
+- [ ] `CLAUDE.md` docs table に新規 doc が status `ACTIVE` で登録
+- [ ] `docs/target_yaml_guide.md` 冒頭に「target.yaml は人間が直接書く前提では
+      ない」「複数の authoring 経路が許容されている」を pin、D1〜D5 の章末に
+      target-doctor cross-ref を追記
+- [ ] `docs/code_semantic_ci_design.md §23.3.1` Adjacent surfaces 表に
+      `init --recipe` / `target-doctor` / `target-catalog` を追記
+- [ ] `docs/cli_usage.md` に「Authoring subcommands(verdict 不参加)」 節を
+      追加(CSCI-42〜44 で順次埋める前提、CSCI-41 では節見出しと §23.3.1
+      cross-ref のみ)
+- [ ] `docs/exit_codes.md` に target-doctor の exit code 規約を §6.3 と逐語
+      一致させて追記
+- [ ] `docs/json_schema.md` に `advisory-1` / `catalog-1` envelope を追記
+- [ ] `ruff check .` / `pytest -q` 全 pass(docs only、コード変更なし)
 
-**Surface**: docs only。実装変更なし。
+**Scope**:
+- IN: `docs/target_authoring_surface.md` (NEW), `docs/target_yaml_guide.md`,
+  `docs/code_semantic_ci_design.md`, `docs/cli_usage.md`, `docs/exit_codes.md`,
+  `docs/json_schema.md`, `CLAUDE.md`, `README.md`
+- OUT: ソースコード一切、テスト一切
+
 **Brief size**: 0.5 日。
 
-### 5.2 CSCI-42 (P1): `semantic-ci init --recipe --from-*`
+### 6.2 CSCI-42 (P1): `semantic-ci init --recipe --from-*`
+
+**Phase**: Brief 8 / Authoring + Provenance surface
 
 **Goal**: 現行 `init` の skeleton 出力を壊さずに、recipe mode と PR metadata
-取り込み(deterministic-only)を追加する。LLM / network 不使用、ユーザー
-指定値と structured markdown section parser から明示 constraint を生成する。
+取り込み(deterministic-only)を追加する。LLM / network 不使用。
 
-**追加 / 変更ファイル**:
+#### 6.2.1 Recipe contract(canonical、本箇所のみが正)
 
-- `src/semantic_ci_code/cli/init_command.py` (UPDATE):
-  `--recipe` / `--add-api` / `--test-case` /
-  `--allow-fqn` / `--allow-fqn-prefix` /
-  `--declared-at` + `--from-pr-body` / `--from-labels` /
-  `--from-commits` / `--from-issue` 引数を追加。`--declared-at` は
-  ISO8601 文字列を逐語保持する deterministic input(未指定時は
-  `authorship.declared_at` を omit、wall-clock で自動埋め込みしない)。
-- `src/semantic_ci_code/cli/init_recipes/` (NEW directory):
-  - `__init__.py`: `RECIPES` dict、`apply_recipe()` entry point
-  - `feature_add_api.py`: `feature:add-api`
-  - `bugfix_regression_test.py`: `bugfix:regression-test`
-  - `refactor_preserve_api.py`: `refactor:preserve-api-with-allowlist`
-  - `test_update_add_test_case.py`: `test-update:add-test-case`
-- `src/semantic_ci_code/authoring/sources/` (NEW directory):
-  PR metadata 系の deterministic parser
-  - `__init__.py`
-  - `pr_body.py`: structured markdown section parser
-    (`## Expected public API` / `## Test cases` 等の固定セクションを抽出)
-  - `issue.py`: issue body の structured section parser
-    (`## Acceptance Criteria` / `## Expected public API` 等を抽出、
-    semantically PR body parser と互換だが entry point を分離して
-    provenance source_surface を区別する)
-  - `labels.py`: `kind:feature` / `kind:bugfix` 等から `primary_kind`
-  - `commits.py`: Conventional Commits prefix(`feat:` / `fix:` / `refactor:`
-    / `test:`)から `primary_kind` 推定 hint
-  - `merge.py`: source 強度 + precedence rule(下表)に従って partial
-    intent を merge、conflict 時は明示 error
-- `src/semantic_ci_code/authoring/provenance.py` (NEW):
-  `build_generation_metadata(source_surfaces, candidate_code_used=False)`
-- `src/semantic_ci_code/cli/main.py` (UPDATE): `init` subparser に新引数。
-- `tests/cli/test_init_recipe.py` (NEW): 各 recipe で生成される YAML が
-  expected と byte-identical(determinism)、生成 YAML が `compile` を
-  pass する、`check` の verdict 出力が hand-written と recipe で
-  byte-identical(同一 intent を表現する場合)。
-- `tests/cli/test_init_sources.py` (NEW): PR metadata / issue / labels /
-  commits source parser の unit テスト + structured section が無い PR body
-  / issue body で graceful degradation。
-- `tests/cli/test_init_merge.py` (NEW): `merge.py` の precedence /
-  conflict resolution rule(C1〜C4)の golden fixture(成功 / 失敗それぞれ
-  のケース、エラー message 文字列を含む)。
-
-**Recipe 仕様(初期 4 件)**:
-
-| Recipe ID | 必須引数 | 生成される positive expectation |
+| Recipe ID | 必須 / optional 引数 | 生成される constraint |
 |---|---|---|
-| `feature:add-api` | **`api_surface_delta.added` 用 FQN list が source merge 後に非空であること**(後述「『以下のいずれか必須』semantics」 の fallback chain に従う: strong layer = `--add-api` ∪ PR body の `## Expected public API`、medium layer = issue body の `## Expected public API`、いずれか 1 layer 以上で FQN+ が得られればよい)。optional `--test-case ID*`(canonical `path/to/test_file.py::test_function` 形式、後述) | `api_surface_delta.added includes_all [{fqn: <FQN1>, visibility: "public"}, {fqn: <FQN2>, visibility: "public"}, …]`(record match で **`visibility: "public"` を強制**、平坦投影 alias `api_surface_delta.added.fqns` を使うと visibility が捨てられて non-public 追加でも satisfy されるため不可、`framework/match_schema.py:47` の `_API_SCHEMA.optional_keys={"kind", "visibility"}` を活用)、merge は fallback chain(strong layer 充足時に medium 層を参照しない)、`--add-api` を逐語保持して PR body 抽出と union dedup merge、`--test-case` 指定時は `test_surface_delta.new_cases includes_all [<canonical test ID…>]`、未指定時は test_surface 制約なし |
-| `bugfix:regression-test` | optional `--test-case ID*`(canonical `path::name` 形式) | `--test-case` 指定時 `test_surface_delta.new_cases includes_all [<canonical test ID…>]`、未指定時 `test_surface_delta.new_cases not_equals []`。template により `api_surface_public equals_baseline`(public API は **追加も削除も不可**、`compiler/templates.py:64-69`)+ `effect_changes.added equals ()`(新規 effect 不可、`compiler/templates.py:70-75`)を auto-expand。public API 変更を伴う修正には別 recipe(`feature:add-api` 等)を使う |
-| `refactor:preserve-api-with-allowlist` | optional `--allow-fqn FQN*`, `--allow-fqn-prefix PREFIX*` | `change.primary_kind: refactor` + `api_surface.allow_changes` rule list(下表) |
-| `test-update:add-test-case` | optional `--test-case ID*`(canonical `path::name` 形式) | `--test-case` 指定時 `test_surface_delta.new_cases includes_all [<canonical test ID…>]`、未指定時 `test_surface_delta.new_cases not_equals []`。`primary_kind=test_update` で template `api_surface_public equals_baseline` + `effect_changes equals {added: (), removed: ()}` + `imports equals_baseline` が auto-expand(`compiler/templates.py:91-108`、test 追加以外を全 lock)。プロダクトコード変更を伴う場合は別 recipe |
+| `feature:add-api` | **必須**: §6.2.3 fallback chain で API FQN list が非空であること(`--add-api FQN+` ∪ PR body `## Expected public API` ∪ issue body `## Expected public API` または `## Acceptance Criteria` の API FQN bullet)。**optional**: `--test-case ID*`(canonical `path/to/test_file.py::test_function` 形式、§6.2.4 参照) | `api_surface_delta.added includes_all [{fqn: <FQN1>, visibility: "public"}, …]`(record match で **`visibility: "public"` を強制**、平坦投影 alias を使わない、`framework/match_schema.py:47` `_API_SCHEMA.optional_keys={"kind", "visibility"}` を活用)。`--test-case` 指定時は `test_surface_delta.new_cases includes_all [<canonical test ID…>]`、未指定時は test_surface 制約なし |
+| `bugfix:regression-test` | **optional**: `--test-case ID*`(canonical `path::name`) | `--test-case` 指定時 `test_surface_delta.new_cases includes_all [<canonical test ID…>]`、未指定時 `test_surface_delta.new_cases not_equals []`。template により `api_surface_public equals_baseline` + `effect_changes.added equals ()`(`compiler/templates.py:64-76`、public API は **追加も削除も不可**)。public API 変更を伴う修正には `feature:add-api` を使う |
+| `refactor:preserve-api-with-allowlist` | **optional**: `--allow-fqn FQN*`, `--allow-fqn-prefix PREFIX*` | allowlist 無し: `change.primary_kind: refactor` のみ(template が `api_surface_public equals_baseline` を auto-expand、`compiler/templates.py:43`)。allowlist 有り: `api_surface.allow_changes` rule を生成(`{fqn: …}` または `{fqn_prefix: …}`、`compiler/target_compiler.py:291`、existing policy escape hatch、新 operator 追加なし)。direction 別(add only / remove only)は現行 DSL 制約で表現不能 |
+| `test-update:add-test-case` | **optional**: `--test-case ID*`(canonical `path::name`) | `--test-case` 指定時 `test_surface_delta.new_cases includes_all [<canonical test ID…>]`、未指定時 `test_surface_delta.new_cases not_equals []`。`primary_kind=test_update` で template が `api_surface_public equals_baseline` + `effect_changes equals {added: (), removed: ()}` + `imports equals_baseline` を auto-expand(`compiler/templates.py:91-108`、test 追加以外を全 lock) |
 
-各 recipe は `change.primary_kind` を必ず設定し、template 展開は engine
-側に委ねる(本コマンドは template constraint を **重複生成しない** ——
-これが ADVISORY-D3 を踏まないための実装側保証)。
+各 recipe は `change.primary_kind` を必ず設定し、template constraint を
+**重複生成しない**(template と user constraint の重複は ADVISORY-D3、
+CSCI-43 で検出される)。
 
-**`refactor:preserve-api-with-allowlist` の constraint 展開**:
-
-`refactor` template は compiler で `template:refactor:api_surface_unchanged`
-(`compiler/templates.py:43`) を auto-expand し、evaluator はこれを
-**`api_surface.allow_changes` rule 経由でのみ緩和する**
-(`evaluator/evaluator.py:76-78`、`_filter_code_state_api_surface`)。
-user constraint を後付けしても template の strict equals_baseline は
-緩まないため、recipe は **既存の policy escape hatch である
-`api_surface.allow_changes`** にルールを書く方式とする。これは新 operator
-の追加ではなく、現行 Target SVP schema に既に存在する narrow policy
-escape hatch(`evaluator/evaluator.py:17` のコメントが明示)の活用であり、
-本 brief Non-goals「新 operator 追加なし」を遵守する。
-
-| `--allow-*` 指定 | 生成される target.yaml fragment |
-|---|---|
-| 両方 unset | `api_surface.allow_changes` を生成しない(template が strict baseline lock を強制) |
-| `--allow-fqn FQN+` | `api_surface.allow_changes: [{fqn: FQN1}, {fqn: FQN2}, …]` |
-| `--allow-fqn-prefix PREFIX+` | `api_surface.allow_changes: [{fqn_prefix: PREFIX1}, …]` |
-| 両方併用 | 上記 rule を併記(各 rule は `fqn` または `fqn_prefix` のいずれか 1 つ、`compiler/target_compiler.py:291` の制約に従う) |
-
-旧版(2026-05-09 review #1 で Codex が指摘、本 brief 確定前に撤回):
-~~`api_surface_delta.removed_public subset_of [...]` / `api_surface_delta.added.fqns subset_of [...]` を user constraint として併記する案~~ は、refactor template の auto-expand が user 構文では緩まない(allowed change が strict template で fail)ため **無効**。recipe は必ず `api_surface.allow_changes` 経由とする。
-
-**direction(add のみ許可 / remove のみ許可)区別について**:
-`api_surface.allow_changes` rule は `fqn` / `fqn_prefix` のみで方向性
-(add 限定 / remove 限定)を区別しない。これは現行 DSL の制約であり、
-本 brief で direction 区別 operator を追加することは Non-goals 違反。
-recipe は「指定 FQN(あるいは prefix 配下)の **add も remove も**
-許す」semantics に絞る。direction 別 allowlist が必要なケースは
-hand-written に逃がし、target-doctor で advisory を出す方向は将来 brief
-で検討。
-
-**`--test-case ID*` の扱い(全 recipe 共通)**:
-
-**形式の指定**: `--test-case` の値は **canonical test case ID** 形式
-`path/to/test_file.py::test_function`(例:
-`tests/test_common.py::test_added`)を必須とする。これは
-`compute_code_state_delta()` の `_test_case_id()`
-(`src/semantic_ci_code/delta/code_state_delta.py:354-355`)が
-`f"{entry.test_file}::{entry.test_function}"` で `new_cases` に書き出す
-canonical 形式と一致する。Python-style FQN(`tests.test_common.test_added`)
-で渡すと `compile` は通るが evaluator が delta に同値の文字列を見つけられず
-**永久に fail**(指摘 22)。recipe / parser / `--test-case` CLI は同じ
-canonical 形式を逐語保持する。
-
-**逐語保持の理由**: `--test-case` で canonical ID が渡された場合、recipe は
-**その値を逐語保持**して
-`test_surface_delta.new_cases includes_all [<canonical test ID…>]` を生成する
-(`new_cases` は `tuple[str, ...]`、`evaluator/operators.py:86`
-`_includes_all` が string collection でも動作)。明示値を捨てて
-`not_equals []` だけ生成すると、無関係な test case 追加でも pass して
-しまうため(PR #73 round-3 codex review で指摘)、明示値はかならず
-constraint に反映する。`--test-case` 未指定時のみ「test 追加そのもの」を
-要求する `not_equals []` に degrade する。
-
-**形式 validation**: `--test-case <ID>` 引数は CLI parse 段階で `::`
-区切りを必須とし、`::` を含まない値が渡されたら明示 error
-(message: `--test-case value '{val}' is not in canonical 'path::name' form
-(e.g. 'tests/test_x.py::test_y'); recipe-generated constraints must match
-TestSurfaceDelta.new_cases output of code_state_delta._test_case_id`)。
-
-**test-update recipe の表現範囲**:
-
-`TestSurfaceDelta` の現行 schema(`new_files` / `new_cases` /
-`removed_cases` の 3 field、`domain/state_schema.py:144`)で表現可能な
-範囲に限定し、存在しない path(`changed_or_added` 等)は使わない。
-「既存 test case の修正(削除なし、追加なし)」は CodeState 上は
-`new_cases` / `removed_cases` ともに空となるため delta では検知不能だが、
-これは本 brief の射程外(`docs/target_yaml_guide.md` D4 と同型の構造的
-限界)。test 修正 PR 全般を gate したいユーザーには target-doctor で
-ADVISORY を出す方向は将来 brief で検討。
-
-**Source 強度ポリシー**:
+#### 6.2.2 Source 強度ポリシー
 
 | Source | 強さ | 役割 |
 |---|---|---|
 | `--add-api` / `--test-case` / `--allow-fqn` / `--allow-fqn-prefix` / `--declared-at`(明示 user input) | strong | positive expectation / authorship の確定値、逐語保持 |
-| labels(`kind:feature` 等) | strong | `change.primary_kind` 決定 |
-| PR body の structured section(`## Expected public API\n- FQN1\n- FQN2`) | strong | positive expectation の値そのもの(`feature:add-api` の必須引数を満たす源として採用可、明示 user input と **union** で merge し重複は dedup) |
-| issue acceptance criteria の structured section(`## Acceptance Criteria` 等) | medium | 同上(PR body より弱い、PR body と user input が空のときのみ参照) |
-| commit message(Conventional Commits prefix) | medium | `primary_kind` の hint(labels が無い時のみ採用) |
-| **candidate code body / observed semantic delta** | **本 brief で非実装** | tautology 化リスクのため、`--allow-candidate-derived-expectations` flag は **存在しない** |
+| labels(`kind:feature` 等、`--from-labels`) | strong | `change.primary_kind` validation のみ(§6.2.3 precedence 表) |
+| PR body の structured section(`--from-pr-body`) | strong | positive expectation の値 |
+| issue body の structured section(`--from-issue`) | medium | positive expectation の値、strong layer 空のときのみ参照 |
+| commit message Conventional Commits prefix(`--from-commits`) | medium | `primary_kind` の hint(他 source 不在時のみ) |
+| **candidate code body / observed semantic delta** | **本 brief 非実装** | tautology 化リスクのため、`--allow-candidate-derived-expectations` flag は **存在しない** |
 
-**`change.primary_kind` の precedence / conflict resolution**:
+#### 6.2.3 Source merge と precedence(canonical)
 
-複数の strong source が `primary_kind` を独立に決定し得るため、`merge.py`
-は **明示的な precedence rule** に従って解決する。silent override や
-silent ignore は一切行わず、矛盾は **明示 error** で止める。
-
-**`--recipe` は recipe 生成の必須前提**: 本 brief は 4 個の固定 recipe ID
-ごとに constraint set を定義しており、推論された `primary_kind` だけから
-recipe を自動選択する deterministic mapping は持たない(`primary_kind=
-feature` だけでは `feature:add-api` 以外の将来 recipe との区別がつかない)。
-したがって precedence 表は **`--recipe <ID>` が指定されたケース限定**で
-`primary_kind` を確定する規則を定める。`--recipe` 不在で source flag
-(`--from-*`)が指定されると error(下記 precedence 行 (none) と統合)。
-plain `init`(`--recipe` も `--from-*` も無し)は scaffold mode で
-`primary_kind` 議論の対象外(generation_metadata 自体生成しない、§5.2)。
-
-| 優先度 | source | 動作 |
-|---|---|---|
-| 1 (authoritative) | `--recipe <ID>`(recipe ID から固定) | `primary_kind` を確定。下位 source の primary_kind hint と **strict 一致**を要求、不一致なら error(C1) |
-| 2 (validation) | labels(`kind:feature` 等、`--from-labels`) | `--recipe` の primary_kind と **一致確認** のみ。`--from-labels` のみで recipe 不在は error(理由: 推論された primary_kind だけでは recipe ID を一意に選べない) |
-| 3 (validation) | commit message(Conventional Commits prefix、`--from-commits`) | 同上、`--recipe` の primary_kind と一致確認のみ。recipe 不在で `--from-commits` のみは error |
-| (`--recipe` も `--from-*` も無し) | scaffold mode | plain `init`(既存 `TARGET_TEMPLATE` 逐語、generation_metadata 不生成) |
-| (`--from-*` 有り、`--recipe` 無し) | error | `--recipe is required when source flags (--from-*) are used; recipe ID determines the constraint set` |
-
-**conflict 検出ルール**(`merge.py` で固定):
-
-- **C1**: `--recipe feature:add-api` + `kind:bugfix` label が同時指定 →
-  recipe の `feature` と label の `bugfix` が不一致、**error**(message:
-  `recipe '{ID}' implies primary_kind '{X}', but label 'kind:{Y}' contradicts;
-  remove the conflicting label or use --recipe 'kind:{Y}:...'`)
-- **C2**: `--recipe` 有り + 同種 labels 複数(例: `kind:feature` 2 個)→
-  問題なし(同 primary_kind を再宣言しているだけ、dedup)。異種混在
-  (`kind:feature` + `kind:bugfix`)は labels 内部矛盾の前段で error
-- **C3**: `--recipe` 有り + Conventional Commits prefix 混在(`feat:` +
-  `fix:`)→ recipe の primary_kind と一致するものは validation OK、
-  不一致 prefix が混在すれば error(commit ごとに 1 つでも recipe と
-  矛盾するなら C1 と同型の error。tie-break で「最後の prefix が勝つ」は
-  recipe 不在時の仮想規則だったが、本 brief では recipe 必須なので
-  適用されない)
-- **C4**: PR body / issue の **intent-declaring structured section**(下記
-  registry)が recipe に消費されずに残った場合 → **error**(silent ignore
-  禁止原則の対称性、PR #73 round-11 codex review で指摘)。例: `--recipe
-  feature:add-api` で `## Expected public API` + `## Removed public API` の
-  2 section がある時、後者は consumed されないため error。message:
-  `pr_body section '{title}' declares intent that recipe '{ID}' does not
-  consume; either remove the section or use a recipe that consumes it`。
-
-  intent-declaring section registry は parser に固定値で持つ:
-
-  | Section title | 消費する recipe |
-  |---|---|
-  | `## Expected public API` | API FQN source(`feature:add-api` の
-    strong / medium layer 入力)。issue body / PR body どちらでも同 semantic |
-  | `## Removed public API` | (本 brief の 4 recipe では消費されない、
-    将来 brief で `feature:remove-api` 等を追加する余地) |
-  | `## Test cases` | test case ID source(`feature:add-api` /
-    `bugfix:regression-test` / `test-update:add-test-case` の `--test-case`
-    と同等。canonical `path::name` 形式の ID list) |
-  | `## Acceptance Criteria` | **両用途**: parser が section 内容を見て
-    判定。canonical FQN(dotted module path)が見つかれば API FQN source、
-    canonical `path::name` test ID が見つかれば test case source、両方
-    混在すれば両方 feed(PR #73 round-18 指摘の「issue-only feature flow
-    で `## Acceptance Criteria` だけがある」 ケースを解消)。content
-    classification は parser 側に grammar(行頭 `-` の値が `::` を含めば
-    test ID、`.` のみ含めば FQN、両方含めば lexer error → C4 error)で
-    固定し silent guess は行わない |
-
-  registry に **無い** 一般 section(`## Description` / `## Motivation` /
-  `## Background` 等の人間向け説明)は **declared intent ではない**ので
-  無視してよい(declared intent / human prose の区別を parser が行う)。
-  registry に **ある**が消費 recipe が無い、もしくは内容が parser
-  grammar で分類不能な section は error。
-
-CSCI-42 acceptance に C1〜C4 全種の golden fixture(成功 / 失敗それぞれ)を
-含める。
-
-**「以下のいずれか必須」semantics**:
-
-`feature:add-api` のように recipe contract で **API FQN のいずれかを必須**
-としているケースでは、CLI 引数の有無で先に reject せず、**source merge
-後に positive expectation の FQN list が空かどうかを検証**する。merge は
-**source 強度層を尊重した fallback chain** で行う(指摘 20 修正後の規則):
-
-1. CLI parse: `--add-api` を **optional** として受け取る
-2. PR body / issue parse: structured section から FQN list を抽出
-3. merge(fallback chain、source 強度層ごとに最初に空でない layer を採用):
-   - **strong layer**: `--add-api`(明示 user input)∪ PR body の structured
-     section。両方とも strong なので **同一 layer 内で union dedup**。strong
-     layer に値があれば、これを最終 FQN list として確定。
-   - **medium layer**: strong layer が空のときのみ参照。issue acceptance
-     criteria の structured section から FQN を採用(ここも複数 source あり
-     得るが、issue は medium 単独 source なのでそのまま採用)。
-   - **lowest layer**: 上 2 層が空のときのみ commit hint(なお commit hint
-     は primary_kind の hint で FQN 列ではないので、`feature:add-api` の
-     positive expectation には貢献しない。FQN 列の merge では実質 strong
-     と medium のみ)。
-   - issue を strong 値の **上に union しない**(指摘 20: stale / broad な
-     issue criteria が hard constraint を膨らませる risk を回避、source
-     強度表の「issue は medium、PR body と user input が空のときのみ参照」
-     と整合)。
-4. 検証: merge 後の FQN list が空ならエラー(`feature:add-api` recipe は
-   API 追加を表現できないと宣言、適切な exit code + 明示 message)
-
-これにより recipe contract と source 強度ポリシーが整合し、user が
-`--add-api` を一切渡さずに `--from-pr-body pr.md` だけで recipe を満たす
-flow、および strong source(`--add-api` / PR body)が空でも
-`--from-issue issue.md` の `## Expected public API` だけで recipe を満たす
-flow(medium layer fallback、PR #73 round-16 で指摘された issue-only flow)
-が成立する(`docs/target_authoring_surface.md` の AI assistant 経由
-authoring シナリオ)。CSCI-42 acceptance に以下 3 つの golden fixture を含める:
-
-- **PR-body-only flow**: `--add-api` 無し、`--from-pr-body pr.md` の
-  `## Expected public API` のみで recipe 満足(strong layer 単独充足)
-- **issue-only flow**: `--add-api` も `--from-pr-body` も無し、
-  `--from-issue issue.md` の `## Expected public API` のみで recipe 満足
-  (strong layer 空 → medium layer fallback、round-16 回帰テスト)
-- **strong layer 充足時に issue が無視される fixture**: `--add-api` で
-  FQN list を完結させた状態で `--from-issue` を併用しても、生成
-  constraint に issue 由来 FQN が混入しない(round-12 指摘 20 回帰テスト)
-
-**Provenance metadata**(**recipe / source mode のみで生成**、wall-clock を埋め込まない):
-
-**スコープ厳守**: 引数なしの plain `semantic-ci init`(`--recipe` も `--from-*`
-flag も渡されないケース)は **既存の `TARGET_TEMPLATE` を逐語維持**する
-(`tests/cli/test_init_command.py:24` `test_init_writes_default_target_template`
-が現行 scaffold の bytes を assert 済み、本 brief「既存 behavior 不変」を
-遵守)。generation_metadata の自動記録は **`--recipe <ID>` が指定された
-時のみ**(round-12 修正後の単一トリガー、`--recipe` が constraint set 選択の
-authoritative source であり、source flag / explicit input flag は recipe
-不在では消費先が無く error 経路へ送られるため、generation_metadata の
-発火条件としては `--recipe` 単独で必要十分):
+**`change.primary_kind` の precedence**: `--recipe` が authoritative。
+`--from-*` / explicit-input flag を `--recipe` 無しで指定すると error
+(`docs/code_semantic_ci_design.md §23.3.1` の constraint set 選択は recipe
+ID にバインドされている)。
 
 | 入力 pattern | 動作 |
 |---|---|
 | `init`(引数なし) | scaffold mode、既存 `TARGET_TEMPLATE` を逐語出力、generation_metadata 不生成 |
-| `init --recipe <ID>`(他 flag なし) | recipe を実行、generation_metadata 生成(source_surfaces は `[user_input]` 等、明示入力された source のみ列挙) |
-| `init --recipe <ID> --from-*` / `--add-api` 等 | recipe + source merge を実行、generation_metadata 生成 |
-| `init --from-*`(`--recipe` 無し) | error(precedence 表 (none) 行) |
-| `init --add-api` / `--test-case` 等(`--recipe` 無し) | error(explicit input flag は recipe contract が消費するため、recipe が無ければ消費先が決まらない) |
+| `init --recipe <ID>`(他 flag なし) | recipe 実行、generation_metadata 生成 |
+| `init --recipe <ID> --from-*` / `--add-api` 等 | recipe + source merge 実行 |
+| `init --from-*`(`--recipe` 無し) | **error**: `--recipe is required when source flags (--from-*) are used; recipe ID determines the constraint set` |
+| `init --add-api` 等(`--recipe` 無し) | **error**(同上) |
 
-CSCI-42 acceptance に「plain `init`(引数なし)出力が
-`tests/cli/test_init_command.py` の既存 assertion を pass」「`--recipe`
-**のみ** が generation_metadata を発火」「`--from-*` / explicit input
-flag を `--recipe` 無しで指定すると error」を明記。
+**FQN list の merge(fallback chain)**: source 強度層を尊重し、層を跨いで
+union しない:
 
-recipe / source mode 時の YAML 例:
+1. CLI parse: `--add-api` を **optional** として受け取る
+2. PR body / issue parse: structured section から FQN list を抽出
+3. merge:
+   - **strong layer**(`--add-api` ∪ PR body)— 同一 layer 内 union dedup。
+     値があれば確定、下位 layer 参照しない。
+   - **medium layer**(issue body)— strong layer が空のときのみ参照。
+   - **lowest**(commit hint)— FQN 列には貢献しない(primary_kind hint のみ)。
+4. 検証: merge 後の FQN list が空ならエラー(明示 message)
+
+**Conflict rules**(`merge.py` で固定):
+
+- **C1**: `--recipe feature:add-api` + `kind:bugfix` label → recipe の
+  `feature` と label の `bugfix` が不一致、**error**(message:
+  `recipe '{ID}' implies primary_kind '{X}', but label 'kind:{Y}' contradicts;
+  remove the conflicting label or use --recipe 'kind:{Y}:...'`)
+- **C2**: 異種 labels 混在(例: `kind:feature` + `kind:bugfix`)→ labels
+  内部矛盾、**error**
+- **C3**: Conventional Commits prefix が recipe primary_kind と不一致 →
+  **error**(C1 と同型)
+- **C4**: PR body / issue の **intent-declaring structured section**(下記
+  registry)が recipe に消費されずに残った場合 → **error**
+
+**Intent-declaring section registry**(parser 側で固定、`## Acceptance Criteria`
+は両用途):
+
+| Section title | 用途 |
+|---|---|
+| `## Expected public API` | API FQN source(PR body / issue 共通) |
+| `## Removed public API` | (本 brief の 4 recipe では消費されない、将来 brief で `feature:remove-api` 等を追加する余地) |
+| `## Test cases` | test case ID source(canonical `path::name` 形式) |
+| `## Acceptance Criteria` | **両用途**: parser が content grammar(行頭 `-` の値が `::` を含めば test ID、`.` のみなら FQN、混在は lexer error)で content 分類。両方混在(別 bullet)なら両方 feed。silent guess 禁止、分類不能な内容は C4 error |
+
+registry に **無い** 一般 section(`## Description` / `## Motivation` /
+`## Background` 等の人間向け説明)は declared intent ではないため無視 OK。
+
+#### 6.2.4 `--test-case` の値形式
+
+`--test-case` は **canonical test case ID** 形式
+`path/to/test_file.py::test_function`(例: `tests/test_common.py::test_added`)
+を必須とする。これは `compute_code_state_delta()._test_case_id()`
+(`src/semantic_ci_code/delta/code_state_delta.py:354-355`)が
+`f"{entry.test_file}::{entry.test_function}"` で `new_cases` に書き出す
+canonical 形式と一致する。Python-style FQN(`tests.test_common.test_added`)
+で渡すと `compile` は通るが evaluator が delta に同値の文字列を見つけられず
+**永久に fail**。
+
+CLI parse 段階で `::` 区切りを必須化し、含まない値は明示 error
+(message: `--test-case value '{val}' is not in canonical 'path::name' form
+(e.g. 'tests/test_x.py::test_y'); recipe-generated constraints must match
+TestSurfaceDelta.new_cases output of code_state_delta._test_case_id`)。
+
+#### 6.2.5 Provenance metadata(`--recipe` 指定時のみ)
+
+`--recipe` 指定時に `authorship.generation_metadata` を生成。**plain
+`init`(引数なし)出力は既存 `TARGET_TEMPLATE` を逐語維持**
+(`tests/cli/test_init_command.py:24` `test_init_writes_default_target_template`
+が現行 scaffold の bytes を assert 済)。
 
 ```yaml
 authorship:
-  # declared_at は default omit(Authorship.declared_at: str | None = None、
-  # framework/target_svp.py:58)。--declared-at ISO8601 が明示指定された
-  # ときのみ書く。wall-clock を default で埋めると同 input → 異 output に
-  # なり determinism acceptance を violate する(PR #73 codex review 指摘)。
+  # declared_at は default omit(framework/target_svp.py:58
+  # Authorship.declared_at: str | None = None)。--declared-at で明示指定時
+  # のみ書く。wall-clock 自動埋め込みは determinism violation のため禁止。
   generation_metadata:
     tool: semantic-ci-init
-    tool_version: "<package version, deterministic>"
-    recipe: "feature:add-api"  # 必ず設定される(generation_metadata は --recipe 必須モード でのみ生成)
+    tool_version: "<package version, importlib.metadata.version で静的解決>"
+    recipe: "feature:add-api"
     source_surfaces:
       - user_input
-      - pr_body    # --from-pr-body が指定された場合のみ
-      - issue      # --from-issue が指定された場合のみ
-      - labels     # --from-labels が指定された場合のみ
-      - commits    # --from-commits が指定された場合のみ
+      - pr_body    # --from-pr-body 指定時のみ
+      - issue      # --from-issue 指定時のみ
+      - labels     # --from-labels 指定時のみ
+      - commits    # --from-commits 指定時のみ
     candidate_code_used: false  # 本 brief では常に false
-    llm_used: false  # 本 brief では常に false
+    llm_used: false  # 本 brief では常に false(Brief 8b で導入)
 ```
 
-`tool_version` は package metadata(`importlib.metadata.version`)から静的
-に解決し、wall-clock / git ref / build host に依存しない。
-`candidate_code_used` / `llm_used` field の存在自体が §23.3 の Provenance
-Invariant を **運用側で可視化**する(false が固定値である設計が tautology
-と LLM 混入を防ぐ)。
+`tool_version` は `importlib.metadata.version()` から静的解決
+(wall-clock / git ref 不依存)。`candidate_code_used` / `llm_used` は固定値
+で provenance invariant を運用側で可視化する。
 
-**determinism と timestamp の関係**:
+#### 6.2.6 追加 / 変更ファイル
 
-| 入力 | `declared_at` 出力 | determinism |
-|---|---|---|
-| `--declared-at` 指定なし | field を omit | 同 input → byte-identical ✓ |
-| `--declared-at "2026-05-09T12:00:00Z"` | 明示値を逐語書き出し | 同 input → byte-identical ✓ |
-| (旧案)wall-clock 自動埋め込み | 実行ごとに変化 | violate ✗ — **採用しない** |
+- `src/semantic_ci_code/cli/init_command.py` (UPDATE): `--recipe` /
+  `--add-api` / `--test-case` / `--allow-fqn` / `--allow-fqn-prefix` /
+  `--declared-at` + `--from-pr-body` / `--from-labels` / `--from-commits` /
+  `--from-issue` 引数追加
+- `src/semantic_ci_code/cli/init_recipes/` (NEW directory):
+  - `__init__.py`: `RECIPES` dict、`apply_recipe()` entry point
+  - `feature_add_api.py`
+  - `bugfix_regression_test.py`
+  - `refactor_preserve_api.py`
+  - `test_update_add_test_case.py`
+- `src/semantic_ci_code/authoring/sources/` (NEW directory):
+  - `__init__.py`
+  - `pr_body.py`: structured markdown section parser
+  - `issue.py`: issue body の structured section parser(PR body と
+    semantically 互換だが entry point 分離で provenance を区別)
+  - `labels.py`: `kind:feature` 等から `primary_kind` 抽出 + validation
+  - `commits.py`: Conventional Commits prefix 抽出 + validation
+  - `merge.py`: source 強度 + precedence rule + C1〜C4 conflict detection
+- `src/semantic_ci_code/authoring/provenance.py` (NEW):
+  `build_generation_metadata()` ユーティリティ
+- `src/semantic_ci_code/cli/main.py` (UPDATE): `init` subparser に新引数
+- `tests/cli/test_init_recipe.py` (NEW)
+- `tests/cli/test_init_sources.py` (NEW)
+- `tests/cli/test_init_merge.py` (NEW): C1〜C4 全種の golden fixture
+  (成功 / 失敗、エラー message 含む)
+- `tests/architecture/test_verdict_bytes_invariant.py` (NEW): INV-1 / INV-3
 
-CSCI-42 acceptance に「`--declared-at` 未指定時は generation_metadata の
-declared_at field が **存在しない**」 + 「同 input 3 回で byte-identical」
-を必ず含める。
+#### 6.2.7 Acceptance Criteria(CSCI-42)
 
-**Acceptance criteria**:
-
-- [ ] 4 recipe すべてが決定論的(同 input → byte-identical YAML、3 回繰返
-      テスト)
-- [ ] 生成 YAML は `compile` を pass(構文 / path / operator すべて妥当)
-- [ ] **recipe が参照する path / operator / policy hatch が現行 schema に
-      実在する**ことを cross-test:
-  - `test_surface_delta.*` は `new_files` / `new_cases` / `removed_cases`
-    のみ(`domain/state_schema.py:144` `TestSurfaceDelta`)
-  - refactor allowlist は **`api_surface.allow_changes` rule** で表現
-    (`compiler/target_compiler.py:291` の `fqn` / `fqn_prefix` 制約に従う、
-    `evaluator/evaluator.py:76-78` で template 緩和される箇所)
-  - user constraint 側で template strict 展開を緩めようとしない
-    (refactor template の `equals_baseline` は `api_surface.allow_changes`
-    経由でしか緩まないことを test fixture で確認)
-  - すべての recipe 出力で `compiler/path_schema.py` の path validation +
-    `target_compiler` の `allow_changes` validation を pass
-- [ ] `init` の既存 behavior(引数なし呼び出し)は不変、既存テスト全 pass
-      (`tests/cli/test_init_command.py:24` `test_init_writes_default_target_template`
-      が現行 `TARGET_TEMPLATE` bytes を assert 済み、これを破らない)
-- [ ] **plain `init`(引数なし)出力に generation_metadata は含まれない**
-      (`--recipe <ID>` 指定時のみ block 生成、`--from-*` / explicit input
-      flag を `--recipe` 無しで指定すると error、§5.2 Provenance metadata
-      スコープ厳守ルール)
-- [ ] LLM / network 呼び出しゼロ(`socket` / `httpx` / `requests` を import
-      しないことを import-graph test で確認、§7 不変条件 #4)
-- [ ] template と user constraint の重複が起きない(ADVISORY-D3 が空に
-      なる、CSCI-43 land 後の cross-test で確認、本 PR では unit-level で
-      重複ゼロを assert)
-- [ ] PR body / issue に structured section が無い場合は **degrade** して
-      動作(明示 user input + recipe default のみで YAML 生成)、source
-      surface に該当 source を含めない
-- [ ] **recipe contract の「いずれか必須」 検証は source merge 後**:
-      `feature:add-api` で `--add-api` を渡さず `--from-pr-body pr.md` の
-      `## Expected public API` セクションだけで FQN を供給する flow が
-      動作する(golden fixture)。CLI parse 段階で `--add-api` 不在を理由
-      に reject しない。merge 後 FQN list が空のときのみエラー(明示
-      message + 適切な exit code)。
-- [ ] generation_metadata.candidate_code_used が **常に false**(test で
-      固定)、`--allow-candidate-derived-expectations` flag が**存在しない**
-      ことを CLI argparse spec で確認
-- [ ] verdict 不変条件テスト(§7 #1)
+- [ ] 4 recipe すべて決定論的(同 input 3 回 → byte-identical YAML)
+- [ ] 生成 YAML は `compile` を pass(構文 / path / operator / template
+      relaxation 経路の妥当性)
+- [ ] **Schema grounding cross-test**(§15 checklist の grep 一覧を実装)
+- [ ] **Template-expansion-parity cross-test**: recipe の template 説明が
+      `compiler/templates.py` の `TEMPLATE_CONSTRAINTS` dict と一致
+- [ ] **Visibility-preservation cross-test**: `feature:add-api` 出力が
+      `{fqn, visibility: "public"}` record match を含む(平坦投影 alias を
+      使わない)
+- [ ] **Source-merge fixture** 3 種:
+  - PR-body-only flow(`--add-api` 無し、`--from-pr-body` のみで recipe 満足)
+  - issue-only flow(`--from-issue` のみで recipe 満足、medium layer fallback)
+  - strong-fills-issue-ignored(strong layer 充足時に issue 由来 FQN が混入
+    しない)
+- [ ] **Conflict-resolution fixture** 4 種(C1〜C4 成功 / 失敗、エラー
+      message 含む)
+- [ ] `--test-case` の `::` 区切り validation(canonical form check)
+- [ ] **Provenance scope** test:
+  - plain `init`(引数なし)出力は `tests/cli/test_init_command.py:24`
+    既存 assertion を pass、generation_metadata 不在
+  - `--recipe` 指定時のみ generation_metadata 生成
+  - `--from-*` / explicit-input flag を `--recipe` 無しで指定すると error
+  - `candidate_code_used` / `llm_used` は **常に false**
+  - `--allow-candidate-derived-expectations` flag は **存在しない**
+      (CLI argparse spec で確認)
+  - `--declared-at` 未指定時は generation_metadata.declared_at 不在
+- [ ] **INV-1 / INV-3 verdict 不変条件テスト**(§5.2 INV-1 / INV-3 の
+      除外 helper 経由で hash 一致)
+- [ ] **INV-4 No-LLM / no-network test**: `httpx` / `requests` / `openai` /
+      `anthropic` / `urllib3` / `socket` を import しない(import-graph)
+- [ ] `ruff check .` / `pytest -q` 全 pass
 
 **Brief size**: 1.5〜2 日。
 
-### 5.3 CSCI-43 (P2): `semantic-ci target-doctor`
+### 6.3 CSCI-43 (P2): `semantic-ci target-doctor`
 
-**Goal**: target.yaml の authoring hazard を Advisor として render する
-新 subcommand。**verdict には参加しない**(advisory presence は exit 0、
-verdict gate ではない)。ただし usage / config error は exit 2、engine /
-git error は exit 3、internal error は exit 4(repo-wide policy
-`docs/exit_codes.md`、§5.3「Exit code 規約」表に詳細)。advisor surface
-でも **silent success on bad input は禁止**(round-18 / round-20 codex
-review 指摘の self-consistency)。`--strict-advice` のような
-advisory→fail 化 flag は **実装しない**。
+**Phase**: Brief 8 / Advisor surface
 
-**追加 / 変更ファイル**:
+**Goal**: target.yaml の authoring hazard を Advisor として render する新
+subcommand。verdict には参加しない(advisory presence は exit 0)。
+`--strict-advice` のような advisory→fail flag は **実装しない**。
 
-- `src/semantic_ci_code/cli/commands/target_doctor.py` (NEW)
-- `src/semantic_ci_code/cli/main.py` (UPDATE): subparser 追加
-- `src/semantic_ci_code/authoring/` (UPDATE): advisory 検出ロジック追加
-  (CSCI-42 で初出した `authoring/` directory を共有)
-  - `hazards.py` (NEW): 各 hazard 検出関数(D1 / D3 / D4 / P1 /
-    P2 / S1。D5 は本 brief で advisor 化しない、§5.3 / R9 (g) 参照)
-  - `advisory.py` (NEW): `Advisory` dataclass(`code`, `severity`,
-    `message`, `evidence`)
-- `src/semantic_ci_code/cli/output/doctor_human.py` (NEW)
-- `src/semantic_ci_code/cli/output/doctor_json.py` (NEW)
-- `src/semantic_ci_code/schemas/doctor_advisory.schema.json` (NEW)
-- `tests/cli/test_target_doctor.py` (NEW)
-- `tests/architecture/test_surface_isolation.py` (NEW): §7 不変条件 #2 / #4
-  の import-graph 検査(本 brief 横断テストの起点)
-
-**検出する advisory 一覧**:
+#### 6.3.1 Advisory 一覧(6 種)
 
 | Code | 概要 | 入力 |
 |---|---|---|
@@ -672,9 +432,15 @@ advisory→fail 化 flag は **実装しない**。
 | `ADVISORY-D4` | target is lock-only / config-only and candidate diff is config/doc/workflow only; PASS would be vacuous | target.yaml + baseline-rev + candidate-rev |
 | `ADVISORY-P1` | `primary_kind=feature` but no positive addition constraint | target.yaml |
 | `ADVISORY-P2` | `primary_kind=bugfix` but no `test_surface_delta.new_cases` expectation | target.yaml |
-| `ADVISORY-S1` | constraint has `severity: info` but `unknown_policy` is `fail` or `repair`; **violation** は verdict から無視されるが **UNKNOWN result(skipped dimensions / type mismatch 等)は unknown_policy 経由で依然 verdict に影響する**(`evaluator/evaluator.py:512-530` `_aggregate`)。完全に informational にしたければ `unknown_policy: ignore` に揃える | target.yaml |
+| `ADVISORY-S1` | constraint has `severity: info` AND `unknown_policy in {fail, repair}`; **violation** は verdict 無視されるが **UNKNOWN result(skipped dimensions / type mismatch 等)は unknown_policy 経由で依然 verdict 影響**(`evaluator/evaluator.py:512-530` `_aggregate`)。完全 informational には `unknown_policy: ignore` | target.yaml |
 
-**CLI**:
+D5 advisory は実装しない(PR #65 で Validator 側に完全吸収済、`TargetSVP` に
+target-level `schema_version` field なく `normalize_collection_expected()` で
+bare-string が valid shorthand に desugar されるため legacy 形を識別できず
+false positive となる、§15 checklist 「advisor は検出可能で意味のある invalid
+pattern が現行 schema に実在することを必ず先に確認」に従い不実装)。
+
+#### 6.3.2 CLI
 
 ```
 semantic-ci target-doctor \
@@ -685,80 +451,80 @@ semantic-ci target-doctor \
   [--format human|json]
 ```
 
-**Exit code 規約**(`docs/exit_codes.md` の repo-wide policy に整合):
+#### 6.3.3 Exit code 規約(canonical)
+
+`docs/exit_codes.md` repo-wide policy に整合:
 
 | 条件 | exit code |
 |---|---|
 | advisory 0 件(成功 + 出力) | 0 |
 | advisory ≥ 1 件(成功 + 出力) | **0**(advisor surface、verdict ではない) |
-| **Usage / configuration error**(target.yaml 不在 / 不正、CLI flag 不正、`--baseline-rev` / `--candidate-rev` parse 不能等) | **2**(`exit_codes.md` 第 14 行 Usage or configuration error と整合) |
-| **Expected engine / git error**(target.yaml 構文エラー = `CompileError`、git revision 解決失敗、git 利用不可等) | **3**(`exit_codes.md` 第 67-70 行 Compile / git error と整合、`--baseline-rev` / `--candidate-rev` の解決失敗を含む) |
+| **Usage / configuration error**(target.yaml 不在 / 不正、CLI flag 不正、`--baseline-rev` / `--candidate-rev` parse 不能) | **2**(`exit_codes.md` l.14) |
+| **Expected engine / git error**(target.yaml 構文エラー = `CompileError`、git revision 解決失敗、git 利用不可) | **3**(`exit_codes.md` l.67-70) |
 | 内部エラー(unhandled exception) | 4 |
 
-`--strict-advice` flag は **存在しない**。advisor が見つかったかどうか
-(advisory ≥ 1 件)では非ゼロを返さないが、**入力やエンジンの失敗**は
-repo-wide policy に従って通常通り非ゼロを返す(advisor surface でも
-silent success on bad input は禁止、PR #73 round-18 codex review 指摘)。
-CI で advisory 0 件を gate したい場合は `--format json` 出力を外部
-workflow policy(GitHub Actions の `if` / 別スクリプト)で処理する。
-`docs/cli_usage.md` に運用例を記載するが、それは workflow recipe で
-あって engine verdict ではない。
+**advisor surface でも silent success on bad input は禁止**: advisor 検出の
+有無のみが verdict 不参加で 0、入力 / engine 失敗は 2 / 3 / 4 を返す。
+`--strict-advice` は実装せず、CI で advisory 0 件を gate したいユーザは
+`--format json` 出力を外部 workflow policy で処理する。
 
-**Determinism**:
+#### 6.3.4 追加 / 変更ファイル
 
-- D1 / D3 / P1 / P2 / S1 は target.yaml 単独で決定論
-- D4 は git diff numstat に依存 → 同 baseline / candidate rev で
-  byte-identical
-- LLM / network 不使用
+- `src/semantic_ci_code/cli/commands/target_doctor.py` (NEW)
+- `src/semantic_ci_code/cli/main.py` (UPDATE): subparser
+- `src/semantic_ci_code/authoring/` (UPDATE):
+  - `hazards.py` (NEW): D1 / D3 / D4 / P1 / P2 / S1 の検出関数
+    (D5 は実装しない、§6.3.1 注記)
+  - `advisory.py` (NEW): `Advisory` dataclass
+- `src/semantic_ci_code/cli/output/doctor_human.py` (NEW)
+- `src/semantic_ci_code/cli/output/doctor_json.py` (NEW)
+- `src/semantic_ci_code/schemas/doctor_advisory.schema.json` (NEW)
+- `tests/cli/test_target_doctor.py` (NEW)
+- `tests/architecture/test_surface_isolation.py` (NEW): INV-2 / INV-4
 
-**Acceptance criteria**:
+#### 6.3.5 Acceptance Criteria(CSCI-43)
 
-- [ ] 6 advisory 全種(D1 / D3 / D4 / P1 / P2 / S1)が unit テスト fixture
-      で検出される
-- [ ] 各 advisory が detect されない fixture(false positive 防止)も持つ
+- [ ] 6 advisory 全種(D1 / D3 / D4 / P1 / P2 / S1)が unit テスト fixture で
+      検出される
+- [ ] 各 advisory に **false positive 防止 fixture** を 1 件持つ(detect
+      されないケース)
+- [ ] **Advisor-no-false-positive cross-test**: `severity: info` +
+      `unknown_policy: ignore` の真に informational なケースで S1 が発火
+      しない
 - [ ] `--format json` 出力が `schema_version="advisory-1"` で安定
-      (envelope 仕様は §6 で固定)
-- [ ] target-doctor を実行しても `check` / `compare` の verdict envelope は
-      byte-identical(§7 不変条件 #1 回帰テスト)
-- [ ] exit code は advisory の有無に関わらず 0(内部エラー除く)
-- [ ] `--strict-advice` flag が **存在しない**ことを CLI argparse spec で
-      確認
+- [ ] **Exit code 規約**(§6.3.3):
+  - 正常入力で advisory 0 / ≥ 1 の両方とも exit 0
+  - target.yaml 不在 / 不正 flag → exit 2
+  - target.yaml 構文エラー / git 解決失敗 → exit 3
+  - `--strict-advice` flag は **存在しない**(argparse spec で確認)
+- [ ] **INV-1 verdict 不変条件テスト**: target-doctor を実行しても
+      `check` / `compare` / `compile-repair` の verdict envelope は
+      byte-identical
+- [ ] **INV-2 surface isolation test**: `cli.commands.check` の transitive
+      imports に `target-doctor` の module が現れない
+- [ ] **INV-4 no-LLM / no-network**: import-graph で `httpx` / `requests` /
+      `openai` / `anthropic` 不在
 - [ ] determinism test(同 input 3 回 → byte-identical)
-- [ ] `tests/architecture/test_surface_isolation.py` で
-      target-doctor 経路に `httpx` / `requests` / `openai` /
-      `anthropic` が import されないことを assert(§7 不変条件 #4)
+- [ ] `ruff check .` / `pytest -q` 全 pass
 
 **Brief size**: 1.5 日。
 
-### 5.4 CSCI-44 (P3): `semantic-ci target-catalog`
+### 6.4 CSCI-44 (P3): `semantic-ci target-catalog`
 
-**Goal**: target / operator / template / match schema / change_kind を
-機械可読 + human readable で出す Advisor surface コマンド。
-AI assistant、IDE 拡張、外部 authoring tool が target.yaml を**正しく
-生成するため**の reference。
+**Phase**: Brief 8 / Authoring (meta) surface
 
-**追加 / 変更ファイル**:
+**Goal**: target / operator / template / match schema を機械可読 + human
+readable で出す Advisor surface コマンド。AI assistant、IDE 拡張、外部
+authoring tool が target.yaml を **正しく生成するため** の reference。
 
-- `src/semantic_ci_code/cli/commands/target_catalog.py` (NEW)
-- `src/semantic_ci_code/cli/main.py` (UPDATE): subparser
-- `src/semantic_ci_code/authoring/catalog.py` (NEW): 既存
-  `compiler/templates.py` / `framework/match_schema.py` /
-  `evaluator/operators.py` / `framework/extract_config.py` から catalog を
-  build
-- `src/semantic_ci_code/schemas/target_catalog.schema.json` (NEW):
-  catalog 出力 JSON schema
-- `tests/cli/test_target_catalog.py` (NEW)
-- `tests/architecture/test_catalog_implementation_parity.py` (NEW):
-  §7 不変条件 #5
-
-**CLI**:
+#### 6.4.1 CLI
 
 ```
 semantic-ci target-catalog [--format json|human] [--kind feature|...]
                            [--target-path api_surface_delta.added]
 ```
 
-**JSON 出力(抜粋)**:
+#### 6.4.2 JSON 出力(抜粋、registry と逐語一致)
 
 ```json
 {
@@ -801,33 +567,44 @@ semantic-ci target-catalog [--format json|human] [--kind feature|...]
 }
 ```
 
-**Determinism**:
+`api_surface_delta.added` の `optional_keys` は `["kind", "visibility"]` のみ
+(`framework/match_schema.py:47` `_API_SCHEMA` と逐語一致)。`signature` は
+forbidden、`module` は未登録。
 
-- 出力は完全に静的(現行コードの定義集計)、LLM / network 不使用
-- ordering は alphabetical(JSON key / array)、再生性 byte-identical
+#### 6.4.3 追加 / 変更ファイル
 
-**Acceptance criteria**:
+- `src/semantic_ci_code/cli/commands/target_catalog.py` (NEW)
+- `src/semantic_ci_code/cli/main.py` (UPDATE): subparser
+- `src/semantic_ci_code/authoring/catalog.py` (NEW): catalog builder
+- `src/semantic_ci_code/schemas/target_catalog.schema.json` (NEW)
+- `tests/cli/test_target_catalog.py` (NEW)
+- `tests/architecture/test_catalog_implementation_parity.py` (NEW): INV-5
 
-- [ ] catalog の JSON schema が `schemas/` に登録され、出力が schema valid
-- [ ] catalog に登録された target / operator が evaluator 実装と一致する
-      ことを **cross-test**(`evaluator/operators.py` の登録 dict と
-      catalog 出力を比較、§7 不変条件 #5)
-- [ ] **catalog の `match_schema` 出力が `framework/match_schema.py` の
-      registry と逐語一致**(`api_surface_delta.added` の `optional_keys`
-      は `["kind", "visibility"]` のみ、`forbidden_keys` には `signature`
-      を含む、`module` は登録しない、等)。AI assistant が catalog を見て
-      生成した target.yaml が `compile` で reject されないことを cross-test
-      で固定(PR #73 round-3 codex review 指摘)
+#### 6.4.4 Acceptance Criteria(CSCI-44)
+
+- [ ] catalog の JSON schema が `schemas/` に登録、出力が schema valid
+- [ ] **INV-5 catalog ↔ implementation parity cross-test**: catalog 出力の
+      target / operator / template が `evaluator/operators.py` / 
+      `compiler/templates.py` / `framework/match_schema.py` の実体と一致
+- [ ] **Match-schema-parity cross-test**: `api_surface_delta.added` の
+      `optional_keys` は `["kind", "visibility"]` のみ、`forbidden_keys` は
+      `signature` を含む、`module` は登録しない
+- [ ] AI assistant が catalog を見て生成した target.yaml が `compile` で
+      reject されないこと(roundtrip cross-test)
 - [ ] `--kind feature` で template 展開が想定通り
-- [ ] determinism test、verdict 不変条件テスト(§7 #1)
-- [ ] human format が target.yaml authoring user(人間)に読める粒度
-- [ ] LLM / network 呼び出しゼロ(import-graph、§7 不変条件 #4)
+- [ ] human format が target.yaml authoring user に読める粒度
+- [ ] **INV-1 verdict 不変条件テスト**(§5.2)
+- [ ] **INV-4 no-LLM / no-network**(import-graph)
+- [ ] determinism test(同 input 3 回 → byte-identical)
+- [ ] `ruff check .` / `pytest -q` 全 pass
 
 **Brief size**: 1 日。
 
-## 6. Schema / envelope 影響
+---
 
-新規 envelope:
+## 7. Schema / envelope 影響
+
+新規 envelope 2 種:
 
 | Envelope | Schema version | Surface | 関連 CSCI |
 |---|---|---|---|
@@ -841,102 +618,10 @@ semantic-ci target-catalog [--format json|human] [--kind feature|...]
 - compile-repair envelope: `"1"`(不変)
 - validate-plan envelope: `"1"`(不変)
 
-`docs/json_schema.md` には新規 envelope 2 つを追記し、それぞれ独立
-schema として `schemas/` に登録する。**verdict envelope と混ざらない**
-(SSP envelope 設計と同じ思想、`docs/brief_7_planning.md §6` の鏡像)。
+target.yaml 自体の schema は **不変**。`generation_metadata` block は既存
+optional field の populate。
 
-target.yaml 自体の schema は **不変**(`init --recipe` は既存 schema に
-従う YAML を出力する。`generation_metadata` block は既存の任意 field の
-populate)。
-
-## 7. Determinism / surface invariants
-
-実装で**構造的に保証する**5 つの不変条件:
-
-1. **Verdict bytes invariant**(narrow scope):
-   `check` / `compare` / `compile-repair` の JSON envelope のうち、
-   **evaluator が決定する field**(`verdict` / `repair_plan` / `summary`
-   および同等の per-subcommand evaluator output)は本 brief の全変更後も
-   既存 fixture で byte-identical。
-
-   除外する 2 領域:
-
-   - `target_authorship` field(`cli/output/json_formatter.py:32-58`
-     `build_payload`、既存 `tests/test_authorship.py:73` で `verdict` /
-     `repair_plan` / `summary` のみ stable とアサート済み)— authorship
-     情報を **意図的に reflect する**既存仕様。
-   - `validate-plan` の出力全体 — adapter `render_pre_gen` が
-     `generation_metadata` を逐語 render する設計
-     (`repair_compiler/adapters/codex.py:83-84` `[GENERATION METADATA]`
-     section、`claude_code.py:69` / `cursor.py:90`
-     `**Generation metadata**: ...`、共有ヘルパ
-     `markdown.py:154-157 format_generation_metadata`)。`validate-plan`
-     は **provenance を generator に伝える**ことが Advisor surface 仕様
-     上の明示要件であり、generation_metadata 書き換えで `rendered` /
-     JSON payload が変わるのは正しい挙動。本不変条件はこれを対象外と
-     する(PR #73 round-7 codex review 指摘)。
-
-   → CSCI-42〜44 すべての acceptance に「verdict / repair_plan / summary
-   不変条件テスト」を含める。比較は `target_authorship` を除外し、
-   `validate-plan` envelope は invariant 対象から外したヘルパを
-   `tests/architecture/test_verdict_bytes_invariant.py` に置く。
-
-2. **`check` does not generate target invariant**(narrow scope):
-   **`cli/commands/check.py` module(および `check` subcommand handler が
-   再帰的に import する verdict 経路の module 集合)** が `init` /
-   `target-doctor` / `target-catalog` のいずれの module も import しない。
-   `cli/main.py` の subparser registration は **CLI dispatcher の事務的
-   import** であり、verdict 計算の意味論越境ではないため本不変条件の
-   対象外(`cli/main.py:6-14` で既に全 subcommand handler が module load
-   時に import されている設計、PR #73 round-15 codex review で指摘)。
-   surface 越境の本質は「verdict 計算経路で advisor / authoring の意味論
-   関数を呼ぶ」 ことであり、subparser entry の名前を main.py に書くのは
-   越境ではない。
-   → import-graph test を `tests/architecture/test_surface_isolation.py`
-   (CSCI-43 で新設)で固定する際、対象は **`cli.commands.check`
-   module の transitive imports**(再帰的 import 集合)に限定し、
-   `cli.main` を root として走査しない。`init` / `target-doctor` /
-   `target-catalog` の module 名がその closure に現れたら fail。
-
-3. **Provenance non-participation invariant**(narrow scope):
-   target.yaml の `authorship.generation_metadata` を任意に書き換えても
-   `check` / `compare` / `compile-repair` の **evaluator-derived field**
-   (`verdict` / `repair_plan` / `summary`)は byte-identical。
-
-   除外する 2 領域(不変条件 #1 と同型):
-
-   - `target_authorship` field — authorship を逐語に reflect する既存仕様
-     のため、generation_metadata 変更で **当該 field のみが変わる**ことは
-     設計上正しい(`tests/test_authorship.py:73` の既存挙動と整合)。
-   - `validate-plan` の `rendered` / JSON payload — adapter
-     `render_pre_gen` が `generation_metadata` を逐語 render する設計
-     (`repair_compiler/adapters/{codex,claude_code,cursor,markdown}.py`、
-     共有ヘルパ `format_generation_metadata`)。`validate-plan` は
-     provenance を generator に伝えることが Advisor surface の明示要件で
-     ある(`§23.3.1`)。
-
-   → fixture を 1 つ作り、generation_metadata の有無 / 値違いで
-   `check` / `compare` / `compile-repair` を回し、`target_authorship` を
-   除外した比較で hash 一致を確認(CSCI-42 acceptance)。`validate-plan`
-   は本不変条件から除外。
-
-4. **No-LLM / no-network invariant**:
-   本 brief で追加・変更されたすべての subcommand 経路で `httpx` /
-   `requests` / `openai` / `anthropic` / `urllib3` などの
-   network/LLM client を import しない。
-   → `tests/architecture/test_surface_isolation.py` で全 authoring
-   subcommand に対して assert。
-
-5. **Catalog ↔ implementation parity invariant**:
-   `target-catalog` の出力に登録された operator / target / template が
-   evaluator 実装と一致する。
-   → `tests/architecture/test_catalog_implementation_parity.py`
-   (CSCI-44 で新設)で cross-test。
-
-これら 5 不変条件は **本 brief 完了の必要十分条件**であり、各 CSCI の
-acceptance には対応する不変条件番号を明記する。
-
-## 8. CLI surface 全体像(after-state)
+## 8. CLI surface(after-state)
 
 ```
 semantic-ci
@@ -952,84 +637,75 @@ semantic-ci
 └── target-catalog  (Authoring meta: machine-readable ref)       ★ NEW
 ```
 
-合計 10 subcommand(現在 8 + 新規 2、`init` は拡張)。
-**Validator 5 / Advisor 3 / Authoring 2** で surface バランスが取れる
-(`init` は Authoring + Provenance、`compile` は Validator readback として
-カウント)。
+合計 10 subcommand(現在 8 + 新規 2、`init` は拡張)。**Validator 5 / Advisor
+3 / Authoring 2** で surface バランス。
 
 ## 9. テスト戦略
 
 ### 9.1 各 CSCI 単位
 
+各 CSCI 内で:
 - **unit**: hazards / recipes / catalog builder / source parser を関数単位
 - **CLI integration**: 各 subcommand の golden fixture
 - **determinism**: 同 input 3 回呼び出して byte-identical
 - **schema valid**: 各 JSON 出力が JSON schema 通過
 
-### 9.2 Brief 全体で要求する横断テスト(`tests/architecture/` 新設)
+### 9.2 横断テスト(`tests/architecture/` 新設)
 
-- `test_surface_isolation.py`(CSCI-43 で新設): §7 不変条件 #2 / #4 の
-  import-graph 検査
-- `test_verdict_bytes_invariant.py`(CSCI-42 で新設): §7 不変条件 #1 / #3
-  の golden hash
-- `test_catalog_implementation_parity.py`(CSCI-44 で新設): §7 不変条件 #5
+- `test_surface_isolation.py`(CSCI-43 で新設): INV-2 / INV-4
+- `test_verdict_bytes_invariant.py`(CSCI-42 で新設): INV-1 / INV-3
+- `test_catalog_implementation_parity.py`(CSCI-44 で新設): INV-5
 
-`tests/architecture/` ディレクトリ自体は本 brief で初出。Brief 7 が後続で
-SSP envelope を分離する際にも同ディレクトリの不変条件 test pattern が再利用
-できる(envelope 分離は両 brief 共通の関心)。
+`tests/architecture/` は本 brief で初出。Brief 7(SSP)が後続で SSP envelope
+分離する際にも同 pattern が再利用できる。
 
 ### 9.3 Dogfooding
 
-CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
-の TC1〜TC10 を **init --recipe で再生成して `compile` を pass するか** を
-小規模 dogfood として実施し、本 brief 内の最終 PR(CSCI-44)で記録する。
-これで「recipe 4 種で実用 PR の大半をカバーできる」が経験的に検証される。
+CSCI-42 land 後、`docs/dogfooding_TC10_report.md` の TC1〜TC10 を
+**`init --recipe` で再生成して `compile` を pass するか**を最終 PR
+(CSCI-44)で記録。recipe 4 種で実用 PR の大半をカバーできることの経験的検証。
+
+---
 
 ## 10. Brief 全体 Acceptance Criteria
 
 - [ ] CSCI-41〜44 全 PR が merged
-- [ ] §7 不変条件 5 件すべてが test で固定されている
-- [ ] `docs/target_authoring_surface.md` が新設、CLAUDE.md docs table に
+- [ ] §5.2 INV-1〜INV-5 全件が test で固定されている
+- [ ] `docs/target_authoring_surface.md` 新設、CLAUDE.md docs table に
       ACTIVE で登録
 - [ ] `docs/cli_usage.md` に `init --recipe + --from-*` / `target-doctor` /
       `target-catalog` のセクションが追加
-- [ ] `docs/exit_codes.md` に target-doctor の exit code 規約が明記される:
-      **advisory presence は 0**(verdict 不参加)、ただし usage / config
-      error は **2**、engine / git error は **3**、internal は **4**
-      (round-18 で確定した repo-wide policy 整合表、§5.3 Exit code 規約と
-      逐語一致)。「常に 0」 とは書かない(silent success on bad input
-      は禁止、PR #73 round-19 codex review で指摘)
-- [ ] `docs/json_schema.md` に `advisory-1` / `catalog-1` envelope が追記
+- [ ] `docs/exit_codes.md` に target-doctor の exit code 規約が §6.3.3 と
+      逐語一致(advisory presence は 0、usage/config = 2、engine/git = 3、
+      internal = 4。「常に 0」 とは書かない、silent success on bad input は
+      禁止)
+- [ ] `docs/json_schema.md` に `advisory-1` / `catalog-1` envelope 追記
 - [ ] CLAUDE.md `次の発行順序` から本 brief 行が削除、Brief 8 が
       `直近 merged` に移動。Brief 7(SSP)発行を本 brief 後に置く順序が
-      `docs/code_semantic_ci_design.md §25` に反映される
+      `docs/code_semantic_ci_design.md §25` に反映
 - [ ] `ruff check .` / `pytest -q` 全 pass
-- [ ] `check` / `compare` / `compile-repair` の **evaluator-derived
-      field**(`verdict` / `repair_plan` / `summary`)が既存 fixture で
-      byte-identical(比較から除外: (a) `target_authorship` field は
-      authorship を reflect する既存仕様、`tests/test_authorship.py:73`
-      と一貫。(b) `validate-plan` envelope は adapter `render_pre_gen` が
-      `generation_metadata` を逐語 render する設計のため invariant 対象外、
-      `repair_compiler/adapters/*.py` の `format_generation_metadata`
-      呼び出しが provenance を generator に伝える明示要件)
 - [ ] LLM / network 呼び出しがゼロであることが import-graph で固定
       (本 brief 完全決定論)
 
+---
+
 ## 11. リスクと回避
 
-| リスク | 内容 | 回避策 |
+| ID | Risk | 回避 |
 |---|---|---|
-| **R1 surface 越境** | target-doctor の advisory が evaluator に流れて verdict を変えてしまう | §7 不変条件 #1 + #2 の import-graph test、CSCI-43 で `tests/architecture/` 新設して構造的に固定 |
-| **R2 candidate-derived tautology** | init recipe が candidate code を読み expected を生成、同 candidate を check して PASS する vacuous loop | `--allow-candidate-derived-expectations` flag を **本 brief で実装しない**、provenance `candidate_code_used` を必ず false で記録、CLI argparse spec で flag 不在を test 固定 |
-| **R3 LLM 経路の意図せぬ混入** | 将来の dependency 追加で `openai` / `anthropic` 等が入る | §7 不変条件 #4 の import-graph test を本 brief で固定。Brief 8b で LLM 経路を追加する際は、本 invariant の境界(authoring subcommand のみ許可、verdict path には絶対不参加)を再確認 |
-| **R4 catalog drift** | catalog と evaluator 実装が乖離し、AI assistant が無効な target.yaml を生成 | §7 不変条件 #5 の cross-test を CSCI-44 acceptance に含める |
-| **R5 advisory ノイズ** | target-doctor が誤検知だらけで信用されない | 各 advisory に false-positive 防止 fixture を必ず 1 件持つ(§5.3 acceptance) |
-| **R6 recipe 不足で結局手書き** | 4 recipe で大半の PR をカバーできない | session 2026-05-09 議論で「4 recipe で大半 cover」の見積、§9.3 dogfood で経験的検証、不足時は CSCI-42 follow-up で追加 recipe を増やす(後方互換破壊なし) |
-| **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken。特に「provenance metadata は必ず生成」を全呼び出しに適用すると plain `init` 出力が変わり `tests/cli/test_init_command.py:24` を破る(PR #73 round-6 codex review 指摘) | CSCI-42 acceptance に「既存 behavior 不変」+「plain `init` 出力に generation_metadata を含めない」を test で固定。Provenance metadata 生成は **`--recipe <ID>` 指定時のみ** に scope する(round-12 で単一トリガーに narrow、`--from-*` / explicit input flag は recipe 無しでは error、§5.2 Provenance metadata セクション) |
-| **R8 PR body parser の脆弱性** | non-structured な PR body で誤動作 / クラッシュ | structured section が存在しない場合は **graceful degrade**(明示 user input + recipe default のみで生成、source surface に該当 source を含めない)、CSCI-42 acceptance に明記 |
-| **R9 recipe / catalog / advisor schema grounding + contract 整合ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照する、または recipe contract と source 強度ポリシーが矛盾して PR body 経由 flow を reject する、または削除済 advisor が file 列挙に取り残される、または recipe の template 説明が実 templates.py と乖離する、または authoring intent (例: "**public** API") を捨てる平坦投影で constraint を生成する、または定義のない CLI flag を file list に列挙する、または source flag を expose しているのに parser / provenance entry が無い、または複数 strong source の primary_kind 矛盾を silent に解決する、または導入した防御原則と他 rule が内部矛盾する。PR #73 codex review で計 28 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除)、(h) D5 削除後も `hazards.py` 列挙に `D5-legacy` が残存し実装側で false positive を再導入する罠、(i) `feature:add-api` の必須引数を `--add-api FQN+` に固定すると `--from-pr-body` の `## Expected public API` セクションだけで recipe を満たす flow が CLI parse 段階で reject される(source 強度ポリシーと recipe contract の矛盾)、(j) `bugfix:regression-test` recipe の template 説明が実 templates.py と異なる(brief は `api_surface_delta.removed_public == []` と書いたが実際は `api_surface_public equals_baseline`(=追加も削除も全禁止)+ `effect_changes.added equals ()`、`compiler/templates.py:64-76`)、(k) `feature:add-api` で `api_surface_delta.added.fqns includes_all` の平坦投影 alias を使うと `## Expected **public** API` 由来の visibility 情報を捨て、non-public 追加でも satisfy される。record match `{fqn, visibility: "public"}` で強制すべき(`framework/match_schema.py:47` `_API_SCHEMA.optional_keys` に `visibility` 登録済み)、(l) `--allowed-import` flag が CSCI-42 ファイル list に列挙されているが merge ロジック / 消費する recipe / generation_metadata 発火条件のいずれも定義されていない幽霊 flag(削除)、(m) `--kind` flag が CSCI-42 init に列挙されているが、`change.primary_kind` は recipe ID で固定され labels / commits も独立に推論する経路があり、`--kind` を消費する recipe / merge ルールがない幽霊 flag(削除、target-catalog の `--kind` は別 subcommand の保持された flag)、(n) `--remove-api` flag が CSCI-42 init / source 強度表 / provenance trigger に列挙されているが、4 recipe いずれも `--remove-api` を constraint に変換しない幽霊 flag(削除)、(o) `--from-issue` flag は brief 全体で source として参照されているのに CSCI-42 file list に `issue.py` parser が無く、provenance example の `source_surfaces` にも `issue` が無い(parser + source_surface entry を追加)、(p) 複数 strong source(`--recipe` / `kind:` labels)が異なる `primary_kind` を独立に決定し得るのに precedence / conflict rule が未定義で silent override / silent ignore の余地が残る(precedence 表 + C1〜C4 conflict rule + 明示 error を `merge.py` で固定)、(q) (p) の対策で導入した C4 ルールが「unconsumed structured section を無視」と書かれており、自身が立てた「silent override / silent ignore 禁止」原則と矛盾(intent-declaring section registry を parser に持ち、unconsumed なら error、人間向け一般 section は declared intent ではないので無視 OK と区別)、(r) merge step が issue(medium)を user input + PR body(strong)の上に常に union する記述になっており、source 強度表の「issue は medium、strong source が空のときのみ参照」と矛盾(stale / broad な issue criteria が hard constraint を膨らませる)→ source 強度層を尊重した fallback chain(strong layer 充足時は medium 層を参照しない)に修正、(s) precedence 表の row 2/3 が `--recipe` 不在で labels / commits だけから `primary_kind` を推論する規則になっていたが、本 brief は recipe ID から constraint set を選ぶため推論された primary_kind だけでは recipe を一意に選べない(silent fallback 不能)→ `--from-*` / explicit input flag 使用時は `--recipe` 必須、不在なら error、generation_metadata 発火条件も `--recipe` 単独に narrow、(t) `--test-case` の値形式が Python-style FQN(`tests.test_common.test_added`)を想定して書かれていたが、`compute_code_state_delta()._test_case_id()`(`code_state_delta.py:354-355`)は `path::name` 形式(`tests/test_common.py::test_added`)で `new_cases` を出すため compile は通るが永久に fail する → recipe / CLI / parser を canonical `path::name` 形式に統一、CLI 引数で `::` 区切りを validation、(u) `ADVISORY-S1` の message「`severity: info` downgrade で verdict に影響しない」は半分しか正しくない。`evaluator/evaluator.py:512-530` `_aggregate` の VIOLATED branch では `Severity.INFO` を ignore するが、UNKNOWN branch は severity を見ず `unknown_policy` だけで判定する(`UnknownPolicy.FAIL` なら verdict FAIL のまま)。partial / smoke extraction の skipped dimensions / type mismatch で UNKNOWN になると `severity: info` でも依然 verdict に影響する → S1 を「`severity: info` AND `unknown_policy in {fail, repair}`」 で発火、message に「violation は ignore されるが UNKNOWN は unknown_policy 経由で verdict 影響、完全 informational には `unknown_policy: ignore`」 と spec 化、(v) §7 不変条件 #2「check 経路から init / target-doctor / target-catalog の module を import しない」を envelope 全体に書くと `cli/main.py:6-14` が CLI dispatcher として全 subcommand handler を module load 時に import している現実装と矛盾(`semantic-ci check` 起動時にも main.py 経由で全 subcommand module が import される)→ invariant 対象を **`cli.commands.check` module の transitive imports** に narrow、`cli.main` の subparser registration は CLI 事務であり verdict 計算意味論の越境ではないため対象外と明記、(w) `feature:add-api` recipe contract が「`--add-api` または `--from-pr-body`」 の strong source のみを「いずれか必須」 として列挙していたが、round-12 で merge step に medium layer fallback として issue を導入した直後に recipe contract の更新を漏らしていたため `--from-issue` のみで FQN を供給する flow が recipe contract で reject される矛盾(merge step は通すが recipe contract が拒否) → recipe contract を「source merge 後に FQN list 非空」 に書き換え、strong layer + medium layer の fallback chain を逐語参照、acceptance に PR-body-only / issue-only / strong-fills-issue-ignored の 3 fixture を追加、(x) §12.3 で Brief 7/SSP を「core にセキュリティ機能を追加する性質」 と framing したが、`AGENTS.md` Forward Design Note は SSP を **「sibling protocol、core verdict semantics を変更・拡張しない」** と正規 framing として明示している。誤った framing を planning に残すと CSCI-36 起草時に core-mixing 設計に流れる risk → §12.3 の Brief 7 description を sibling protocol framing に訂正、AGENTS.md への cross-ref を pin、(y) target-doctor の exit code 表が advisor 0 件 → 0 / advisor ≥ 1 件 → 0 / 内部エラー → 4 のみで、`docs/exit_codes.md` の repo-wide policy(2 = usage/config error、3 = engine/git error)を反映していない。target.yaml 不在 / 不正 baseline-rev で silent success してしまう → exit code 表に 2(usage/config error)と 3(engine/git error)を追加、`exit_codes.md` 第 14 / 67-70 行への cross-ref を pin、(z) C4 intent-declaring section registry が `## Acceptance Criteria` を test-case 専用と分類していたが、issue-only `feature:add-api` flow(round-16 で導入)で issue body の `## Acceptance Criteria` に API FQN しか書かれていないケースだと recipe contract は API FQN fallback を期待するのに registry が test-case と判定して矛盾 → registry を「両用途、parser が content grammar(行頭 `-` の値が `::` を含めば test ID、`.` のみなら FQN)で分類」 に拡張、silent guess は行わず 分類不能な内容は error、(aa) round-18 で §5.3 の exit code 表を 0/2/3/4 に修正したが §10 brief acceptance の対応行が「常に 0」 のまま残置していた(自身が立てた防御原則 silent-success-禁止 と矛盾、CSCI-41 が `docs/exit_codes.md` 更新時にこの acceptance を見て silent-success に逆戻りする risk)→ §10 acceptance 行を §5.3 exit code 表と逐語一致させ「`advisory presence は 0` だが usage/config = 2、engine/git = 3、internal = 4」 と spec、「常に 0」 表記を削除、(bb) round-19 で §10 acceptance を更新したが §5.3 CSCI-43 Goal 文 / §2 Goals (3) / §3 Non-goals / 冒頭の objection 解決サマリ §0.2 にも「常に 0」 / 「内部エラー除く」 系 表記が複数残置していた(同じ spec drift category の再発、3 箇所)→ 全 4 箇所を §5.3 Exit code 規約と逐語一致させ「advisory presence は 0、usage/config=2、engine/git=3、internal=4」 と spec | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field + template 展開ルール を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + template-expansion-parity + match-schema-parity + advisor-no-false-positive + source-merge-validation + visibility-preservation + conflict-resolution cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、recipe contract の必須性は **source merge 後**に検証(CLI parse 段階で reject しない)、advisor を削除する際は **file 列挙 / 関数 stub / acceptance count をすべて grep して整合化**、recipe の template 説明は **実 templates.py の TEMPLATE_CONSTRAINTS dict を逐語参照**(brief 起草時に思い込みで書かない)、authoring intent に visibility / kind / scope などの修飾子が含まれる場合は **平坦投影 alias を避け record match で強制**(match_schema registry の optional_keys を活用)、CLI flag を file list に追加する際は **merge / consumption / provenance trigger の 3 点をすべて定義**(未定義なら削除)、source flag を expose する際は **対応する parser file + provenance source_surface entry を必ず併設**(片方だけ追加しない)、複数 strong source が同一 field を独立に決定し得る場合は **明示 precedence + conflict error 規則を planning レベルで固定**(silent override / silent ignore は禁止)、conflict rule を立てた直後にその rule の各 case が **自身の防御原則と整合しているかを再 audit**(round-11 で C4 が silent ignore 原則と矛盾していた前例)、declared intent と human prose の区別が必要な場合は **parser 側に固定 registry を持たせ silent ignore 範囲を明文化**、source 強度層が複数あるとき merge は **同一強度層内で union、強度層を跨いで union しない**(strong layer 充足時に medium / lowest 層を参照しない、source 強度表と merge step の挙動を文面上一致させる)、`primary_kind` 推論は **recipe ID とのバインディングが完結するときのみ意味がある**(本 brief のように固定 recipe ID で constraint set を選ぶ設計では `--recipe` を source flag 使用時必須にし、推論だけで recipe を「自動選択」する silent fallback を入れない)、collection 系 constraint の値形式は **必ず実 delta producer の出力形式を grep して合わせる**(本 brief の `new_cases` は `code_state_delta._test_case_id()` の `path::name` 形式、Python-style FQN との取り違えを禁止。実装側で compile は通るが evaluator で永久 fail する category)、verdict 影響に関する advisor message は **`evaluator._aggregate` の VIOLATED / UNKNOWN 両 branch を確認**(severity だけで判断せず unknown_policy との組合せで真に verdict 不参加かを spec 化、半正確な advisor message は false advisory category)、import-graph / surface 越境系 invariant の対象は **意味論層(`cli/commands/<sub>.py` の transitive imports)に narrow** し CLI dispatcher(`cli/main.py` の subparser registration)を含めない(dispatcher は全 subcommand handler を必然的に import するため、ここを invariant 対象に入れると物理的に成立しない、PR #73 round-15 で発覚した invariant 過剰要求 category)、merge step / fallback chain を更新したら **すぐ recipe contract / acceptance fixture / 「いずれか必須」 列挙の整合性も同時更新**(片方だけ更新すると recipe が merge を reject する category、PR #73 round-16 で発覚)、他 brief への参照は **`AGENTS.md` Forward Design Note の正規 framing を逐語使用**(SSP は「sibling protocol、core verdict semantics を変更しない」 が正規。「core にセキュリティ機能を追加」 のような core-mixing framing は AGENTS.md 違反、後続 brief 起草時に core-mixing 設計に流れる risk、PR #73 round-17 で発覚)、新 subcommand の exit code 表は **`docs/exit_codes.md` の repo-wide policy(0 / 1 / 2 / 3 / 4)を必ず参照**(advisor / authoring surface でも usage error / engine error の **silent success は禁止**、advisor 検出の有無のみが verdict 不参加で 0、入力 / engine 失敗は 2 / 3 / 4 を返す、PR #73 round-18 で発覚)、registry 系の section title classification は **両用途を許容するなら parser 側に固定 grammar を持たせ silent guess を禁止**(content による分類は明示 grammar で固定、不明確な content は error、PR #73 round-18 で発覚)、spec table を更新したら **brief 内の参照箇所(§10 acceptance / §11 R 行 / cross-ref / §0 status box / §2 Goals / §3 Non-goals / §5 各 CSCI Goal 文)も同期更新**(片方だけ更新すると古い記述が残置して後続実装者が古い側を採用する risk、PR #73 round-19 / round-20 で 2 連続発覚した spec drift の category。**spec table 修正時は対応する spec 文字列を grep で全箇所検出して同時更新**を必須化)、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
-| **R10 envelope-wide byte-identical の過剰要求** | §7 invariant #1 / #3 を envelope 全体 / 全 subcommand に拡張すると 2 領域で既存仕様と矛盾: (a) `target_authorship` field は authorship を reflect する設計(既存 `tests/test_authorship.py:73` を破る)、(b) `validate-plan` adapter `render_pre_gen` は `generation_metadata` を逐語 render する設計(`repair_compiler/adapters/{codex,claude_code,cursor,markdown}.py` の `format_generation_metadata`、provenance を generator に伝える Advisor surface 要件、PR #73 round-7 codex review 指摘) | 不変条件は **evaluator-derived field**(`verdict` / `repair_plan` / `summary`)に narrow、`target_authorship` を比較から除外し、`validate-plan` を invariant 対象 subcommand から除外するヘルパを `tests/architecture/` に置く。一般原則: **adapter / output layer が provenance / authorship を意図的に reflect する surface は invariant 対象外**(rendered/serialized 側で reflect することがその surface の存在理由) |
-| **R11 wall-clock 由来の非決定性** | recipe が `declared_at` を `datetime.now()` で埋めると同 input → 異 output となり determinism acceptance を violate(PR #73 round-3 codex review 指摘) | `declared_at` は **default omit**(`Authorship.declared_at: str \| None = None` を活用)、`--declared-at ISO8601` で明示指定時のみ書き出す。`tool_version` は `importlib.metadata.version` から静的解決。CSCI-42 acceptance に「`--declared-at` 未指定時は declared_at field 不在」「同 input 3 回 byte-identical」を含める |
+| **R1** | Surface 越境(advisor / authoring が verdict 経路に介入) | INV-1 / INV-2 / INV-3 の test を CSCI 単位で fail-fast 化、`tests/architecture/` で構造保証 |
+| **R2** | Candidate-derived tautology(候補コードを expectation source にして vacuous PASS) | `--allow-candidate-derived-expectations` flag を実装しない、`candidate_code_used` を常に false 固定、CLI argparse spec で flag 不在を test 固定 |
+| **R3** | LLM / network の意図せぬ混入(将来 dependency 追加経由) | INV-4 import-graph test で `httpx` / `requests` / `openai` / `anthropic` 等を禁止、Brief 8b で LLM 経路を追加する際に本 invariant の境界(authoring 限定)を再確認 |
+| **R4** | Catalog drift(catalog と evaluator 実装の乖離) | INV-5 cross-test を CSCI-44 acceptance に含める |
+| **R5** | Advisor noise(target-doctor の誤検知) | 各 advisory に false-positive 防止 fixture を 1 件持つ、§15 checklist「検出可能で意味のある invalid pattern の実在を先に確認」 を遵守 |
+| **R6** | Recipe 不足(4 recipe で実用 PR を cover しきれない) | §9.3 dogfood で経験的検証、不足時は CSCI-42 follow-up で追加(後方互換破壊なし) |
+| **R7** | `init` 既存 behavior 退行(plain init 出力が変わる) | provenance metadata 生成を `--recipe` 指定時のみに narrow、CSCI-42 acceptance に既存テスト不変を含める |
+| **R8** | Spec drift(brief 内の同一 spec を複数箇所で paraphrase した結果一致しなくなる) | 本 brief 全 spec table は §6 内の **canonical 1 箇所のみ**、他は cross-ref。§15 brief drafting checklist に「spec table 修正時は対応する spec 文字列を grep で全箇所検出して同時更新」を必須化 |
+
+R9 履歴(round-1〜20 の specific findings 28 件)は **Appendix A** に audit
+trail として保存。本表に統合した防御原則は §15 checklist で再利用可能。
+
+---
 
 ## 12. 順序 / 依存
 
@@ -1058,89 +734,259 @@ CSCI-41 (docs)         ── 独立、最初に着地
 CSCI-41 → CSCI-43 → CSCI-42 → CSCI-44
 ```
 
-CSCI-43(target-doctor)を CSCI-42 より先に出す理由:
-
-- `tests/architecture/` を最初に立てることで、後続 CSCI が surface 越境
-  リスクを引きずらない(R1 早期に固定)
-- D1〜D4 の advisory 化が CSCI-42 recipe 設計の検証ツールになる
-  (recipe 出力で D3 が検出されないことを cross-test できる)
-
-CSCI-42 を CSCI-43 の後ろに置くことで、recipe 出力が doctor を pass する
-ことを recipe テストで保証できる(両者 simultaneous 開発でも順序差は最小)。
+CSCI-43 を CSCI-42 より先に出す理由: `tests/architecture/` を最初に立てて
+後続 CSCI が surface 越境リスクを引きずらない(R1 早期固定)。CSCI-42 を
+CSCI-43 の後ろに置くことで、recipe 出力が doctor を pass することを recipe
+テストで保証可能。
 
 ### 12.3 Brief 7(SSP)との関係 — Brief 8 先行を確定
 
-**Brief 8 を Brief 7 より先に発行することを本 planning で確定する**。
-判断根拠:
+**Brief 8 を Brief 7 より先に発行することを本 planning で確定**。
 
-1. **adoption bottleneck の所在**: session 2026-05-09 までの議論で、
-   現時点の adoption 障壁は SSP sibling protocol の不在ではなく、
-   target.yaml authoring の摩擦であることが確認された。SSP は
-   `AGENTS.md` Forward Design Note の正規 framing に従い
-   **「deterministic security sensor delta を扱う sibling protocol」**
-   であって core verdict semantics を変更・拡張するものではない
-   (PR #73 round-17 で誤 framing を訂正)。core 入口の authoring 摩擦
-   解消は sibling protocol である SSP の追加では達成されないため、
-   Brief 8 を先行する。
-
+1. **adoption bottleneck の所在**: 現時点の adoption 障壁は SSP sibling
+   protocol の不在ではなく target.yaml authoring の摩擦。SSP は `AGENTS.md`
+   Forward Design Note の正規 framing に従い「**deterministic security
+   sensor delta を扱う sibling protocol、core verdict semantics を変更・拡張
+   しない**」 protocol。core 入口の authoring 摩擦は sibling protocol の
+   追加では解消されない。
 2. **surface の独立性**: Brief 7 SSP は core verdict path から独立した
    sibling protocol(`docs/brief_7_planning.md §1`、`AGENTS.md` Forward
    Design Note「semantic-ci core を太らせない」 / 「SSP envelope と core
-   verdict envelope は分離」)。Brief 8 が core の入口側 Authoring
-   surface を整備しても SSP 設計に影響しない。順序を入れ替えても SSP の
-   design / spec は変わらない。
-
-3. **共有ファイルの merge 面積**: Brief 7 と Brief 8 が両方触る箇所は
+   verdict envelope は分離」)。Brief 8 が Authoring surface を整備しても
+   SSP 設計に影響しない。
+3. **共有ファイルの merge 面積**: 両 brief が触る箇所は
    `docs/code_semantic_ci_design.md §23.3.1` / `docs/json_schema.md` /
-   `tests/architecture/`。いずれも別節 / 別 file で、conflict は最小。
-
-4. **Brief 8b(LLM 経路)との時系列**: Brief 8 完了後、Brief 8b
-   (LLM authoring)を発行可。Brief 7(SSP)は Brief 8b の前後どちらでも
-   発行可能(独立性が高い)。推奨順:
-   `Brief 8 → Brief 7 → Brief 8b` または `Brief 8 → Brief 8b → Brief 7`。
+   `tests/architecture/`、いずれも別節 / 別 file で conflict は最小。
+4. **Brief 8b(LLM 経路)との時系列**: Brief 8 完了後、Brief 8b 発行可。
+   Brief 7 と Brief 8b の順序は Brief 8 完了後の状況で再評価。
 
 `docs/code_semantic_ci_design.md §25` の Brief 表を CSCI-41 で更新し、
 Brief 8 を Brief 7 より上(先発行)に並べる。
 
+---
+
 ## 13. Open questions
 
-初稿の 5 点(LLM / strict-advice / 順序 / explain / draft-target 統合)は
-すべて解決済み。残る Open は次の 3 点のみ:
+1. **catalog の human format の詳細度**(CSCI-44): 全 operator / target
+   展開 vs `--target-path` 部分参照 default。確定タイミング: CSCI-44 task
+   brief 起草時。
+2. **recipe registry の plugin 化**(CSCI-42): 本 brief は 4 recipe 内蔵のみ。
+   `pyproject.toml` user-defined recipe は将来 brief。確定タイミング: Brief 8
+   完走後の dogfood で需要観察してから。
+3. **Brief 8b と Brief 7 の順序**(本 planning 範囲外): 両方 Brief 8 完了
+   前提。確定タイミング: Brief 8 完走後。
 
-1. **catalog の human format をどこまで詳細にするか**(CSCI-44)
-   - 案 A: 全 operator + target を 1 ページに展開(長くなる)
-   - 案 B: `--target-path X` で部分参照を default にする
-   - 推奨: 両方サポート、`--target-path` 無し時は summary のみ表示し
-     詳細は JSON へ(human ヒューリスティクス)
-   - 確定タイミング: CSCI-44 task brief 起草時
-
-2. **recipe registry の plugin 化を将来許容するか**(CSCI-42)
-   - 本 brief: 4 recipe 内蔵のみ
-   - 将来 brief で `pyproject.toml` に書ける user-defined recipe を許容
-     する余地を残すかは Open(CSCI-42 では internal dict のみ)
-   - 確定タイミング: Brief 8 完走後の dogfood で需要を観察してから
-
-3. **Brief 8b(LLM authoring)を Brief 7 より先に発行するか後にするか**
-   - Brief 8 が先、これは確定(§12.3)
-   - Brief 8b と Brief 7 の順序は本 planning 範囲外(両方が Brief 8
-     完了を前提とする)
-   - 確定タイミング: Brief 8 完走後の状況で再評価
+---
 
 ## 14. CSCI Task Brief 起草時の checklist
 
-各 CSCI を AGENTS.md フォーマットで Codex に渡す際、必ず以下を Brief に
-記載する:
+各 CSCI を AGENTS.md フォーマットで Codex に渡す際、必ず Brief に記載:
 
-- [ ] **Surface 配属**を明示(本 planning §4.1 の表を参照)
-- [ ] **§7 不変条件**のうち該当する番号を Acceptance に転記
-- [ ] **`tests/architecture/`** の test を増やすか(CSCI-42 / 43 / 44 で
-      それぞれ新設、対応 test 名を Brief に明記)
-- [ ] **schema_version**(該当する場合)を本 planning §6 と一致させる
+- [ ] **Surface 配属**を明示(本 planning §5.1 表)
+- [ ] **§5.2 INV-1〜INV-5** のうち該当番号を Acceptance に転記
+- [ ] **`tests/architecture/`** test を増やすか(CSCI-42 / 43 / 44 でそれぞれ
+      新設、対応 test 名を Brief に明記)
+- [ ] **schema_version**(該当する場合)を §7 と一致
 - [ ] **LLM / network**: 不使用を default、本 brief 全 PR で `httpx` /
-      `requests` / `openai` / `anthropic` などの依存追加を Allowed
-      Dependencies で **明示的に禁止**
+      `requests` / `openai` / `anthropic` などの依存追加を Allowed Dependencies
+      で **明示的に禁止**
 - [ ] **既存 verdict envelope の byte-identical** を必ず acceptance に
+      (除外領域は §5.2 INV-1 / INV-3 参照)
 - [ ] **`--strict-advice` / `--llm-assist` / `--allow-candidate-derived-
-      expectations` などの flag が CLI に存在しない**ことを test で固定
+      expectations` flag が CLI に存在しない**ことを test で固定
+- [ ] **§15 brief drafting checklist** を起草前に走らせる(実 schema grep、
+      cross-ref 同期確認、surface 越境 audit)
 - [ ] **Codex への申し送り**: surface 越境は §23.3 違反として escalation
-      対象(AGENTS.md §3 の rule 5)
+      対象(`AGENTS.md §3` rule 5)
+
+---
+
+## 15. Brief drafting checklist(再利用可能、20 round の蒸留)
+
+新 brief / CSCI brief を書くとき / 既存 brief に変更を入れる時、**起草前**
+に必ず走らせる checklist。各項目は `tests/architecture/` で構造保証 or
+CSCI acceptance の cross-test に対応。
+
+### 15.1 Schema grounding(spec を書く前に)
+
+- [ ] **実 schema を grep して検証**: 提案する path / operator / match_schema
+      key / template constraint が実装に存在することを以下のファイルで確認:
+  - `domain/state_schema.py`(Delta field)
+  - `evaluator/operators.py`(operator 名と semantic)
+  - `evaluator/evaluator.py`(template relaxation 経路)
+  - `compiler/templates.py`(`TEMPLATE_CONSTRAINTS` dict)
+  - `compiler/target_compiler.py`(allow_changes 等の policy hatch)
+  - `compiler/path_schema.py`(path validation)
+  - `framework/match_schema.py`(registry: required/optional/forbidden keys)
+  - `framework/target_svp.py`(field optionality / target-level keys)
+- [ ] **template 説明は `TEMPLATE_CONSTRAINTS` dict を逐語参照**(brief 起草時
+      に思い込みで書かない)
+- [ ] **collection constraint の値形式**は実 delta producer の出力と一致
+      (例: `new_cases` は `code_state_delta._test_case_id()` の `path::name`
+      形式、Python-style FQN との取り違えは compile pass / evaluator 永久
+      fail category)
+
+### 15.2 Authoring intent の保存
+
+- [ ] **修飾子(visibility / kind / scope)** が含まれる場合は **平坦投影
+      alias を避け record match で強制**(match_schema registry の
+      optional_keys を活用)
+- [ ] **明示 user input は逐語保持**して constraint に反映(明示値を捨てて
+      `not_equals []` だけ生成すると無関係な追加で pass する false negative)
+
+### 15.3 Source merge / contract 整合
+
+- [ ] **recipe contract の必須性は source merge 後に検証**(CLI parse 段階で
+      reject しない、PR-body-only / issue-only flow を許す)
+- [ ] **source 強度層を跨いで union しない**(strong layer 充足時に medium /
+      lowest 層を参照しない、source 強度表と merge step の挙動を文面上一致)
+- [ ] **`primary_kind` 推論は recipe ID とのバインディング完結時のみ意味が
+      ある**(本 brief のように固定 recipe ID で constraint set を選ぶ設計
+      では `--recipe` を source flag 使用時必須にし、推論だけで recipe を
+      自動選択する silent fallback を入れない)
+- [ ] **複数 strong source が同一 field を独立に決定し得る場合**は明示
+      precedence + conflict error を planning レベルで固定(silent override /
+      silent ignore は禁止)
+- [ ] **conflict rule を立てた直後に各 case が自身の防御原則と整合している
+      かを再 audit**(silent ignore 禁止と書いた直後に他 rule で silent ignore
+      しないか、等)
+- [ ] **declared intent と human prose の区別** は parser 側に固定 registry を
+      持たせ silent guess を禁止(両用途の section は content grammar で
+      明示分類、不明確な content は error)
+
+### 15.4 CLI flag / source の整合
+
+- [ ] **CLI flag を file list に追加する際は merge / consumption / provenance
+      trigger の 3 点をすべて定義**(未定義なら削除)
+- [ ] **source flag を expose する際は対応する parser file + provenance
+      `source_surface` entry を必ず併設**(片方だけ追加しない)
+
+### 15.5 Advisor 設計
+
+- [ ] **検出可能で意味のある invalid pattern が現行 schema に実在することを
+      必ず先に確認**(D5-LEGACY type の false positive 防止)
+- [ ] **verdict 影響に関する advisor message** は `evaluator._aggregate` の
+      VIOLATED / UNKNOWN 両 branch を確認(severity だけで判断せず
+      unknown_policy との組合せで spec 化、半正確な advisor message は
+      false advisory category)
+- [ ] **Advisor 削除時** は file 列挙 / 関数 stub / acceptance count を
+      すべて grep して整合化
+
+### 15.6 Invariant の scope
+
+- [ ] **byte-identical / import-graph 系 invariant の対象は意味論層に
+      narrow**:
+  - 比較対象は **evaluator-derived field**(`verdict` / `repair_plan` /
+    `summary`)に限定、`target_authorship` field と `validate-plan.rendered`
+    は除外(adapter / output layer が provenance を意図的に reflect する
+    surface は invariant 対象外、reflect することがその surface の存在
+    理由)
+  - import-graph は **`cli/commands/<sub>.py` の transitive imports** に
+    narrow、`cli/main.py` の subparser registration(全 subcommand handler を
+    必然的 import)は対象外
+
+### 15.7 他 brief / 他 doc 整合
+
+- [ ] **他 brief への参照は `AGENTS.md` Forward Design Note の正規 framing を
+      逐語使用**(SSP は「sibling protocol、core verdict semantics を変更
+      しない」 が正規)
+- [ ] **新 subcommand の exit code 表は `docs/exit_codes.md` の repo-wide
+      policy(0 / 1 / 2 / 3 / 4)を必ず参照**(advisor / authoring surface
+      でも usage error / engine error の silent success は禁止)
+- [ ] **brief 内の repeated spec を 0 にする**: 各 spec の canonical 箇所を
+      brief 内に 1 つ決め、他は cross-ref。表を更新したら **対応する spec
+      文字列を grep で全箇所検出**(§0 / §2 Goals / §3 Non-goals / §5 各
+      CSCI Goal / §10 acceptance / §11 R 行)し同期更新
+
+### 15.8 同期更新の発火条件
+
+以下を変更したら brief 全体の grep audit を必須化:
+
+- recipe table → recipe contract / acceptance fixture / 「いずれか必須」 列挙
+- merge step / fallback chain → recipe contract / acceptance fixture
+- exit code 表 → §0 / §2 / §3 / §5 各 CSCI Goal 文 / §10 acceptance / §11
+- invariant 範囲 → §4.1.1 cross-test note / §10 acceptance / R 行 / 各 CSCI
+  acceptance
+- registry(intent-declaring section、advisory list 等)→ parser file 列挙 /
+  acceptance count
+
+---
+
+## Appendix A: Audit trail(round-1〜20)
+
+PR #73 の 20 round / 計 28 P2 findings の category 別圧縮。本 brief 本文の
+規律は §15 checklist に統合済、本表は履歴保存目的のみ。
+
+### A.1 Schema grounding(brief 表が実 schema と乖離)
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| a | `test_surface_delta.changed_or_added` 不在(`TestSurfaceDelta` は `new_files`/`new_cases`/`removed_cases` のみ) | §6.2.1 test-update recipe |
+| b | `equals_baseline + allowlist` semantic 不在 | §6.2.1 refactor recipe |
+| c | refactor template は user `subset_of` では緩まず `api_surface.allow_changes` 経由のみ | §6.2.1 refactor recipe |
+| e | catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾 | §6.4.2 catalog JSON |
+| f | catalog に `kind` / `visibility` を出していない | §6.4.2 catalog JSON |
+| j | bugfix template 説明が `compiler/templates.py` と乖離 | §6.2.1 bugfix recipe |
+| t | `--test-case` の値形式が Python-style FQN想定で `_test_case_id()` の `path::name` と不一致 | §6.2.4 |
+
+### A.2 Recipe / contract 整合
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| d | `--test-case` 明示 FQN を捨てて `not_equals []` のみ生成 | §6.2.4 「逐語保持の理由」 |
+| i | `feature:add-api` 必須引数固定で PR-body-only flow が CLI parse で reject | §6.2.3 precedence 表 + 「以下のいずれか必須」 |
+| k | 平坦投影 alias で visibility 情報を捨てる | §6.2.1 feature recipe |
+| w | merge step に medium layer を導入後、recipe contract 更新漏れ | §6.2.1 + §6.2.7 acceptance |
+| z | `## Acceptance Criteria` を test-case 専用と分類して issue-only flow と矛盾 | §6.2.3 intent-declaring section registry |
+
+### A.3 Source merge / precedence
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| p | 複数 strong source の primary_kind 矛盾 silent 解決 | §6.2.3 precedence + C1〜C4 |
+| q | C4 silent ignore が自身の防御原則と矛盾 | §6.2.3 C4 + intent-declaring registry |
+| r | merge step が issue を strong sources の上に常に union | §6.2.3 fallback chain |
+| s | labels/commits-only path で recipe 自動選択 mapping 無し | §6.2.3 「`--recipe` は recipe 生成の必須前提」 |
+
+### A.4 Ghost flag / unconsumed flag
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| l | `--allowed-import` が merge / consumption / provenance trigger 未定義 | (削除) |
+| m | `--kind` flag が未消費(recipe ID で固定済) | (削除) |
+| n | `--remove-api` flag が未消費 | (削除) |
+| o | `--from-issue` flag に対応する parser / provenance entry 不在 | §6.2.6 + §6.2.5 |
+
+### A.5 Invariant 過剰要求
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| g | `ADVISORY-D5-LEGACY` は valid YAML を warn する false positive | §6.3.1 注記(D5 不実装) |
+| h | D5 削除後も `hazards.py` 列挙に `D5-legacy` 残存 | §6.3.4 file list 整理済 |
+| u | `ADVISORY-S1` の verdict 影響 message が VIOLATED branch のみで UNKNOWN を捨てる | §6.3.1 S1 spec |
+| v | INV-2 を envelope 全体に書くと CLI dispatcher と矛盾 | §5.2 INV-2 narrow scope |
+
+### A.6 Wall-clock / determinism
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| - | wall-clock `declared_at` 自動埋め込みで determinism 違反 | §6.2.5 「declared_at は default omit」 |
+
+### A.7 Spec drift / 同期更新漏れ
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| aa | round-18 で §5.3 exit code を更新したが §10 acceptance は「常に 0」 残置 | §10 acceptance + §15.7 / §15.8 |
+| bb | round-19 で §10 を更新したが §0.2 / §2 / §3 / §5.3 Goal 文に同型残置 | §15.8 grep audit 強制化 |
+
+### A.8 他 brief / framing
+
+| # | Finding | 本文反映先 |
+|---|---|---|
+| x | §12.3 で SSP を core 機能追加と framing(AGENTS.md 違反) | §12.3 sibling protocol framing |
+| y | target-doctor exit code が 0 / 4 のみで repo-wide policy 違反 | §6.3.3 exit code 表 |
+| - | INV-1 / INV-3 を envelope 全体で書くと `target_authorship` field と矛盾 | §5.2 INV-1 / INV-3 narrow scope |
+| - | INV-1 / INV-3 が `validate-plan` で生成 metadata が rendered field に流れる設計と矛盾 | §5.2 INV-1 / INV-3 除外領域 |
+
+履歴の各 finding の発覚 round 詳細は `git log docs/brief_8_planning.md` の
+commit message 参照。

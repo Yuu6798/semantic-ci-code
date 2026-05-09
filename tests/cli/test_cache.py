@@ -29,7 +29,7 @@ from .git_helpers import (
     stage_changes,
     write_file,
 )
-from .helpers import REPO_ROOT, payload, run_semantic_ci
+from .helpers import REPO_ROOT, payload, run_semantic_ci, run_semantic_ci_subprocess
 
 
 def test_check_uses_cached_codestate_without_calling_extractor_on_second_run(tmp_path: Path):
@@ -45,7 +45,7 @@ def test_check_uses_cached_codestate_without_calling_extractor_on_second_run(tmp
         "--cache-dir",
         str(cache_dir),
     )
-    second = run_semantic_ci(
+    second = run_semantic_ci_subprocess(
         repo,
         "check",
         "--format",
@@ -90,7 +90,7 @@ def test_pre_commit_uses_cached_codestate_without_calling_extractor_on_second_ru
         "--cache-dir",
         str(cache_dir),
     )
-    second = run_semantic_ci(
+    second = run_semantic_ci_subprocess(
         repo,
         "pre-commit",
         "--format",

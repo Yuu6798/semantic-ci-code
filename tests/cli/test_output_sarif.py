@@ -11,7 +11,7 @@ from .git_helpers import (
     init_repo_without_candidate_commit,
     stage_changes,
 )
-from .helpers import payload, run_semantic_ci
+from .helpers import payload, run_semantic_ci, run_semantic_ci_subprocess
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "cli" / "compare"
 BASELINE = FIXTURES / "baseline_pkg"
@@ -247,10 +247,10 @@ def test_sarif_output_file_writes_json_and_leaves_stdout_empty(tmp_path: Path):
 
 
 def test_sarif_is_byte_identical_across_hash_seeds():
-    first = run_semantic_ci(
+    first = run_semantic_ci_subprocess(
         Path.cwd(), *compare_args(REPAIR_TARGET), "--format", "sarif", hash_seed="1"
     )
-    second = run_semantic_ci(
+    second = run_semantic_ci_subprocess(
         Path.cwd(), *compare_args(REPAIR_TARGET), "--format", "sarif", hash_seed="2"
     )
 

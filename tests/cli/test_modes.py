@@ -5,6 +5,8 @@ import time
 from os import pathsep
 from pathlib import Path
 
+import pytest
+
 from semantic_ci_code.compiler import compile_target_svp
 from semantic_ci_code.domain.state_schema import CodeState, CodeStateDelta, ComplexityDelta
 from semantic_ci_code.evaluator import ResultStatus, VerdictResult, evaluate_constraints
@@ -18,7 +20,7 @@ from .git_helpers import (
     init_repo_without_candidate_commit,
     stage_changes,
 )
-from .helpers import payload, run_semantic_ci
+from .helpers import payload, run_semantic_ci, run_semantic_ci_subprocess
 
 COMPLEXITY_TARGET = """\
 intent: smoke should skip expensive dimensions
@@ -246,6 +248,7 @@ def test_smoke_verdict_exit_matrix_matches_full_semantics(tmp_path: Path):
     assert payload(fail_result)["verdict"] == "fail"
 
 
+@pytest.mark.slow
 def test_smoke_is_faster_than_full(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
@@ -265,7 +268,7 @@ def _timed_pre_commit(
     extra_env: dict[str, str] | None = None,
 ) -> float:
     start = time.perf_counter()
-    result = run_semantic_ci(
+    result = run_semantic_ci_subprocess(
         repo,
         "pre-commit",
         "--mode",

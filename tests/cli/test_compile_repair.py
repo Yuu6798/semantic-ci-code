@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -18,25 +17,15 @@ from semantic_ci_code.framework.constraint_types import (
 from semantic_ci_code.repair import emit_repair_plan
 
 from .git_helpers import TARGET_REPAIR, init_repo, write_file
-from .helpers import cli_env, payload, run_console
+from .helpers import InprocResult, payload, run_semantic_ci
 
 
 def run_cli(
     *args: str,
     cwd: Path | None = None,
     input_text: str | None = None,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["semantic-ci", *args],
-        cwd=cwd or Path.cwd(),
-        env=cli_env(),
-        input=input_text,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        capture_output=True,
-        check=False,
-    )
+) -> InprocResult:
+    return run_semantic_ci(cwd or Path.cwd(), *args, stdin_text=input_text)
 
 
 def repair_plan_dict() -> dict:
@@ -270,7 +259,7 @@ def test_compile_repair_unknown_adapter_is_argparse_usage_error():
 def test_check_json_pipes_directly_into_compile_repair(tmp_path: Path):
     repo = init_repo(tmp_path)
     write_file(repo / "target.yaml", TARGET_REPAIR)
-    check_result = run_console(
+    check_result = run_semantic_ci(
         repo,
         "check",
         "--no-fetch",

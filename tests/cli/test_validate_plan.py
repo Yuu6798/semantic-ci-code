@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .git_helpers import BASELINE_SOURCE, git, init_repo, write_file
-from .helpers import payload, run_console
+from .helpers import payload, run_semantic_ci
 
 TARGET_WITH_RISK = """\
 intent: validate profile endpoint plan
@@ -32,7 +32,7 @@ def test_validate_plan_outputs_text_for_claude_code_with_baseline_dir(tmp_path: 
     target = tmp_path / "target.yaml"
     write_file(target, TARGET_WITH_RISK)
 
-    result = run_console(
+    result = run_semantic_ci(
         tmp_path,
         "validate-plan",
         "--target",
@@ -56,7 +56,7 @@ def test_validate_plan_json_envelope_contains_risk_summary(tmp_path: Path):
     target = tmp_path / "target.yaml"
     write_file(target, TARGET_WITH_RISK)
 
-    result = run_console(
+    result = run_semantic_ci(
         tmp_path,
         "validate-plan",
         "--target",
@@ -92,7 +92,7 @@ def test_validate_plan_writes_output_file(tmp_path: Path):
     output = tmp_path / "plan.mdc"
     write_file(target, TARGET_WITH_RISK)
 
-    result = run_console(
+    result = run_semantic_ci(
         tmp_path,
         "validate-plan",
         "--target",
@@ -115,7 +115,7 @@ def test_validate_plan_supports_baseline_rev(tmp_path: Path):
     write_file(repo / "target.yaml", TARGET_WITH_RISK)
     baseline = git(repo, "rev-parse", "origin/main").stdout.strip()
 
-    result = run_console(
+    result = run_semantic_ci(
         repo,
         "validate-plan",
         "--target",
@@ -134,7 +134,7 @@ def test_validate_plan_default_baseline_resolution_uses_git_fallback(tmp_path: P
     repo = init_repo(tmp_path)
     write_file(repo / "target.yaml", TARGET_WITH_RISK)
 
-    result = run_console(
+    result = run_semantic_ci(
         repo,
         "validate-plan",
         "--target",
@@ -152,7 +152,7 @@ def test_validate_plan_falls_back_to_empty_baseline_when_no_git_baseline(tmp_pat
     target = tmp_path / "target.yaml"
     write_file(target, TARGET_WITH_RISK)
 
-    result = run_console(
+    result = run_semantic_ci(
         tmp_path,
         "validate-plan",
         "--target",
@@ -169,7 +169,7 @@ def test_validate_plan_falls_back_to_empty_baseline_when_no_git_baseline(tmp_pat
 
 
 def test_validate_plan_missing_target_exits_two(tmp_path: Path):
-    result = run_console(
+    result = run_semantic_ci(
         tmp_path,
         "validate-plan",
         "--target",
@@ -186,7 +186,7 @@ def test_validate_plan_invalid_baseline_rev_exits_two(tmp_path: Path):
     repo = init_repo(tmp_path)
     write_file(repo / "target.yaml", TARGET_WITH_RISK)
 
-    result = run_console(
+    result = run_semantic_ci(
         repo,
         "validate-plan",
         "--target",
@@ -205,7 +205,7 @@ def test_validate_plan_requires_adapter(tmp_path: Path):
     target = tmp_path / "target.yaml"
     write_file(target, TARGET_WITH_RISK)
 
-    result = run_console(tmp_path, "validate-plan", "--target", str(target))
+    result = run_semantic_ci(tmp_path, "validate-plan", "--target", str(target))
 
     assert result.returncode == 2
     assert "required" in result.stderr

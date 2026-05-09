@@ -13,7 +13,7 @@ from .git_helpers import (
     stage_changes,
     write_file,
 )
-from .helpers import payload, run_semantic_ci
+from .helpers import payload, run_semantic_ci, run_semantic_ci_subprocess
 
 
 def test_pre_commit_with_no_staged_changes_returns_empty_pass(tmp_path: Path):
@@ -144,7 +144,7 @@ def test_pre_commit_subprocess_determinism_across_hash_seeds(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
 
-    first = run_semantic_ci(
+    first = run_semantic_ci_subprocess(
         repo,
         "pre-commit",
         "--format",
@@ -152,7 +152,7 @@ def test_pre_commit_subprocess_determinism_across_hash_seeds(tmp_path: Path):
         "--no-cache",
         hash_seed="1",
     )
-    second = run_semantic_ci(
+    second = run_semantic_ci_subprocess(
         repo,
         "pre-commit",
         "--format",

@@ -384,12 +384,23 @@ ADVISORY を出す方向は将来 brief で検討。
 は **明示的な precedence rule** に従って解決する。silent override や
 silent ignore は一切行わず、矛盾は **明示 error** で止める。
 
+**`--recipe` は recipe 生成の必須前提**: 本 brief は 4 個の固定 recipe ID
+ごとに constraint set を定義しており、推論された `primary_kind` だけから
+recipe を自動選択する deterministic mapping は持たない(`primary_kind=
+feature` だけでは `feature:add-api` 以外の将来 recipe との区別がつかない)。
+したがって precedence 表は **`--recipe <ID>` が指定されたケース限定**で
+`primary_kind` を確定する規則を定める。`--recipe` 不在で source flag
+(`--from-*`)が指定されると error(下記 precedence 行 (none) と統合)。
+plain `init`(`--recipe` も `--from-*` も無し)は scaffold mode で
+`primary_kind` 議論の対象外(generation_metadata 自体生成しない、§5.2)。
+
 | 優先度 | source | 動作 |
 |---|---|---|
-| 1 (authoritative) | `--recipe <ID>`(recipe ID から固定) | `primary_kind` を確定。下位 source の primary_kind hint と **strict 一致**を要求、不一致なら error(後述) |
-| 2 (strong) | labels(`kind:feature` 等、`--from-labels`) | `--recipe` 不在時のみ採用。複数 labels が異なる primary_kind を出す場合は error |
-| 3 (medium) | commit message(Conventional Commits prefix、`--from-commits`) | `--recipe` も labels も不在時のみ hint として採用 |
-| (none) | すべて不在 | recipe / labels / commits のいずれかが必要(`--kind` flag は round-9 で削除済)、不在なら明示 error |
+| 1 (authoritative) | `--recipe <ID>`(recipe ID から固定) | `primary_kind` を確定。下位 source の primary_kind hint と **strict 一致**を要求、不一致なら error(C1) |
+| 2 (validation) | labels(`kind:feature` 等、`--from-labels`) | `--recipe` の primary_kind と **一致確認** のみ。`--from-labels` のみで recipe 不在は error(理由: 推論された primary_kind だけでは recipe ID を一意に選べない) |
+| 3 (validation) | commit message(Conventional Commits prefix、`--from-commits`) | 同上、`--recipe` の primary_kind と一致確認のみ。recipe 不在で `--from-commits` のみは error |
+| (`--recipe` も `--from-*` も無し) | scaffold mode | plain `init`(既存 `TARGET_TEMPLATE` 逐語、generation_metadata 不生成) |
+| (`--from-*` 有り、`--recipe` 無し) | error | `--recipe is required when source flags (--from-*) are used; recipe ID determines the constraint set` |
 
 **conflict 検出ルール**(`merge.py` で固定):
 
@@ -397,13 +408,15 @@ silent ignore は一切行わず、矛盾は **明示 error** で止める。
   recipe の `feature` と label の `bugfix` が不一致、**error**(message:
   `recipe '{ID}' implies primary_kind '{X}', but label 'kind:{Y}' contradicts;
   remove the conflicting label or use --recipe 'kind:{Y}:...'`)
-- **C2**: `--recipe` なしで `kind:feature` + `kind:bugfix` の 2 labels が
-  同時指定 → labels 内部矛盾、**error**(複数 strong source 自体が矛盾、
-  どちらを採用するか自動決定しない)
-- **C3**: `--recipe` も labels も無く `feat:` + `fix:` の commit が混在 →
-  commit hint は medium、最も新しい commit を採用する(deterministic
-  tie-break: commit order は `--from-commits` 入力順、複数指定時は最後の
-  Conventional Commits prefix が勝つ。これは silent ではなく仕様)
+- **C2**: `--recipe` 有り + 同種 labels 複数(例: `kind:feature` 2 個)→
+  問題なし(同 primary_kind を再宣言しているだけ、dedup)。異種混在
+  (`kind:feature` + `kind:bugfix`)は labels 内部矛盾の前段で error
+- **C3**: `--recipe` 有り + Conventional Commits prefix 混在(`feat:` +
+  `fix:`)→ recipe の primary_kind と一致するものは validation OK、
+  不一致 prefix が混在すれば error(commit ごとに 1 つでも recipe と
+  矛盾するなら C1 と同型の error。tie-break で「最後の prefix が勝つ」は
+  recipe 不在時の仮想規則だったが、本 brief では recipe 必須なので
+  適用されない)
 - **C4**: PR body / issue の **intent-declaring structured section**(下記
   registry)が recipe に消費されずに残った場合 → **error**(silent ignore
   禁止原則の対称性、PR #73 round-11 codex review で指摘)。例: `--recipe
@@ -435,12 +448,26 @@ CSCI-42 acceptance に C1〜C4 全種の golden fixture(成功 / 失敗それぞ
 
 `feature:add-api` のように recipe contract で **API FQN のいずれかを必須**
 としているケースでは、CLI 引数の有無で先に reject せず、**source merge
-後に positive expectation の FQN list が空かどうかを検証**する。具体的には:
+後に positive expectation の FQN list が空かどうかを検証**する。merge は
+**source 強度層を尊重した fallback chain** で行う(指摘 20 修正後の規則):
 
 1. CLI parse: `--add-api` を **optional** として受け取る
 2. PR body / issue parse: structured section から FQN list を抽出
-3. merge: user input(strong)を base に、PR body(strong)→ issue
-   (medium)の順に **union 追加**(重複は dedup)
+3. merge(fallback chain、source 強度層ごとに最初に空でない layer を採用):
+   - **strong layer**: `--add-api`(明示 user input)∪ PR body の structured
+     section。両方とも strong なので **同一 layer 内で union dedup**。strong
+     layer に値があれば、これを最終 FQN list として確定。
+   - **medium layer**: strong layer が空のときのみ参照。issue acceptance
+     criteria の structured section から FQN を採用(ここも複数 source あり
+     得るが、issue は medium 単独 source なのでそのまま採用)。
+   - **lowest layer**: 上 2 層が空のときのみ commit hint(なお commit hint
+     は primary_kind の hint で FQN 列ではないので、`feature:add-api` の
+     positive expectation には貢献しない。FQN 列の merge では実質 strong
+     と medium のみ)。
+   - issue を strong 値の **上に union しない**(指摘 20: stale / broad な
+     issue criteria が hard constraint を膨らませる risk を回避、source
+     強度表の「issue は medium、PR body と user input が空のときのみ参照」
+     と整合)。
 4. 検証: merge 後の FQN list が空ならエラー(`feature:add-api` recipe は
    API 追加を表現できないと宣言、適切な exit code + 明示 message)
 
@@ -448,6 +475,7 @@ CSCI-42 acceptance に C1〜C4 全種の golden fixture(成功 / 失敗それぞ
 `--add-api` を一切渡さずに `--from-pr-body pr.md` だけで recipe を満たす
 flow が成立する(`docs/target_authoring_surface.md` の AI assistant 経由
 authoring シナリオ)。CSCI-42 acceptance に当該 flow の golden fixture
++ 「strong layer 充足時に issue が無視される」 fixture(指摘 20 回帰テスト)
 を含める。
 
 **Provenance metadata**(**recipe / source mode のみで生成**、wall-clock を埋め込まない):
@@ -456,19 +484,24 @@ authoring シナリオ)。CSCI-42 acceptance に当該 flow の golden fixture
 flag も渡されないケース)は **既存の `TARGET_TEMPLATE` を逐語維持**する
 (`tests/cli/test_init_command.py:24` `test_init_writes_default_target_template`
 が現行 scaffold の bytes を assert 済み、本 brief「既存 behavior 不変」を
-遵守)。generation_metadata の自動記録は **以下のいずれかが発火した時のみ**:
+遵守)。generation_metadata の自動記録は **`--recipe <ID>` が指定された
+時のみ**(round-12 修正後の単一トリガー、`--recipe` が constraint set 選択の
+authoritative source であり、source flag / explicit input flag は recipe
+不在では消費先が無く error 経路へ送られるため、generation_metadata の
+発火条件としては `--recipe` 単独で必要十分):
 
-1. `--recipe <ID>` が指定された
-2. `--from-pr-body` / `--from-labels` / `--from-commits` / `--from-issue` の
-   いずれかが指定された
-3. `--add-api` / `--test-case` / `--allow-fqn` /
-   `--allow-fqn-prefix` / `--declared-at` のいずれかが指定された
+| 入力 pattern | 動作 |
+|---|---|
+| `init`(引数なし) | scaffold mode、既存 `TARGET_TEMPLATE` を逐語出力、generation_metadata 不生成 |
+| `init --recipe <ID>`(他 flag なし) | recipe を実行、generation_metadata 生成(source_surfaces は `[user_input]` 等、明示入力された source のみ列挙) |
+| `init --recipe <ID> --from-*` / `--add-api` 等 | recipe + source merge を実行、generation_metadata 生成 |
+| `init --from-*`(`--recipe` 無し) | error(precedence 表 (none) 行) |
+| `init --add-api` / `--test-case` 等(`--recipe` 無し) | error(explicit input flag は recipe contract が消費するため、recipe が無ければ消費先が決まらない) |
 
-上記いずれも未指定なら **generation_metadata block を一切書かず**、`init`
-の出力は現行と byte-identical でなければならない。CSCI-42 acceptance に
-「plain `init`(引数なし)出力が `tests/cli/test_init_command.py` の既存
-assertion を pass」「recipe / source mode で **のみ** generation_metadata
-が生成される」を明記。
+CSCI-42 acceptance に「plain `init`(引数なし)出力が
+`tests/cli/test_init_command.py` の既存 assertion を pass」「`--recipe`
+**のみ** が generation_metadata を発火」「`--from-*` / explicit input
+flag を `--recipe` 無しで指定すると error」を明記。
 
 recipe / source mode 時の YAML 例:
 
@@ -481,7 +514,7 @@ authorship:
   generation_metadata:
     tool: semantic-ci-init
     tool_version: "<package version, deterministic>"
-    recipe: "feature:add-api"  # null if --recipe 未指定
+    recipe: "feature:add-api"  # 必ず設定される(generation_metadata は --recipe 必須モード でのみ生成)
     source_surfaces:
       - user_input
       - pr_body    # --from-pr-body が指定された場合のみ
@@ -531,8 +564,9 @@ declared_at field が **存在しない**」 + 「同 input 3 回で byte-identi
       (`tests/cli/test_init_command.py:24` `test_init_writes_default_target_template`
       が現行 `TARGET_TEMPLATE` bytes を assert 済み、これを破らない)
 - [ ] **plain `init`(引数なし)出力に generation_metadata は含まれない**
-      (recipe / source / explicit-input flag のいずれかが発火した時のみ
-      block 生成、§5.2 Provenance metadata スコープ厳守ルール)
+      (`--recipe <ID>` 指定時のみ block 生成、`--from-*` / explicit input
+      flag を `--recipe` 無しで指定すると error、§5.2 Provenance metadata
+      スコープ厳守ルール)
 - [ ] LLM / network 呼び出しゼロ(`socket` / `httpx` / `requests` を import
       しないことを import-graph test で確認、§7 不変条件 #4)
 - [ ] template と user constraint の重複が起きない(ADVISORY-D3 が空に
@@ -918,9 +952,9 @@ CSCI-42(init recipe + sources)land 後、`docs/dogfooding_TC10_report.md`
 | **R4 catalog drift** | catalog と evaluator 実装が乖離し、AI assistant が無効な target.yaml を生成 | §7 不変条件 #5 の cross-test を CSCI-44 acceptance に含める |
 | **R5 advisory ノイズ** | target-doctor が誤検知だらけで信用されない | 各 advisory に false-positive 防止 fixture を必ず 1 件持つ(§5.3 acceptance) |
 | **R6 recipe 不足で結局手書き** | 4 recipe で大半の PR をカバーできない | session 2026-05-09 議論で「4 recipe で大半 cover」の見積、§9.3 dogfood で経験的検証、不足時は CSCI-42 follow-up で追加 recipe を増やす(後方互換破壊なし) |
-| **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken。特に「provenance metadata は必ず生成」を全呼び出しに適用すると plain `init` 出力が変わり `tests/cli/test_init_command.py:24` を破る(PR #73 round-6 codex review 指摘) | CSCI-42 acceptance に「既存 behavior 不変」+「plain `init` 出力に generation_metadata を含めない」を test で固定。Provenance metadata 生成は **recipe / source / explicit-input flag が 1 つでも発火した時のみ** に scope する(§5.2 Provenance metadata セクション) |
+| **R7 init 既存 behavior 退行** | `init` の引数なし呼び出しが broken。特に「provenance metadata は必ず生成」を全呼び出しに適用すると plain `init` 出力が変わり `tests/cli/test_init_command.py:24` を破る(PR #73 round-6 codex review 指摘) | CSCI-42 acceptance に「既存 behavior 不変」+「plain `init` 出力に generation_metadata を含めない」を test で固定。Provenance metadata 生成は **`--recipe <ID>` 指定時のみ** に scope する(round-12 で単一トリガーに narrow、`--from-*` / explicit input flag は recipe 無しでは error、§5.2 Provenance metadata セクション) |
 | **R8 PR body parser の脆弱性** | non-structured な PR body で誤動作 / クラッシュ | structured section が存在しない場合は **graceful degrade**(明示 user input + recipe default のみで生成、source surface に該当 source を含めない)、CSCI-42 acceptance に明記 |
-| **R9 recipe / catalog / advisor schema grounding + contract 整合ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照する、または recipe contract と source 強度ポリシーが矛盾して PR body 経由 flow を reject する、または削除済 advisor が file 列挙に取り残される、または recipe の template 説明が実 templates.py と乖離する、または authoring intent (例: "**public** API") を捨てる平坦投影で constraint を生成する、または定義のない CLI flag を file list に列挙する、または source flag を expose しているのに parser / provenance entry が無い、または複数 strong source の primary_kind 矛盾を silent に解決する、または導入した防御原則と他 rule が内部矛盾する。PR #73 codex review で計 17 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除)、(h) D5 削除後も `hazards.py` 列挙に `D5-legacy` が残存し実装側で false positive を再導入する罠、(i) `feature:add-api` の必須引数を `--add-api FQN+` に固定すると `--from-pr-body` の `## Expected public API` セクションだけで recipe を満たす flow が CLI parse 段階で reject される(source 強度ポリシーと recipe contract の矛盾)、(j) `bugfix:regression-test` recipe の template 説明が実 templates.py と異なる(brief は `api_surface_delta.removed_public == []` と書いたが実際は `api_surface_public equals_baseline`(=追加も削除も全禁止)+ `effect_changes.added equals ()`、`compiler/templates.py:64-76`)、(k) `feature:add-api` で `api_surface_delta.added.fqns includes_all` の平坦投影 alias を使うと `## Expected **public** API` 由来の visibility 情報を捨て、non-public 追加でも satisfy される。record match `{fqn, visibility: "public"}` で強制すべき(`framework/match_schema.py:47` `_API_SCHEMA.optional_keys` に `visibility` 登録済み)、(l) `--allowed-import` flag が CSCI-42 ファイル list に列挙されているが merge ロジック / 消費する recipe / generation_metadata 発火条件のいずれも定義されていない幽霊 flag(削除)、(m) `--kind` flag が CSCI-42 init に列挙されているが、`change.primary_kind` は recipe ID で固定され labels / commits も独立に推論する経路があり、`--kind` を消費する recipe / merge ルールがない幽霊 flag(削除、target-catalog の `--kind` は別 subcommand の保持された flag)、(n) `--remove-api` flag が CSCI-42 init / source 強度表 / provenance trigger に列挙されているが、4 recipe いずれも `--remove-api` を constraint に変換しない幽霊 flag(削除)、(o) `--from-issue` flag は brief 全体で source として参照されているのに CSCI-42 file list に `issue.py` parser が無く、provenance example の `source_surfaces` にも `issue` が無い(parser + source_surface entry を追加)、(p) 複数 strong source(`--recipe` / `kind:` labels)が異なる `primary_kind` を独立に決定し得るのに precedence / conflict rule が未定義で silent override / silent ignore の余地が残る(precedence 表 + C1〜C4 conflict rule + 明示 error を `merge.py` で固定)、(q) (p) の対策で導入した C4 ルールが「unconsumed structured section を無視」と書かれており、自身が立てた「silent override / silent ignore 禁止」原則と矛盾(intent-declaring section registry を parser に持ち、unconsumed なら error、人間向け一般 section は declared intent ではないので無視 OK と区別) | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field + template 展開ルール を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + template-expansion-parity + match-schema-parity + advisor-no-false-positive + source-merge-validation + visibility-preservation + conflict-resolution cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、recipe contract の必須性は **source merge 後**に検証(CLI parse 段階で reject しない)、advisor を削除する際は **file 列挙 / 関数 stub / acceptance count をすべて grep して整合化**、recipe の template 説明は **実 templates.py の TEMPLATE_CONSTRAINTS dict を逐語参照**(brief 起草時に思い込みで書かない)、authoring intent に visibility / kind / scope などの修飾子が含まれる場合は **平坦投影 alias を避け record match で強制**(match_schema registry の optional_keys を活用)、CLI flag を file list に追加する際は **merge / consumption / provenance trigger の 3 点をすべて定義**(未定義なら削除)、source flag を expose する際は **対応する parser file + provenance source_surface entry を必ず併設**(片方だけ追加しない)、複数 strong source が同一 field を独立に決定し得る場合は **明示 precedence + conflict error 規則を planning レベルで固定**(silent override / silent ignore は禁止)、conflict rule を立てた直後にその rule の各 case が **自身の防御原則と整合しているかを再 audit**(round-11 で C4 が silent ignore 原則と矛盾していた前例)、declared intent と human prose の区別が必要な場合は **parser 側に固定 registry を持たせ silent ignore 範囲を明文化**、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
+| **R9 recipe / catalog / advisor schema grounding + contract 整合ずれ** | recipe / catalog / advisor が現行 schema に存在しない path / operator semantics / template 緩和経路 / match key / 識別子 を参照する、または recipe contract と source 強度ポリシーが矛盾して PR body 経由 flow を reject する、または削除済 advisor が file 列挙に取り残される、または recipe の template 説明が実 templates.py と乖離する、または authoring intent (例: "**public** API") を捨てる平坦投影で constraint を生成する、または定義のない CLI flag を file list に列挙する、または source flag を expose しているのに parser / provenance entry が無い、または複数 strong source の primary_kind 矛盾を silent に解決する、または導入した防御原則と他 rule が内部矛盾する。PR #73 codex review で計 19 件発覚: (a) `test_surface_delta.changed_or_added` 不在、(b) `equals_baseline + allowlist` semantic 不在、(c) refactor template は user `subset_of` constraint では緩まず `api_surface.allow_changes` 経由のみ、(d) `--test-case` 明示 FQN を捨てて `not_equals []` だけ生成すると無関係 test 追加で pass する、(e) catalog example の `optional_keys: ["signature", "module"]` は registry と矛盾(`signature` は forbidden、`module` は未登録)、(f) `kind` / `visibility` を catalog に出していない、(g) `ADVISORY-D5-LEGACY` は `TargetSVP` に target-level `schema_version` が無く `normalize_collection_expected()` で bare-string が valid shorthand として desugar されるため legacy 形を識別できず valid YAML を warn する false positive となる(削除)、(h) D5 削除後も `hazards.py` 列挙に `D5-legacy` が残存し実装側で false positive を再導入する罠、(i) `feature:add-api` の必須引数を `--add-api FQN+` に固定すると `--from-pr-body` の `## Expected public API` セクションだけで recipe を満たす flow が CLI parse 段階で reject される(source 強度ポリシーと recipe contract の矛盾)、(j) `bugfix:regression-test` recipe の template 説明が実 templates.py と異なる(brief は `api_surface_delta.removed_public == []` と書いたが実際は `api_surface_public equals_baseline`(=追加も削除も全禁止)+ `effect_changes.added equals ()`、`compiler/templates.py:64-76`)、(k) `feature:add-api` で `api_surface_delta.added.fqns includes_all` の平坦投影 alias を使うと `## Expected **public** API` 由来の visibility 情報を捨て、non-public 追加でも satisfy される。record match `{fqn, visibility: "public"}` で強制すべき(`framework/match_schema.py:47` `_API_SCHEMA.optional_keys` に `visibility` 登録済み)、(l) `--allowed-import` flag が CSCI-42 ファイル list に列挙されているが merge ロジック / 消費する recipe / generation_metadata 発火条件のいずれも定義されていない幽霊 flag(削除)、(m) `--kind` flag が CSCI-42 init に列挙されているが、`change.primary_kind` は recipe ID で固定され labels / commits も独立に推論する経路があり、`--kind` を消費する recipe / merge ルールがない幽霊 flag(削除、target-catalog の `--kind` は別 subcommand の保持された flag)、(n) `--remove-api` flag が CSCI-42 init / source 強度表 / provenance trigger に列挙されているが、4 recipe いずれも `--remove-api` を constraint に変換しない幽霊 flag(削除)、(o) `--from-issue` flag は brief 全体で source として参照されているのに CSCI-42 file list に `issue.py` parser が無く、provenance example の `source_surfaces` にも `issue` が無い(parser + source_surface entry を追加)、(p) 複数 strong source(`--recipe` / `kind:` labels)が異なる `primary_kind` を独立に決定し得るのに precedence / conflict rule が未定義で silent override / silent ignore の余地が残る(precedence 表 + C1〜C4 conflict rule + 明示 error を `merge.py` で固定)、(q) (p) の対策で導入した C4 ルールが「unconsumed structured section を無視」と書かれており、自身が立てた「silent override / silent ignore 禁止」原則と矛盾(intent-declaring section registry を parser に持ち、unconsumed なら error、人間向け一般 section は declared intent ではないので無視 OK と区別)、(r) merge step が issue(medium)を user input + PR body(strong)の上に常に union する記述になっており、source 強度表の「issue は medium、strong source が空のときのみ参照」と矛盾(stale / broad な issue criteria が hard constraint を膨らませる)→ source 強度層を尊重した fallback chain(strong layer 充足時は medium 層を参照しない)に修正、(s) precedence 表の row 2/3 が `--recipe` 不在で labels / commits だけから `primary_kind` を推論する規則になっていたが、本 brief は recipe ID から constraint set を選ぶため推論された primary_kind だけでは recipe を一意に選べない(silent fallback 不能)→ `--from-*` / explicit input flag 使用時は `--recipe` 必須、不在なら error、generation_metadata 発火条件も `--recipe` 単独に narrow | recipe / catalog / advisor 表は **必ず実 schema + evaluator path + match_schema registry + framework field + template 展開ルール を grep して検証**(`domain/state_schema.py` / `evaluator/operators.py` / `evaluator/evaluator.py` / `compiler/templates.py` / `compiler/target_compiler.py` / `compiler/path_schema.py` / `framework/match_schema.py` / `framework/target_svp.py`)、CSCI-42 / CSCI-43 / CSCI-44 acceptance に schema + template-relaxation + template-expansion-parity + match-schema-parity + advisor-no-false-positive + source-merge-validation + visibility-preservation + conflict-resolution cross-test を含める、明示 user input(`--test-case` 等)は逐語保持して constraint に反映、advisor は **検出可能で意味のある invalid pattern が現行 schema に実在することを必ず先に確認**、recipe contract の必須性は **source merge 後**に検証(CLI parse 段階で reject しない)、advisor を削除する際は **file 列挙 / 関数 stub / acceptance count をすべて grep して整合化**、recipe の template 説明は **実 templates.py の TEMPLATE_CONSTRAINTS dict を逐語参照**(brief 起草時に思い込みで書かない)、authoring intent に visibility / kind / scope などの修飾子が含まれる場合は **平坦投影 alias を避け record match で強制**(match_schema registry の optional_keys を活用)、CLI flag を file list に追加する際は **merge / consumption / provenance trigger の 3 点をすべて定義**(未定義なら削除)、source flag を expose する際は **対応する parser file + provenance source_surface entry を必ず併設**(片方だけ追加しない)、複数 strong source が同一 field を独立に決定し得る場合は **明示 precedence + conflict error 規則を planning レベルで固定**(silent override / silent ignore は禁止)、conflict rule を立てた直後にその rule の各 case が **自身の防御原則と整合しているかを再 audit**(round-11 で C4 が silent ignore 原則と矛盾していた前例)、declared intent と human prose の区別が必要な場合は **parser 側に固定 registry を持たせ silent ignore 範囲を明文化**、source 強度層が複数あるとき merge は **同一強度層内で union、強度層を跨いで union しない**(strong layer 充足時に medium / lowest 層を参照しない、source 強度表と merge step の挙動を文面上一致させる)、`primary_kind` 推論は **recipe ID とのバインディングが完結するときのみ意味がある**(本 brief のように固定 recipe ID で constraint set を選ぶ設計では `--recipe` を source flag 使用時必須にし、推論だけで recipe を「自動選択」する silent fallback を入れない)、Non-goals「新 operator 追加なし」を recipe 設計時に再確認 |
 | **R10 envelope-wide byte-identical の過剰要求** | §7 invariant #1 / #3 を envelope 全体 / 全 subcommand に拡張すると 2 領域で既存仕様と矛盾: (a) `target_authorship` field は authorship を reflect する設計(既存 `tests/test_authorship.py:73` を破る)、(b) `validate-plan` adapter `render_pre_gen` は `generation_metadata` を逐語 render する設計(`repair_compiler/adapters/{codex,claude_code,cursor,markdown}.py` の `format_generation_metadata`、provenance を generator に伝える Advisor surface 要件、PR #73 round-7 codex review 指摘) | 不変条件は **evaluator-derived field**(`verdict` / `repair_plan` / `summary`)に narrow、`target_authorship` を比較から除外し、`validate-plan` を invariant 対象 subcommand から除外するヘルパを `tests/architecture/` に置く。一般原則: **adapter / output layer が provenance / authorship を意図的に reflect する surface は invariant 対象外**(rendered/serialized 側で reflect することがその surface の存在理由) |
 | **R11 wall-clock 由来の非決定性** | recipe が `declared_at` を `datetime.now()` で埋めると同 input → 異 output となり determinism acceptance を violate(PR #73 round-3 codex review 指摘) | `declared_at` は **default omit**(`Authorship.declared_at: str \| None = None` を活用)、`--declared-at ISO8601` で明示指定時のみ書き出す。`tool_version` は `importlib.metadata.version` から静的解決。CSCI-42 acceptance に「`--declared-at` 未指定時は declared_at field 不在」「同 input 3 回 byte-identical」を含める |
 

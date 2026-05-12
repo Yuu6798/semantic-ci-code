@@ -1231,6 +1231,7 @@ ACTIVE 仕様 / 契約:
 PLANNING (open):
 
 - [`brief_7_planning.md`](./brief_7_planning.md) — Brief 7 (SSP v0.1) Q1〜Q6 確定 + 5 要素 fingerprint + Sensor Provenance Invariant + CSCI-36〜40 候補
+- [`brief_resultstatus_planning.md`](./brief_resultstatus_planning.md) — ResultStatus.UNKNOWN を authoring/extraction に分離する brief planning(C+B 仮固定、5 PR 想定、§1b で Brief 8 Authoring Surface との境界を pin)
 
 REFERENCE / ARCHIVED (`docs/archive/` に集約、[`archive/README.md`](./archive/README.md) 参照):
 

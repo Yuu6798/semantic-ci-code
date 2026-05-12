@@ -98,6 +98,7 @@ Active references (current behavior):
 Planning (open):
 
 - [Brief 7 — Semantic Security Protocol v0.1](docs/brief_7_planning.md) — SAST + SCA, Python only, independent envelope, Sensor Provenance Invariant
+- [ResultStatus authoring/extraction split](docs/brief_resultstatus_planning.md) — C+B (compile-time pushback + `unknown_cause` sibling field), 5 PR split, validate-plan v2 — boundary with Brief 8 (Authoring Surface) pinned in §1b
 
 Reference / archived (completed briefs, retained for context — see [`docs/archive/README.md`](docs/archive/README.md)):
 

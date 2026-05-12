@@ -31,6 +31,30 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 直近 merged
 
+### 2026-05-12 — ResultStatus split planning 取り込み + ABCD 完成度境界の確認
+
+- **PR #74** (`docs(planning): land ResultStatus split planning + pin Brief 8
+  boundary`、 merge commit `9679a9b`): 5/9 branch 残置の `19e47bd`
+  (`docs/brief_resultstatus_planning.md`) を main 取り込み。 取り込み際の
+  audit で Brief 8 (Authoring Surface、 PR #73) が 5/9 以降に landed して
+  おり working title 衝突 + 設計射程 overlap を発見、 §1b "Boundary with
+  Brief 8" 4 節を新設してから取り込み: §1b.1 error class boundary 表
+  (semantic hazard = Advisor / syntactic-type = Validator) / §1b.2 INV-1
+  framing (D2 は malformed-input domain 縮小、 INV-1 は well-formed input
+  domain 要求) / §1b.3 ADVISORY-S1 文言更新 follow-up を D1-4 PR で call out
+  / §1b.4 着地順序 open question。 同 PR で CLAUDE.md docs table + README
+  Planning (open) + design.md §24 PLANNING に planning doc 登録。 main 直
+  push は server 403 で denied、 user 「PR 可」 で経路切替。 後半で
+  **ABCD 完成度境界の確認**: post-ABCD で「product 機能 ship-blocking gap
+  は消える」 / 「外部 readiness (配布 + 文書 + community) は別軸」 という
+  分離 framing で、 半年強の壁打ちが ABCD という形に蒸留された節目を言語化
+- **(参考) PR #73** (`docs/brief_8_planning.md` 新設、 2026-05-09 後半に
+  merge): Brief 8 (Authoring Surface) planning。 4 CSCI 分割 (CSCI-41 docs
+  / CSCI-43 `target-doctor` / CSCI-42 `init --recipe` / CSCI-44
+  `target-catalog`)、 推奨着地順 41 → 43 → 42 → 44、 §12.3 で Brief 7 (SSP)
+  より先発行を確定。 5/10 / 5/11 は本リポジトリで session 不在、 本 STATUS
+  refresh 時に soak inventory として確認
+
 ### 2026-05-09 — 緊急 perf brief 2 連続 + ResultStatus split planning + Brief D1-2 起草
 
 - **PR #70** (D2-1, `perf(tests): switch tests/cli to in-process invocation`):
@@ -165,27 +189,88 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 次の発行順序
 
-- **D1-2. `E_OPERATOR_TARGET_MISMATCH` を compile-time 化**(ResultStatus split
-  Brief D1 系の本体実装第 1 段、 既起草): `compiler/operator_schema.py` 新規
-  + `_validate_target_svp_values` 拡張で (kind, operator-class, path-domain) の
+P2.5 完走 + 3 planning (Brief 7 / Brief 8 / ResultStatus split) すべて main
+landed の状態。 ABCD = 「中身の完成」 4 軸として整理 (`2026-05-12.md` 参照)、
+ABCD 完走で product 機能の ship-blocking gap が消える。
+
+### A. ResultStatus split(planning merged 2026-05-12 PR #74、 implementation 4 PR)
+
+- **A-1. D1-2. `E_OPERATOR_TARGET_MISMATCH` を compile-time 化**(本体実装
+  第 1 段、 **brief 起草済**): `compiler/operator_schema.py` 新規 +
+  `_validate_target_svp_values` 拡張で (kind, operator-class, path-domain) の
   3 ルール違反を `CompileError` として reject。 evaluator 3 emit site
   (`:255 / :287 / :309`) を defense-in-depth コメント追記で残置(挙動不変)。
-  次セッション開始時に user → Codex paste で発行可。 brief 文章は 2026-05-09
-  session log 参照、 planning は `docs/brief_resultstatus_planning.md`(branch
-  `claude/daily-tasks-cbQj7` の `19e47bd` に残置、 同 brief 投入時に main へ取り込み)
-- **B. Brief 7 (SSP v0.1)**: Semantic Security Protocol。Brief 5 完了済 →
-  CSCI-36〜40 として発行可能。planning は `docs/brief_7_planning.md` で
-  merged 済み
-- **C. P2 残課題の brief 化**: Lock violation 即 fail(§8.2)/ Performance
-  budget per-extractor timeout(§18)/ Hash trail per-extractor version(§10)
-- **E. ResultStatus 概念モデル更新**(弱点 ③): `UNKNOWN` を authoring error
-  と extractor failure に分離。**C+B 仮固定**で planning 完了
-  (`docs/brief_resultstatus_planning.md`、 branch 残置)、 D1-2〜D1-4 + D3 の
-  5 PR 分割確定。 D1-2 は本表 §D1-2 として独立項目化、 D1-3 / D1-4 / D3 は本
-  項目内 sub-task として継続
-- **D2-3. `pytest-xdist` 並列化判定**(deferred): D2-2 で Windows wallclock
-  264.92s → 181.61s (-31.4%) で <150s 未達も実用閾値クリア。 ROI 低、 別日に
-  取って単独完結が筋。 必要性は user 判断
+  次セッション開始時に user → Codex paste で発行可。 brief 文章は
+  `2026-05-09.md` 末尾、 planning は `docs/brief_resultstatus_planning.md`
+- **A-2. D1-3. `E_TYPE_MISMATCH` を compile-time 化**: 11 operators.py emit
+  site のうち observed-side ~95% + expected-side 100% を CompileError 化。
+  brief 未起草。 planning §4.5 / §5 参照
+- **A-3. D1-4. `results[].unknown_cause` optional field + 配線**: aggregate
+  / repair emitter / SARIF / GH Actions / human / json formatter wiring +
+  authoring-cause を verdict FAIL に倒す。 brief 未起草
+- **A-4. D3. `validate-plan` v1→v2**: `risk_summary.authoring_errors` を
+  `would_violate` から分離 + adapter rendering 更新 (claude-code / cursor /
+  codex)。 brief 未起草
+
+### B. Brief 8(Authoring Surface、 planning merged 2026-05-09 PR #73、 implementation 4 PR)
+
+推奨着地順 41 → 43 → 42 → 44(`docs/brief_8_planning.md §12.2`)。
+
+- **B-1. CSCI-41. 設計文書追記**(docs only): `docs/target_authoring_surface.md`
+  新設、 §23.3.1 surface 配属の実装側追記。 brief 未起草
+- **B-2. CSCI-43. `semantic-ci target-doctor`**: 6 advisory (D1/D3/D4/P1/P2/S1)
+  検出、 verdict 不参加、 `tests/architecture/test_surface_isolation.py` 新設。
+  brief 未起草
+- **B-3. CSCI-42. `semantic-ci init --recipe --from-*`**: PR body / labels /
+  commits / issue から target.yaml 生成 + `authorship.generation_metadata`
+  自動記録。 brief 未起草
+- **B-4. CSCI-44. `semantic-ci target-catalog`**: 全 operator / template /
+  match schema を機械可読 + human で出力(AI assistant / IDE 拡張用)。
+  brief 未起草
+
+### C. Brief 7(SSP v0.1、 planning merged 2026-05-06 PR #50、 implementation 5 PR)
+
+順序: CSCI-36 → 37 → (38 ∥ 39) → 40(`docs/brief_7_planning.md §6`)。
+Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
+
+- **C-1. CSCI-36. `docs/ssp_protocol.md` v0.1 spec**(docs only、 500-700 行):
+  起草時 `docs/brief_7_planning.md §11` checklist + AGENTS.md `Forward Design
+  Note: Brief 7 / SSP v0.1` を逐語参照
+- **C-2. CSCI-37. envelope schema + delta engine core**: Pydantic model + JSON
+  Schema + 5 要素 fingerprint
+- **C-3. CSCI-38. SemgrepAdapter** (SAST): AST-aware fp + audit 5 落とし穴回帰
+- **C-4. CSCI-39. pip-audit Adapter** (SCA): lockfile parser + advisory db hash
+- **C-5. CSCI-40. `semantic-ci ssp` subcommand 群**: ssp-to-sarif 変換 + e2e
+
+### D. P2 残課題(planning なし、 brief 化が必要、 3 件)
+
+`design.md §25` P2 Brief 群:
+
+- **D-1. Lock violation 即 fail**(§8.2 / Brief 3 #8): `lock` operator
+  完全実装の一部として violation 検出と同時に hard fail
+- **D-2. Performance budget per-extractor timeout**(§18 / Brief 3 #5):
+  巨大 repo の extractor runaway 保護、 incremental extraction の foundation
+- **D-3. Hash trail per-extractor version**(§10 / Brief 3 #9 残部):
+  P3a empirical alignment の reproducibility 担保(同 input → 同 output を
+  semantic-ci version またぎで保証)
+
+### Sequencing decisions
+
+- **Brief 8 vs Brief 7**: Brief 8 先(`brief_8_planning.md §12.3` 確定)
+- **Brief 8 vs ResultStatus split**: open(`brief_resultstatus_planning.md
+  §1b.4` で user 判断に残置、 3 option: Brief 8 先 / ResultStatus split 先
+  / 並列)
+- **D は A/B/C と独立**: いつ挟んでも良い、 ただし P3a (Action 配布) を狙う
+  なら D-3 hash trail が前提
+
+### 直近最短経路
+
+- **D1-2 paste**(brief 起草済、 `2026-05-09.md` 参照)— user → Codex paste
+  1 回で発進可能、 ResultStatus split が走り始める
+- **CSCI-41 起草**(Brief 8 docs only) — 半日〜1 日、 Brief 8 が走り始める
+- 並列実行可: A と B は touch する file が disjoint(A = compiler / evaluator
+  / risk_summary、 B = 新 subcommand + 新 module)、 並列レビュー負荷だけが
+  trade-off
 
 ## Frozen / Deferred
 
@@ -195,3 +280,12 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 - **Brief 8+ deferred**: spec quality metrics(§19)/ suite packaging(§20)/
   override 機構(Brief 3 #3)/ Round-trip log(§10.3 / Brief 3 #10)/
   orchestrator 観測応用 / Brief 6 解凍判断
+- **D2-3. `pytest-xdist` 並列化**(deferred): D2-2 で Windows wallclock
+  264.92s → 181.61s (-31.4%) で <150s 未達も実用閾値クリア。 ROI 低、 別日に
+  取って単独完結が筋。 必要性は user 判断
+- **post-ABCD: 外部 readiness phase**(planning なし): 配布チャネル
+  (GitHub Action / PyPI / semver 1.0)+ onboarding (Quickstart / 比較
+  positioning / example gallery)+ community (CONTRIBUTING / SECURITY /
+  issue template)+ 外部 user feedback loop。 `2026-05-12.md` で「OSS 全体
+  ~50%、 ABCD では埋まらない別軸」 として framing、 ABCD 完走後に Phase X
+  として明示化を検討

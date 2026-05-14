@@ -107,6 +107,7 @@ def _sarif_result(
         "properties": {
             "status": result["status"],
             "error_code": result["error_code"],
+            "unknown_cause": result.get("unknown_cause"),
             "target": result["target"],
             "operator": result["operator"],
         },

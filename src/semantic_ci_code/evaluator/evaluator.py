@@ -52,6 +52,7 @@ from semantic_ci_code.framework.constraint_types import (
 __all__ = [
     "ConstraintResult",
     "ResultStatus",
+    "UnknownCause",
     "Verdict",
     "VerdictResult",
     "evaluate_constraints",
@@ -98,6 +99,38 @@ class VerdictResult(StrEnum):
     FAIL = "fail"
 
 
+class UnknownCause(StrEnum):
+    """Diagnostic cause attached to ``ResultStatus.UNKNOWN`` results.
+
+    Splits the original conflated ``UNKNOWN`` value into a small set of
+    diagnosable failure classes (Brief D1-4 of the ResultStatus split
+    planning, ``docs/brief_resultstatus_planning.md`` §3 D1):
+
+    - ``AUTHORING`` — the constraint is malformed. After Brief D1-2 and
+      D1-3 nearly all authoring errors are rejected at compile time;
+      this cause is emitted only by the residual defense-in-depth
+      branches in the evaluator and operators (reachable solely from
+      direct ``CompiledConstraint`` construction, e.g. evaluator tests).
+      Authoring-cause UNKNOWN forces ``VerdictResult.FAIL`` regardless
+      of ``unknown_policy`` (planning §3 D2).
+    - ``EXTRACTION`` — the extractor produced partial state and a
+      schema-valid path resolves to ``None`` at runtime. Routed by
+      ``unknown_policy`` (the original intent of that policy per
+      ``docs/code_semantic_ci_design.md`` §5.4).
+    - ``OPEN_RUNTIME`` — the path lives in an open schema region
+      (``python_specific.*`` / ``typescript_specific.*``) and resolves
+      to a missing key at runtime. Routed by ``unknown_policy``.
+    - ``EVALUATOR_INTERNAL`` — the two defensive ``except TypeError``
+      catch-alls in ``evaluator/operators.py`` tripped. Near-bug;
+      routed by ``unknown_policy`` for backward compatibility.
+    """
+
+    AUTHORING = "authoring"
+    EXTRACTION = "extraction"
+    OPEN_RUNTIME = "open_runtime"
+    EVALUATOR_INTERNAL = "evaluator_internal"
+
+
 @dataclass(frozen=True)
 class ConstraintResult:
     constraint_id: str
@@ -112,6 +145,7 @@ class ConstraintResult:
     status: ResultStatus
     error_code: str | None
     evidence: tuple[tuple[str, JsonValue], ...]
+    unknown_cause: UnknownCause | None = None
 
 
 @dataclass(frozen=True)
@@ -184,11 +218,14 @@ def _evaluate_constraint(
 
     segments = _target_segments(constraint.target)
     if segments is None:
+        # Defense-in-depth: the syntactic ``_TARGET_PATTERN`` check is
+        # also enforced at compile time. Authoring cause.
         return _result(
             constraint,
             ResultStatus.UNKNOWN,
             E_PATH_UNRESOLVED,
             target=constraint.target,
+            unknown_cause=UnknownCause.AUTHORING,
         )
     skipped_dimension = _skipped_dimension(segments, extracted_dimensions)
     if skipped_dimension is not None:
@@ -226,11 +263,13 @@ def _evaluate_constraint(
     except AssertionError:
         raise
     except Exception as exc:
+        # Defensive catch-all for evaluator-internal raises; near-bug.
         return _result(
             constraint,
             ResultStatus.UNKNOWN,
             E_TYPE_MISMATCH,
             error=exc.__class__.__name__,
+            unknown_cause=UnknownCause.EVALUATOR_INTERNAL,
         )
 
     raise AssertionError(f"Unknown constraint kind: {constraint.kind}")
@@ -243,11 +282,14 @@ def _evaluate_state_constraint(
     candidate: CodeState,
 ) -> ConstraintResult:
     if segments[0] not in _CODE_STATE_FIELDS:
+        # Defense-in-depth: path-domain check is also enforced at
+        # compile time by ``compiler.path_schema``. Authoring cause.
         return _result(
             constraint,
             ResultStatus.UNKNOWN,
             E_PATH_UNRESOLVED,
             target=constraint.target,
+            unknown_cause=UnknownCause.AUTHORING,
         )
     # Defense-in-depth: this combination (state-kind + baseline operator) is
     # rejected at compile time by ``compiler.operator_schema``. The branch
@@ -260,13 +302,23 @@ def _evaluate_state_constraint(
             ResultStatus.UNKNOWN,
             E_OPERATOR_TARGET_MISMATCH,
             target=constraint.target,
+            unknown_cause=UnknownCause.AUTHORING,
         )
     if constraint.operator not in PURE_OPERATORS:
         raise AssertionError(f"Unhandled state operator: {constraint.operator}")
 
     resolved, error_code = resolve_path(candidate, segments)
     if resolved is UNRESOLVED:
-        return _result(constraint, ResultStatus.UNKNOWN, error_code, target=constraint.target)
+        # Runtime path resolution failure on a schema-valid path means
+        # the extractor didn't populate this branch (or it was an open
+        # dimension with a missing key).
+        return _result(
+            constraint,
+            ResultStatus.UNKNOWN,
+            error_code,
+            target=constraint.target,
+            unknown_cause=_resolved_unknown_cause(constraint.target),
+        )
     outcome = evaluate_pure_operator(
         constraint.operator,
         resolved,
@@ -297,13 +349,20 @@ def _evaluate_delta_constraint(
                 ResultStatus.UNKNOWN,
                 E_OPERATOR_TARGET_MISMATCH,
                 target=constraint.target,
+                unknown_cause=UnknownCause.AUTHORING,
             )
         if constraint.operator not in PURE_OPERATORS:
             raise AssertionError(f"Unhandled delta operator: {constraint.operator}")
 
         resolved, error_code = resolve_path(delta, segments)
         if resolved is UNRESOLVED:
-            return _result(constraint, ResultStatus.UNKNOWN, error_code, target=constraint.target)
+            return _result(
+                constraint,
+                ResultStatus.UNKNOWN,
+                error_code,
+                target=constraint.target,
+                unknown_cause=_resolved_unknown_cause(constraint.target),
+            )
         outcome = evaluate_pure_operator(
             constraint.operator,
             resolved,
@@ -324,6 +383,7 @@ def _evaluate_delta_constraint(
                 ResultStatus.UNKNOWN,
                 E_OPERATOR_TARGET_MISMATCH,
                 target=constraint.target,
+                unknown_cause=UnknownCause.AUTHORING,
             )
 
         baseline_value, baseline_error = resolve_path(baseline, segments)
@@ -334,6 +394,7 @@ def _evaluate_delta_constraint(
                 ResultStatus.UNKNOWN,
                 baseline_error or candidate_error,
                 target=constraint.target,
+                unknown_cause=_resolved_unknown_cause(constraint.target),
             )
         outcome = evaluate_baseline_operator(
             constraint.operator,
@@ -343,7 +404,15 @@ def _evaluate_delta_constraint(
         )
         return _from_operator_outcome(constraint, outcome)
 
-    return _result(constraint, ResultStatus.UNKNOWN, E_PATH_UNRESOLVED, target=constraint.target)
+    # Defense-in-depth: target's first segment is on neither domain.
+    # Compile catches this; reach implies direct CompiledConstraint use.
+    return _result(
+        constraint,
+        ResultStatus.UNKNOWN,
+        E_PATH_UNRESOLVED,
+        target=constraint.target,
+        unknown_cause=UnknownCause.AUTHORING,
+    )
 
 
 def _delta_for_constraint(
@@ -516,11 +585,16 @@ def _from_operator_outcome(
     constraint: CompiledConstraint,
     outcome,
 ) -> ConstraintResult:
+    # operators.py uses string causes (it cannot import UnknownCause from
+    # this module without forming a cycle); convert to the enum at the
+    # boundary.
+    cause = UnknownCause(outcome.unknown_cause) if outcome.unknown_cause else None
     return _result(
         constraint,
         ResultStatus(outcome.status),
         outcome.error_code,
         evidence=outcome.evidence,
+        unknown_cause=cause,
     )
 
 
@@ -537,6 +611,13 @@ def _aggregate(results: tuple[ConstraintResult, ...]) -> VerdictResult:
             else:
                 raise NotImplementedError(f"unhandled severity: {result.severity!r}")
         elif result.status is ResultStatus.UNKNOWN:
+            # Authoring-cause UNKNOWN is invalid input, not undecided
+            # judgment, so it forces FAIL irrespective of unknown_policy
+            # (planning §3 D2). After Brief D1-2 / D1-3 this path is
+            # only reachable via direct CompiledConstraint construction
+            # (e.g. evaluator tests).
+            if result.unknown_cause is UnknownCause.AUTHORING:
+                return VerdictResult.FAIL
             if result.unknown_policy is UnknownPolicy.FAIL:
                 return VerdictResult.FAIL
             if result.unknown_policy is UnknownPolicy.REPAIR:
@@ -551,6 +632,7 @@ def _result(
     error_code: str | None,
     *,
     evidence: tuple[tuple[str, JsonValue], ...] = (),
+    unknown_cause: UnknownCause | None = None,
     **extra_evidence: JsonValue,
 ) -> ConstraintResult:
     merged_evidence = tuple(
@@ -559,6 +641,8 @@ def _result(
             key=lambda item: item[0],
         )
     )
+    # unknown_cause is meaningful only when status is UNKNOWN.
+    cause = unknown_cause if status is ResultStatus.UNKNOWN else None
     return ConstraintResult(
         constraint_id=constraint.id,
         source=constraint.source,
@@ -572,7 +656,22 @@ def _result(
         status=status,
         error_code=error_code,
         evidence=merged_evidence,
+        unknown_cause=cause,
     )
+
+
+def _resolved_unknown_cause(target: str) -> UnknownCause:
+    """Cause for runtime path-resolution failures at evaluate time.
+
+    Open-dimension paths fall under ``open_runtime``; everything else is
+    ``extraction`` (the extractor populated the parent as None or omitted
+    the key the constraint reads).
+    """
+
+    head = target.partition(".")[0]
+    if head in {"python_specific", "typescript_specific"}:
+        return UnknownCause.OPEN_RUNTIME
+    return UnknownCause.EXTRACTION
 
 
 def _target_segments(target: str) -> tuple[str, ...] | None:

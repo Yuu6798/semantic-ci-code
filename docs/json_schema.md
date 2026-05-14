@@ -71,7 +71,7 @@ bump beyond the current CLI schema version.
 | `allowed_secondary_kinds` | Target secondary change kinds. Empty for `observe`. |
 | `target_authorship` | Target authorship metadata, or `null` when omitted or for `observe`. Semantic CI reports this metadata but does not validate signatures in P1. |
 | `summary` | Counts by repair category plus satisfied and skipped constraints. `null` for `observe`. |
-| `results` | Serialized evaluator `ConstraintResult` entries in evaluation order. |
+| `results` | Serialized evaluator `ConstraintResult` entries in evaluation order. Each entry includes an optional `unknown_cause` field populated only when `status == "unknown"` (values: `authoring`, `extraction`, `open_runtime`, `evaluator_internal`); `null` otherwise. See `docs/brief_resultstatus_planning.md` §3 D1. |
 | `repair_plan` | Serialized repair plan, or `null` for `observe`. `verdict == "pass"` does not imply `repair_plan.instructions == []`: violations of `severity: info` constraints surface as `category: "info"` instructions while the verdict stays `pass` (Advisor channel; see `code_semantic_ci_design.md §23.3`). |
 | `code_state` | Full `CodeState` dump for `observe`; otherwise `null`. |
 | `files_touched` | Git diff file count. Zero for `observe` and `compare`. |
@@ -248,6 +248,25 @@ meaning requires a schema version bump. Adding a new top-level field to an
 existing envelope also requires a bump. Separate envelopes, such as `compile`,
 may use the same version when they are explicitly keyed by `subcommand`.
 
+### Nested optional diagnostic fields
+
+Adding a new optional field nested under an existing array element or sub-object
+(for example, `results[].unknown_cause`, or future diagnostic fields under
+`risk_summary` items) does NOT require a schema version bump as long as the
+field is genuinely optional and existing readers can ignore it. The bump
+requirement still applies to:
+
+- adding, removing, or changing the meaning of an existing field;
+- adding a new top-level field on the envelope;
+- adding, removing, or changing the meaning of an enum value already in use.
+
+This exception exists because the verdict / compile envelopes accumulate
+diagnostic surfaces as the engine evolves (Brief D1-4 added `results[].unknown_cause`
+without bumping `schema_version` from `"5"`). If a downstream tool starts
+*depending on* such a field being present, that tool effectively pins a strict
+schema parse; the brief that flips the dependency should revisit whether to
+bump the envelope version.
+
 ## Version History
 
 | Version | Envelope | Change |
@@ -259,6 +278,7 @@ may use the same version when they are explicitly keyed by `subcommand`.
 | `3` | verdict, compile | Added top-level `cache` stats and aligned both envelopes on schema version `"3"`. |
 | `4` | verdict, compile | Added `target_authorship` to verdict envelopes and `compiled_target.authorship` to compile envelopes. |
 | `5` | verdict, compile | Added Match Schema partial-record semantics for set operators, compile-time validation for partial dict expected records, flat projection aliases, and `evidence.matched` for `excludes_all` violations. |
+| `5` | verdict | Brief D1-4: added optional `results[].unknown_cause` and `repair_plan.instructions[].unknown_cause` (values: `authoring` / `extraction` / `open_runtime` / `evaluator_internal`). Nested optional diagnostic field; no bump per the compatibility exception above. Authoring-cause UNKNOWN routes to `verdict: "fail"` regardless of `unknown_policy`. |
 | `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 

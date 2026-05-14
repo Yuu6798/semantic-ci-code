@@ -29,7 +29,13 @@ from typing import Final
 
 from semantic_ci_code.compiler import ConstraintSource
 from semantic_ci_code.domain.state_schema import JsonValue
-from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict, VerdictResult
+from semantic_ci_code.evaluator import (
+    ConstraintResult,
+    ResultStatus,
+    UnknownCause,
+    Verdict,
+    VerdictResult,
+)
 from semantic_ci_code.framework.constraint_types import (
     ConstraintKind,
     Operator,
@@ -100,6 +106,7 @@ class RepairInstruction:
     missing: tuple[JsonValue, ...]
     extra: tuple[JsonValue, ...]
     extra_evidence: tuple[tuple[str, JsonValue], ...]
+    unknown_cause: UnknownCause | None = None
 
     def __hash__(self) -> int:
         return hash(
@@ -123,6 +130,7 @@ class RepairInstruction:
                 _hashable_json(self.missing),
                 _hashable_json(self.extra),
                 _hashable_json(self.extra_evidence),
+                self.unknown_cause,
             )
         )
 
@@ -203,6 +211,7 @@ def _instruction_or_none(result: ConstraintResult) -> RepairInstruction | None:
         missing=evidence.missing,
         extra=evidence.extra,
         extra_evidence=evidence.extra_evidence,
+        unknown_cause=result.unknown_cause,
     )
 
 
@@ -219,6 +228,12 @@ def _category_or_none(result: ConstraintResult) -> RepairCategory | None:
             return RepairCategory.INFO
 
     if result.status is ResultStatus.UNKNOWN:
+        # Authoring-cause UNKNOWN forces fix_required regardless of
+        # unknown_policy: a malformed spec is invalid input that must be
+        # corrected before the generator can iterate on the implementation
+        # (planning §3 D2, §3 D3 two-step instruction).
+        if result.unknown_cause is UnknownCause.AUTHORING:
+            return RepairCategory.FIX_REQUIRED
         if result.unknown_policy is UnknownPolicy.FAIL:
             return RepairCategory.FIX_REQUIRED
         if result.unknown_policy is UnknownPolicy.REPAIR:
@@ -296,9 +311,10 @@ def _message(result: ConstraintResult, repair_code: str) -> str:
         "R_TYPE_MISMATCH",
         "R_OPERATOR_TARGET_MISMATCH",
     }:
+        cause_suffix = f", cause={result.unknown_cause.value}" if result.unknown_cause else ""
         return (
             f"{result.constraint_id}: cannot evaluate ({result.error_code}); "
-            f"target={result.target}, operator={result.operator.value}."
+            f"target={result.target}, operator={result.operator.value}{cause_suffix}."
         )
 
     if repair_code in {"R_UNSUPPORTED_OPERATOR", "R_UNSUPPORTED_REPAIR_KIND"}:

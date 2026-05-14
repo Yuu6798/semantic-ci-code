@@ -4,7 +4,7 @@ from typing import Any
 
 from semantic_ci_code.compiler import ConstraintSource
 from semantic_ci_code.domain.state_schema import JsonValue
-from semantic_ci_code.evaluator import ResultStatus, VerdictResult
+from semantic_ci_code.evaluator import ResultStatus, UnknownCause, VerdictResult
 from semantic_ci_code.framework.constraint_types import (
     ConstraintKind,
     Operator,
@@ -57,7 +57,14 @@ def _deserialize_instruction(payload: object) -> RepairInstruction:
         missing=_tuple_field(payload, "missing"),
         extra=_tuple_field(payload, "extra"),
         extra_evidence=_extra_evidence(payload),
+        unknown_cause=_optional_unknown_cause(payload.get("unknown_cause")),
     )
+
+
+def _optional_unknown_cause(value: object) -> UnknownCause | None:
+    if value is None:
+        return None
+    return UnknownCause(value)
 
 
 def _required(payload: dict[str, Any], key: str) -> Any:

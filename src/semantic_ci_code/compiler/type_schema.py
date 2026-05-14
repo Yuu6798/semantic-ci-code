@@ -175,29 +175,46 @@ def check_type_compatibility(
 ) -> None:
     """Validate the (target, operator, expected) triple against static type.
 
-    Categories on open dimensions (UNKNOWN_OPEN) bypass the check; element
-    matching inside ``tuple[JsonValue, ...]`` is intentionally out of
-    scope (planning §4.6 Q3: shallow check only).
+    The two sides are independently classifiable:
+
+    - **Observed-side** depends on the target's static category. Open
+      dimensions (UNKNOWN_OPEN) cannot be proven at compile so the
+      observed-side check is bypassed for them and a residual shape
+      mismatch is routed as ``open_runtime`` at evaluate-time.
+    - **Expected-side** depends only on the YAML literal under
+      ``constraints[i].expected``; the observed type is irrelevant. We
+      therefore validate the expected literal **even for open targets**
+      so a malformed ``expected: "five"`` against a numeric operator is
+      caught as an authoring error at compile (planning §3 D1 / D2 —
+      malformed input forces ``FAIL``, not ``unknown_policy`` routing).
+
+    Element matching inside ``tuple[JsonValue, ...]`` is intentionally
+    out of scope (planning §4.6 Q3: shallow check only).
     """
 
     category = category_for_target(target)
-    if category is TargetCategory.UNKNOWN_OPEN:
-        return
 
-    if operator in _COLLECTION_OPERATORS and category not in _COLLECTION_CATEGORIES:
-        raise TypeMismatch(
-            _observed_collection_message(target, operator, category),
-            side=TypeMismatchSide.OBSERVED,
-        )
+    # Observed-side: only run when the target has a statically known
+    # category. UNKNOWN_OPEN observed mismatches are surfaced at runtime
+    # as ``open_runtime`` (see ``evaluator._from_operator_outcome``).
+    if category is not TargetCategory.UNKNOWN_OPEN:
+        if operator in _COLLECTION_OPERATORS and category not in _COLLECTION_CATEGORIES:
+            raise TypeMismatch(
+                _observed_collection_message(target, operator, category),
+                side=TypeMismatchSide.OBSERVED,
+            )
 
-    if (
-        operator in _NUMERIC_OPERATORS or operator is Operator.WITHIN_RANGE
-    ) and category is not TargetCategory.SCALAR_NUMBER:
-        raise TypeMismatch(
-            _observed_numeric_message(target, operator, category),
-            side=TypeMismatchSide.OBSERVED,
-        )
+        if (
+            operator in _NUMERIC_OPERATORS or operator is Operator.WITHIN_RANGE
+        ) and category is not TargetCategory.SCALAR_NUMBER:
+            raise TypeMismatch(
+                _observed_numeric_message(target, operator, category),
+                side=TypeMismatchSide.OBSERVED,
+            )
 
+    # Expected-side: unconditional. Literal shape is independent of the
+    # target category, so we catch malformed expected literals at
+    # compile even when the target is an open dimension.
     _check_expected_shape(target=target, operator=operator, expected=expected)
 
 

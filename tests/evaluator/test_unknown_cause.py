@@ -249,6 +249,66 @@ def test_extraction_cause_respects_unknown_policy(policy: UnknownPolicy, expecte
 # --- serialization & non-UNKNOWN bypass ------------------------------------
 
 
+def test_open_target_type_mismatch_is_retagged_open_runtime():
+    # Regression for PR #78 review (Codex P2): a constraint that compiles
+    # because its target is an open dimension (UNKNOWN_OPEN at compile)
+    # but whose runtime observed value does not match the operator's
+    # required shape reaches ``_unknown_type_mismatch`` from well-formed
+    # target.yaml input. The default ``authoring`` cause from operators.py
+    # must be re-tagged ``open_runtime`` at ``_from_operator_outcome`` so
+    # ``unknown_policy`` still governs verdict routing for such results.
+    result = _evaluate(
+        _constraint(
+            target="python_specific.score",
+            operator=Operator.LESS_THAN,
+            expected=5,
+            unknown_policy=UnknownPolicy.WARN,
+        ),
+        candidate=CodeState(python_specific={"score": "not_a_number"}),
+    )
+
+    assert result.status is ResultStatus.UNKNOWN
+    assert result.error_code == "E_TYPE_MISMATCH"
+    assert result.unknown_cause is UnknownCause.OPEN_RUNTIME
+
+
+@pytest.mark.parametrize(
+    "policy,expected",
+    [
+        (UnknownPolicy.FAIL, VerdictResult.FAIL),
+        (UnknownPolicy.REPAIR, VerdictResult.REPAIR),
+        (UnknownPolicy.WARN, VerdictResult.PASS),
+        (UnknownPolicy.IGNORE, VerdictResult.PASS),
+    ],
+)
+def test_open_target_type_mismatch_respects_unknown_policy(
+    policy: UnknownPolicy, expected: VerdictResult
+):
+    target = CompiledTarget(
+        intent="t",
+        primary_kind=ChangeKind.FEATURE,
+        allowed_secondary_kinds=(),
+        scope=(),
+        constraints=(
+            _constraint(
+                target="python_specific.score",
+                operator=Operator.LESS_THAN,
+                expected=5,
+                unknown_policy=policy,
+            ),
+        ),
+    )
+    verdict = evaluate_constraints(
+        target,
+        CodeStateDelta(),
+        baseline=CodeState(),
+        candidate=CodeState(python_specific={"score": "not_a_number"}),
+    )
+
+    assert verdict.result is expected
+    assert verdict.results[0].unknown_cause is UnknownCause.OPEN_RUNTIME
+
+
 def test_non_unknown_result_has_no_cause():
     # Satisfied / violated / skipped results never carry unknown_cause.
     result = _evaluate(

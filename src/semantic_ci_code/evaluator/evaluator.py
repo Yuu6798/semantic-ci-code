@@ -588,7 +588,19 @@ def _from_operator_outcome(
     # operators.py uses string causes (it cannot import UnknownCause from
     # this module without forming a cycle); convert to the enum at the
     # boundary.
-    cause = UnknownCause(outcome.unknown_cause) if outcome.unknown_cause else None
+    if outcome.unknown_cause is None:
+        cause: UnknownCause | None = None
+    else:
+        cause = UnknownCause(outcome.unknown_cause)
+        # ``_unknown_type_mismatch`` defaults to ``authoring`` because the
+        # 11 user-facing emit sites are unreachable from a typed path
+        # post-D1-3. Open-dimension targets are intentionally exempted
+        # from the type-schema check (their value shape cannot be proven
+        # at compile), so a runtime shape mismatch on them DOES come from
+        # well-formed target.yaml input. Re-tag those as ``open_runtime``
+        # so they keep ``unknown_policy`` routing per planning §3 D2.
+        if cause is UnknownCause.AUTHORING and _is_open_target(constraint.target):
+            cause = UnknownCause.OPEN_RUNTIME
     return _result(
         constraint,
         ResultStatus(outcome.status),
@@ -660,6 +672,13 @@ def _result(
     )
 
 
+def _is_open_target(target: str) -> bool:
+    """Return True for ``python_specific.*`` / ``typescript_specific.*``."""
+
+    head = target.partition(".")[0]
+    return head in {"python_specific", "typescript_specific"}
+
+
 def _resolved_unknown_cause(target: str) -> UnknownCause:
     """Cause for runtime path-resolution failures at evaluate time.
 
@@ -668,10 +687,7 @@ def _resolved_unknown_cause(target: str) -> UnknownCause:
     the key the constraint reads).
     """
 
-    head = target.partition(".")[0]
-    if head in {"python_specific", "typescript_specific"}:
-        return UnknownCause.OPEN_RUNTIME
-    return UnknownCause.EXTRACTION
+    return UnknownCause.OPEN_RUNTIME if _is_open_target(target) else UnknownCause.EXTRACTION
 
 
 def _target_segments(target: str) -> tuple[str, ...] | None:

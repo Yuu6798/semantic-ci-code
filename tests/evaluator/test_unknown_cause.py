@@ -141,17 +141,38 @@ def test_authoring_cause_on_delta_kind_with_pure_on_state_path():
     assert result.unknown_cause is UnknownCause.AUTHORING
 
 
-def test_extraction_cause_on_runtime_unresolved_state_path():
-    # ``coverage`` defaults to None on CodeState; ``coverage.line`` resolves
-    # to UNRESOLVED at runtime via parent-is-None. Cause is EXTRACTION
-    # (the extractor populated parent as None / omitted the dimension).
+def test_extraction_cause_on_runtime_unresolved_schema_valid_path():
+    # ``coverage_delta`` defaults to None on CodeStateDelta;
+    # ``coverage_delta.line`` is a schema-valid delta path
+    # (CoverageDelta.line walked into the schema corpus) that resolves
+    # to UNRESOLVED via parent-is-None. Cause is EXTRACTION (the
+    # extractor populated parent as None / omitted the dimension).
     result = _evaluate(
-        _constraint(target="coverage.line"),
-        candidate=CodeState(coverage=None),
+        _constraint(
+            kind=ConstraintKind.DELTA,
+            target="coverage_delta.line",
+            operator=Operator.LESS_THAN,
+            expected=5,
+        ),
+        delta=CodeStateDelta(coverage_delta=None),
     )
 
     assert result.error_code == "E_PATH_UNRESOLVED"
     assert result.unknown_cause is UnknownCause.EXTRACTION
+
+
+def test_authoring_cause_on_runtime_unresolved_schema_invalid_subpath():
+    # Regression for PR #78 Codex P2 review (2nd round): a direct
+    # CompiledConstraint with a schema-invalid subpath (e.g.
+    # ``api_surface.fqn`` — element-level access through a tuple)
+    # bypasses ``compiler.path_schema`` and reaches the evaluator. The
+    # path_resolver returns UNRESOLVED at the invalid segment; classify
+    # as AUTHORING so ``unknown_policy: warn`` / ``ignore`` cannot pass
+    # a malformed spec.
+    result = _evaluate(_constraint(target="api_surface.fqn"))
+
+    assert result.error_code == "E_PATH_UNRESOLVED"
+    assert result.unknown_cause is UnknownCause.AUTHORING
 
 
 def test_open_runtime_cause_on_python_specific_subpath():
@@ -233,13 +254,21 @@ def test_extraction_cause_respects_unknown_policy(policy: UnknownPolicy, expecte
         primary_kind=ChangeKind.FEATURE,
         allowed_secondary_kinds=(),
         scope=(),
-        constraints=(_constraint(target="coverage.line", unknown_policy=policy),),
+        constraints=(
+            _constraint(
+                kind=ConstraintKind.DELTA,
+                target="coverage_delta.line",
+                operator=Operator.LESS_THAN,
+                expected=5,
+                unknown_policy=policy,
+            ),
+        ),
     )
     verdict = evaluate_constraints(
         target,
-        CodeStateDelta(),
+        CodeStateDelta(coverage_delta=None),
         baseline=CodeState(),
-        candidate=CodeState(coverage=None),
+        candidate=CodeState(),
     )
 
     assert verdict.result is expected

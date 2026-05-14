@@ -679,15 +679,49 @@ def _is_open_target(target: str) -> bool:
     return head in {"python_specific", "typescript_specific"}
 
 
+def _is_schema_valid_target(target: str) -> bool:
+    """Return True when ``target`` appears in the static schema corpus.
+
+    Both state and delta path domains are considered because a delta-kind
+    constraint may legitimately reference a CodeState path (baseline
+    operator semantics). Open-prefix matches are owned by
+    ``_is_open_target`` instead.
+
+    Imported lazily to keep ``evaluator.evaluator`` import-light at module
+    load (path_schema reflects on Pydantic models on first use).
+    """
+
+    from semantic_ci_code.compiler.path_schema import (
+        valid_delta_target_paths,
+        valid_state_target_paths,
+    )
+
+    return target in valid_state_target_paths() or target in valid_delta_target_paths()
+
+
 def _resolved_unknown_cause(target: str) -> UnknownCause:
     """Cause for runtime path-resolution failures at evaluate time.
 
-    Open-dimension paths fall under ``open_runtime``; everything else is
-    ``extraction`` (the extractor populated the parent as None or omitted
-    the key the constraint reads).
+    Three-way classification (planning §3 D1):
+
+    - Open-dimension paths (``python_specific.*`` / ``typescript_specific.*``)
+      → ``OPEN_RUNTIME`` (resolves to a missing key in an intentionally
+      open schema region; routed by ``unknown_policy``).
+    - Schema-valid paths that resolved to ``UNRESOLVED`` → ``EXTRACTION``
+      (the extractor populated parent as ``None`` or omitted the key the
+      constraint reads; routed by ``unknown_policy``).
+    - Schema-invalid paths reaching evaluate-time → ``AUTHORING``.
+      ``compiler.path_schema`` rejects these at compile, so they can
+      only arrive via direct ``CompiledConstraint`` construction. Per
+      planning §3 D1 / D2 these are malformed input and must force
+      ``FAIL`` regardless of ``unknown_policy``.
     """
 
-    return UnknownCause.OPEN_RUNTIME if _is_open_target(target) else UnknownCause.EXTRACTION
+    if _is_open_target(target):
+        return UnknownCause.OPEN_RUNTIME
+    if _is_schema_valid_target(target):
+        return UnknownCause.EXTRACTION
+    return UnknownCause.AUTHORING
 
 
 def _target_segments(target: str) -> tuple[str, ...] | None:

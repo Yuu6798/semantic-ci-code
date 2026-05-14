@@ -48,6 +48,22 @@ def test_state_kind_with_baseline_operator_raises():
     assert "'equals'" in message
 
 
+def test_state_kind_with_changed_operator_suggests_not_equals():
+    # Asymmetry guard: BASELINE_TO_PURE_HINT must contain both UNCHANGED
+    # and CHANGED so the two baseline boolean operators get parallel
+    # "Did you mean" hints.
+    with pytest.raises(OperatorTargetMismatch) as exc_info:
+        check_operator_target_compatibility(
+            kind=ConstraintKind.STATE,
+            target="api_surface",
+            operator=Operator.CHANGED,
+        )
+
+    message = str(exc_info.value)
+    assert "'changed'" in message
+    assert "'not_equals'" in message
+
+
 def test_delta_kind_with_baseline_operator_on_delta_path_raises():
     with pytest.raises(OperatorTargetMismatch) as exc_info:
         check_operator_target_compatibility(

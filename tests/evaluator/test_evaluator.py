@@ -621,10 +621,50 @@ def test_python_specific_none_dotted_access_returns_unknown_path_unresolved():
 
 
 def test_baseline_operator_on_delta_field_returns_operator_target_mismatch():
+    # Defense-in-depth: ``compiler.operator_schema`` rejects this triple at
+    # compile (Brief D1-2), but constructing ``CompiledConstraint`` directly
+    # (here, via ``delta_value_constraint``) bypasses the compiler. The
+    # evaluator branch in ``_evaluate_delta_constraint`` (delta-domain path
+    # + baseline operator) must still return a structured UNKNOWN rather
+    # than raising AssertionError.
     result = evaluate_one(
         delta_value_constraint(
             target="api_surface_delta.added",
             operator=Operator.EQUALS_BASELINE,
+        )
+    )
+
+    assert result.status is ResultStatus.UNKNOWN
+    assert result.error_code == "E_OPERATOR_TARGET_MISMATCH"
+
+
+def test_baseline_operator_on_state_kind_returns_operator_target_mismatch():
+    # Defense-in-depth for ``_evaluate_state_constraint``: state-kind with a
+    # baseline operator is rejected at compile (Brief D1-2). Direct
+    # ``CompiledConstraint`` construction must still produce a structured
+    # UNKNOWN result rather than an AssertionError.
+    result = evaluate_one(
+        constraint(
+            kind=ConstraintKind.STATE,
+            target="api_surface",
+            operator=Operator.EQUALS_BASELINE,
+        )
+    )
+
+    assert result.status is ResultStatus.UNKNOWN
+    assert result.error_code == "E_OPERATOR_TARGET_MISMATCH"
+
+
+def test_pure_operator_on_state_path_under_delta_kind_returns_operator_target_mismatch():
+    # Defense-in-depth for ``_evaluate_delta_constraint`` state-branch:
+    # delta-kind with a CodeState path and a pure operator is rejected at
+    # compile (Brief D1-2). Direct ``CompiledConstraint`` construction must
+    # still produce a structured UNKNOWN result.
+    result = evaluate_one(
+        constraint(
+            kind=ConstraintKind.DELTA,
+            target="imports",
+            operator=Operator.EQUALS,
         )
     )
 

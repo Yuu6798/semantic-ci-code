@@ -90,6 +90,7 @@ _BASELINE_TO_PURE_HINT: Mapping[Operator, Operator] = {
     Operator.NOT_EQUALS_BASELINE: Operator.NOT_EQUALS,
     Operator.SUPERSET_OF_BASELINE: Operator.SUPERSET_OF,
     Operator.UNCHANGED: Operator.EQUALS,
+    Operator.CHANGED: Operator.NOT_EQUALS,
 }
 
 _PURE_TO_BASELINE_HINT: Mapping[Operator, Operator] = {

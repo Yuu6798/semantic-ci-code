@@ -28,6 +28,10 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from semantic_ci_code.compiler.operator_schema import (
+    OperatorTargetMismatch,
+    check_operator_target_compatibility,
+)
 from semantic_ci_code.compiler.path_schema import (
     is_open_path,
     suggest_targets,
@@ -275,6 +279,7 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
             allowed = delta_paths
             domain_label = "CodeState/CodeStateDelta"
         if constraint.target in allowed or is_open_path(constraint.target):
+            _validate_operator_target(constraint, index=index, filename=filename)
             _validate_match_schema_expected(constraint, index=index, filename=filename)
             continue
         suggestions = suggest_targets(constraint.target, allowed)
@@ -336,6 +341,26 @@ def _compile_user_constraint(constraint: Constraint) -> CompiledConstraint:
         scope=constraint.scope,
         source=ConstraintSource.USER,
     )
+
+
+def _validate_operator_target(
+    constraint: Constraint,
+    *,
+    index: int,
+    filename: str,
+) -> None:
+    try:
+        check_operator_target_compatibility(
+            kind=ConstraintKind(constraint.kind),
+            target=constraint.target,
+            operator=constraint.operator,
+        )
+    except OperatorTargetMismatch as exc:
+        raise CompileError(
+            message=str(exc),
+            filename=filename,
+            path=f"constraints[{index}].operator",
+        ) from exc
 
 
 def _validate_match_schema_expected(

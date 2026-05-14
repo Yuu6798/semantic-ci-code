@@ -249,6 +249,11 @@ def _evaluate_state_constraint(
             E_PATH_UNRESOLVED,
             target=constraint.target,
         )
+    # Defense-in-depth: this combination (state-kind + baseline operator) is
+    # rejected at compile time by ``compiler.operator_schema``. The branch
+    # remains so direct ``CompiledConstraint`` construction (e.g. evaluator
+    # unit tests) still gets a structured UNKNOWN result instead of an
+    # AssertionError. Behavior is unchanged for the compiled path.
     if constraint.operator in BASELINE_OPERATORS:
         return _result(
             constraint,
@@ -281,6 +286,11 @@ def _evaluate_delta_constraint(
 ) -> ConstraintResult:
     first = segments[0]
     if first in _CODE_STATE_DELTA_FIELDS:
+        # Defense-in-depth: this combination (delta-kind + delta-domain path
+        # + baseline operator) is rejected at compile time by
+        # ``compiler.operator_schema``. Direct ``CompiledConstraint``
+        # construction in evaluator unit tests still routes here. Behavior
+        # is unchanged for the compiled path.
         if constraint.operator in BASELINE_OPERATORS:
             return _result(
                 constraint,
@@ -303,6 +313,11 @@ def _evaluate_delta_constraint(
         return _from_operator_outcome(constraint, outcome)
 
     if first in _CODE_STATE_FIELDS:
+        # Defense-in-depth: this combination (delta-kind + state-domain path
+        # + pure operator) is rejected at compile time by
+        # ``compiler.operator_schema``. Direct ``CompiledConstraint``
+        # construction in evaluator unit tests still routes here. Behavior
+        # is unchanged for the compiled path.
         if constraint.operator not in BASELINE_OPERATORS:
             return _result(
                 constraint,

@@ -5,4 +5,4 @@ constraints:
   - id: template:feature:no_removed_api
     kind: delta
     target: imports
-    operator: equals
+    operator: equals_baseline

@@ -153,6 +153,7 @@ def _serialize_constraint_result(result: ConstraintResult) -> dict[str, Any]:
         "evidence_required": result.evidence_required,
         "status": result.status.value,
         "error_code": result.error_code,
+        "unknown_cause": result.unknown_cause.value if result.unknown_cause else None,
         "evidence": _pairs_to_dict(result.evidence),
     }
 
@@ -223,6 +224,7 @@ def _serialize_repair_instruction(instruction: RepairInstruction) -> dict[str, A
         "unknown_policy": instruction.unknown_policy.value,
         "status": instruction.status.value,
         "error_code": instruction.error_code,
+        "unknown_cause": instruction.unknown_cause.value if instruction.unknown_cause else None,
         "repair_code": instruction.repair_code,
         "category": instruction.category.value,
         "message": instruction.message,

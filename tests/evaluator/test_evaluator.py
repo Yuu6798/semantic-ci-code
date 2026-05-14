@@ -28,6 +28,7 @@ from semantic_ci_code.domain.state_schema import (
 from semantic_ci_code.evaluator import (
     ConstraintResult,
     ResultStatus,
+    UnknownCause,
     Verdict,
     VerdictResult,
     evaluate_constraints,
@@ -716,31 +717,58 @@ def test_unknown_policy_fail_aggregates_to_fail():
 
 
 def test_unknown_policy_repair_aggregates_to_repair():
+    # Use a runtime-resolvable open path so cause is OPEN_RUNTIME (Brief
+    # D1-4): authoring-cause UNKNOWN ignores unknown_policy and forces
+    # FAIL, so unknown_policy: repair routing can only be exercised on a
+    # non-authoring cause.
     verdict = evaluate_verdict(
         constraint(
             kind=ConstraintKind.STATE,
-            target="missing",
+            target="python_specific.missing",
             operator=Operator.EQUALS,
             unknown_policy=UnknownPolicy.REPAIR,
-        )
+        ),
+        candidate=CodeState(python_specific=None),
     )
 
     assert verdict.result is VerdictResult.REPAIR
+    assert verdict.unknowns[0].unknown_cause is UnknownCause.OPEN_RUNTIME
 
 
 @pytest.mark.parametrize("policy", (UnknownPolicy.WARN, UnknownPolicy.IGNORE))
 def test_unknown_policy_warn_and_ignore_do_not_affect_verdict(policy: UnknownPolicy):
+    # Same as above: warn / ignore routing is only meaningful for
+    # non-authoring causes after D1-4.
     verdict = evaluate_verdict(
         constraint(
             kind=ConstraintKind.STATE,
-            target="missing",
+            target="python_specific.missing",
             operator=Operator.EQUALS,
             unknown_policy=policy,
-        )
+        ),
+        candidate=CodeState(python_specific=None),
     )
 
     assert verdict.result is VerdictResult.PASS
     assert verdict.unknowns[0].unknown_policy is policy
+    assert verdict.unknowns[0].unknown_cause is UnknownCause.OPEN_RUNTIME
+
+
+def test_authoring_cause_unknown_forces_fail_regardless_of_unknown_policy():
+    # Direct CompiledConstraint construction with an invalid path triggers
+    # the defense-in-depth E_PATH_UNRESOLVED branch tagged AUTHORING. Per
+    # planning §3 D2 this routes to FAIL irrespective of unknown_policy.
+    for policy in UnknownPolicy:
+        verdict = evaluate_verdict(
+            constraint(
+                kind=ConstraintKind.STATE,
+                target="not_a_field",
+                operator=Operator.EQUALS,
+                unknown_policy=policy,
+            )
+        )
+        assert verdict.result is VerdictResult.FAIL, policy
+        assert verdict.unknowns[0].unknown_cause is UnknownCause.AUTHORING
 
 
 def test_skipped_only_passes():

@@ -99,12 +99,16 @@ def _instruction_lines(item: dict[str, Any], *, use_color: bool) -> list[str]:
         label = _CATEGORY_LABEL[item["category"]]
         header = f"[{label}] {item['repair_code']}  {item['constraint_id']}"
         color = _CATEGORY_COLOR[item["category"]]
-    return [
+    lines = [
         colored(header, color, enabled=use_color),
         f"  target:    {item['target']}",
         f"  operator:  {item['operator']}",
         f"  message:   {item['message']}",
     ]
+    cause = item.get("unknown_cause")
+    if cause:
+        lines.append(f"  cause:     {cause}")
+    return lines
 
 
 def _compiled_constraint_lines(item: dict[str, Any], *, use_color: bool) -> list[str]:

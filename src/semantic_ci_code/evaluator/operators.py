@@ -80,6 +80,10 @@ class OperatorOutcome:
     status: str
     error_code: str | None
     evidence: tuple[tuple[str, JsonValue], ...]
+    # Diagnostic cause for ``status == 'unknown'``; ``None`` otherwise.
+    # Threaded through ``evaluator._from_operator_outcome`` into the
+    # ``ConstraintResult`` for downstream surfaces (Brief D1-4).
+    unknown_cause: str | None = None
 
 
 def evaluate_pure_operator(
@@ -123,7 +127,13 @@ def evaluate_pure_operator(
         if operator is Operator.WITHIN_RANGE:
             return _within_range(resolved, expected, tolerance=tolerance)
     except TypeError:
-        return _unknown_type_mismatch(observed=resolved, expected=expected)
+        # Catch-all defensive net — internal-state surprise rather than
+        # an authoring error. Tagged ``evaluator_internal`` (Brief D1-4).
+        return _unknown_type_mismatch(
+            cause="evaluator_internal",
+            observed=resolved,
+            expected=expected,
+        )
 
     raise AssertionError(f"Unsupported pure operator dispatch: {operator}")
 
@@ -151,7 +161,13 @@ def evaluate_baseline_operator(
         if operator is Operator.NO_REMOVED_ITEMS:
             return _no_removed_items(baseline, candidate)
     except TypeError:
-        return _unknown_type_mismatch(baseline=baseline, candidate=candidate)
+        # Catch-all defensive net — see ``evaluate_pure_operator`` for
+        # the cause rationale.
+        return _unknown_type_mismatch(
+            cause="evaluator_internal",
+            baseline=baseline,
+            candidate=candidate,
+        )
 
     raise AssertionError(f"Unsupported baseline operator dispatch: {operator}")
 
@@ -370,11 +386,25 @@ def _baseline_set_outcome(
     return OperatorOutcome(status, error_code, _evidence(**evidence))
 
 
-def _unknown_type_mismatch(**evidence: object) -> OperatorOutcome:
+def _unknown_type_mismatch(
+    *,
+    cause: str = "authoring",
+    **evidence: object,
+) -> OperatorOutcome:
+    """Build an UNKNOWN / E_TYPE_MISMATCH outcome with a cause tag.
+
+    The 11 user-facing emit sites default to ``"authoring"`` because
+    they are only reachable via the defense-in-depth path post-D1-3
+    (direct ``CompiledConstraint`` construction). The two catch-all
+    ``except TypeError`` blocks pass ``cause="evaluator_internal"``
+    explicitly.
+    """
+
     return OperatorOutcome(
         STATUS_UNKNOWN,
         E_TYPE_MISMATCH,
         _evidence(**evidence),
+        unknown_cause=cause,
     )
 
 

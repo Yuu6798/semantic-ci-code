@@ -297,7 +297,26 @@ def test_equals_with_any_expected_passes():
     )
 
 
-# --- open-dimension bypass --------------------------------------------------
+# --- open-dimension partial bypass ----------------------------------------
+
+
+@pytest.mark.parametrize(
+    "operator,expected",
+    [
+        (Operator.INCLUDES_ALL, [{"k": "v"}]),
+        (Operator.LESS_THAN, 5),
+        (Operator.WITHIN_RANGE, [0, 10]),
+    ],
+)
+def test_open_path_observed_side_check_is_bypassed(operator: Operator, expected: object):
+    # ``python_specific.*`` is UNKNOWN_OPEN by category, so the observed-
+    # side category check is bypassed (the runtime shape cannot be
+    # proven at compile). With a valid expected literal, compile passes.
+    check_type_compatibility(
+        target="python_specific.something",
+        operator=operator,
+        expected=expected,
+    )
 
 
 @pytest.mark.parametrize(
@@ -306,17 +325,23 @@ def test_equals_with_any_expected_passes():
         (Operator.INCLUDES_ALL, "scalar_string_not_a_list"),
         (Operator.LESS_THAN, "not_a_number"),
         (Operator.WITHIN_RANGE, [0, 5, 10]),
+        (Operator.WITHIN_RANGE, [0]),
     ],
 )
-def test_open_path_bypasses_all_type_checks(operator: Operator, expected: object):
-    # ``python_specific.*`` is UNKNOWN_OPEN by category. The check defers
-    # to runtime regardless of how implausible the (operator, expected)
-    # combination looks at compile time.
-    check_type_compatibility(
-        target="python_specific.something",
-        operator=operator,
-        expected=expected,
-    )
+def test_open_path_expected_side_check_still_runs(operator: Operator, expected: object):
+    # Regression for PR #78 Codex P2 review (3rd round): the expected
+    # literal shape is independent of the observed target category, so
+    # it must be validated even for open dimensions. Without this, a
+    # malformed expected reached ``_unknown_type_mismatch`` at runtime
+    # and was retagged ``open_runtime`` — letting ``unknown_policy:
+    # warn`` / ``ignore`` pass a malformed spec.
+    with pytest.raises(TypeMismatch) as exc_info:
+        check_type_compatibility(
+            target="python_specific.something",
+            operator=operator,
+            expected=expected,
+        )
+    assert exc_info.value.side is TypeMismatchSide.EXPECTED
 
 
 # --- integration through compile_target_svp --------------------------------
@@ -403,10 +428,11 @@ constraints:
     assert "within_range" in exc_info.value.message
 
 
-def test_compile_open_path_with_implausible_combo_compiles():
-    # python_specific bypasses type checks; the constraint compiles even
-    # though the (operator, expected) combination would be rejected on a
-    # typed path.
+def test_compile_open_path_with_valid_expected_compiles():
+    # python_specific bypasses the observed-side type check; with a valid
+    # expected literal, the constraint compiles. Observed-side runtime
+    # mismatches are then routed as ``open_runtime`` UNKNOWN
+    # (``evaluator._from_operator_outcome``).
     yaml_source = """
 intent: open path bypass
 change:
@@ -416,12 +442,36 @@ constraints:
     kind: delta
     target: python_specific.value
     operator: less_than
-    expected: "not_a_number"
+    expected: 5
 """
 
     compiled = compile_target_svp(yaml_source, filename="target.yaml")
     user_constraints = [c for c in compiled.constraints if c.source.value == "user"]
     assert any(c.id == "open_bypass" for c in user_constraints)
+
+
+def test_compile_open_path_with_malformed_expected_is_rejected():
+    # PR #78 Codex P2 (3rd round): expected-side validation runs even
+    # for open dimensions so a malformed literal cannot reach runtime
+    # and slip through ``unknown_policy: warn`` / ``ignore``.
+    yaml_source = """
+intent: open path with malformed expected
+change:
+  primary_kind: feature
+constraints:
+  - id: open_bad_expected
+    kind: delta
+    target: python_specific.value
+    operator: less_than
+    expected: "not_a_number"
+    unknown_policy: warn
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].expected"
+    assert "less_than" in exc_info.value.message
 
 
 def test_compile_design_feature_fixture_still_compiles():

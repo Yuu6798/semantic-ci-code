@@ -1,3 +1,23 @@
+"""Operator evaluation primitives for the constraint evaluator.
+
+The ``_unknown_type_mismatch`` helper is invoked at 11 user-facing sites
+(8 collection-shape, 3 baseline-collection, 4 numeric, 1 within-range
+observed, 1 within-range expected — counted shape-wise) plus 2 catch-all
+``except TypeError`` blocks (one in ``evaluate_pure_operator``, one in
+``evaluate_baseline_operator``).
+
+After Brief D1-3, the 11 user-facing sites are rejected at compile time
+by ``compiler.type_schema`` so the evaluator never reaches them from a
+target.yaml-driven path. They stay as **defense-in-depth** so that
+direct ``CompiledConstraint`` construction (e.g. evaluator unit tests)
+still produces a structured ``UNKNOWN`` rather than an unhandled
+exception. The two ``except TypeError`` catch-alls remain genuinely
+runtime — they trip on internal-state surprises (e.g. Pydantic round-trip
+canonicalization edge cases) and will be tagged
+``unknown_cause: evaluator_internal`` once Brief D1-4 wires the cause
+field.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

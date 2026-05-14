@@ -210,6 +210,12 @@ def test_module_graph_partial_dict_is_rejected_as_unregistered_match_schema_targ
 
 
 def test_dict_expected_on_numeric_target_is_rejected_as_type_domain_mismatch():
+    # After Brief D1-3, the type-schema check fires before match-schema for
+    # this combination: ``includes_all`` (collection operator) on
+    # ``complexity_delta.cyclomatic`` (scalar_number) is rejected on
+    # observed-side category alone, regardless of what ``expected`` looks
+    # like. Keep the same fixture shape so the test still documents the
+    # numeric-target rejection — only the error wording changes.
     with pytest.raises(CompileError) as exc_info:
         _compile_constraint(
             target="complexity_delta.cyclomatic",
@@ -217,4 +223,7 @@ def test_dict_expected_on_numeric_target_is_rejected_as_type_domain_mismatch():
       - fqn: pkg.a""",
         )
 
-    assert "no Match Schema is registered" in exc_info.value.message
+    message = exc_info.value.message
+    assert "complexity_delta.cyclomatic" in message
+    assert "scalar_number" in message
+    assert "includes_all" in message

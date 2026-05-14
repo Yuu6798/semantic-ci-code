@@ -94,8 +94,8 @@ constraints:
     target: imports
     operator: superset_of_baseline
   - id: second_user
-    kind: state
-    target: complexity
+    kind: delta
+    target: complexity_delta.cyclomatic
     operator: less_than_or_equal
     expected: 10
 """
@@ -117,44 +117,118 @@ constraints:
     )
 
 
-def _target_for_operator(operator: Operator) -> str:
-    """Pick a delta-kind compatible target for this operator.
+def _yaml_block_for_operator(operator: Operator) -> str:
+    """Produce a constraint YAML block compatible with this operator.
 
-    After Brief D1-2 the compiler rejects (kind, target-domain, operator-class)
-    triples that the evaluator could only resolve as
-    ``E_OPERATOR_TARGET_MISMATCH``. This parametrized test stays kind=delta
-    and varies the target so each operator hits its valid domain:
+    After Brief D1-2 (operator-target alignment) and Brief D1-3
+    (operator-category + expected-shape alignment), every operator has
+    a narrow set of valid (kind, target, expected) combinations. This
+    helper picks one valid triple per operator so the parametrized
+    "every operator compiles" smoke test still exercises all 20
+    Operator enum values.
 
-    - baseline operators read a CodeState path (e.g. ``imports``)
-    - pure operators read a CodeStateDelta path (e.g.
-      ``complexity_delta.cyclomatic``)
-    - ``changed_only_in`` is SKIPPED unconditionally; either target works.
+    The exact triple per operator is irrelevant — only that it satisfies
+    both compile-time checks. Runtime evaluation semantics are tested
+    elsewhere.
     """
 
-    from semantic_ci_code.compiler.operator_schema import (
-        _BASELINE_OPERATORS,
-        _PURE_OPERATORS,
-    )
-
-    if operator in _BASELINE_OPERATORS:
-        return "imports"
-    if operator in _PURE_OPERATORS:
-        return "complexity_delta.cyclomatic"
-    return "imports"
+    # Pure collection operators (need record/string/number_collection
+    # observed + list expected).
+    if operator in {
+        Operator.INCLUDES_ALL,
+        Operator.INCLUDES_ANY,
+        Operator.EXCLUDES_ALL,
+        Operator.SUBSET_OF,
+        Operator.SUPERSET_OF,
+    }:
+        return (
+            f"  - id: op_{operator.value}\n"
+            f"    kind: delta\n"
+            f"    target: api_surface_delta.added\n"
+            f"    operator: {operator.value}\n"
+            f"    expected:\n"
+            f"      - fqn: 'sample.x'\n"
+        )
+    # Baseline collection operators (state-domain path, no expected).
+    if operator in {
+        Operator.SUPERSET_OF_BASELINE,
+        Operator.NO_NEW_ITEMS,
+        Operator.NO_REMOVED_ITEMS,
+    }:
+        return (
+            f"  - id: op_{operator.value}\n"
+            f"    kind: delta\n"
+            f"    target: imports\n"
+            f"    operator: {operator.value}\n"
+        )
+    # Numeric scalar operators (need scalar_number observed + number
+    # expected).
+    if operator in {
+        Operator.LESS_THAN,
+        Operator.LESS_THAN_OR_EQUAL,
+        Operator.GREATER_THAN,
+        Operator.GREATER_THAN_OR_EQUAL,
+    }:
+        return (
+            f"  - id: op_{operator.value}\n"
+            f"    kind: delta\n"
+            f"    target: complexity_delta.cyclomatic\n"
+            f"    operator: {operator.value}\n"
+            f"    expected: 5\n"
+        )
+    # within_range requires a [low, high] pair of numbers.
+    if operator is Operator.WITHIN_RANGE:
+        return (
+            f"  - id: op_{operator.value}\n"
+            f"    kind: delta\n"
+            f"    target: complexity_delta.cyclomatic\n"
+            f"    operator: {operator.value}\n"
+            f"    expected: [0, 10]\n"
+        )
+    # Pure category-agnostic operators (equals / not_equals): scalar
+    # number target is the simplest valid combination.
+    if operator in {Operator.EQUALS, Operator.NOT_EQUALS}:
+        return (
+            f"  - id: op_{operator.value}\n"
+            f"    kind: delta\n"
+            f"    target: complexity_delta.cyclomatic\n"
+            f"    operator: {operator.value}\n"
+            f"    expected: 0\n"
+        )
+    # Baseline category-agnostic operators (equals_baseline /
+    # not_equals_baseline / unchanged / changed): state path, no expected.
+    if operator in {
+        Operator.EQUALS_BASELINE,
+        Operator.NOT_EQUALS_BASELINE,
+        Operator.UNCHANGED,
+        Operator.CHANGED,
+    }:
+        return (
+            f"  - id: op_{operator.value}\n"
+            f"    kind: delta\n"
+            f"    target: imports\n"
+            f"    operator: {operator.value}\n"
+        )
+    # changed_only_in is SKIPPED unconditionally; any path/expected works.
+    if operator is Operator.CHANGED_ONLY_IN:
+        return (
+            f"  - id: op_{operator.value}\n"
+            f"    kind: delta\n"
+            f"    target: imports\n"
+            f"    operator: {operator.value}\n"
+        )
+    raise AssertionError(f"Unhandled operator in fixture helper: {operator}")
 
 
 @pytest.mark.parametrize("operator", tuple(Operator))
 def test_all_operator_enum_values_compile(operator: Operator):
-    yaml_source = f"""
-intent: operator test
-change:
-  primary_kind: feature
-constraints:
-  - id: op_{operator.value}
-    kind: delta
-    target: {_target_for_operator(operator)}
-    operator: {operator.value}
-"""
+    yaml_source = (
+        "intent: operator test\n"
+        "change:\n"
+        "  primary_kind: feature\n"
+        "constraints:\n"
+        f"{_yaml_block_for_operator(operator)}"
+    )
 
     compiled = compile_target_svp(yaml_source)
 

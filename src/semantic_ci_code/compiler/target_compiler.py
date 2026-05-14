@@ -38,6 +38,11 @@ from semantic_ci_code.compiler.path_schema import (
     valid_delta_target_paths,
     valid_state_target_paths,
 )
+from semantic_ci_code.compiler.type_schema import (
+    TypeMismatch,
+    TypeMismatchSide,
+    check_type_compatibility,
+)
 from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import (
     Constraint,
@@ -280,6 +285,7 @@ def _validate_target_svp_values(target_svp: TargetSVP, *, filename: str) -> None
             domain_label = "CodeState/CodeStateDelta"
         if constraint.target in allowed or is_open_path(constraint.target):
             _validate_operator_target(constraint, index=index, filename=filename)
+            _validate_type_target(constraint, index=index, filename=filename)
             _validate_match_schema_expected(constraint, index=index, filename=filename)
             continue
         suggestions = suggest_targets(constraint.target, allowed)
@@ -360,6 +366,32 @@ def _validate_operator_target(
             message=str(exc),
             filename=filename,
             path=f"constraints[{index}].operator",
+        ) from exc
+
+
+def _validate_type_target(
+    constraint: Constraint,
+    *,
+    index: int,
+    filename: str,
+) -> None:
+    try:
+        check_type_compatibility(
+            target=constraint.target,
+            operator=constraint.operator,
+            expected=constraint.expected,
+        )
+    except TypeMismatch as exc:
+        # Expected-side errors are pinned to ``.expected`` and observed-side
+        # errors to ``.target``; ``operator_schema`` already owns the
+        # ``.operator`` slot.
+        path_suffix = (
+            "expected" if exc.side is TypeMismatchSide.EXPECTED else "target"
+        )
+        raise CompileError(
+            message=str(exc),
+            filename=filename,
+            path=f"constraints[{index}].{path_suffix}",
         ) from exc
 
 

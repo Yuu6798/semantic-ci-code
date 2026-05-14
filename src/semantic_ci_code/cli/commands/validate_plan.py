@@ -38,7 +38,7 @@ from semantic_ci_code.repair_compiler.adapters import register_builtin_adapters
 from semantic_ci_code.repair_compiler.risk_summary import compute_risk_summary
 from semantic_ci_code.repair_compiler.types import Adapter, CompiledPreGen
 
-_VALIDATE_PLAN_SCHEMA_VERSION = "1"
+_VALIDATE_PLAN_SCHEMA_VERSION = "2"
 
 
 class ValidatePlanUsageError(ValueError):

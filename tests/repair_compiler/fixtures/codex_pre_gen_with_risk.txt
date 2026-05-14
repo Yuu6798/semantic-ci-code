@@ -26,6 +26,13 @@ refactor
   severity: hard
   unknown_policy: fail
 
+[IMPLEMENTATION ORDER]
+1. Fix every item under AUTHORING ERRORS in target.yaml first.
+2. Then implement against RISK AREAS / FORBIDDEN ZONES / REQUIRED ADDITIONS.
+
+[AUTHORING ERRORS]
+(none)
+
 [RISK AREAS]
 - "require_missing_api"
 

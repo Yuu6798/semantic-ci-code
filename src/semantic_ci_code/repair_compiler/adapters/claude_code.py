@@ -4,6 +4,7 @@ from semantic_ci_code.domain.state_schema import CodeState
 from semantic_ci_code.framework.target_svp import TargetSVP
 from semantic_ci_code.repair import RepairCategory, RepairPlan
 from semantic_ci_code.repair_compiler.adapters.markdown import (
+    IMPLEMENTATION_ORDER_NOTE,
     RISK_SECTION_TITLES,
     finish,
     format_generation_metadata,
@@ -71,6 +72,7 @@ class ClaudeCodeAdapter:
         ]
         lines.extend(render_target_constraints(target))
         risk_summary = normalize_risk_summary(risk_summary)
+        lines.extend([IMPLEMENTATION_ORDER_NOTE, ""])
         for key in RISK_SUMMARY_KEYS:
             lines.extend(
                 render_risk_section_structured(RISK_SECTION_TITLES[key], risk_summary[key])

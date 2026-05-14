@@ -73,11 +73,22 @@ def test_risk_summary_is_deterministic_for_same_input():
 
     assert first == second
     assert tuple(first) == (
+        "authoring_errors",
         "would_violate",
         "forbidden_zones",
         "required_additions",
         "template_implications",
     )
+
+
+def test_authoring_errors_empty_under_compile_valid_input():
+    # After Brief D1-2 / D1-3 a well-formed target.yaml that survives
+    # ``compile_target_svp`` should not produce any authoring-cause
+    # UNKNOWN at the evaluator level (the defense-in-depth branches
+    # remain unreachable from this path).
+    summary = compute_risk_summary(risk_target(), baseline_state())
+
+    assert summary["authoring_errors"] == []
 
 
 def baseline_state() -> CodeState:

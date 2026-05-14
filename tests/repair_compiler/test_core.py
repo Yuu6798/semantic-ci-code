@@ -22,6 +22,7 @@ class MockAdapter:
         assert target.intent == "Add profile endpoint"
         assert baseline_state == CodeState()
         assert risk_summary == {
+            "authoring_errors": [],
             "would_violate": [],
             "forbidden_zones": [],
             "required_additions": [],
@@ -67,6 +68,7 @@ def test_repair_compiler_dispatches_pre_gen_with_placeholder_risk_summary():
     assert compiled.metadata["constraint_count"] == 0
     assert compiled.metadata["input_kind"] == "target_svp"
     assert compiled.risk_summary == {
+        "authoring_errors": [],
         "would_violate": [],
         "forbidden_zones": [],
         "required_additions": [],

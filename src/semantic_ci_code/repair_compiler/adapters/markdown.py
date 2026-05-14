@@ -7,11 +7,20 @@ from semantic_ci_code.framework.target_svp import TargetSVP
 from semantic_ci_code.repair import RepairInstruction
 
 RISK_SECTION_TITLES = {
+    "authoring_errors": "Authoring Errors",
     "would_violate": "Risk Areas",
     "forbidden_zones": "Forbidden Zones",
     "required_additions": "Required Additions",
     "template_implications": "Template Implications",
 }
+
+# Two-step instruction surfaced when authoring_errors and the
+# implementation-side hints coexist (planning §3 D3).
+IMPLEMENTATION_ORDER_NOTE = (
+    "**Implementation order**: fix every item under *Authoring Errors* in "
+    "`target.yaml` first; only then implement against *Risk Areas* / "
+    "*Forbidden Zones* / *Required Additions*."
+)
 RISK_FIELD_ORDER = (
     ("source", "Source"),
     ("target", "Target"),

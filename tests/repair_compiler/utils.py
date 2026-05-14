@@ -92,6 +92,7 @@ constraints:
 
 def pre_gen_risk_summary():
     return {
+        "authoring_errors": [],
         "would_violate": ["require_missing_api"],
         "forbidden_zones": [
             {

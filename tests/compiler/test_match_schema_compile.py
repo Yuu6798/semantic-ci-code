@@ -10,6 +10,7 @@ def _compile_constraint(
     target: str,
     operator: str = "includes_all",
     expected: str,
+    kind: str = "delta",
 ):
     yaml_source = f"""
 intent: match schema
@@ -17,7 +18,7 @@ change:
   primary_kind: feature
 constraints:
   - id: match_schema
-    kind: delta
+    kind: {kind}
     target: {target}
     operator: {operator}
     expected:
@@ -194,8 +195,12 @@ def test_empty_includes_all_is_allowed():
 
 
 def test_module_graph_partial_dict_is_rejected_as_unregistered_match_schema_target():
+    # ``module_graph`` is a CodeState path; pair it with kind=state so the
+    # (kind, target, operator) triple passes the operator-schema check and
+    # the failure remains the match-schema rejection under test.
     with pytest.raises(CompileError) as exc_info:
         _compile_constraint(
+            kind="state",
             target="module_graph",
             expected="""
       - module: pkg.a""",

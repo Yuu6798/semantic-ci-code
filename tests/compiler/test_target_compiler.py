@@ -92,7 +92,7 @@ constraints:
   - id: first_user
     kind: delta
     target: imports
-    operator: includes_any
+    operator: superset_of_baseline
   - id: second_user
     kind: state
     target: complexity
@@ -117,6 +117,32 @@ constraints:
     )
 
 
+def _target_for_operator(operator: Operator) -> str:
+    """Pick a delta-kind compatible target for this operator.
+
+    After Brief D1-2 the compiler rejects (kind, target-domain, operator-class)
+    triples that the evaluator could only resolve as
+    ``E_OPERATOR_TARGET_MISMATCH``. This parametrized test stays kind=delta
+    and varies the target so each operator hits its valid domain:
+
+    - baseline operators read a CodeState path (e.g. ``imports``)
+    - pure operators read a CodeStateDelta path (e.g.
+      ``complexity_delta.cyclomatic``)
+    - ``changed_only_in`` is SKIPPED unconditionally; either target works.
+    """
+
+    from semantic_ci_code.compiler.operator_schema import (
+        _BASELINE_OPERATORS,
+        _PURE_OPERATORS,
+    )
+
+    if operator in _BASELINE_OPERATORS:
+        return "imports"
+    if operator in _PURE_OPERATORS:
+        return "complexity_delta.cyclomatic"
+    return "imports"
+
+
 @pytest.mark.parametrize("operator", tuple(Operator))
 def test_all_operator_enum_values_compile(operator: Operator):
     yaml_source = f"""
@@ -126,7 +152,7 @@ change:
 constraints:
   - id: op_{operator.value}
     kind: delta
-    target: imports
+    target: {_target_for_operator(operator)}
     operator: {operator.value}
 """
 

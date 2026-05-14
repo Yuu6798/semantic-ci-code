@@ -5,8 +5,8 @@ constraints:
   - id: duplicate
     kind: delta
     target: imports
-    operator: equals
+    operator: equals_baseline
   - id: duplicate
     kind: delta
     target: effects
-    operator: equals
+    operator: equals_baseline

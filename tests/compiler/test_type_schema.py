@@ -67,9 +67,7 @@ from semantic_ci_code.framework.constraint_types import Operator
         ("not_a_field", TargetCategory.UNKNOWN_OPEN),
     ],
 )
-def test_category_for_target_resolves_static_type(
-    target: str, category: TargetCategory
-):
+def test_category_for_target_resolves_static_type(target: str, category: TargetCategory):
     assert category_for_target(target) is category
 
 
@@ -94,11 +92,14 @@ def test_collection_operator_on_scalar_number_is_rejected(operator: Operator):
         check_type_compatibility(
             target="complexity_delta.cyclomatic",
             operator=operator,
-            expected=[{"fqn": "x"}] if operator not in {
+            expected=[{"fqn": "x"}]
+            if operator
+            not in {
                 Operator.SUPERSET_OF_BASELINE,
                 Operator.NO_NEW_ITEMS,
                 Operator.NO_REMOVED_ITEMS,
-            } else None,
+            }
+            else None,
         )
 
     assert exc_info.value.side is TypeMismatchSide.OBSERVED

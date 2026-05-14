@@ -385,9 +385,7 @@ def _validate_type_target(
         # Expected-side errors are pinned to ``.expected`` and observed-side
         # errors to ``.target``; ``operator_schema`` already owns the
         # ``.operator`` slot.
-        path_suffix = (
-            "expected" if exc.side is TypeMismatchSide.EXPECTED else "target"
-        )
+        path_suffix = "expected" if exc.side is TypeMismatchSide.EXPECTED else "target"
         raise CompileError(
             message=str(exc),
             filename=filename,

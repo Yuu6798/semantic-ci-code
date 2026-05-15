@@ -203,7 +203,7 @@ envelope version.
 
 ```jsonc
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "subcommand": "validate-plan",
   "adapter_name": "claude-code",
   "rendered": "# Plan Validation - Pre-Generation Guidance\n...\n",
@@ -219,6 +219,7 @@ envelope version.
     "input_kind": "target_svp"
   },
   "risk_summary": {
+    "authoring_errors": [],
     "would_violate": [],
     "forbidden_zones": [],
     "required_additions": [],
@@ -233,12 +234,12 @@ envelope version.
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | Validate-plan envelope version. Currently `"1"`. |
+| `schema_version` | Validate-plan envelope version. Currently `"2"`. |
 | `subcommand` | Always `validate-plan`. |
 | `adapter_name` | Adapter used for rendering: `claude-code`, `cursor`, or `codex`. |
 | `rendered` | Adapter-rendered text exactly as emitted in `--format text`. |
 | `metadata` | Repair compiler pre-generation metadata. |
-| `risk_summary` | Deterministic projections: `would_violate`, `forbidden_zones`, `required_additions`, and `template_implications`. |
+| `risk_summary` | Deterministic projections in declared rendering order: `authoring_errors`, `would_violate`, `forbidden_zones`, `required_additions`, and `template_implications`. The author-facing `authoring_errors` slot lists residual spec-level errors (typically empty after Brief D1-2 / D1-3 caught them at compile); generator-facing slots stay scoped to "this implementation will likely violate / cannot touch / must add". Adapters render a two-step instruction so generators fix `target.yaml` first when `authoring_errors` is non-empty. |
 | `engine` | Python minor version and package version. |
 
 ## Compatibility Policy
@@ -281,6 +282,7 @@ bump the envelope version.
 | `5` | verdict | Brief D1-4: added optional `results[].unknown_cause` and `repair_plan.instructions[].unknown_cause` (values: `authoring` / `extraction` / `open_runtime` / `evaluator_internal`). Nested optional diagnostic field; no bump per the compatibility exception above. Authoring-cause UNKNOWN routes to `verdict: "fail"` regardless of `unknown_policy`. |
 | `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
+| `2` | validate-plan | Brief D3: added `risk_summary.authoring_errors` as a sibling list (positioned first). Adapter rendering surfaces a two-step "fix authoring first, then implement" instruction. |
 
 ## v2 to v3 Diff
 
@@ -320,3 +322,27 @@ bump the envelope version.
 - Added flat projection aliases:
   `api_surface_delta.added.fqns`, `effect_changes.added.fqns`, and
   `imports_delta.added.modules`.
+
+## validate-plan v1 to v2 Diff
+
+- Added `risk_summary.authoring_errors` as a sibling list to
+  `risk_summary.would_violate`. Positioned first in the rendering order so
+  adapters can surface the two-step instruction "fix every item under
+  `authoring_errors` in `target.yaml` first; only then implement against
+  `would_violate` / `forbidden_zones` / `required_additions`".
+- `authoring_errors` carries user constraints whose self-evaluation tagged
+  the result `unknown_cause: authoring` (planning §3 D3 / §3 D2). After
+  Brief D1-2 and D1-3 the list is typically empty: most authoring errors
+  are rejected at compile-time as `CompileError` before `validate-plan`
+  reaches the evaluator. The slot stays so the contract is visible to
+  adapter implementations and remains populated when residual cases reach
+  evaluate-time via direct CompiledConstraint construction.
+- Adapter rendering update (claude-code / cursor / codex):
+  - claude-code / cursor: a one-line "Implementation order" note appears
+    above the risk sections, plus a new `## Authoring Errors` section
+    rendered first.
+  - codex: a `[IMPLEMENTATION ORDER]` block lists the two-step order;
+    `[AUTHORING ERRORS]` is the first risk section.
+- Migration: consumers reading v1 should accept the new
+  `risk_summary.authoring_errors` key (treat missing as `[]`). No other
+  field shape changed.

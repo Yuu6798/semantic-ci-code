@@ -16,11 +16,20 @@ _CATEGORY_SECTIONS = (
 )
 
 _RISK_SECTION_LABELS = {
+    "authoring_errors": "AUTHORING ERRORS",
     "would_violate": "RISK AREAS",
     "forbidden_zones": "FORBIDDEN ZONES",
     "required_additions": "REQUIRED ADDITIONS",
     "template_implications": "TEMPLATE IMPLICATIONS",
 }
+
+# Two-step instruction rendered above the risk sections (planning §3 D3).
+_IMPLEMENTATION_ORDER_LINES = (
+    "[IMPLEMENTATION ORDER]",
+    "1. Fix every item under AUTHORING ERRORS in target.yaml first.",
+    "2. Then implement against RISK AREAS / FORBIDDEN ZONES / REQUIRED ADDITIONS.",
+    "",
+)
 
 
 class CodexAdapter:
@@ -86,6 +95,7 @@ class CodexAdapter:
         ]
         lines.extend(_render_target_constraints(target))
         risk_summary = normalize_risk_summary(risk_summary)
+        lines.extend(_IMPLEMENTATION_ORDER_LINES)
         for key in RISK_SUMMARY_KEYS:
             lines.extend(_render_value_section(_RISK_SECTION_LABELS[key], risk_summary[key]))
         return _finish(lines)

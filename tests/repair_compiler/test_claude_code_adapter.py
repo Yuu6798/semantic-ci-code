@@ -53,6 +53,7 @@ def test_claude_code_pre_gen_matches_golden_and_placeholder_risk_summary():
 
     assert compiled.rendered == (FIXTURES / "pre_gen_feature.md").read_text(encoding="utf-8")
     assert compiled.risk_summary == {
+        "authoring_errors": [],
         "would_violate": [],
         "forbidden_zones": [],
         "required_additions": [],

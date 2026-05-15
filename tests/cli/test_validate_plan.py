@@ -71,16 +71,18 @@ def test_validate_plan_json_envelope_contains_risk_summary(tmp_path: Path):
     data = payload(result)
 
     assert result.returncode == 0
-    assert data["schema_version"] == "1"
+    assert data["schema_version"] == "2"
     assert data["subcommand"] == "validate-plan"
     assert data["adapter_name"] == "codex"
     assert data["risk_summary"]["would_violate"] == ["require_missing_api"]
-    assert set(data["risk_summary"]) == {
+    assert data["risk_summary"]["authoring_errors"] == []
+    assert tuple(data["risk_summary"]) == (
+        "authoring_errors",
         "would_violate",
         "forbidden_zones",
         "required_additions",
         "template_implications",
-    }
+    )
     assert data["rendered"].startswith("[INTENT]\n")
     assert data["engine"]["package_version"]
 

@@ -8,7 +8,12 @@ from semantic_ci_code.framework.target_svp import TargetSVP
 from semantic_ci_code.repair import RepairPlan
 
 REPAIR_COMPILER_SCHEMA_VERSION = "1"
+# Risk summary key order. ``authoring_errors`` comes first so adapters
+# render the "fix the spec before implementing" hint above the
+# implementation-side hints (Brief D3, ``docs/brief_resultstatus_planning.md``
+# §3 D3 two-step instruction).
 RISK_SUMMARY_KEYS = (
+    "authoring_errors",
     "would_violate",
     "forbidden_zones",
     "required_additions",

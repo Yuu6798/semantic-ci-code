@@ -6,13 +6,17 @@ from pydantic import BaseModel
 
 from semantic_ci_code.compiler import (
     CompiledConstraint,
-    CompiledTarget,
     ConstraintSource,
     compile_target_svp,
 )
 from semantic_ci_code.delta import compute_code_state_delta
 from semantic_ci_code.domain.state_schema import CodeState, JsonValue
-from semantic_ci_code.evaluator import ResultStatus, evaluate_constraints
+from semantic_ci_code.evaluator import (
+    ConstraintResult,
+    ResultStatus,
+    UnknownCause,
+    evaluate_constraints,
+)
 from semantic_ci_code.framework.constraint_types import Operator
 from semantic_ci_code.framework.target_svp import TargetSVP, target_svp_to_yaml
 from semantic_ci_code.repair_compiler.types import (
@@ -45,8 +49,16 @@ def compute_risk_summary(target: TargetSVP, baseline_state: CodeState) -> RiskSu
     # doing so risks drift between pre-generation risk rendering and real target
     # compilation (Brief 5 sweep tail / AGENTS handoff).
     compiled = compile_target_svp(target_svp_to_yaml(target), filename="<target_svp>")
+    delta = compute_code_state_delta(baseline_state, baseline_state)
+    verdict = evaluate_constraints(
+        compiled,
+        delta,
+        baseline=baseline_state,
+        candidate=baseline_state,
+    )
     return {
-        "would_violate": _would_violate(compiled, baseline_state),
+        "authoring_errors": _authoring_errors(verdict.results),
+        "would_violate": _would_violate(verdict.results),
         "forbidden_zones": _forbidden_zones(compiled.constraints),
         "required_additions": _required_additions(compiled.constraints),
         "template_implications": _template_implications(compiled.constraints),
@@ -59,20 +71,33 @@ def normalize_risk_summary(summary: dict[str, Any] | None) -> RiskSummary:
     return {key: list(summary.get(key, ())) for key in RISK_SUMMARY_KEYS}
 
 
-def _would_violate(
-    compiled: CompiledTarget,
-    baseline_state: CodeState,
-) -> list[JsonValue]:
-    delta = compute_code_state_delta(baseline_state, baseline_state)
-    verdict = evaluate_constraints(
-        compiled,
-        delta,
-        baseline=baseline_state,
-        candidate=baseline_state,
-    )
+def _authoring_errors(results: tuple[ConstraintResult, ...]) -> list[JsonValue]:
+    """User constraints whose self-evaluation tagged the result AUTHORING.
+
+    After Brief D1-2 / D1-3 nearly all authoring errors are caught at
+    compile time and ``compile_target_svp`` raises ``CompileError``
+    before this evaluation runs, so the list is usually empty. Residual
+    cases reach here through the evaluator's defense-in-depth branches —
+    surface them so the author sees what to fix in ``target.yaml``
+    before iterating on the implementation (planning §3 D3).
+    """
+
+    return [
+        {
+            "constraint_id": result.constraint_id,
+            "error_code": result.error_code,
+        }
+        for result in results
+        if result.source is ConstraintSource.USER
+        and result.status is ResultStatus.UNKNOWN
+        and result.unknown_cause is UnknownCause.AUTHORING
+    ]
+
+
+def _would_violate(results: tuple[ConstraintResult, ...]) -> list[JsonValue]:
     return [
         result.constraint_id
-        for result in verdict.results
+        for result in results
         if result.source is ConstraintSource.USER and result.status is ResultStatus.VIOLATED
     ]
 

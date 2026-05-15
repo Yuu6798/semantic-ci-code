@@ -488,6 +488,52 @@ def test_d4_silent_when_equals_targets_whole_delta_mapping_with_list(tmp_path: P
     assert "ADVISORY-D4" not in [a.code for a in advisories]
 
 
+def test_d4_silent_when_user_constraint_targets_open_path(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 14, hazards.py:497): an open-path
+    target (`python_specific.*` or `typescript_specific.*`) resolves
+    to UNKNOWN at evaluate time. Under default `unknown_policy: fail`,
+    UNKNOWN routes to FAIL — the verdict is NOT a vacuous PASS on a
+    config-only diff. D4 must stay silent. `_is_lock_only_constraint`
+    now excludes open-path targets from lock-only classification.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: python_specific_lock\n"
+        "    kind: delta\n"
+        "    target: python_specific.foo\n"
+        "    operator: excludes_all\n"
+        '    expected: ["bad_item"]\n',
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    assert "ADVISORY-D4" not in [a.code for a in advisories]
+
+
+def test_p1_fires_when_only_addition_is_loc_delta(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 14, hazards.py:605):
+    `loc_delta.added` is a numeric line-count surface that a
+    docs/config diff can satisfy without adding any API or test case.
+    `_targets_added_dimension` used a substring check (`_delta.added
+    in path`) that incorrectly matched `loc_delta.added`. Restricted
+    to the semantic addition surfaces `api_surface_delta.added` and
+    `test_surface_delta.new_cases` per `brief_8_planning §6.3.1`.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: loc_only\n"
+        "    kind: delta\n"
+        "    target: loc_delta.added\n"
+        "    operator: equals\n"
+        "    expected: 10\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P1" in [a.code for a in advisories]
+
+
 def test_d4_silent_when_user_constraint_is_state_kind(tmp_path: Path):
     """Codex review (PR #82 P2 Round 12, hazards.py:459): a
     `kind: state` constraint reads the candidate `CodeState` directly,

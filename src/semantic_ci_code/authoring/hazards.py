@@ -463,6 +463,13 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
     """
     if constraint.kind is not ConstraintKind.DELTA:
         return False
+    # Open-path targets (`python_specific.*` / `typescript_specific.*`)
+    # resolve to UNKNOWN at evaluate time, which routes through
+    # `unknown_policy` (default FAIL). Even on a config-only diff the
+    # verdict can be FAIL, so these constraints cannot be classified
+    # as lock-only by target-doctor without runtime knowledge.
+    if _is_open_path(constraint.target):
+        return False
 
     operator = constraint.operator
     expected = constraint.expected
@@ -601,8 +608,41 @@ def _is_positive_addition(constraint: CompiledConstraint) -> bool:
     return False
 
 
+_SEMANTIC_ADDITION_PATH_PREFIXES: tuple[str, ...] = (
+    "api_surface_delta.added",
+    "test_surface_delta.new_cases",
+)
+# Open-path target prefixes: the evaluator resolves these to None /
+# UNKNOWN by default and routes them through `unknown_policy`. They
+# cannot be reasoned about as "lock-only" or "positive addition"
+# without a runtime value.
+_OPEN_PATH_PREFIXES: tuple[str, ...] = (
+    "python_specific",
+    "typescript_specific",
+)
+
+
 def _targets_added_dimension(path: str) -> bool:
-    return "_delta.added" in path or ".new_cases" in path
+    """Restrict positive-addition detection to **semantic** addition
+    surfaces (API + test surface) as documented in `brief_8_planning
+    §6.3.1` ADVISORY-P1 / P2.
+
+    `loc_delta.added` is a numeric line count that a docs/config diff
+    can satisfy without adding any API or test case, so it does not
+    qualify as a positive addition. `effect_changes.added` and
+    `imports_delta.added` are semantic in their own right but they
+    don't represent "a feature shipped" — they're orthogonal axes the
+    user must opt into separately.
+    """
+    return any(
+        path == prefix or path.startswith(prefix + ".")
+        for prefix in _SEMANTIC_ADDITION_PATH_PREFIXES
+    )
+
+
+def _is_open_path(path: str) -> bool:
+    head = path.split(".", 1)[0]
+    return head in _OPEN_PATH_PREFIXES
 
 
 def _targets_new_test_cases(constraint: CompiledConstraint) -> bool:

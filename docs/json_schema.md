@@ -242,6 +242,49 @@ envelope version.
 | `risk_summary` | Deterministic projections in declared rendering order: `authoring_errors`, `would_violate`, `forbidden_zones`, `required_additions`, and `template_implications`. The author-facing `authoring_errors` slot lists residual spec-level errors (typically empty after Brief D1-2 / D1-3 caught them at compile); generator-facing slots stay scoped to "this implementation will likely violate / cannot touch / must add". Adapters render a two-step instruction so generators fix `target.yaml` first when `authoring_errors` is non-empty. |
 | `engine` | Python minor version and package version. |
 
+## Target-Doctor Advisory Envelope (Brief 8 / CSCI-43, planned)
+
+`semantic-ci target-doctor --format json` will use an independent Brief 8
+envelope. `schema_version` is not tied to the verdict, compile, compile-repair,
+or validate-plan envelopes. The full field shape is fixed in
+`docs/brief_8_planning.md §6.3` and pinned by
+`src/semantic_ci_code/schemas/doctor_advisory.schema.json` when CSCI-43 lands.
+
+```jsonc
+{
+  "schema_version": "advisory-1",
+  "subcommand": "target-doctor",
+  "advisories": [
+    {"code": "ADVISORY-D1", "severity": "info", "message": "...", "evidence": {}}
+  ]
+}
+```
+
+Advisory presence does not change the exit code — see `docs/exit_codes.md`.
+
+## Target-Catalog Reference Envelope (Brief 8 / CSCI-44, planned)
+
+`semantic-ci target-catalog --format json` will use an independent Brief 8
+envelope listing every registered target / operator / template / match
+schema. The full shape is fixed in `docs/brief_8_planning.md §6.4` and pinned
+by `src/semantic_ci_code/schemas/target_catalog.schema.json` when CSCI-44
+lands.
+
+```jsonc
+{
+  "schema_version": "catalog-1",
+  "subcommand": "target-catalog",
+  "primary_kinds": ["feature", "bugfix", "refactor", "test_update"],
+  "targets": {},
+  "templates": {},
+  "operators": {}
+}
+```
+
+The catalog content is required to stay byte-identical to the runtime
+registries (INV-5 catalog ↔ implementation parity, see
+`docs/brief_8_planning.md §5.2`).
+
 ## Compatibility Policy
 
 Within a given envelope, removing fields, renaming fields, or changing field
@@ -283,6 +326,8 @@ bump the envelope version.
 | `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 | `2` | validate-plan | Brief D3: added `risk_summary.authoring_errors` as a sibling list (positioned first). Adapter rendering surfaces a two-step "fix authoring first, then implement" instruction. |
+| `advisory-1` | target-doctor | Brief 8 / CSCI-43 (planned): initial advisory envelope. Independent schema; not tied to verdict / compile / compile-repair / validate-plan versions. |
+| `catalog-1` | target-catalog | Brief 8 / CSCI-44 (planned): initial catalog envelope. Independent schema; mirrors runtime registries via INV-5 parity. |
 
 ## v2 to v3 Diff
 

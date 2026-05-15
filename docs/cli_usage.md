@@ -476,3 +476,16 @@ semantic-ci validate-plan --target target.yaml --adapter claude-code
 semantic-ci validate-plan --target target.yaml --adapter codex --format json
 semantic-ci validate-plan --target target.yaml --adapter cursor --baseline-rev HEAD~1
 ```
+
+## Authoring subcommands (verdict 不参加)
+
+Future subcommands that live on the **Authoring** or **Advisor** surface
+(`docs/code_semantic_ci_design.md §23.3.1`) will be documented under this
+section as Brief 8 lands (`init --recipe`, `target-doctor`,
+`target-catalog`). They do not compute a verdict. Until each subcommand
+is implemented, the canonical spec is
+[`docs/brief_8_planning.md §6`](./brief_8_planning.md) and the surface
+design contract is in
+[`docs/target_authoring_surface.md`](./target_authoring_surface.md). The
+CLI parser in `src/semantic_ci_code/cli/main.py` only exposes the 8
+subcommands documented above.

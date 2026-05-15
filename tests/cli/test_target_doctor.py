@@ -350,6 +350,45 @@ def test_p1_fires_when_only_addition_constraint_is_severity_info(tmp_path: Path)
     assert "ADVISORY-P1" in [a.code for a in advisories]
 
 
+def test_p1_silent_when_feature_uses_equals_with_non_empty_expected(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 6, hazards.py:444): non-empty
+    `equals` on `api_surface_delta.added` forces the observed delta to
+    equal that exact list (non-empty), so an empty observed delta would
+    fail. That is a real positive addition assertion — P1 must stay
+    silent. `target_yaml_guide.md` D4 explicitly lists non-empty
+    `equals` alongside `includes_all` etc.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: equals_addition\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: equals\n"
+        '    expected: ["src.api.users.fetch_user_profile"]\n',
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P1" not in [a.code for a in advisories]
+
+
+def test_p1_fires_when_equals_has_empty_expected(tmp_path: Path):
+    """`equals []` on `_delta.added` is vacuously satisfied by an empty
+    observed delta. Same vacuous-pass hazard as `includes_all []`."""
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: vacuous_equals\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: equals\n"
+        "    expected: []\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P1" in [a.code for a in advisories]
+
+
 def test_p1_fires_when_includes_all_has_empty_expected(tmp_path: Path):
     """Codex review (PR #82 P2 Round 3, hazards.py:410): `includes_all
     expected: []` is vacuously satisfied by any observed delta

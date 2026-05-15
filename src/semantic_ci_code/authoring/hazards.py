@@ -42,6 +42,7 @@ _ADVISORY_ORDER = (
 _TEST_SURFACE_DELTA_PREFIX = "test_surface_delta"
 _ADDITION_FORCING_OPERATORS = frozenset(
     {
+        Operator.EQUALS,
         Operator.INCLUDES_ALL,
         Operator.INCLUDES_ANY,
         Operator.SUPERSET_OF,
@@ -50,9 +51,13 @@ _ADDITION_FORCING_OPERATORS = frozenset(
 # When applied to a `_delta.added` / `.new_cases` target with a
 # **non-empty** `expected`, these operators require the observed delta
 # to contain at least one item — a real positive addition assertion.
-# Empty-expected variants (`includes_all []`, `superset_of []`) are
-# vacuously satisfied by an empty observed delta and must NOT suppress
-# ADVISORY-P1 / P2. `not_equals expected: []` is handled separately in
+# `equals ["x"]` forces observed == ["x"] (non-empty),
+# `includes_all` / `includes_any` / `superset_of` with non-empty
+# expected force observed ⊇ expected (and therefore non-empty).
+# Empty-expected variants (`equals []`, `includes_all []`,
+# `superset_of []`) are vacuously satisfied by an empty observed delta
+# and must NOT suppress ADVISORY-P1 / P2.
+# `not_equals expected: []` is handled separately in
 # `_is_positive_addition`. `SUPERSET_OF_BASELINE` is excluded because it
 # has no `expected` parameter and cannot guarantee a non-empty
 # addition by itself (an empty baseline + empty delta is satisfied).

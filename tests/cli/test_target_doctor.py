@@ -1238,6 +1238,63 @@ def test_d4_cli_silent_on_python_to_non_python_rename(tmp_path: Path):
     assert "ADVISORY-D4" not in [a["code"] for a in payload["advisories"]]
 
 
+def test_d4_cli_fires_when_python_diff_is_outside_package_root(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 15, target_doctor.py:51):
+    `_resolve_files_touched` returned every repo diff path, so any
+    Python change anywhere in the repo (even outside the requested
+    `--package-root`) suppressed D4. But `semantic-ci check` extracts
+    only inside `--package-root`, so a lock-only target can still
+    pass vacuously for the in-scope slice when the only Python
+    changes are out of scope. Fix filters numstat paths to those
+    inside `package_root` before classification.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "src").mkdir()
+    (repo / "src" / "in_scope.py").write_text("def foo(): return 1\n", encoding="utf-8")
+    (repo / "out_of_scope.py").write_text("def bar(): return 2\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    _git(repo, "checkout", "-b", "feature")
+    # Python change is OUTSIDE --package-root=src
+    (repo / "out_of_scope.py").write_text("def bar(): return 99\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "out-of-scope py change")
+    _write_target(
+        repo / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints: []\n",
+    )
+    result = run_semantic_ci(
+        repo,
+        "target-doctor",
+        "--target",
+        str(repo / "target.yaml"),
+        "--package-root",
+        str(repo / "src"),
+        "--baseline-rev",
+        baseline_sha,
+        "--candidate-rev",
+        "HEAD",
+        "--format",
+        "json",
+    )
+    assert result.returncode == 0
+    payload = parse_json(result.stdout)
+    codes = [a["code"] for a in payload["advisories"]]
+    # In-scope (src/) has no Python diff → vacuous PASS for the
+    # in-scope slice → D4 fires.
+    assert "ADVISORY-D4" in codes
+
+
 def test_d4_cli_silent_when_python_diff_present(tmp_path: Path):
     repo = tmp_path / "repo"
     repo.mkdir()

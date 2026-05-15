@@ -48,7 +48,7 @@ def run_target_doctor(args: Namespace) -> int:
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
         package_root = _resolve_package_root(args.package_root)
-        files_touched = _resolve_files_touched(args)
+        files_touched = _resolve_files_touched(args, package_root=package_root)
         advisories = detect_advisories(
             compiled,
             package_root=package_root,
@@ -83,8 +83,19 @@ def _resolve_package_root(raw: str | None) -> Path:
     return candidate
 
 
-def _resolve_files_touched(args: Namespace) -> tuple[Path, ...] | None:
-    """Resolve the candidate diff file list for D4.
+def _resolve_files_touched(
+    args: Namespace,
+    *,
+    package_root: Path,
+) -> tuple[Path, ...] | None:
+    """Resolve the candidate diff file list for D4, filtered to the
+    `--package-root` slice.
+
+    `semantic-ci check` extracts only inside `--package-root`, so D4's
+    "vacuous PASS" hazard applies whenever the in-scope slice has no
+    Python diff — even if other parts of the repo do. We filter the
+    repo-wide numstat to paths under `package_root` before
+    classification.
 
     When the user passes `--baseline-rev` or `--candidate-rev`, git
     failures surface as exit 3. When neither is passed and git is
@@ -136,4 +147,19 @@ def _resolve_files_touched(args: Namespace) -> tuple[Path, ...] | None:
         paths.append(entry.path)
         if entry.old_path is not None:
             paths.append(entry.old_path)
-    return tuple(paths)
+
+    # Filter to the in-scope slice: numstat paths are repo-relative,
+    # so we resolve under `root` and check whether they land inside
+    # `package_root`. Diffs outside package_root are extracted as
+    # nothing by `semantic-ci check`, so they cannot prevent a
+    # vacuous PASS on the in-scope slice.
+    package_root_resolved = package_root.resolve()
+    filtered: list[Path] = []
+    for path in paths:
+        full = (root / path).resolve()
+        try:
+            if full.is_relative_to(package_root_resolved):
+                filtered.append(path)
+        except (OSError, ValueError):
+            continue
+    return tuple(filtered)

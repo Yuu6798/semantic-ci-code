@@ -184,9 +184,16 @@ def detect_d4(
     *,
     files_touched: tuple[Path, ...],
 ) -> tuple[Advisory, ...]:
-    """Lock-only target + non-Python diff = vacuous PASS."""
-    if not files_touched:
-        return ()
+    """Lock-only target + no in-scope Python diff = vacuous PASS.
+
+    An empty `files_touched` tuple is treated as "no Python in scope":
+    `_resolve_files_touched` filters the numstat to paths inside
+    `--package-root`, so an empty result means every diff path was
+    out-of-scope (or the PR has no diff). Either way, a lock-only
+    target gates nothing relevant and passes vacuously. `None`
+    indicates that D4 is inapplicable (git unavailable) and is
+    filtered out by the caller before reaching this detector.
+    """
     if any(_is_python_path(path) for path in files_touched):
         return ()
     if not _is_lock_only_target(target):

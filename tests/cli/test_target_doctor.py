@@ -248,6 +248,32 @@ def test_d4_fires_when_lock_only_target_has_extra_severity_info_user_constraint(
     assert d4[0].evidence["files_touched_count"] == 2
 
 
+def test_d4_fires_when_only_extra_user_constraint_is_subset_of(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 7, hazards.py:412): a hard
+    `subset_of` allow-list is vacuously satisfied by an empty observed
+    delta (`[]` is a subset of any set), so a refactor target's hard
+    template locks plus an `api_surface_delta.added subset_of [...]`
+    user constraint still passes vacuously on a config-only diff.
+    `_is_lock_only_constraint` now classifies `subset_of` as lock-only,
+    mirroring the existing treatment of `excludes_all`.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: addition_allowlist\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: subset_of\n"
+        '    expected: ["src.api.allowed"]\n',
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+    assert d4[0].evidence["files_touched_count"] == 2
+
+
 def test_d4_silent_when_files_touched_is_none(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",

@@ -410,6 +410,13 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
             return True
     if operator is Operator.EXCLUDES_ALL:
         return True
+    if operator is Operator.SUBSET_OF:
+        # `subset_of [...]` and `subset_of []` are both vacuously
+        # satisfied by an empty observed delta (`[]` is a subset of any
+        # set, including the empty set), so a target whose only
+        # non-template constraint is a subset_of allow-list still
+        # passes vacuously on a config-only diff.
+        return True
     return False
 
 

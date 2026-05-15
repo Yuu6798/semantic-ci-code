@@ -297,6 +297,49 @@ def test_p1_silent_when_feature_has_not_equals_empty(tmp_path: Path):
     assert "ADVISORY-P1" not in [a.code for a in advisories]
 
 
+def test_p1_fires_when_only_addition_constraint_is_severity_info(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 3, hazards.py:210): an `info`
+    severity constraint does not participate in the verdict
+    (`docs/code_semantic_ci_design.md §23.3` Advisor channel), so an
+    empty delta still aggregates to PASS even though the constraint
+    "exists". P1 must still fire to warn about the missing
+    verdict-participating lock.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: info_only_addition\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: includes_all\n"
+        '    expected: ["src.api.users.fetch_user_profile"]\n'
+        "    severity: info\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P1" in [a.code for a in advisories]
+
+
+def test_p1_fires_when_includes_all_has_empty_expected(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 3, hazards.py:410): `includes_all
+    expected: []` is vacuously satisfied by any observed delta
+    (including empty), so it cannot guarantee a positive addition. P1
+    must still fire.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: vacuous_includes_all\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: includes_all\n"
+        "    expected: []\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P1" in [a.code for a in advisories]
+
+
 def test_p1_silent_on_non_feature_kind(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",
@@ -335,6 +378,26 @@ def test_p2_fires_when_bugfix_only_has_non_empty_not_equals_on_new_cases(tmp_pat
         "    target: test_surface_delta.new_cases\n"
         "    operator: not_equals\n"
         '    expected: ["tests.test_other.test_x"]\n',
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P2" in [a.code for a in advisories]
+
+
+def test_p2_fires_when_bugfix_only_has_severity_info_new_cases(tmp_path: Path):
+    """Same Round 3 fix as P1: an `info`-severity new_cases assertion
+    does not participate in the verdict, so an empty test_surface delta
+    still aggregates to PASS. P2 must still fire.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: bugfix\nchange:\n  primary_kind: bugfix\nconstraints:\n"
+        "  - id: info_only_test\n"
+        "    kind: delta\n"
+        "    target: test_surface_delta.new_cases\n"
+        "    operator: not_equals\n"
+        "    expected: []\n"
+        "    severity: info\n",
     )
     compiled = _compile(target)
     advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)

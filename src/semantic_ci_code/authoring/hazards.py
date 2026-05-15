@@ -40,19 +40,22 @@ _ADVISORY_ORDER = (
 )
 
 _TEST_SURFACE_DELTA_PREFIX = "test_surface_delta"
-_POSITIVE_DELTA_OPERATORS = frozenset(
+_ADDITION_FORCING_OPERATORS = frozenset(
     {
         Operator.INCLUDES_ALL,
         Operator.INCLUDES_ANY,
         Operator.SUPERSET_OF,
-        Operator.SUPERSET_OF_BASELINE,
     }
 )
-# `not_equals` is treated as a positive addition only when the expected
-# value is an empty collection (`expected: []`), which forces the
-# observed delta to contain at least one item. Other `not_equals`
-# expectations (e.g. `not_equals expected: ["x.y"]`) are vacuously
-# satisfied by an empty delta and must not suppress ADVISORY-P1 / P2.
+# When applied to a `_delta.added` / `.new_cases` target with a
+# **non-empty** `expected`, these operators require the observed delta
+# to contain at least one item — a real positive addition assertion.
+# Empty-expected variants (`includes_all []`, `superset_of []`) are
+# vacuously satisfied by an empty observed delta and must NOT suppress
+# ADVISORY-P1 / P2. `not_equals expected: []` is handled separately in
+# `_is_positive_addition`. `SUPERSET_OF_BASELINE` is excluded because it
+# has no `expected` parameter and cannot guarantee a non-empty
+# addition by itself (an empty baseline + empty delta is satisfied).
 _NON_PYTHON_SUFFIXES = frozenset(
     {
         ".md",
@@ -404,10 +407,29 @@ def _is_empty_collection(value: object) -> bool:
 
 
 def _is_positive_addition(constraint: CompiledConstraint) -> bool:
+    """True if this constraint forces a non-empty observed delta AND
+    participates in the verdict.
+
+    Three filters apply (each independently essential to the P1 / P2
+    "vacuous PASS" semantics):
+
+    1. `severity != info` — INFO violations are Advisor-channel only
+       (`docs/code_semantic_ci_design.md §23.3`) and never change the
+       verdict, so an info-severity addition assertion does not gate
+       the vacuous PASS hazard P1 / P2 warns about.
+    2. The target points at an addition dimension (`_delta.added`,
+       `_delta.added_cases`, `.new_cases`).
+    3. The operator + expected combination forces observed != []:
+       `includes_all` / `includes_any` / `superset_of` with non-empty
+       expected qualify; `not_equals expected: []` qualifies; empty
+       expected variants do not (vacuous).
+    """
+    if constraint.severity is Severity.INFO:
+        return False
     if not _targets_added_dimension(constraint.target):
         return False
-    if constraint.operator in _POSITIVE_DELTA_OPERATORS:
-        return True
+    if constraint.operator in _ADDITION_FORCING_OPERATORS:
+        return not _is_empty_collection(constraint.expected)
     if constraint.operator is Operator.NOT_EQUALS and _is_empty_collection(constraint.expected):
         return True
     return False

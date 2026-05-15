@@ -782,6 +782,53 @@ def test_d4_cli_integration_with_git(tmp_path: Path):
     assert "ADVISORY-D4" in codes
 
 
+def test_d4_cli_silent_on_python_to_non_python_rename(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 5, target_doctor.py:128): when a
+    Python file is renamed to a non-`.py` path (e.g. `foo.py ->
+    foo.txt`), git numstat records `old_path=foo.py` and
+    `path=foo.txt`. The Validator surface would extract a Python delta
+    (api_surface_delta.removed_public on the old name), so the diff is
+    not "config/doc only". D4 must stay silent. `_resolve_files_touched`
+    now includes both sides of rename entries.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "mod.py").write_text("def foo(): return 1\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    _git(repo, "checkout", "-b", "feature")
+    _git(repo, "mv", "mod.py", "mod.txt")
+    _git(repo, "commit", "-m", "rename Python to text")
+    _write_target(
+        repo / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints: []\n",
+    )
+    result = run_semantic_ci(
+        repo,
+        "target-doctor",
+        "--target",
+        str(repo / "target.yaml"),
+        "--baseline-rev",
+        baseline_sha,
+        "--candidate-rev",
+        "HEAD",
+        "--format",
+        "json",
+    )
+    assert result.returncode == 0
+    payload = parse_json(result.stdout)
+    assert "ADVISORY-D4" not in [a["code"] for a in payload["advisories"]]
+
+
 def test_d4_cli_silent_when_python_diff_present(tmp_path: Path):
     repo = tmp_path / "repo"
     repo.mkdir()

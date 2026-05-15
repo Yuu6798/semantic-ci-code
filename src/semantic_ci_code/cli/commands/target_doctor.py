@@ -125,4 +125,15 @@ def _resolve_files_touched(args: Namespace) -> tuple[Path, ...] | None:
             raise
         return None
 
-    return tuple(entry.path for entry in entries)
+    # Include both sides of rename entries so D4 can see Python touches
+    # on either side. A `foo.py -> bar.txt` rename has new path
+    # `bar.txt` and `old_path=foo.py`; dropping `old_path` would let D4
+    # misclassify the diff as non-Python and emit a vacuous-pass
+    # warning even though the validator would extract a Python delta
+    # (api_surface_delta.removed_public on the old name).
+    paths: list[Path] = []
+    for entry in entries:
+        paths.append(entry.path)
+        if entry.old_path is not None:
+            paths.append(entry.old_path)
+    return tuple(paths)

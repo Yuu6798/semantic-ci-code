@@ -476,3 +476,28 @@ semantic-ci validate-plan --target target.yaml --adapter claude-code
 semantic-ci validate-plan --target target.yaml --adapter codex --format json
 semantic-ci validate-plan --target target.yaml --adapter cursor --baseline-rev HEAD~1
 ```
+
+## Authoring subcommands (verdict 不参加)
+
+The following subcommands live on the **Authoring** or **Advisor** surface
+(`docs/code_semantic_ci_design.md §23.3.1`). They do not compute a verdict and
+do not change the JSON envelope produced by `check` / `compare` /
+`compile-repair`. Their full contracts will be filled in as Brief 8 lands
+(`docs/brief_8_planning.md §6`).
+
+- `semantic-ci init` — already documented above (Authoring: scaffold).
+- `semantic-ci init --recipe <id> --from-pr-body|--from-labels|--from-commits|--from-issue`
+  — Authoring: generate `target.yaml` from a recipe and structured PR
+  metadata; records provenance in `authorship.generation_metadata`
+  (Brief 8 / CSCI-42).
+- `semantic-ci target-doctor` — Advisor: audit a target file for the
+  six authoring hazards (D1 / D3 / D4 / P1 / P2 / S1); advisory presence
+  does not change the verdict (Brief 8 / CSCI-43).
+- `semantic-ci target-catalog` — Authoring (meta): machine-readable
+  reference of targets / operators / templates / match schemas for AI
+  assistants and IDE extensions (Brief 8 / CSCI-44).
+
+These subcommands are completely deterministic and never call out to an LLM
+or the network (`docs/brief_8_planning.md §5.2` INV-4). The Authoring surface
+design contract is in
+[`docs/target_authoring_surface.md`](./target_authoring_surface.md).

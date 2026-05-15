@@ -17,6 +17,14 @@ so you know what your `target.yaml` is and is not declaring.
 > the intent itself. Authoring guidance lives in the **Authoring** surface and
 > never participates in the verdict.
 
+> **`target.yaml` is not required to be hand-written.** This guide covers the
+> hand-authoring path, but `target.yaml` may also be produced by `init --recipe`
+> from PR metadata (Brief 8 / CSCI-42) or generated from the machine-readable
+> `target-catalog` (Brief 8 / CSCI-44). All paths converge on the same compiled
+> target before the verdict runs. See
+> [`docs/target_authoring_surface.md`](./target_authoring_surface.md) for the
+> Authoring surface design contract.
+
 ## Authoring Workflow
 
 The recommended loop is short:
@@ -162,6 +170,9 @@ the file you wanted it to gate on.
 If the test-surface dimension is irrelevant to a particular target file, drop
 the constraint instead of leaving it dead.
 
+`semantic-ci target-doctor` (Brief 8 / CSCI-43) detects this hazard as
+`ADVISORY-D1` once it lands.
+
 ## Hazard 2 — Template and user constraint duplication (D3)
 
 `change.primary_kind: refactor` auto-expands an `equals_baseline` invariant on
@@ -190,6 +201,9 @@ duplicate keeps firing the old contract silently.
   the compiled `CompiledTarget` lists every constraint that will be evaluated,
   template-supplied or user-authored, with stable IDs. A duplicate ID pair
   with identical `target`+`operator`+`expected` is redundancy you can remove.
+
+`semantic-ci target-doctor` (Brief 8 / CSCI-43) detects this hazard as
+`ADVISORY-D3` once it lands.
 
 ## Hazard 3 — Out-of-scope diffs can return vacuous PASS (D4)
 
@@ -235,6 +249,9 @@ non-Python artifacts (see `design.md §13` on out-of-scope items). It is
   not in core).
 - For mixed PRs, the engine still gates the Python slice. The vacuous
   contribution is only on PRs whose entire diff is outside the package root.
+
+`semantic-ci target-doctor` (Brief 8 / CSCI-43) detects this hazard as
+`ADVISORY-D4` once it lands.
 
 ## Constraint Authoring Tips
 
@@ -320,5 +337,10 @@ exempt, and the rest of the surface is still locked.
   Constraint Severity, Set Operator Match Semantics
 - `docs/exit_codes.md` — verdict-to-exit-code mapping
 - `docs/dogfooding_TC10_report.md` — concrete cases (TC1–TC10) of constraints
-  exercised end-to-end; D5 / FINDING-1 there is an open hazard tracked
-  separately in `.claude/memory/STATUS.md` 次の発行順序 §F
+  exercised end-to-end; D5 / FINDING-1 (set operator partial-dict semantics)
+  was resolved Validator-side in PR #65 (Match Schema partial-record match)
+  and is **not** covered by `target-doctor` (`docs/brief_8_planning.md §6.3.1`
+  notes D5 has no residual advisory pattern)
+- `docs/target_authoring_surface.md` — Authoring surface design contract;
+  hand-authoring, `init --recipe`, and `target-catalog` are alternative
+  paths to the same compiled target

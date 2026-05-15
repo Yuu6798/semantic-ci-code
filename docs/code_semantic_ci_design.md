@@ -1154,9 +1154,11 @@ intent への補正誘導や入力補足は **検討価値があり**、別 surf
 | Surface | 役割 | verdict 関与 | 例 |
 |---|---|---|---|
 | **Validator** | declared intent への adherence を判定 | YES (核) | `check`, `compare`, evaluator, constraint engine |
-| **Authoring** | target.yaml の **形式** を書く支援 | NO | `init` (scaffold), template constraints |
-| **Provenance** | intent の declared 経路を記録 | NO | spec authorship anchoring (§17) |
-| **Advisor** | intent 周辺の情報を人間に届ける | NO | `severity: info` constraint, Repair Compiler (§9.3 / §21.4), Vibe Coding Adapter (§21.3) |
+| **Authoring** | target.yaml の **形式** を書く支援 | NO | `init` (scaffold), `init --recipe --from-*` (Brief 8 / CSCI-42), `target-catalog` (Brief 8 / CSCI-44), template constraints |
+| **Provenance** | intent の declared 経路を記録 | NO | spec authorship anchoring (§17), `authorship.generation_metadata` 自動記録 (Brief 8 / CSCI-42) |
+| **Advisor** | intent 周辺の情報を人間に届ける | NO | `severity: info` constraint, Repair Compiler (§9.3 / §21.4), Vibe Coding Adapter (§21.3), `target-doctor` (Brief 8 / CSCI-43) |
+
+実装側の boundary catch-up は [`target_authoring_surface.md`](./target_authoring_surface.md) を参照 (CSCI-41 で landed)。 Brief 8 の 5 つの不変条件 (INV-1 verdict bytes / INV-2 surface isolation / INV-3 provenance non-participation / INV-4 no-LLM・no-network / INV-5 catalog↔implementation parity) は [`brief_8_planning.md §5.2`](./brief_8_planning.md) を参照。
 
 #### 23.3.2 設計判断への適用
 
@@ -1227,6 +1229,7 @@ ACTIVE 仕様 / 契約:
 - [`json_schema.md`](./json_schema.md) — verdict / compile / compile-repair / validate-plan envelopes
 - [`cli_test_inventory.md`](./cli_test_inventory.md) — CLI test coverage map
 - [`target_yaml_guide.md`](./target_yaml_guide.md) — `target.yaml` authoring guide（hazards D1/D3/D4）
+- [`target_authoring_surface.md`](./target_authoring_surface.md) — Authoring surface 設計契約 (target.yaml 生成経路 3 通り / LLM 経路は Brief 8b / verdict 前 freeze / surface isolation / `candidate_code_used: false` 固定)
 
 PLANNING (open):
 
@@ -1273,7 +1276,8 @@ DOGFOOD REPORT:
 | **Brief 4d** | `semantic-ci init`（Q4、target.yaml scaffolding）+ **spec authorship anchoring（§17 / Brief 3 #7）** + **soft / info constraint kind（Brief 3 #2）** — thin spec/CLI 拡張 | `codex/csci-30-init-authorship-severity` | merged (CSCI-30 / PR #43) |
 | **Brief 5** | **Vibe Coding Adapter（§21.3）+ Repair Compiler 前倒し（§9.3 / §21.4 / Brief 3 #4）** — P2.5 entry に絞る | `codex/csci-31-…` 〜 `codex/csci-35-…` | merged (CSCI-31 / PR #52, CSCI-32 / #53, CSCI-33 / #54, CSCI-34 / #55, CSCI-35 / #56 + 完了宣言 PR #57、`docs/archive/brief_5_planning.md` を REFERENCE として保存) |
 | **Brief 6** | ~~TypeScript extractor 着手（§22.2、P2.5 並列）~~ | ~~`codex/code-semantic-ci-ts-extractor`~~ | **凍結**（2026-05-06 Session 2 確定、§12 P3b 参照）。費用対効果再評価のため P3 以降に後倒し |
-| **Brief 7** | **Semantic Security Protocol (SSP) v0.1**（SAST + SCA、Python only、独立 envelope、Sensor Provenance Invariant）— Issue #48 audit を経て core 外の別 protocol として確立 | `codex/csci-36-...`〜`codex/csci-40-...`（CSCI-36〜40 想定） | planning merged (PR #50、`docs/brief_7_planning.md`)、Brief 5 完走済 → CSCI-36 発行可。AGENTS.md `Forward Design Note` を CSCI-36 起草時に逐語参照 |
+| **Brief 8** | **Authoring Surface 実装** — §23.3.1 Authoring / Provenance / Advisor surface の実装側 catch-up。CSCI-41 (`docs/target_authoring_surface.md` 設計契約) + CSCI-42 (`init --recipe --from-*` + `authorship.generation_metadata` 自動記録) + CSCI-43 (`target-doctor` advisor) + CSCI-44 (`target-catalog` machine-readable reference)。完全決定論 (INV-4 no-LLM・no-network)、LLM 経路は Brief 8b に分離 | `codex/csci-41-...`〜`codex/csci-44-...` | planning merged (PR #73、`docs/brief_8_planning.md`)、**Brief 7 より先発行確定**（§12.3 参照）。CSCI-41 起草時 `docs/brief_8_planning.md §6.1` + §14 checklist を逐語参照 |
+| **Brief 7** | **Semantic Security Protocol (SSP) v0.1**（SAST + SCA、Python only、独立 envelope、Sensor Provenance Invariant）— Issue #48 audit を経て core 外の別 protocol として確立 | `codex/csci-36-...`〜`codex/csci-40-...`（CSCI-36〜40 想定） | planning merged (PR #50、`docs/brief_7_planning.md`)、**Brief 8 完了後発行**（§12.3 参照）。AGENTS.md `Forward Design Note` を CSCI-36 起草時に逐語参照 |
 | **P2 Brief 群** | Repair Core Completion (§12 参照) — Brief 3 #5 / #8 / #9 残部を細目として明記:<br>・**Lock violation 即 fail（§8.2 / Brief 3 #8）** を `lock` operator 完全実装の一部として<br>・**Performance budget 部分対応（§18 / Brief 3 #5）**: per-extractor timeout、incremental extraction の foundation<br>・**Hash trail per-extractor version（§10 / Brief 3 #9 残部）**: P3a empirical alignment の reproducibility 担保 | TBD（P2 Brief 化時に分割） | pending |
 | **Brief 8+ deferred** | spec quality metrics（§19 / Brief 3 #6）+ suite packaging（§20）+ tolerance / scope / unknown_policy override（Brief 3 #3）+ Round-trip log（§10.3 / Brief 3 #10）+ orchestrator 観測応用（`docs/multi_agent_audit_case.md`）+ Brief 6 解凍（TypeScript extractor 再開判断） | TBD | deferred |
 

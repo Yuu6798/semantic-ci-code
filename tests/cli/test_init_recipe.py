@@ -58,16 +58,12 @@ def _target_bytes(tmp_path: Path) -> bytes:
 
 
 def test_a_feature_recipe_emits_record_match_with_visibility(tmp_path: Path):
-    rc, data = _run_init(
-        tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New"
-    )
+    rc, data = _run_init(tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New")
     assert rc == 0
     assert data["change"]["primary_kind"] == "feature"
 
     constraints = data["constraints"]
-    api_added = next(
-        c for c in constraints if c["target"] == "api_surface_delta.added"
-    )
+    api_added = next(c for c in constraints if c["target"] == "api_surface_delta.added")
     assert api_added["operator"] == "includes_all"
     # Inviolate: record match {fqn, visibility: "public"}, not flat string alias
     assert api_added["expected"] == [{"fqn": "pkg.New", "visibility": "public"}]
@@ -102,9 +98,7 @@ def test_a_bugfix_recipe_test_case_yields_includes_all(tmp_path: Path):
 
 
 def test_a_refactor_recipe_without_allowlist_has_no_api_block(tmp_path: Path):
-    rc, data = _run_init(
-        tmp_path, "--recipe", "refactor:preserve-api-with-allowlist"
-    )
+    rc, data = _run_init(tmp_path, "--recipe", "refactor:preserve-api-with-allowlist")
     assert rc == 0
     assert data["change"]["primary_kind"] == "refactor"
     # No user constraint added; only template REFACTOR constraints apply at compile
@@ -218,9 +212,7 @@ def test_b_test_update_recipe_byte_identical_across_three_runs(tmp_path: Path):
 
 
 def test_c_feature_recipe_output_compiles(tmp_path: Path):
-    rc, _ = _run_init(
-        tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New"
-    )
+    rc, _ = _run_init(tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New")
     assert rc == 0
     data = _compile_target(tmp_path)
     constraints = data["compiled_target"]["constraints"]
@@ -279,13 +271,9 @@ def test_d_feature_record_match_is_not_flat_string_alias(tmp_path: Path):
     dicts. Using the flat-projection alias (bare FQN strings) would lose
     visibility information.
     """
-    rc, data = _run_init(
-        tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.Sym"
-    )
+    rc, data = _run_init(tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.Sym")
     assert rc == 0
-    api_added = next(
-        c for c in data["constraints"] if c["target"] == "api_surface_delta.added"
-    )
+    api_added = next(c for c in data["constraints"] if c["target"] == "api_surface_delta.added")
     expected = api_added["expected"]
     assert isinstance(expected, list)
     for item in expected:
@@ -307,17 +295,13 @@ def test_e_feature_recipe_does_not_duplicate_feature_template_constraints(
     `effect_changes.added equals ()`), not re-emit them itself. Duplicates
     would surface as ADVISORY-D3 in target-doctor (CSCI-43).
     """
-    rc, data = _run_init(
-        tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New"
-    )
+    rc, data = _run_init(tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New")
     assert rc == 0
     template_constraints = TEMPLATE_CONSTRAINTS[ChangeKind.FEATURE]
     template_keys = {(c.target, c.operator.value) for c in template_constraints}
     user_keys = {(c["target"], c["operator"]) for c in data["constraints"]}
     overlap = template_keys & user_keys
-    assert not overlap, (
-        f"recipe duplicates FEATURE template constraints (ADVISORY-D3): {overlap}"
-    )
+    assert not overlap, f"recipe duplicates FEATURE template constraints (ADVISORY-D3): {overlap}"
 
 
 def test_e_bugfix_recipe_does_not_duplicate_bugfix_template_constraints(
@@ -373,12 +357,8 @@ def test_f_pr_body_only_flow_satisfies_feature_recipe(tmp_path: Path):
         str(body),
     )
     assert rc == 0
-    api_added = next(
-        c for c in data["constraints"] if c["target"] == "api_surface_delta.added"
-    )
-    assert api_added["expected"] == [
-        {"fqn": "pkg.NewFromPRBody", "visibility": "public"}
-    ]
+    api_added = next(c for c in data["constraints"] if c["target"] == "api_surface_delta.added")
+    assert api_added["expected"] == [{"fqn": "pkg.NewFromPRBody", "visibility": "public"}]
     metadata = data["authorship"]["generation_metadata"]
     assert metadata["source_surfaces"] == ["pr_body"]
 
@@ -397,12 +377,8 @@ def test_f_issue_only_flow_satisfies_feature_recipe(tmp_path: Path):
         str(issue),
     )
     assert rc == 0
-    api_added = next(
-        c for c in data["constraints"] if c["target"] == "api_surface_delta.added"
-    )
-    assert api_added["expected"] == [
-        {"fqn": "pkg.NewFromIssue", "visibility": "public"}
-    ]
+    api_added = next(c for c in data["constraints"] if c["target"] == "api_surface_delta.added")
+    assert api_added["expected"] == [{"fqn": "pkg.NewFromIssue", "visibility": "public"}]
     metadata = data["authorship"]["generation_metadata"]
     assert metadata["source_surfaces"] == ["issue"]
 
@@ -425,9 +401,7 @@ def test_f_strong_fills_issue_ignored(tmp_path: Path):
         str(issue),
     )
     assert rc == 0
-    api_added = next(
-        c for c in data["constraints"] if c["target"] == "api_surface_delta.added"
-    )
+    api_added = next(c for c in data["constraints"] if c["target"] == "api_surface_delta.added")
     expected_fqns = [item["fqn"] for item in api_added["expected"]]
     assert "pkg.Strong" in expected_fqns
     assert "issue.OnlySym" not in expected_fqns
@@ -612,9 +586,7 @@ def test_i_plain_init_has_no_generation_metadata(tmp_path: Path):
 
 
 def test_i_recipe_metadata_contains_required_fields(tmp_path: Path):
-    rc, data = _run_init(
-        tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New"
-    )
+    rc, data = _run_init(tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New")
     assert rc == 0
     metadata = data["authorship"]["generation_metadata"]
     assert metadata["tool"] == "semantic-ci-init"
@@ -626,9 +598,7 @@ def test_i_recipe_metadata_contains_required_fields(tmp_path: Path):
 
 
 def test_i_declared_at_omitted_when_not_specified(tmp_path: Path):
-    rc, data = _run_init(
-        tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New"
-    )
+    rc, data = _run_init(tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New")
     assert rc == 0
     authorship = data["authorship"]
     assert "declared_at" not in authorship

@@ -102,6 +102,39 @@ def test_explicit_test_cases_and_pr_body_dedup():
     assert merged.test_ids == ("tests/a.py::x", "tests/a.py::y")
 
 
+def test_strong_layer_cutoff_blocks_issue_for_unfilled_field():
+    """Layer-wide cutoff: when ANY positive expectation lands in the
+    strong layer (explicit flags or PR body), the medium issue body is
+    not consulted for content — even for a field the strong layer left
+    empty. Otherwise the merger would silently union test_ids from
+    issue while honouring api_fqns from strong, violating §6.2.3
+    "層を跨いで union しない" (Codex review on PR #84).
+    """
+    issue = ParsedSections(test_ids=("tests/issue.py::test_leak",))
+    merged = _merge(
+        explicit_add_api=("pkg.Strong",),
+        issue=issue,
+    )
+    assert merged.api_fqns == ("pkg.Strong",)
+    # test_ids must NOT leak in from issue, because strong layer was
+    # already filled (api_fqns side).
+    assert merged.test_ids == ()
+    # The issue surface IS still recorded for provenance.
+    assert "issue" in merged.source_surfaces
+
+
+def test_strong_layer_cutoff_via_pr_body_only_also_blocks_issue():
+    pr_body = ParsedSections(api_fqns=("pkg.FromPR",))
+    issue = ParsedSections(test_ids=("tests/issue.py::test_leak",))
+    merged = _merge(
+        explicit_add_api=(),
+        pr_body=pr_body,
+        issue=issue,
+    )
+    assert merged.api_fqns == ("pkg.FromPR",)
+    assert merged.test_ids == ()
+
+
 # ---------------------------------------------------------------------------
 # C1 — labels conflict
 # ---------------------------------------------------------------------------

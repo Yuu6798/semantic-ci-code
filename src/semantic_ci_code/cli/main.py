@@ -251,20 +251,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         metavar="PATH::NAME",
-        help=(
-            "canonical test case ID (path/to/test_file.py::test_function); "
-            "repeatable"
-        ),
+        help=("canonical test case ID (path/to/test_file.py::test_function); repeatable"),
     )
     init.add_argument(
         "--allow-fqn",
         action="append",
         default=None,
         metavar="FQN",
-        help=(
-            "FQN to allow in api_surface.allow_changes (refactor recipe only); "
-            "repeatable"
-        ),
+        help=("FQN to allow in api_surface.allow_changes (refactor recipe only); repeatable"),
     )
     init.add_argument(
         "--allow-fqn-prefix",
@@ -272,8 +266,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PREFIX",
         help=(
-            "FQN prefix to allow in api_surface.allow_changes (refactor recipe "
-            "only); repeatable"
+            "FQN prefix to allow in api_surface.allow_changes (refactor recipe only); repeatable"
         ),
     )
     init.add_argument(

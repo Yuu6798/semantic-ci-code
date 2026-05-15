@@ -261,28 +261,35 @@ def merge_sources(
         recipe_primary_kind=primary_kind,
         commits_kind=commits_kind,
     )
-    _check_unconsumed_sections(
-        recipe_id=recipe_id, surface_label="PR body", parsed=pr_body
-    )
-    _check_unconsumed_sections(
-        recipe_id=recipe_id, surface_label="issue body", parsed=issue
-    )
+    _check_unconsumed_sections(recipe_id=recipe_id, surface_label="PR body", parsed=pr_body)
+    _check_unconsumed_sections(recipe_id=recipe_id, surface_label="issue body", parsed=issue)
 
     pr_api_fqns = pr_body.api_fqns if pr_body is not None else ()
     pr_test_ids = pr_body.test_ids if pr_body is not None else ()
     issue_api_fqns = issue.api_fqns if issue is not None else ()
     issue_test_ids = issue.test_ids if issue is not None else ()
 
-    strong_api_fqns = _dedup_ordered(explicit_add_api + pr_api_fqns)
-    if strong_api_fqns:
-        api_fqns = strong_api_fqns
+    # §6.2.3 fallback chain: the strong layer's cutoff is applied to the
+    # layer as a whole, not per-field. If ANY positive expectation lands
+    # in the strong layer (explicit-input flags or PR body content), the
+    # issue body is no longer consulted for content — only for surface
+    # provenance. Per-field fallback would silently union across layers
+    # and violate the brief's "層を跨いで union しない" rule (Codex
+    # review on PR #84).
+    strong_has_positive_expectation = bool(
+        explicit_add_api
+        or explicit_test_cases
+        or explicit_allow_fqns
+        or explicit_allow_fqn_prefixes
+        or pr_api_fqns
+        or pr_test_ids
+    )
+
+    if strong_has_positive_expectation:
+        api_fqns = _dedup_ordered(explicit_add_api + pr_api_fqns)
+        test_ids = _dedup_ordered(explicit_test_cases + pr_test_ids)
     else:
         api_fqns = _dedup_ordered(issue_api_fqns)
-
-    strong_test_ids = _dedup_ordered(explicit_test_cases + pr_test_ids)
-    if strong_test_ids:
-        test_ids = strong_test_ids
-    else:
         test_ids = _dedup_ordered(issue_test_ids)
 
     allow_fqns = _dedup_ordered(explicit_allow_fqns)
@@ -303,9 +310,7 @@ def merge_sources(
         "labels": labels_consulted,
         "commits": commits_consulted,
     }
-    source_surfaces = tuple(
-        name for name in CANONICAL_SURFACE_ORDER if consulted[name]
-    )
+    source_surfaces = tuple(name for name in CANONICAL_SURFACE_ORDER if consulted[name])
 
     return MergedSources(
         recipe_id=recipe_id,

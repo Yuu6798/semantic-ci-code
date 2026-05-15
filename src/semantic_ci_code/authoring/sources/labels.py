@@ -53,10 +53,7 @@ def parse_kind_labels(labels: tuple[str, ...]) -> ChangeKind | None:
 
     if unknown:
         allowed = ", ".join(sorted(LABEL_TO_KIND.keys()))
-        msg = (
-            f"unrecognised kind:* label(s) {sorted(unknown)!r}; "
-            f"allowed: {allowed}"
-        )
+        msg = f"unrecognised kind:* label(s) {sorted(unknown)!r}; allowed: {allowed}"
         raise LabelsParseError(msg)
 
     if len(seen) > 1:

@@ -45,9 +45,7 @@ def build(merged: MergedSources) -> dict[str, Any]:
             "kind": "delta",
             "target": "api_surface_delta.added",
             "operator": "includes_all",
-            "expected": [
-                {"fqn": fqn, "visibility": "public"} for fqn in merged.api_fqns
-            ],
+            "expected": [{"fqn": fqn, "visibility": "public"} for fqn in merged.api_fqns],
         }
     )
 

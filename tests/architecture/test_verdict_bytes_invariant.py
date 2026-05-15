@@ -72,7 +72,7 @@ def _hand_written_target() -> str:
     output.
     """
     return (
-        "intent: \"\"\n"
+        'intent: ""\n'
         "change:\n"
         "  primary_kind: feature\n"
         "constraints:\n"
@@ -93,7 +93,7 @@ def _recipe_target(recipe_id: str) -> str:
     `authorship` block differs.
     """
     return (
-        "intent: \"\"\n"
+        'intent: ""\n'
         "change:\n"
         "  primary_kind: feature\n"
         "authorship:\n"

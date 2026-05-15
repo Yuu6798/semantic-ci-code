@@ -89,20 +89,14 @@ def _run_recipe(args: Namespace) -> dict[str, Any]:
 
     pr_body_parsed = None
     if args.from_pr_body is not None:
-        pr_body_parsed = parse_pr_body(
-            _read_text_file(args.from_pr_body, label="--from-pr-body")
-        )
+        pr_body_parsed = parse_pr_body(_read_text_file(args.from_pr_body, label="--from-pr-body"))
 
     issue_parsed = None
     if args.from_issue is not None:
-        issue_parsed = parse_issue_body(
-            _read_text_file(args.from_issue, label="--from-issue")
-        )
+        issue_parsed = parse_issue_body(_read_text_file(args.from_issue, label="--from-issue"))
 
     labels_consulted = args.from_labels is not None
-    labels_kind = (
-        parse_kind_labels(tuple(args.from_labels)) if labels_consulted else None
-    )
+    labels_kind = parse_kind_labels(tuple(args.from_labels)) if labels_consulted else None
 
     commits_consulted = args.from_commits is not None
     commits_kind = (

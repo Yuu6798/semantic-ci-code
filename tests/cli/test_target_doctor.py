@@ -218,6 +218,36 @@ def test_d4_silent_when_target_is_not_lock_only(tmp_path: Path):
     assert "ADVISORY-D4" not in [a.code for a in advisories]
 
 
+def test_d4_fires_when_lock_only_target_has_extra_severity_info_user_constraint(
+    tmp_path: Path,
+):
+    """Codex review (PR #82 P2 Round 4, hazards.py:371): a refactor
+    target's templates are hard lock-only, and an extra user
+    constraint with `severity: info` does not participate in the
+    verdict (`docs/code_semantic_ci_design.md §23.3`). On a config-only
+    diff, the hard locks pass vacuously and the info violation is
+    ignored — vacuous PASS. D4 must still fire. `_is_lock_only_target`
+    now filters out info-severity constraints before classification,
+    mirroring the same filter in `_is_positive_addition`.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: info_advisory_addition\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: includes_all\n"
+        '    expected: ["src.api.x"]\n'
+        "    severity: info\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+    assert d4[0].evidence["files_touched_count"] == 2
+
+
 def test_d4_silent_when_files_touched_is_none(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",

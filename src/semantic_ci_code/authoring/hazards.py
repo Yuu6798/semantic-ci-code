@@ -365,9 +365,21 @@ def _is_python_path(path: Path) -> bool:
 
 
 def _is_lock_only_target(target: CompiledTarget) -> bool:
-    if not target.constraints:
+    """True if every verdict-participating constraint is lock-only.
+
+    `severity: info` constraints are filtered out before classification
+    because they are Advisor-channel only and do not affect the verdict
+    (`docs/code_semantic_ci_design.md §23.3`). A refactor target with
+    hard lock templates plus an informational `includes_all` user
+    constraint still passes vacuously on an empty delta — the hard
+    locks pass trivially and the info violation is ignored — so D4
+    must still fire. Mirrors the Severity.INFO filter in
+    `_is_positive_addition`.
+    """
+    verdict_participating = tuple(c for c in target.constraints if c.severity is not Severity.INFO)
+    if not verdict_participating:
         return False
-    for constraint in target.constraints:
+    for constraint in verdict_participating:
         if not _is_lock_only_constraint(constraint):
             return False
     return True

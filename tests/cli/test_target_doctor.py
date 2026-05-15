@@ -306,6 +306,71 @@ def test_d4_fires_when_only_extra_user_constraint_is_subset_of(tmp_path: Path):
     assert d4[0].evidence["files_touched_count"] == 2
 
 
+def test_d4_fires_when_user_constraint_is_not_equals_non_empty(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 10, hazards.py:456): a hard user
+    predicate `api_surface_delta.added not_equals ["other"]` is
+    vacuously satisfied by an empty observed delta (`[] != ["other"]`
+    is True). On a config-only diff, the templates pass and the user
+    predicate also passes — vacuous PASS. D4 must fire.
+    `_is_lock_only_constraint` now classifies `not_equals` with
+    non-empty expected as lock-only.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: addition_not_equals_other\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: not_equals\n"
+        '    expected: ["src.api.other"]\n',
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+
+
+def test_d4_fires_when_user_constraint_is_includes_all_empty(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 10): `includes_all []` is
+    vacuously satisfied by any observed delta (`[] ⊇ []`). On a
+    config-only diff, vacuous PASS. D4 must fire."""
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: empty_includes_all\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: includes_all\n"
+        "    expected: []\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+
+
+def test_d4_fires_when_user_constraint_is_superset_of_empty(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 10): `superset_of []` is
+    vacuously satisfied by any observed delta. Same vacuous-pass
+    hazard as `includes_all []`."""
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: empty_superset_of\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: superset_of\n"
+        "    expected: []\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+
+
 def test_d4_fires_when_extra_user_constraint_uses_changed_only_in(tmp_path: Path):
     """Codex review (PR #82 P2 Round 8, hazards.py:420): the evaluator
     unconditionally returns SKIPPED for `Operator.CHANGED_ONLY_IN` (see

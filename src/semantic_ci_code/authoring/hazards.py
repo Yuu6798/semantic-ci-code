@@ -427,32 +427,50 @@ def _participates_in_verdict(constraint: CompiledConstraint) -> bool:
 
 
 def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
+    """True if this constraint is vacuously satisfied by an empty
+    observed delta (the verdict can PASS without inspecting any
+    Python change).
+
+    The classification is exhaustive over the operators that admit a
+    well-defined "lock vs positive" semantic. Operators whose vacuous
+    behavior depends on `expected` (`equals` / `includes_all` /
+    `superset_of` / `not_equals`) are handled per-operator.
+    """
     operator = constraint.operator
     expected = constraint.expected
+
+    # Always lock-only — vacuously satisfied by any empty observed,
+    # independent of `expected`.
     if operator in {
         Operator.EQUALS_BASELINE,
         Operator.SUPERSET_OF_BASELINE,
         Operator.NO_NEW_ITEMS,
         Operator.NO_REMOVED_ITEMS,
         Operator.UNCHANGED,
+        Operator.EXCLUDES_ALL,
+        Operator.SUBSET_OF,
     }:
         return True
-    if operator is Operator.EQUALS:
+
+    # Expected-dependent: lock-only when expected is "empty enough"
+    # (so the operator becomes trivially satisfied by an empty
+    # observed delta). `equals []`, `equals {added: [], removed: []}`,
+    # `includes_all []`, `superset_of []` all pass vacuously.
+    if operator in {Operator.EQUALS, Operator.INCLUDES_ALL, Operator.SUPERSET_OF}:
         if _is_empty_collection(expected):
             return True
         if isinstance(expected, dict) and all(
             _is_empty_collection(value) for value in expected.values()
         ):
             return True
-    if operator is Operator.EXCLUDES_ALL:
-        return True
-    if operator is Operator.SUBSET_OF:
-        # `subset_of [...]` and `subset_of []` are both vacuously
-        # satisfied by an empty observed delta (`[]` is a subset of any
-        # set, including the empty set), so a target whose only
-        # non-template constraint is a subset_of allow-list still
-        # passes vacuously on a config-only diff.
-        return True
+        return False
+
+    # `not_equals` is inverted: an empty observed delta satisfies
+    # `not_equals [non-empty]` (vacuous pass) but fails
+    # `not_equals []` (the empty observed equals the empty expected).
+    if operator is Operator.NOT_EQUALS:
+        return not _is_empty_collection(expected)
+
     return False
 
 

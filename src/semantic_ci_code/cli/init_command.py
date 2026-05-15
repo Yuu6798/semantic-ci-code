@@ -112,19 +112,22 @@ def _validate_fqn_values(values: list[str] | None, *, flag: str) -> None:
 def _validate_fqn_prefix_values(values: list[str] | None) -> None:
     # The refactor allowlist evaluator does prefix match with
     # `fqn.startswith(rule.fqn_prefix)`, so `legacy` would also match
-    # `legacy2.Foo`. Require the trailing `.` to scope correctly.
+    # `legacy2.Foo`. Require exactly one trailing `.` and reject
+    # doubled trailing dots (`pkg..`) which would form a prefix that
+    # extractor-produced FQNs can never satisfy.
     for value in values or ():
         if not value or "::" in value or not value.endswith(".") or value.startswith("."):
             valid = False
         else:
-            body = value.rstrip(".")
+            body = value[:-1]
             valid = bool(body) and all(part.isidentifier() for part in body.split("."))
         if not valid:
             raise ValueError(
                 f"--allow-fqn-prefix value {value!r} is not a valid FQN prefix; the "
-                f"value must end with '.' (e.g. 'pkg.legacy.') so the allowlist matches "
-                f"the intended package subtree only — bare 'legacy' would also permit "
-                f"'legacy2.Foo' through the evaluator's startswith() check"
+                f"value must end with exactly one '.' (e.g. 'pkg.legacy.') so the "
+                f"allowlist matches the intended package subtree only — bare 'legacy' "
+                f"would also permit 'legacy2.Foo' through the evaluator's startswith() "
+                f"check, and doubled dots like 'pkg..' would never match real FQNs"
             )
 
 

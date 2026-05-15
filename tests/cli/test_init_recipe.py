@@ -698,7 +698,25 @@ def test_h_allow_fqn_prefix_rejects_bare_value_without_trailing_dot(tmp_path: Pa
     )
     assert result.returncode == 2
     assert "--allow-fqn-prefix" in result.stderr
-    assert "trailing" in result.stderr or "end with '.'" in result.stderr
+    assert "must end with" in result.stderr
+
+
+def test_h_allow_fqn_prefix_rejects_doubled_trailing_dot(tmp_path: Path):
+    """`pkg..` would be emitted literally and the evaluator's
+    `startswith()` check could never match a real FQN (Codex review
+    on PR #84).
+    """
+    for bogus in ("pkg..", "pkg.legacy.."):
+        result = run_semantic_ci(
+            tmp_path,
+            "init",
+            "--recipe",
+            "refactor:preserve-api-with-allowlist",
+            "--allow-fqn-prefix",
+            bogus,
+        )
+        assert result.returncode == 2, f"accepted doubled trailing dot: {bogus!r}"
+        assert "--allow-fqn-prefix" in result.stderr
 
 
 def test_h_allow_fqn_prefix_rejects_leading_dot(tmp_path: Path):

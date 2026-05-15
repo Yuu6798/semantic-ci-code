@@ -135,6 +135,11 @@ def merge_sources(
             f"--add-api is only valid with --recipe {RECIPE_FEATURE_ADD_API}; "
             f"current recipe is {recipe_id!r}"
         )
+    if explicit_test_cases and _TEST_ID not in consumes:
+        raise RecipeFlagCompatibilityError(
+            f"--test-case is only valid with recipes that consume test cases; "
+            f"current recipe {recipe_id!r} would silently drop the declared test IDs"
+        )
     if (
         explicit_allow_fqns or explicit_allow_fqn_prefixes
     ) and recipe_id != RECIPE_REFACTOR_PRESERVE_API:

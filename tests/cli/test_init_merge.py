@@ -239,6 +239,20 @@ def test_add_api_with_non_feature_recipe_rejected():
     assert "feature:add-api" in str(exc_info.value)
 
 
+def test_test_case_with_non_consuming_recipe_rejected():
+    """Refactor recipe never reads `merged.test_ids`; accepting --test-case
+    there would silently drop the user's declared test expectation
+    (Codex review on PR #84).
+    """
+    with pytest.raises(RecipeFlagCompatibilityError) as exc_info:
+        _merge(
+            recipe_id=RECIPE_REFACTOR_PRESERVE_API,
+            explicit_add_api=(),
+            explicit_test_cases=("tests/a.py::test_x",),
+        )
+    assert "--test-case" in str(exc_info.value)
+
+
 def test_allow_fqn_with_non_refactor_recipe_rejected():
     with pytest.raises(RecipeFlagCompatibilityError):
         _merge(

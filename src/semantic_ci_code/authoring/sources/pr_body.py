@@ -31,7 +31,16 @@ class ParsedSections:
 
 
 def _is_test_id(value: str) -> bool:
-    return "::" in value
+    # Match `_test_case_id` in delta/code_state_delta.py:354-355:
+    # `f"{entry.test_file}::{entry.test_function}"`. A bullet with a
+    # different shape (parametrize brackets, class prefix, stray spaces,
+    # GFM checklist leftovers) would compile but never match the delta.
+    if value.count("::") != 1:
+        return False
+    path, name = value.split("::")
+    if not path or not name or " " in path or " " in name:
+        return False
+    return name.isidentifier()
 
 
 def _is_fqn(value: str) -> bool:
@@ -60,6 +69,8 @@ def _extract_section_bodies(text: str) -> dict[str, tuple[str, ...]]:
             continue
         if stripped.startswith("- "):
             value = stripped[2:].strip()
+            if value.startswith(("[ ] ", "[x] ", "[X] ")):
+                value = value[4:].strip()
             if value:
                 sections[current].append(value)
     return {key: tuple(values) for key, values in sections.items()}

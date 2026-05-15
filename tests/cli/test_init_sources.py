@@ -21,6 +21,7 @@ from semantic_ci_code.authoring.sources.pr_body import (
     ACCEPTANCE_CRITERIA_TITLE,
     EXPECTED_API_TITLE,
     REMOVED_API_TITLE,
+    TEST_CASES_TITLE,
 )
 from semantic_ci_code.domain.state_schema import ChangeKind
 
@@ -74,6 +75,42 @@ def test_pr_body_acceptance_criteria_splits_test_ids_and_fqns():
     )
     assert parsed.api_fqns == ("foo.bar.HelperSym",)
     assert parsed.unclassified == ()
+
+
+def test_pr_body_test_id_rejects_checklist_marker_leftover():
+    """`- [ ] tests/test_x.py::test_y` is a common GFM checklist bullet.
+    The leading `[ ]` is stripped before classification so the bullet
+    surfaces as a canonical test ID (Codex review on PR #84).
+    """
+    body = """## Test cases
+- [ ] tests/test_x.py::test_y
+- [x] tests/test_x.py::test_z
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.test_ids == (
+        "tests/test_x.py::test_y",
+        "tests/test_x.py::test_z",
+    )
+    assert parsed.unclassified == ()
+
+
+def test_pr_body_test_id_rejects_parametrize_brackets():
+    body = """## Test cases
+- tests/test_x.py::test_func[case1]
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.test_ids == ()
+    assert parsed.unclassified == ((TEST_CASES_TITLE, "tests/test_x.py::test_func[case1]"),)
+
+
+def test_pr_body_test_id_rejects_class_prefix_form():
+    body = """## Test cases
+- tests/test_x.py::TestClass::test_method
+"""
+    parsed = parse_pr_body(body)
+    # Two `::` is not the canonical `file::function` form used by the
+    # delta producer.
+    assert parsed.test_ids == ()
 
 
 def test_pr_body_unclassifiable_bullet_recorded():

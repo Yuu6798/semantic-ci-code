@@ -103,6 +103,31 @@ def test_pr_body_test_id_rejects_parametrize_brackets():
     assert parsed.unclassified == ((TEST_CASES_TITLE, "tests/test_x.py::test_func[case1]"),)
 
 
+def test_pr_body_test_id_rejects_non_test_function_name():
+    """The extractor's `_is_test_function_name` requires the function
+    portion to start with `test_`; a `helper` name would not be emitted
+    and accepting it would yield a permanently-failing constraint
+    (Codex review on PR #84).
+    """
+    body = """## Test cases
+- tests/test_x.py::helper
+- tests/test_x.py::TestAPI::helper
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.test_ids == ()
+
+
+def test_pr_body_test_id_rejects_non_test_class_prefix():
+    """Class-based test IDs must match `_is_test_class_name`
+    (`startswith("Test")`); `Helper::test_x` is not extractor output.
+    """
+    body = """## Test cases
+- tests/test_x.py::Helper::test_method
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.test_ids == ()
+
+
 def test_pr_body_test_id_rejects_overqualified_node_id():
     """The extractor never nests classes (`_entries_for_test_class` only
     walks direct method defs), so `path::TestA::TestB::test_case` is not

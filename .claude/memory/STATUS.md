@@ -24,19 +24,94 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-P2.5 完走 + ABCD-A 完走 + ABCD-B 着手 (CSCI-41 landed) — Brief 1〜5 全 merged
-+ ResultStatus split (D1-1〜D3) 全 merged + Brief 8 入口 (Authoring surface
-設計契約) merged。 `semantic-ci` CLI は `init` / `observe` / `compare` /
-`check` / `pre-commit` / `compile` / `compile-repair` / `validate-plan` の
-8 subcommand を持ち、 Vibe Coding Adapter(Claude Code / Cursor / Codex)
-経由で repair guidance + pre-generation guidance を render 可能。 UNKNOWN は
-(a) compile-time `CompileError` (大半の authoring error)、 (b) runtime
-`unknown_cause` 4 値、 (c) `validate-plan` の
-`risk_summary.authoring_errors` slot で end-to-end 診断可能。 Authoring
-surface (target.yaml 生成経路 / surface isolation / `candidate_code_used:
-false` 固定) は `docs/target_authoring_surface.md` で設計契約済。
+P2.5 完走 + ABCD-A 完走 + ABCD-B 着手 (CSCI-41 + CSCI-43 landed) — Brief 1〜5
+全 merged + ResultStatus split (D1-1〜D3) 全 merged + Brief 8 入口 (Authoring
+surface 設計契約 + `target-doctor` Advisor surface) merged。 `semantic-ci`
+CLI は `init` / `observe` / `compare` / `check` / `pre-commit` / `compile` /
+`compile-repair` / `validate-plan` / `target-doctor` の 9 subcommand を持ち、
+Vibe Coding Adapter(Claude Code / Cursor / Codex)経由で repair guidance +
+pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
+`CompileError` (大半の authoring error)、 (b) runtime `unknown_cause` 4 値、
+(c) `validate-plan` の `risk_summary.authoring_errors` slot、 (d)
+`target-doctor` の 6 advisory (D1/D3/D4/P1/P2/S1) で end-to-end 診断可能。
+Authoring surface (target.yaml 生成経路 / surface isolation / Advisor
+renderer exempt / `candidate_code_used: false` 固定) は
+`docs/target_authoring_surface.md` で設計契約済。
 
 ## 直近 merged
+
+### 2026-05-15 Session 3 — Brief 8 / CSCI-43 (`semantic-ci target-doctor` Advisor surface) landed
+
+B 軸 (Brief 8) 実装 1 本目 = 推奨着地順 41 → **43** → 42 → 44 の 2 番目消化。
+docs only の CSCI-41 (Session 2) を実装に展開し、 6 advisory (D1/D3/D4/P1/P2/S1)
+を verdict 不参加で検出する `target-doctor` subcommand を landed。
+
+- **PR #82** (CSCI-43, `feat(brief-8): land CSCI-43 — semantic-ci target-doctor
+  (Advisor surface)`): `cli/commands/target_doctor.py` + `authoring/hazards.py`
+  + `authoring/advisory.py` + `cli/output/doctor_human.py` /
+  `doctor_json.py` 新設、 `tests/architecture/test_surface_isolation.py` で
+  INV-2 (verdict-bearing module = `check` / `compare` / `pre_commit` + engine
+  の transitive imports に doctor module が混入しない) + INV-4 (CLI dispatcher
+  例外を main.py に narrow) を gate。 schemas/doctor_advisory.schema.json で
+  envelope を `schema_version="advisory-1"` で固定、 exit code は §6.3.3 規約
+  (advisory ≥ 0 でも 0、 入力エラー 2、 engine エラー 3、 unhandled 4)。
+  **Codex bot review 16 round 全部 P2 消化** (本体 1 commit + 16 fix commit、
+  merge `66b6fc2`):
+  - R1: SKIPPED-by-design operator 経由の D4 misclassification → 418cef0 で
+    `_evaluator_skipped_baseline` フィルタを D4 入力に直結
+  - R2: `not_equals(non-empty)` を addition と誤検知して P1/P2 を握り潰し →
+    bd38702 で `not_equals` を `expected=={empty}` のみ addition 扱いに narrow
+  - R3: zero-magnitude `not_equals` / `lock` を P1/P2 addition と誤検知 →
+    0928f63 で「非 info + 非 empty addition」 の論理積で P1/P2 を gate
+  - R4-R6: `equals_baseline` / `subset_of` / rename `old_path` の D4 分類
+    取りこぼし → c06c0fa / 2f36864 / 14df79c で順次 fix
+  - R7: `severity: info` constraint を D4 lock-only 判定に混ぜると vacuous
+    addition と区別不能 → de2fb90 で info constraint 除外
+  - R8: dict-nested expected の意味的等価重複が D3 で抜け → 1bf6c97 で
+    nested expected を canonicalize してから duplicate check
+  - R9: `unknown_policy in {fail, repair}` 起因の info constraint が
+    S1 評価 + D4 lock-only 評価で扱い不一致 → c197bac で `_is_lock_only_user_constraint`
+    に unknown-routing 例外を追加
+  - R10-R12: zero-shape / partial-dict expected を lock-only と誤分類して D4
+    suppression が false-negative 化 → b41f6de / e040f83 / e190f2f で 3 段階に
+    narrow (vacuous predicate → zero-delta scalar lock → delta observation 限定)
+  - R13-R14: `--package-root` 配下外の path / open path を D1 / D4 で
+    扱い間違え → e190f2f / 673f5e4 で path scope を package-root に narrow + open
+    paths を D4 lock-only から除外、 P1 を semantic surface に narrow
+  - R15: leaf target が collection lock-only と誤分類されて D4 false negative
+    → 6394a14 で leaf target requirement を追加
+  - R16: D4 numstat が repo 全体を走査して package-root 外を含む → 11b7893 で
+    numstat を `--package-root` slice に restrict
+  - R17 (post-merge): `--package-root .` resolve が cwd vs `check` の
+    repo-root で divergence → **deferred follow-up** (subdirectory 起動時のみ
+    表面化、 critical でない UX consistency 改善、 別 PR 候補)
+  - CI: 3.11 / 3.12 / 3.13 全 green、 **pytest 1072 passed** (+66 new test
+    = 53 CLI doctor + 7 architecture + 6 D4 git integration)、 ruff check /
+    ruff format ✅
+
+**設計判断のハイライト**:
+
+1. **INV-2 architecture test を実装より先に書く** — Session 2 メモで「surface
+   boundary を docs に書く前に既存実装の boundary 仕様を inventory する」
+   pattern を pin したのが効いた。 `tests/architecture/test_surface_isolation.py`
+   を最初に書いて verdict-bearing module 群の transitive imports を closure
+   で固定すると、 `target-doctor` 実装中の incidental import が即 fail で
+   検出され、 Advisor renderer exempt の boundary を実装側で逐語固定できる
+2. **「lock-only と vacuous-pass」 の境界が D4 false-negative の主因** —
+   R10〜R12 の 3 round で「lock-only に見える predicate が delta observation
+   起因なら vacuous でない」 / 「zero-magnitude が必ずしも lock とは限らない」
+   / 「partial-dict expected は subset 評価で意味を持つ」 という 3 重 narrow が
+   必要だった。 D4 brief を起草する時点で「lock vs vacuous」 の inviolate
+   definition を §6.3.1 に書ききれていなかった反省、 CSCI-42 brief 起草時に
+   先に「authoring 生成経路における lock vs vacuous の境界」 を design.md
+   §23.3.1 でカバーすべきか確認
+3. **16 round 全部 P2 = 仕様 vs 実装の boundary が曖昧** — operator semantics /
+   severity / SKIPPED / git / scalar / path domain / source filter のそれぞれで
+   「target-doctor 実装が boundary を 1 mm 越えていた」 が累積、 Brief 8 §6.3.1
+   の advisory spec が「inviolate predicate」 形式で書かれていなかったため
+   実装が連続的に推測した結果。 CSCI-42 / CSCI-44 brief では「advisory 1 つ
+   ごとに inviolate predicate 1 行」 + 「false negative の境界 fixture を AC で
+   要求」 する pattern を継承
 
 ### 2026-05-15 Session 2 — Brief 8 / CSCI-41 (Authoring Surface 設計契約) landed
 
@@ -323,10 +398,10 @@ evaluator_internal)、 (c) author-facing `risk_summary.authoring_errors` slot
 
 ## 次の発行順序
 
-P2.5 完走 + A (ResultStatus split) 完走 + B-1 (CSCI-41) 完走で ABCD-A 軸
-landed + ABCD-B 軸 1/4 landed。 残り B-2〜B-4 (Brief 8 implementation 3 PR) /
-C (Brief 7 SSP) / D (P2 残課題)。 ABCD 完走で product 機能の ship-blocking
-gap が消える(`2026-05-12.md` 参照)。
+P2.5 完走 + A (ResultStatus split) 完走 + B-1 (CSCI-41) + B-2 (CSCI-43) 完走で
+ABCD-A 軸 landed + ABCD-B 軸 2/4 landed。 残り B-3〜B-4 (Brief 8 implementation
+2 PR) / C (Brief 7 SSP) / D (P2 残課題)。 ABCD 完走で product 機能の
+ship-blocking gap が消える(`2026-05-12.md` 参照)。
 
 ### A. ResultStatus split — **完走 (2026-05-14/15)**
 
@@ -339,7 +414,7 @@ D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
   が unknown_policy 非尊重になったため S1 の scope を `extraction-cause +
   open_runtime` に narrow)
 
-### B. Brief 8(Authoring Surface、 planning merged 2026-05-09 PR #73、 implementation 4 PR、 1/4 landed)
+### B. Brief 8(Authoring Surface、 planning merged 2026-05-09 PR #73、 implementation 4 PR、 2/4 landed)
 
 推奨着地順 41 → 43 → 42 → 44(`docs/brief_8_planning.md §12.2`)。
 
@@ -348,18 +423,29 @@ D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
   Codex 3 round 消化(scope creep / Section F 内部矛盾 / Section E import
   isolation contradiction)。 詳細は本ファイル 直近 merged § 2026-05-15
   Session 2 参照
-- **B-2. CSCI-43. `semantic-ci target-doctor`**: 6 advisory (D1/D3/D4/P1/P2/S1)
-  検出、 verdict 不参加、 `tests/architecture/test_surface_isolation.py` 新設。
-  brief 未起草。 起草時必読: A 軸 follow-up の `ADVISORY-S1` 文言更新 +
-  `docs/target_authoring_surface.md` Section E (Advisor renderer は INV-2
-  適用外) を逐語参照、 INV-2 import-graph test は verdict-bearing module
-  (`check` / `compare` / `pre_commit` + engine) のみ閉包対象
+- **B-2. CSCI-43. `semantic-ci target-doctor`**: **完走 (2026-05-15 Session 3、
+  PR #82)**。 6 advisory (D1/D3/D4/P1/P2/S1) 検出、 verdict 不参加、
+  `tests/architecture/test_surface_isolation.py` で INV-2 (verdict-bearing
+  module = check / compare / pre_commit + engine) + INV-4 (CLI dispatcher
+  例外を main.py に narrow) を gate。 Codex 16 round 全部 P2 消化、 R17
+  (`--package-root .` cwd vs repo-root divergence) は deferred follow-up。
+  詳細は本ファイル 直近 merged § 2026-05-15 Session 3 参照。 follow-up:
+  - **A 軸 follow-up 残**: `docs/brief_8_planning.md §6.3.1` line 435 の
+    `ADVISORY-S1` 文言を「extraction-cause + open_runtime UNKNOWN のみ
+    `unknown_policy` 経由 verdict 影響」 に narrow する one-liner (D1-4 で
+    authoring-cause UNKNOWN は `unknown_policy` 非尊重で常時 FAIL となった
+    ため)。 docs only、 別 PR で landing 想定
+  - **R17 deferred**: target-doctor の `--package-root` resolve を `check` と
+    同じ repo-relative に揃える consistency 改善 (subdirectory 起動時のみ
+    表面化、 critical でない UX 改善)
 - **B-3. CSCI-42. `semantic-ci init --recipe --from-*`**: PR body / labels /
   commits / issue から target.yaml 生成 + `authorship.generation_metadata`
   自動記録。 brief 未起草。 起草時必読: `docs/target_authoring_surface.md`
   Section F (`generation_metadata` populate は generator paths 限定、 plain
   init は TARGET_TEMPLATE 逐語維持で block 自体 absent、
-  `candidate_code_used: false` 固定)
+  `candidate_code_used: false` 固定)。 加えて CSCI-43 で得た知見 (advisory
+  1 つごとに inviolate predicate 1 行で書く / false negative 境界 fixture を
+  AC で要求) を継承
 - **B-4. CSCI-44. `semantic-ci target-catalog`**: 全 operator / template /
   match schema を機械可読 + human で出力(AI assistant / IDE 拡張用)。
   brief 未起草
@@ -401,18 +487,23 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 
 ### 直近最短経路
 
-- **CSCI-43 起草**(Brief 8 / `target-doctor`、 1.5 日規模、 推奨着地順
-  §12.2 で CSCI-42 より先) — `tests/architecture/test_surface_isolation.py`
-  新設で INV-2 / INV-4 を早期固定、 6 advisory (D1 / D3 / D4 / P1 / P2 /
-  S1) 検出。 起草時必読:
-  1. `docs/brief_8_planning.md §6.3` (advisory 一覧 + CLI + exit code 規約 +
-     Acceptance Criteria) + §14 起草 checklist
-  2. `docs/target_authoring_surface.md` Section E (verdict-bearing module
-     リスト = `check` / `compare` / `pre_commit` + engine、 Advisor renderer
-     は exempt) を INV-2 test scope に逐語反映
-  3. A 軸 follow-up: `ADVISORY-S1` 文言更新(scope narrow to
-     `extraction-cause + open_runtime`、 D1-4 で authoring-cause UNKNOWN が
-     unknown_policy 非尊重になったため)を Brief 8 / CSCI-43 brief に明記
+- **CSCI-42 起草**(Brief 8 / `init --recipe --from-*`、 推奨着地順 §12.2 で
+  CSCI-43 の次) — PR body / labels / commits / issue から target.yaml 生成 +
+  `authorship.generation_metadata` 自動記録。 起草時必読:
+  1. `docs/brief_8_planning.md §6.2` (`init --recipe` spec、 AC、 file 一覧、
+     exit code 規約) + §14 起草 checklist
+  2. `docs/target_authoring_surface.md` Section F (`generation_metadata`
+     populate は generator paths 限定、 plain init は TARGET_TEMPLATE 逐語維持で
+     block 自体 absent、 `candidate_code_used: false` 固定) を逐語反映
+  3. CSCI-43 で得た 16 round Codex review の教訓: (a) advisory / generator
+     仕様は「inviolate predicate 1 行」 形式で AC に明記、 (b) false negative
+     境界 fixture を AC で要求 (今回は「generation_metadata が plain init で
+     populate されない」 / 「recipe 経由で空配列を生成しない」)、 (c) INV-2
+     surface isolation test を実装より先に書いて Advisor renderer exempt の
+     boundary を `tests/architecture/test_surface_isolation.py` に閉包追加
+  4. **A 軸 follow-up 残**: `docs/brief_8_planning.md §6.3.1` line 435 の
+     `ADVISORY-S1` 文言 narrow (docs only、 CSCI-42 とは別 PR で landing)。
+     PR が並走する場合は CSCI-42 branch では §6.3.1 を編集しない
 
 ## Frozen / Deferred
 

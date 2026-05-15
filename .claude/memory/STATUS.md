@@ -24,12 +24,86 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-P2.5 完走 — Brief 1〜5 全 merged。`semantic-ci` CLI は `init` / `observe` /
-`compare` / `check` / `pre-commit` / `compile` / `compile-repair` /
-`validate-plan` の 8 subcommand を持ち、Vibe Coding Adapter(Claude Code /
-Cursor / Codex)経由で repair guidance + pre-generation guidance を render 可能。
+P2.5 完走 + ABCD-A 完走 — Brief 1〜5 全 merged + ResultStatus split (D1-1〜D3)
+全 merged。`semantic-ci` CLI は `init` / `observe` / `compare` / `check` /
+`pre-commit` / `compile` / `compile-repair` / `validate-plan` の 8 subcommand
+を持ち、Vibe Coding Adapter(Claude Code / Cursor / Codex)経由で repair
+guidance + pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
+`CompileError` (大半の authoring error)、 (b) runtime `unknown_cause` 4 値、
+(c) `validate-plan` の `risk_summary.authoring_errors` slot で end-to-end
+診断可能。
 
 ## 直近 merged
+
+### 2026-05-14/15 — ResultStatus split 完走 (4 PR 一気通貫)
+
+A (ResultStatus split) を planning §3 D1〜D3 の全 brief で main landed。
+UNKNOWN は (a) compile-time `CompileError` (大半の authoring error)、
+(b) runtime `unknown_cause` 4 値 (authoring 残置 / extraction / open_runtime /
+evaluator_internal)、 (c) author-facing `risk_summary.authoring_errors` slot
+で end-to-end 診断可能。
+
+- **PR #76** (D1-2, `compile(operator-schema): push E_OPERATOR_TARGET_MISMATCH
+  to compile time`): `compiler/operator_schema.py` 新設、 (kind, operator-class,
+  path-domain) 3 ルール違反を `CompileError` reject。 evaluator 3 emit site は
+  defense-in-depth として残置 + コメント追記。 self-review で `CHANGED` hint
+  asymmetry + site 1/3 defense test を follow-up commit で同 PR 内消化、
+  16 + 2 件のテスト追加。 994 passed
+- **PR #77** (D1-3, `compile(type-schema): push E_TYPE_MISMATCH to compile
+  time`): `compiler/type_schema.py` 新設、 `TargetCategory` 9 値 enum +
+  Pydantic 反射ベース path → category map (lru_cache)、 observed-category +
+  expected-shape の 2 軸検証。 operators.py 11 emit site は defense-in-depth、
+  2 catch-all は runtime safety net (D1-4 で EVALUATOR_INTERNAL 付与)。 81 件
+  のテスト追加、 既存テスト 3 件を valid combination に更新。 CI で
+  `ruff format --check` が失敗 → follow-up commit で format 適用。 975 passed
+- **PR #78** (D1-4, `evaluator(unknown-cause): wire diagnostic cause + force
+  authoring fail`): `UnknownCause` StrEnum (4 値) を evaluator に追加、
+  `ConstraintResult.unknown_cause: UnknownCause | None`、 `OperatorOutcome`
+  経由で operators.py から `_from_operator_outcome` 境界で enum 変換
+  (compiler/evaluator 循環回避)。 `_aggregate` で AUTHORING 強制 FAIL
+  (planning §3 D2)、 `_category_or_none` で `RepairCategory.FIX_REQUIRED`
+  強制。 JSON / SARIF / GH Actions / human formatter + repair serialization に
+  surface。 verdict envelope schema_version 据え置き ("nested optional
+  diagnostic field" 例外規定を `docs/json_schema.md` に新設)。 Codex review
+  3 round 全部 P2 design soundness を消化:
+  - Round 1: open path で `_unknown_type_mismatch` 経由 authoring が
+    `unknown_policy: warn` を握り潰す → `_from_operator_outcome` 境界で
+    open target + authoring → OPEN_RUNTIME 再分類
+  - Round 2: `_resolved_unknown_cause` が schema-invalid subpath を
+    EXTRACTION で握り潰す → 3-way 分類 (open / schema-valid → EXTRACTION /
+    schema-invalid → AUTHORING) に拡張
+  - Round 3: D1-3 が UNKNOWN_OPEN で expected-side も bypass する → D1-3 の
+    `check_type_compatibility` を「observed-side は target category 依存」
+    「expected-side は literal-shape 単独」 に split、 expected 側は無条件実行
+  - 1006 passed
+- **PR #79** (D3, `validate-plan(authoring-errors): split risk_summary into
+  authoring + impl slots`): `risk_summary.authoring_errors` を `would_violate`
+  と分離、 `RISK_SUMMARY_KEYS` の先頭に配置。 `compute_risk_summary` を
+  single-evaluation refactor、 verdict から authoring_errors + would_violate を
+  同時計算。 3 adapter (claude-code / cursor / codex) に 2-step
+  implementation order intro + AUTHORING ERRORS section。 validate-plan
+  envelope schema_version `"1" → "2"` bump、 6 golden fixture refresh、
+  `docs/json_schema.md` に validate-plan v1→v2 diff 節 + version history row。
+  1006 passed
+
+**設計判断のハイライト**:
+
+1. **UnknownCause の置き場所** — result-side 概念なので `evaluator.evaluator`
+   に enum 定義 (`framework` ではなく)。 operators.py からは string で渡し、
+   `_from_operator_outcome` 境界で enum 変換 (compiler→evaluator 循環回避)。
+   同じ理由で `_BASELINE_OPERATORS` / `_PURE_OPERATORS` は
+   `compiler.operator_schema` に duplicated、 sync invariant test で gate
+2. **D4 envelope bump policy の 2 ケース** — `results[].unknown_cause` は
+   nested optional diagnostic field (bump 不要、 `docs/json_schema.md` の
+   "Nested optional diagnostic fields" 例外規定)、 D3 の
+   `risk_summary.authoring_errors` は depth-1 top-level (bump 該当)。
+   ResultStatus split 全体で envelope bump 1 回 (validate-plan v1→v2) に収束
+3. **3 round Codex review に共通する設計の本質** — 「authoring vs runtime
+   cause の境界が曖昧」 という設計問題。 「authoring = compile が押し戻せ
+   なかった spec malformed」 という inviolate definition に立ち戻れば 3 round
+   全部が一貫した実装に収束 (`_from_operator_outcome` retag / 3-way
+   `_resolved_unknown_cause` / D1-3 observed-vs-expected split)。 design spec
+   の境界判定を実装側で 3 段階に精緻化した経過は `2026-05-15.md` に永続化
 
 ### 2026-05-12 — ResultStatus split planning 取り込み + ABCD 完成度境界の確認
 
@@ -189,28 +263,20 @@ Cursor / Codex)経由で repair guidance + pre-generation guidance を render �
 
 ## 次の発行順序
 
-P2.5 完走 + 3 planning (Brief 7 / Brief 8 / ResultStatus split) すべて main
-landed の状態。 ABCD = 「中身の完成」 4 軸として整理 (`2026-05-12.md` 参照)、
-ABCD 完走で product 機能の ship-blocking gap が消える。
+P2.5 完走 + A (ResultStatus split) 完走で ABCD のうち A 軸 landed。 残り B
+(Brief 8 Authoring Surface) / C (Brief 7 SSP) / D (P2 残課題)。 ABCD 完走で
+product 機能の ship-blocking gap が消える(`2026-05-12.md` 参照)。
 
-### A. ResultStatus split(planning merged 2026-05-12 PR #74、 implementation 4 PR)
+### A. ResultStatus split — **完走 (2026-05-14/15)**
 
-- **A-1. D1-2. `E_OPERATOR_TARGET_MISMATCH` を compile-time 化**(本体実装
-  第 1 段、 **brief 起草済**): `compiler/operator_schema.py` 新規 +
-  `_validate_target_svp_values` 拡張で (kind, operator-class, path-domain) の
-  3 ルール違反を `CompileError` として reject。 evaluator 3 emit site
-  (`:255 / :287 / :309`) を defense-in-depth コメント追記で残置(挙動不変)。
-  次セッション開始時に user → Codex paste で発行可。 brief 文章は
-  `2026-05-09.md` 末尾、 planning は `docs/brief_resultstatus_planning.md`
-- **A-2. D1-3. `E_TYPE_MISMATCH` を compile-time 化**: 11 operators.py emit
-  site のうち observed-side ~95% + expected-side 100% を CompileError 化。
-  brief 未起草。 planning §4.5 / §5 参照
-- **A-3. D1-4. `results[].unknown_cause` optional field + 配線**: aggregate
-  / repair emitter / SARIF / GH Actions / human / json formatter wiring +
-  authoring-cause を verdict FAIL に倒す。 brief 未起草
-- **A-4. D3. `validate-plan` v1→v2**: `risk_summary.authoring_errors` を
-  `would_violate` から分離 + adapter rendering 更新 (claude-code / cursor /
-  codex)。 brief 未起草
+D1-1 (planning PR #74) → D1-2 (PR #76) → D1-3 (PR #77) → D1-4 (PR #78) →
+D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
+2026-05-14/15 参照。 follow-up:
+
+- **CSCI-43 起草時必読**: planning §1b.3 が D1-4 PR description で約束した
+  Brief 8 `ADVISORY-S1` 文言更新の one-liner (D1-4 で authoring-cause UNKNOWN
+  が unknown_policy 非尊重になったため S1 の scope を `extraction-cause +
+  open_runtime` に narrow)
 
 ### B. Brief 8(Authoring Surface、 planning merged 2026-05-09 PR #73、 implementation 4 PR)
 
@@ -256,21 +322,22 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 
 ### Sequencing decisions
 
+- **A (ResultStatus split) 完走**: 2026-05-14/15 で 4 PR (#76 / #77 / #78 /
+  #79) 一気通貫マージ、 Brief 8 vs ResultStatus split の着地順序は事後的に
+  「ResultStatus split 先 → Brief 8」 で確定
 - **Brief 8 vs Brief 7**: Brief 8 先(`brief_8_planning.md §12.3` 確定)
-- **Brief 8 vs ResultStatus split**: open(`brief_resultstatus_planning.md
-  §1b.4` で user 判断に残置、 3 option: Brief 8 先 / ResultStatus split 先
-  / 並列)
-- **D は A/B/C と独立**: いつ挟んでも良い、 ただし P3a (Action 配布) を狙う
+- **D は B/C と独立**: いつ挟んでも良い、 ただし P3a (Action 配布) を狙う
   なら D-3 hash trail が前提
 
 ### 直近最短経路
 
-- **D1-2 paste**(brief 起草済、 `2026-05-09.md` 参照)— user → Codex paste
-  1 回で発進可能、 ResultStatus split が走り始める
-- **CSCI-41 起草**(Brief 8 docs only) — 半日〜1 日、 Brief 8 が走り始める
-- 並列実行可: A と B は touch する file が disjoint(A = compiler / evaluator
-  / risk_summary、 B = 新 subcommand + 新 module)、 並列レビュー負荷だけが
-  trade-off
+- **CSCI-41 起草**(Brief 8 docs only) — 半日〜1 日、
+  `docs/target_authoring_surface.md` 新設 + §23.3.1 surface 配属の実装側追記。
+  Brief 8 が走り始める。 起草時 `docs/brief_8_planning.md §6.1` + §14
+  checklist を逐語参照
+- **CSCI-43 起草の事前準備**: planning §1b.3 で D1-4 が約束した
+  `ADVISORY-S1` 文言更新(scope narrow to extraction-cause + open_runtime)
+  を CSCI-43 brief に明記
 
 ## Frozen / Deferred
 

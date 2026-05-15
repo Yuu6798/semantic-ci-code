@@ -570,6 +570,88 @@ def test_h_test_case_must_contain_double_colon(tmp_path: Path):
     assert "_test_case_id" in result.stderr
 
 
+def test_h_add_api_rejects_empty_string(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "feature:add-api",
+        "--add-api",
+        "",
+    )
+    assert result.returncode == 2
+    assert "--add-api" in result.stderr
+
+
+def test_h_add_api_rejects_non_dotted_value(tmp_path: Path):
+    """AC G negative: a raw CLI value like `not-an-fqn` would otherwise
+    compile but never match an extractor-produced FQN (Codex review on
+    PR #84).
+    """
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "feature:add-api",
+        "--add-api",
+        "not-an-fqn",
+    )
+    assert result.returncode == 2
+    assert "--add-api" in result.stderr
+    assert "not-an-fqn" in result.stderr
+
+
+def test_h_add_api_rejects_leading_or_trailing_dot(tmp_path: Path):
+    for bogus in (".pkg.Sym", "pkg.Sym.", "pkg..Sym"):
+        result = run_semantic_ci(
+            tmp_path,
+            "init",
+            "--recipe",
+            "feature:add-api",
+            "--add-api",
+            bogus,
+        )
+        assert result.returncode == 2, f"accepted invalid FQN: {bogus!r}"
+
+
+def test_h_allow_fqn_rejects_malformed_value(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "refactor:preserve-api-with-allowlist",
+        "--allow-fqn",
+        "not an fqn",
+    )
+    assert result.returncode == 2
+    assert "--allow-fqn" in result.stderr
+
+
+def test_h_allow_fqn_prefix_accepts_trailing_dot(tmp_path: Path):
+    rc, data = _run_init(
+        tmp_path,
+        "--recipe",
+        "refactor:preserve-api-with-allowlist",
+        "--allow-fqn-prefix",
+        "legacy.",
+    )
+    assert rc == 0
+    assert data["api_surface"]["allow_changes"] == [{"fqn_prefix": "legacy."}]
+
+
+def test_h_allow_fqn_prefix_rejects_leading_dot(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "refactor:preserve-api-with-allowlist",
+        "--allow-fqn-prefix",
+        ".legacy",
+    )
+    assert result.returncode == 2
+    assert "--allow-fqn-prefix" in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # Section I — provenance scope
 # ---------------------------------------------------------------------------

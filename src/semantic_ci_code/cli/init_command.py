@@ -123,6 +123,80 @@ def _run_recipe(args: Namespace) -> dict[str, Any]:
     return apply_recipe(merged)
 
 
+def _is_valid_fqn(value: str) -> bool:
+    """Same FQN grammar as `authoring/sources/pr_body._is_fqn`.
+
+    Kept in sync explicitly rather than imported to avoid wiring the
+    CLI surface into pr_body's internal helpers; if the grammar
+    changes in one place, the corresponding test should fail in the
+    other.
+    """
+    if not value or "::" in value:
+        return False
+    if "." not in value:
+        return False
+    if value.startswith(".") or value.endswith("."):
+        return False
+    return all(part.isidentifier() for part in value.split("."))
+
+
+def _is_valid_fqn_prefix(value: str) -> bool:
+    """Validate `--allow-fqn-prefix` values.
+
+    A valid prefix is non-empty, free of `::`, and consists of one or
+    more dotted identifier parts. A trailing `.` is allowed (e.g.
+    `pkg.legacy.`) and is the canonical form for a true prefix; values
+    without a trailing dot are accepted as the degenerate "single
+    component" case so users can write `--allow-fqn-prefix legacy`
+    when matching anything under `legacy.*`.
+    """
+    if not value or "::" in value:
+        return False
+    if value.startswith("."):
+        return False
+    body = value.rstrip(".")
+    if not body:
+        return False
+    return all(part.isidentifier() for part in body.split("."))
+
+
+def _validate_fqn_values(values: list[str] | None, *, flag: str) -> None:
+    """Raise a clear authoring error for malformed `--add-api` / `--allow-fqn`.
+
+    PR / issue body bullets are vetted by `_is_fqn` and unclassifiable
+    values surface as C4 errors. The CLI surface used to bypass that
+    grammar entirely, so `--add-api ''` or `--add-api not-an-fqn`
+    produced a target that compiled but could never match an
+    extractor-produced FQN (Codex review on PR #84). The same grammar
+    is now enforced at parse time.
+    """
+    if not values:
+        return
+    for value in values:
+        if not _is_valid_fqn(value):
+            raise ValueError(
+                f"{flag} value {value!r} is not a valid dotted FQN "
+                f"(e.g. 'pkg.module.symbol'); each segment must be a "
+                f"Python identifier and the value must contain at "
+                f"least one '.', start and end with an identifier "
+                f"character, and not contain '::'"
+            )
+
+
+def _validate_fqn_prefix_values(values: list[str] | None) -> None:
+    if not values:
+        return
+    for value in values:
+        if not _is_valid_fqn_prefix(value):
+            raise ValueError(
+                f"--allow-fqn-prefix value {value!r} is not a valid "
+                f"FQN prefix (e.g. 'pkg.legacy.'); each segment must "
+                f"be a Python identifier, the value must not start "
+                f"with '.', and a trailing '.' is allowed but a "
+                f"leading or doubled '.' is not"
+            )
+
+
 def _validate_test_case_format(values: list[str] | None) -> None:
     """Enforce canonical `path/to/test_x.py::test_y` form (§6.2.4).
 
@@ -186,6 +260,9 @@ def run_init(args: Namespace) -> int:
     try:
         _validate_recipe_relationship(args)
         _validate_test_case_format(args.test_case)
+        _validate_fqn_values(args.add_api, flag="--add-api")
+        _validate_fqn_values(args.allow_fqn, flag="--allow-fqn")
+        _validate_fqn_prefix_values(args.allow_fqn_prefix)
 
         path = Path(args.path or ".semantic-ci/target.yaml")
         if path.exists() and not args.force:

@@ -23,15 +23,45 @@ target that omits `generation_metadata` entirely.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
+import sys
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-
-from tests.cli.helpers import run_semantic_ci
 
 # Fields that the evaluator decides. These are what INV-1 / INV-3
 # protect: their bytes must be stable across (a) Brief 8 module
 # additions and (b) any variation in `target_authorship`.
 VERDICT_FIELDS: tuple[str, ...] = ("verdict", "summary", "results", "repair_plan")
+
+
+def _run_semantic_ci(cwd: Path, *args: str) -> tuple[int, str]:
+    """In-process semantic-ci runner without depending on `tests.cli.helpers`.
+
+    `tests/__init__.py` is absent in this repo, so the dotted
+    `tests.cli.helpers` import only resolves under specific pytest
+    rootdir configurations. To keep this architecture test robust
+    across Python 3.11〜3.13 we re-implement the minimal in-process
+    invocation here instead.
+    """
+    from semantic_ci_code.cli.main import main
+
+    saved_cwd = Path.cwd()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    try:
+        os.chdir(cwd)
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            try:
+                rc = main(list(args))
+            except SystemExit as exc:
+                rc = exc.code if isinstance(exc.code, int) else 1
+        return rc, stdout.getvalue()
+    finally:
+        os.chdir(saved_cwd)
+        sys.stdout.flush()
+        sys.stderr.flush()
 
 
 def _evaluator_derived_bytes(payload: dict) -> bytes:
@@ -117,7 +147,7 @@ def _recipe_target(recipe_id: str) -> str:
 
 
 def _run_compare(tmp_path: Path, target_path: Path, baseline: Path, candidate: Path) -> dict:
-    result = run_semantic_ci(
+    rc, stdout = _run_semantic_ci(
         tmp_path,
         "compare",
         "--baseline-dir",
@@ -129,8 +159,8 @@ def _run_compare(tmp_path: Path, target_path: Path, baseline: Path, candidate: P
         "--format",
         "json",
     )
-    assert result.returncode == 0, result.stderr
-    return json.loads(result.stdout)
+    assert rc == 0, f"compare failed with rc={rc}"
+    return json.loads(stdout)
 
 
 def test_inv1_verdict_bytes_stable_across_metadata_variants(tmp_path: Path):

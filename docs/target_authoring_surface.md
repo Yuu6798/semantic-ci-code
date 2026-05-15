@@ -84,23 +84,38 @@ byte-identical.
 
 ## E. Authoring / Advisor / Provenance surfaces are not reachable from the evaluator
 
-The verdict-bearing modules (`evaluator/`, `compiler/`, `pipeline/`, `repair/`,
-the `check` / `compare` / `compile-repair` / `pre-commit` command handlers) must
-not import the modules that implement the Authoring / Advisor / Provenance
-surfaces. Brief 8 fixes this structurally:
+The verdict-bearing modules — `evaluator/`, `compiler/`, `pipeline/`,
+`repair/`, and the verdict subcommand handlers `check` / `compare` /
+`pre-commit` — must not import the new Authoring or target-audit modules
+(`init --recipe`, `target-doctor`, `target-catalog`).
+
+The Advisor surface itself is **explicitly exempt** from this isolation rule.
+`compile-repair` and `validate-plan` are Advisor subcommands; their adapter
+renderers in `repair_compiler/adapters/*` intentionally include
+`authorship.generation_metadata` (`format_generation_metadata`) so the
+downstream generator sees how the target was produced. That is the existing
+contract called out as an INV-1 exception in
+`docs/brief_8_planning.md §5.2` (the `validate-plan` envelope and the verdict
+envelope's `target_authorship` field are reflected, not quarantined).
+
+Brief 8 fixes the isolation structurally:
 
 - **INV-2 (Surface isolation)**: the transitive import closure of
-  `cli/commands/check.py` (and the other verdict-path command handlers) does
-  not contain `init`, `target-doctor`, `target-catalog`, or any
-  `authoring/` module. `cli/main.py` subparser registration is excluded —
-  it is a dispatcher concern, not a verdict-semantic one.
+  `cli/commands/check.py` (and the other verdict-path command handlers
+  `compare.py` / `pre_commit.py`) does not contain `init`, `target-doctor`,
+  `target-catalog`, or any new `authoring/` module. `cli/main.py` subparser
+  registration is excluded — it is a dispatcher concern, not a
+  verdict-semantic one. `compile-repair` / `validate-plan` and
+  `repair_compiler/` are not on the verdict path and are not gated by INV-2.
 - **INV-1 (Verdict bytes invariant)**: the JSON fields the evaluator decides
   (`verdict`, `repair_plan`, `summary`) remain byte-identical across Brief 8.
   Two narrow exceptions are documented in `docs/brief_8_planning.md §5.2`:
   the existing `target_authorship` field on the verdict envelope, and the
-  whole `validate-plan` envelope (which is itself an Advisor output).
+  whole `validate-plan` envelope (which is itself an Advisor output that
+  intentionally renders `generation_metadata`).
 - **INV-3 (Provenance non-participation)**: arbitrary edits to
-  `authorship.generation_metadata` do not move the evaluator-derived fields.
+  `authorship.generation_metadata` do not move the evaluator-derived fields,
+  even though Advisor renderers reflect that metadata into their output.
 
 `docs/code_semantic_ci_design.md §23.3.1` lists the four surfaces (Validator /
 Authoring / Provenance / Advisor) and pins that adapters and repair compilers

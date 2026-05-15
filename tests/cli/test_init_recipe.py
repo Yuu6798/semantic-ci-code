@@ -639,6 +639,23 @@ def test_h_allow_fqn_prefix_accepts_trailing_dot(tmp_path: Path):
     assert data["api_surface"]["allow_changes"] == [{"fqn_prefix": "legacy."}]
 
 
+def test_h_allow_fqn_prefix_rejects_bare_value_without_trailing_dot(tmp_path: Path):
+    """The evaluator's allowlist uses `startswith(rule.fqn_prefix)`, so bare
+    `legacy` would also match `legacy2.Foo` (Codex review on PR #84).
+    """
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "refactor:preserve-api-with-allowlist",
+        "--allow-fqn-prefix",
+        "legacy",
+    )
+    assert result.returncode == 2
+    assert "--allow-fqn-prefix" in result.stderr
+    assert "trailing" in result.stderr or "end with '.'" in result.stderr
+
+
 def test_h_allow_fqn_prefix_rejects_leading_dot(tmp_path: Path):
     result = run_semantic_ci(
         tmp_path,

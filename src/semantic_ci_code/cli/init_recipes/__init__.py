@@ -1,11 +1,4 @@
-"""Recipe registry for `semantic-ci init --recipe` (Brief 8 / CSCI-42).
-
-Each recipe module exposes a single `build(merged: MergedSources)`
-function that returns the target.yaml payload as an ordered mapping.
-The mapping is then serialised with `yaml.safe_dump(..., sort_keys=False)`
-so that same input yields byte-identical output across runs (INV-1 /
-determinism acceptance).
-"""
+"""Recipe registry for `semantic-ci init --recipe`."""
 
 from __future__ import annotations
 
@@ -37,13 +30,7 @@ RECIPES: dict[str, RecipeBuilder] = {
 
 
 def apply_recipe(merged: MergedSources) -> dict[str, Any]:
-    """Apply the recipe selected by `merged.recipe_id`.
-
-    The caller is expected to have already validated the recipe ID via
-    the merger and to pass the corresponding `MergedSources` payload.
-    """
-    builder = RECIPES[merged.recipe_id]
-    return builder(merged)
+    return RECIPES[merged.recipe_id](merged)
 
 
 __all__ = ["RECIPES", "RecipeBuilder", "apply_recipe"]

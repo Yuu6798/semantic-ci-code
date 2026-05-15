@@ -512,12 +512,22 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
 
     # Expected-dependent: collection or scalar.
     if operator in {Operator.EQUALS, Operator.INCLUDES_ALL, Operator.SUPERSET_OF}:
-        # Dict-shape `equals {added: [], removed: []}` is the
-        # whole-delta zero shape — lock regardless of leafness
-        # (template:refactor:effects_unchanged uses this).
+        # Dict-shape `equals {added: (), removed: ()}` is the
+        # whole-delta zero shape that template:refactor:effects_unchanged
+        # and template:test_update:effects_unchanged emit. Restrict
+        # this shortcut to **template-sourced** constraints — the
+        # template registry encodes the canonical zero shape for each
+        # whole-delta target, so we trust it. User constraints like
+        # `equals {}` or `equals {added: []}` are partial dicts that
+        # the evaluator compares against the full `{added: (),
+        # removed: ()}` shape and VIOLATES; classifying them as
+        # lock-only would let D4 falsely claim "vacuous PASS" when
+        # the actual verdict is FAIL.
         if (
             operator is Operator.EQUALS
+            and constraint.source is ConstraintSource.TEMPLATE
             and isinstance(expected, dict)
+            and expected
             and all(_is_empty_collection(value) for value in expected.values())
         ):
             return True

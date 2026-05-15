@@ -488,6 +488,31 @@ def test_d4_silent_when_equals_targets_whole_delta_mapping_with_list(tmp_path: P
     assert "ADVISORY-D4" not in [a.code for a in advisories]
 
 
+def test_d4_silent_when_user_equals_partial_dict_on_whole_delta(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 16, hazards.py:522): a user
+    constraint `effect_changes equals {added: []}` (partial dict) is
+    compared by the evaluator against the full `{added: (),
+    removed: ()}` shape and VIOLATES on a config-only diff — verdict
+    FAIL, not vacuous PASS. The dict-of-empties shortcut now only
+    applies to `ConstraintSource.TEMPLATE` constraints (the template
+    registry encodes the canonical zero shape).
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: partial_dict_lock\n"
+        "    kind: delta\n"
+        "    target: effect_changes\n"
+        "    operator: equals\n"
+        "    expected:\n"
+        "      added: []\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    assert "ADVISORY-D4" not in [a.code for a in advisories]
+
+
 def test_d4_silent_when_user_constraint_targets_open_path(tmp_path: Path):
     """Codex review (PR #82 P2 Round 14, hazards.py:497): an open-path
     target (`python_specific.*` or `typescript_specific.*`) resolves

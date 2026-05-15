@@ -103,6 +103,20 @@ def test_pr_body_test_id_rejects_parametrize_brackets():
     assert parsed.unclassified == ((TEST_CASES_TITLE, "tests/test_x.py::test_func[case1]"),)
 
 
+def test_pr_body_test_id_rejects_non_posix_paths():
+    """The extractor records `test_file` via `relative.as_posix()`, so
+    backslashes, absolute paths, and non-`.py` extensions never appear
+    in `test_surface_delta.new_cases` (Codex review on PR #84).
+    """
+    body = """## Test cases
+- tests\\test_x.py::test_y
+- /repo/tests/test_x.py::test_y
+- tests/test_x.txt::test_y
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.test_ids == ()
+
+
 def test_pr_body_test_id_rejects_non_test_function_name():
     """The extractor's `_is_test_function_name` requires the function
     portion to start with `test_`; a `helper` name would not be emitted

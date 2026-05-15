@@ -32,15 +32,15 @@ class ParsedSections:
 
 def _is_test_id(value: str) -> bool:
     # Match `_test_case_id` in delta/code_state_delta.py: it joins
-    # `test_file::test_function` where `test_function` is what
-    # `_is_test_function_name` accepts (starts with `test_`), or the
-    # `Class::method` form where the class is what `_is_test_class_name`
-    # accepts (starts with `Test`) and the method still starts with
-    # `test_`. See test_surface/python_test_surface_extractor.py:113,
-    # 181-195, 287-292. Reject anything else — those forms compile but
-    # the extractor never produces them.
+    # `test_file::test_function` where the extractor's `test_file` is a
+    # repo-relative POSIX `.py` path (`relative.as_posix()` in
+    # python_test_surface_extractor.py:139-140) and `test_function` is
+    # either `test_*` or `Test*::test_*` (lines 113, 181-195, 287-292).
+    # Reject anything the extractor never produces.
     path, sep, name = value.partition("::")
     if not sep or not path or not name or " " in path or " " in name:
+        return False
+    if "\\" in path or path.startswith("/") or not path.endswith(".py"):
         return False
     parts = name.split("::")
     if not all(part.isidentifier() for part in parts):

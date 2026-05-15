@@ -72,10 +72,12 @@ hand-written ─────┘   (declared        ┃    validate-plan
 target-doctor (Advisor, audits) ──────/
 ```
 
-The provenance of the file — which path produced it, what recipe ID was used,
-what PR body fragment seeded a constraint — is recorded under
-`authorship.generation_metadata` for traceability, but the evaluator never
-reads it. INV-3 (Provenance non-participation) in
+The provenance of the file — which generator path produced it, what recipe ID
+was used, what PR body fragment seeded a constraint — is recorded under
+`authorship.generation_metadata` for traceability on generator paths
+(`init --recipe --from-*`), but the evaluator never reads it. Plain `init`
+scaffold and hand-written targets do not populate `generation_metadata` at
+all. INV-3 (Provenance non-participation) in
 `docs/brief_8_planning.md §5.2` requires that mutating `generation_metadata`
 leaves evaluator-derived fields (`verdict`, `repair_plan`, `summary`)
 byte-identical.
@@ -107,7 +109,7 @@ rule applies to recipes: a recipe expands `change.primary_kind` and user input
 into a `target.yaml`, but the resulting file is then frozen as declared intent
 before any verdict runs.
 
-## F. Candidate-derived expectations are not implemented; `candidate_code_used: false` is always recorded
+## F. Candidate-derived expectations are not implemented; `candidate_code_used: false` whenever provenance metadata is populated
 
 Deriving an expectation from the candidate code under review — for example,
 auto-generating `api_surface_delta.added` to match whatever the candidate
@@ -116,12 +118,17 @@ actually added — is a tautology that produces vacuous PASS verdicts. Brief 8
 `--allow-candidate-derived-expectations` flag (see `R2` in
 `docs/brief_8_planning.md §11`; the argparse spec test fixes flag non-existence).
 
-For traceability, every Brief 8 authoring path records
-`authorship.generation_metadata.candidate_code_used: false`. The field is
-**always false** in this brief. A future brief that legitimately introduces
-candidate-aware expectations (if such a path is ever shown to be safe) would
-have to negotiate the boundary against §23.3 first; until then the field is a
-fixed sentinel, not a switch.
+`authorship.generation_metadata` is populated only on generator paths
+(`init --recipe --from-*` today; any future Brief 8b LLM path would have to
+populate the same block). Plain `semantic-ci init` and hand-written targets
+do not get a `generation_metadata` block at all — that block is absent rather
+than set, which preserves the byte-for-byte `TARGET_TEMPLATE` invariant
+(`docs/brief_8_planning.md §2.4`). Whenever `generation_metadata` is
+populated, the recorded `candidate_code_used` is **always `false`** in this
+brief. A future brief that legitimately introduces candidate-aware
+expectations (if such a path is ever shown to be safe) would have to
+negotiate the boundary against §23.3 first; until then the field is a fixed
+sentinel, not a switch.
 
 ## Cross References
 

@@ -228,6 +228,87 @@ def build_parser() -> argparse.ArgumentParser:
     init = subcommands.add_parser("init", help="scaffold a semantic-ci target.yaml")
     init.add_argument("--path", default=None, help="target.yaml path to create")
     init.add_argument("--force", action="store_true", help="overwrite an existing file")
+    init.add_argument(
+        "--recipe",
+        default=None,
+        choices=(
+            "feature:add-api",
+            "bugfix:regression-test",
+            "refactor:preserve-api-with-allowlist",
+            "test-update:add-test-case",
+        ),
+        help="generate target.yaml from a recipe instead of the bare scaffold",
+    )
+    init.add_argument(
+        "--add-api",
+        action="append",
+        default=None,
+        metavar="FQN",
+        help="explicit public API FQN to declare (feature:add-api only); repeatable",
+    )
+    init.add_argument(
+        "--test-case",
+        action="append",
+        default=None,
+        metavar="PATH::NAME",
+        help=(
+            "canonical test case ID (path/to/test_file.py::test_function); "
+            "repeatable"
+        ),
+    )
+    init.add_argument(
+        "--allow-fqn",
+        action="append",
+        default=None,
+        metavar="FQN",
+        help=(
+            "FQN to allow in api_surface.allow_changes (refactor recipe only); "
+            "repeatable"
+        ),
+    )
+    init.add_argument(
+        "--allow-fqn-prefix",
+        action="append",
+        default=None,
+        metavar="PREFIX",
+        help=(
+            "FQN prefix to allow in api_surface.allow_changes (refactor recipe "
+            "only); repeatable"
+        ),
+    )
+    init.add_argument(
+        "--declared-at",
+        default=None,
+        help="explicit ISO-8601 timestamp for authorship.declared_at",
+    )
+    init.add_argument(
+        "--from-pr-body",
+        default=None,
+        metavar="PATH",
+        help="path to a markdown file containing the PR body",
+    )
+    init.add_argument(
+        "--from-issue",
+        default=None,
+        metavar="PATH",
+        help="path to a markdown file containing an issue body",
+    )
+    init.add_argument(
+        "--from-labels",
+        nargs="+",
+        default=None,
+        metavar="LABEL",
+        help="GitHub labels for primary_kind validation; e.g. kind:feature",
+    )
+    init.add_argument(
+        "--from-commits",
+        default=None,
+        metavar="PATH",
+        help=(
+            "path to a text file containing one commit subject line per row; "
+            "Conventional Commits prefix feeds the primary_kind hint"
+        ),
+    )
 
     target_doctor = subcommands.add_parser(
         "target-doctor",

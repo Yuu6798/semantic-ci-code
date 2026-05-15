@@ -1,0 +1,73 @@
+"""Helpers shared across recipe modules.
+
+Keeps the per-recipe modules small and lets `compile_target_svp` see a
+consistent top-level structure (`intent`, `change`, `authorship`,
+`api_surface`, `effects`, `constraints`) regardless of which recipe ran.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from semantic_ci_code.authoring.provenance import build_generation_metadata
+from semantic_ci_code.authoring.sources.merge import MergedSources
+
+
+def empty_recipe_payload(merged: MergedSources) -> dict[str, Any]:
+    """Build the base `target.yaml` payload shared by all recipes.
+
+    Includes `intent`, `change.primary_kind`, and the provenance
+    metadata block. Recipes append `constraints` (and optionally an
+    `api_surface` block for refactor allowlist) on top.
+    """
+    authorship: dict[str, Any] = {
+        "generation_metadata": build_generation_metadata(
+            recipe_id=merged.recipe_id,
+            source_surfaces=merged.source_surfaces,
+        ),
+    }
+    if merged.declared_at is not None:
+        authorship = {
+            "declared_at": merged.declared_at,
+            "generation_metadata": authorship["generation_metadata"],
+        }
+
+    return {
+        "intent": "",
+        "change": {
+            "primary_kind": merged.primary_kind.value,
+        },
+        "authorship": authorship,
+        "constraints": [],
+    }
+
+
+def append_new_cases_constraint(
+    payload: dict[str, Any],
+    *,
+    constraint_id: str,
+    test_ids: tuple[str, ...],
+) -> None:
+    """Append a `test_surface_delta.new_cases` constraint.
+
+    If `test_ids` is non-empty, emits `includes_all` with the canonical
+    test IDs. Otherwise emits `not_equals []` so the recipe still
+    requires at least one new test case.
+    """
+    if test_ids:
+        constraint = {
+            "id": constraint_id,
+            "kind": "delta",
+            "target": "test_surface_delta.new_cases",
+            "operator": "includes_all",
+            "expected": list(test_ids),
+        }
+    else:
+        constraint = {
+            "id": constraint_id,
+            "kind": "delta",
+            "target": "test_surface_delta.new_cases",
+            "operator": "not_equals",
+            "expected": [],
+        }
+    payload["constraints"].append(constraint)

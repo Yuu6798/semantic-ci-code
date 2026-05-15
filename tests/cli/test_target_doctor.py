@@ -274,6 +274,32 @@ def test_d4_fires_when_only_extra_user_constraint_is_subset_of(tmp_path: Path):
     assert d4[0].evidence["files_touched_count"] == 2
 
 
+def test_d4_fires_when_extra_user_constraint_uses_changed_only_in(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 8, hazards.py:420): the evaluator
+    unconditionally returns SKIPPED for `Operator.CHANGED_ONLY_IN` (see
+    `evaluator/evaluator.py::_evaluate_constraint`, reason
+    `changed_only_in_p1`), so the constraint never affects the verdict.
+    A refactor target's hard lock templates plus a `changed_only_in`
+    user constraint still passes vacuously on a config-only diff. D4
+    must still fire. `_participates_in_verdict` filters out skipped
+    operators before lock-only classification.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: only_in_module\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: changed_only_in\n"
+        '    expected: ["src.api"]\n',
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+
+
 def test_d4_silent_when_files_touched_is_none(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",

@@ -25,6 +25,7 @@ from semantic_ci_code.compiler.target_compiler import (
 from semantic_ci_code.compiler.templates import TEMPLATE_CONSTRAINTS
 from semantic_ci_code.domain.state_schema import ChangeKind
 from semantic_ci_code.framework.constraint_types import (
+    ConstraintKind,
     Operator,
     Severity,
     UnknownPolicy,
@@ -372,21 +373,45 @@ def _is_python_path(path: Path) -> bool:
 def _is_lock_only_target(target: CompiledTarget) -> bool:
     """True if every verdict-participating constraint is lock-only.
 
-    `severity: info` constraints are filtered out before classification
-    because they are Advisor-channel only and do not affect the verdict
-    (`docs/code_semantic_ci_design.md §23.3`). A refactor target with
-    hard lock templates plus an informational `includes_all` user
-    constraint still passes vacuously on an empty delta — the hard
-    locks pass trivially and the info violation is ignored — so D4
-    must still fire. Mirrors the Severity.INFO filter in
-    `_is_positive_addition`.
+    Verdict-participating means the evaluator can fail on the
+    constraint (see `_participates_in_verdict`). A refactor target
+    with hard lock templates plus an extra constraint that the
+    evaluator silently skips (info severity / repair kind /
+    changed_only_in operator) still passes vacuously on an empty
+    delta — the hard locks pass trivially and the skipped constraint
+    is ignored — so D4 must still fire.
     """
-    verdict_participating = tuple(c for c in target.constraints if c.severity is not Severity.INFO)
+    verdict_participating = tuple(c for c in target.constraints if _participates_in_verdict(c))
     if not verdict_participating:
         return False
     for constraint in verdict_participating:
         if not _is_lock_only_constraint(constraint):
             return False
+    return True
+
+
+def _participates_in_verdict(constraint: CompiledConstraint) -> bool:
+    """True if the evaluator can route this constraint into the verdict.
+
+    Three constraint shapes are unconditionally non-participating:
+
+    - `severity: info` — Advisor channel, never affects verdict
+      (`docs/code_semantic_ci_design.md §23.3`).
+    - `kind: repair` — `evaluator.evaluator._evaluate_constraint`
+      returns SKIPPED (`reason="repair_kind_p1"`) before any
+      operator dispatch.
+    - `operator: changed_only_in` — same evaluator surface returns
+      SKIPPED (`reason="changed_only_in_p1"`).
+
+    These filters mirror the runtime semantics so target-doctor's
+    classification reflects what the verdict can actually conclude.
+    """
+    if constraint.severity is Severity.INFO:
+        return False
+    if constraint.kind is ConstraintKind.REPAIR:
+        return False
+    if constraint.operator is Operator.CHANGED_ONLY_IN:
+        return False
     return True
 
 
@@ -437,18 +462,17 @@ def _is_positive_addition(constraint: CompiledConstraint) -> bool:
     Three filters apply (each independently essential to the P1 / P2
     "vacuous PASS" semantics):
 
-    1. `severity != info` — INFO violations are Advisor-channel only
-       (`docs/code_semantic_ci_design.md §23.3`) and never change the
-       verdict, so an info-severity addition assertion does not gate
-       the vacuous PASS hazard P1 / P2 warns about.
+    1. `_participates_in_verdict(constraint)` — INFO severity, repair
+       kind, and `changed_only_in` operator are unconditionally
+       SKIPPED by the evaluator and never change the verdict.
     2. The target points at an addition dimension (`_delta.added`,
        `_delta.added_cases`, `.new_cases`).
     3. The operator + expected combination forces observed != []:
-       `includes_all` / `includes_any` / `superset_of` with non-empty
-       expected qualify; `not_equals expected: []` qualifies; empty
-       expected variants do not (vacuous).
+       `equals` / `includes_all` / `includes_any` / `superset_of` with
+       non-empty expected qualify; `not_equals expected: []` qualifies;
+       empty expected variants do not (vacuous).
     """
-    if constraint.severity is Severity.INFO:
+    if not _participates_in_verdict(constraint):
         return False
     if not _targets_added_dimension(constraint.target):
         return False

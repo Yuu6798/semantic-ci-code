@@ -103,6 +103,35 @@ def test_pr_body_test_id_rejects_parametrize_brackets():
     assert parsed.unclassified == ((TEST_CASES_TITLE, "tests/test_x.py::test_func[case1]"),)
 
 
+def test_pr_body_test_id_rejects_non_normalized_paths():
+    """The extractor uses `resolved.relative_to(root).as_posix()` which
+    produces normalized paths — no `./`, `..`, or empty segments. Any
+    of those forms would compile but never match a real delta (Codex
+    review on PR #84).
+    """
+    body = """## Test cases
+- ./tests/test_x.py::test_y
+- tests/../test_x.py::test_y
+- tests//test_x.py::test_y
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.test_ids == ()
+
+
+def test_pr_body_resets_current_section_on_any_heading():
+    """Any ATX heading (`# Foo` / `### Sub`), not just `## ...`, must
+    end the current structured section (Codex review on PR #84).
+    """
+    body = """## Expected public API
+- pkg.WantedSym
+
+# Checklist
+- pkg.NotAnExpectation
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.api_fqns == ("pkg.WantedSym",)
+
+
 def test_pr_body_test_id_rejects_non_posix_paths():
     """The extractor records `test_file` via `relative.as_posix()`, so
     backslashes, absolute paths, and non-`.py` extensions never appear

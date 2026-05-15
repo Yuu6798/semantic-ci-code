@@ -32,15 +32,17 @@ class ParsedSections:
 
 def _is_test_id(value: str) -> bool:
     # Match `_test_case_id` in delta/code_state_delta.py: it joins
-    # `test_file::test_function` where the extractor's `test_file` is a
-    # repo-relative POSIX `.py` path (`relative.as_posix()` in
-    # python_test_surface_extractor.py:139-140) and `test_function` is
-    # either `test_*` or `Test*::test_*` (lines 113, 181-195, 287-292).
+    # `test_file::test_function` where the extractor's `test_file` is
+    # `resolved.relative_to(root).as_posix()` (relative, POSIX, no
+    # `.`/`..`/empty segments), and `test_function` is `test_*` or
+    # `Test*::test_*` (extractor names start with `test_` / `Test`).
     # Reject anything the extractor never produces.
     path, sep, name = value.partition("::")
     if not sep or not path or not name or " " in path or " " in name:
         return False
     if "\\" in path or path.startswith("/") or not path.endswith(".py"):
+        return False
+    if any(seg in ("", ".", "..") for seg in path.split("/")):
         return False
     parts = name.split("::")
     if not all(part.isidentifier() for part in parts):
@@ -69,7 +71,11 @@ def _extract_section_bodies(text: str) -> dict[str, tuple[str, ...]]:
     current: str | None = None
     for raw_line in text.splitlines():
         stripped = raw_line.strip()
-        if stripped.startswith("## "):
+        # Any ATX heading ends the current structured section; only
+        # exact `## <registered title>` opens a new one. Without this
+        # `# Checklist` after `## Expected public API` would silently
+        # keep classifying bullets under the API section.
+        if stripped.startswith("#"):
             current = stripped if stripped in INTENT_DECLARING_TITLES else None
             if current is not None and current not in sections:
                 sections[current] = []

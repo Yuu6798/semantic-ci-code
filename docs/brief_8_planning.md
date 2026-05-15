@@ -432,7 +432,7 @@ subcommand。verdict には参加しない(advisory presence は exit 0)。
 | `ADVISORY-D4` | target is lock-only / config-only and candidate diff is config/doc/workflow only; PASS would be vacuous | target.yaml + baseline-rev + candidate-rev |
 | `ADVISORY-P1` | `primary_kind=feature` but no positive addition constraint | target.yaml |
 | `ADVISORY-P2` | `primary_kind=bugfix` but no `test_surface_delta.new_cases` expectation | target.yaml |
-| `ADVISORY-S1` | constraint has `severity: info` AND `unknown_policy in {fail, repair}`; **violation** は verdict 無視されるが **UNKNOWN result(skipped dimensions / type mismatch 等)は unknown_policy 経由で依然 verdict 影響**(`evaluator/evaluator.py:512-530` `_aggregate`)。完全 informational には `unknown_policy: ignore` | target.yaml |
+| `ADVISORY-S1` | constraint has `severity: info` AND `unknown_policy in {fail, repair}`; **violation** は verdict 無視されるが **extraction-cause / open_runtime UNKNOWN(skipped dimensions 等)は `unknown_policy` 経由で依然 verdict 影響**(`evaluator/evaluator.py` `_aggregate`)。 D1-4 (PR #78) で **authoring-cause UNKNOWN は `unknown_policy` 非尊重で常時 FAIL** となり、 S1 の scope は extraction / open_runtime に narrow(`docs/brief_resultstatus_planning.md §1b.3`)。 完全 informational には `unknown_policy: ignore` | target.yaml |
 
 D5 advisory は実装しない(PR #65 で Validator 側に完全吸収済、`TargetSVP` に
 target-level `schema_version` field なく `normalize_collection_expected()` で

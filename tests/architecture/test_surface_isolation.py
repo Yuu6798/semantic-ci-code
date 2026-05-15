@@ -189,3 +189,95 @@ def test_inv4_authoring_hazards_does_not_import_network_or_llm():
     closure = _transitive_closure("semantic_ci_code.authoring.hazards")
     leaks = sorted(m for m in closure if _is_forbidden_match(m, NETWORK_LLM_FORBIDDEN))
     assert not leaks, f"authoring.hazards INV-4 violation: {leaks}"
+
+
+# ---------------------------------------------------------------------------
+# INV-4 (CSCI-42 additions) — init recipes and PR-metadata sources are
+# deterministic and must not transitively pull in network / LLM clients.
+# ---------------------------------------------------------------------------
+
+
+CSCI_42_MODULES = (
+    "semantic_ci_code.cli.init_command",
+    "semantic_ci_code.cli.init_recipes",
+    "semantic_ci_code.cli.init_recipes.feature_add_api",
+    "semantic_ci_code.cli.init_recipes.bugfix_regression_test",
+    "semantic_ci_code.cli.init_recipes.refactor_preserve_api",
+    "semantic_ci_code.cli.init_recipes.test_update_add_test_case",
+    "semantic_ci_code.authoring.sources",
+    "semantic_ci_code.authoring.sources.pr_body",
+    "semantic_ci_code.authoring.sources.issue",
+    "semantic_ci_code.authoring.sources.labels",
+    "semantic_ci_code.authoring.sources.commits",
+    "semantic_ci_code.authoring.sources.merge",
+    "semantic_ci_code.authoring.provenance",
+)
+
+
+def test_inv4_csci42_init_command_does_not_import_network_or_llm():
+    closure = _transitive_closure("semantic_ci_code.cli.init_command")
+    leaks = sorted(m for m in closure if _is_forbidden_match(m, NETWORK_LLM_FORBIDDEN))
+    assert not leaks, f"cli.init_command INV-4 violation: {leaks}"
+
+
+def test_inv4_csci42_modules_do_not_import_network_or_llm():
+    """Each Brief 8 CSCI-42 module (recipes + sources + provenance) must
+    have a clean import closure. A single offender among them is enough
+    to break INV-4, so this test enumerates them rather than relying on
+    the package-level closure to surface a child.
+    """
+    failures: dict[str, list[str]] = {}
+    for module in CSCI_42_MODULES:
+        closure = _transitive_closure(module)
+        leaks = sorted(m for m in closure if _is_forbidden_match(m, NETWORK_LLM_FORBIDDEN))
+        if leaks:
+            failures[module] = leaks
+    assert not failures, f"CSCI-42 INV-4 violation: {failures}"
+
+
+def test_inv4_csci42_modules_do_not_import_socket_or_ssl():
+    """Stdlib network primitives are also forbidden — even without a
+    high-level HTTP client, a `socket.create_connection` or
+    `ssl.SSLContext` import would constitute a network surface.
+    `importlib.metadata` is OK; that's how we read the package version.
+    """
+    forbidden_stdlib = ("socket", "ssl")
+    failures: dict[str, list[str]] = {}
+    for module in CSCI_42_MODULES:
+        closure = _transitive_closure(module)
+        leaks = sorted(m for m in closure if _is_forbidden_match(m, forbidden_stdlib))
+        if leaks:
+            failures[module] = leaks
+    assert not failures, f"CSCI-42 stdlib network INV-4 violation: {failures}"
+
+
+# ---------------------------------------------------------------------------
+# INV-2 (CSCI-42 follow-up) — verdict-path handlers must NOT import the
+# new init-recipe / authoring-sources modules either.
+# ---------------------------------------------------------------------------
+
+
+CSCI_42_FORBIDDEN_FOR_VERDICT_PATH = (
+    "semantic_ci_code.cli.init_command",
+    "semantic_ci_code.cli.init_recipes",
+    "semantic_ci_code.authoring.sources",
+    "semantic_ci_code.authoring.provenance",
+)
+
+
+def test_inv2_check_handler_does_not_import_init_recipe_or_sources():
+    closure = _transitive_closure("semantic_ci_code.cli.commands.check")
+    leaks = sorted(m for m in closure if _is_forbidden_match(m, CSCI_42_FORBIDDEN_FOR_VERDICT_PATH))
+    assert not leaks, f"cli.commands.check INV-2 violation (CSCI-42): {leaks}"
+
+
+def test_inv2_compare_handler_does_not_import_init_recipe_or_sources():
+    closure = _transitive_closure("semantic_ci_code.cli.commands.compare")
+    leaks = sorted(m for m in closure if _is_forbidden_match(m, CSCI_42_FORBIDDEN_FOR_VERDICT_PATH))
+    assert not leaks, f"cli.commands.compare INV-2 violation (CSCI-42): {leaks}"
+
+
+def test_inv2_pre_commit_handler_does_not_import_init_recipe_or_sources():
+    closure = _transitive_closure("semantic_ci_code.cli.commands.pre_commit")
+    leaks = sorted(m for m in closure if _is_forbidden_match(m, CSCI_42_FORBIDDEN_FOR_VERDICT_PATH))
+    assert not leaks, f"cli.commands.pre_commit INV-2 violation (CSCI-42): {leaks}"

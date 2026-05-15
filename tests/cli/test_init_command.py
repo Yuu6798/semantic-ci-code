@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from semantic_ci_code.cli.main import build_parser
+
 from .helpers import payload, run_semantic_ci
 
 EXPECTED_TEMPLATE = """# semantic-ci target.yaml — declared change intent + constraints
@@ -70,3 +72,39 @@ def test_init_scaffold_compiles_positionally(tmp_path: Path):
     assert data["subcommand"] == "compile"
     assert data["compiled_target"]["intent"] == ""
     assert data["compiled_target"]["constraints"]
+
+
+def _init_parser_dests() -> set[str]:
+    parser = build_parser()
+    init_parser = parser._subparsers._group_actions[0].choices["init"]  # noqa: SLF001
+    return {action.dest for action in init_parser._actions}  # noqa: SLF001
+
+
+def test_init_argparse_does_not_expose_candidate_derived_expectations():
+    """INV: --allow-candidate-derived-expectations must not exist (Brief 8
+    §6.2.5 / §R2, AC G negative fixture).
+
+    A future brief that legitimately introduces candidate-aware
+    expectations would have to negotiate §23.3 first; until then no flag
+    of this name (or anything matching `candidate_derived`) may be in
+    the CLI.
+    """
+    dests = _init_parser_dests()
+    leaking = {d for d in dests if "candidate_derived" in d or "candidate-derived" in d}
+    assert not leaking, f"forbidden flag dest leaked into init: {leaking}"
+
+
+def test_init_argparse_does_not_expose_llm_assist():
+    dests = _init_parser_dests()
+    leaking = {d for d in dests if "llm" in d.lower()}
+    assert not leaking, f"--llm-assist family must not exist on init (Brief 8b deferred): {leaking}"
+
+
+def test_init_argparse_does_not_expose_strict_advice():
+    """INV: --strict-advice belongs to `target-doctor`, not `init`. Pinning here
+    catches accidental leak in case CSCI-43 / CSCI-42 helpers are refactored
+    together.
+    """
+    dests = _init_parser_dests()
+    leaking = {d for d in dests if "strict_advice" in d or "strict-advice" in d}
+    assert not leaking, f"--strict-advice must not exist on init: {leaking}"

@@ -318,11 +318,19 @@ def _is_test_surface_target(path: str) -> bool:
 def _has_python_test_files(package_root: Path) -> bool:
     if not package_root.exists() or not package_root.is_dir():
         return False
+    package_root_resolved = package_root.resolve()
     for entry in package_root.rglob("*.py"):
         name = entry.name
         if name.startswith("test_") or name.endswith("_test.py"):
             return True
-        if "tests" in entry.parts or "test" in entry.parts:
+        # Use parts relative to `package_root` so a parent path
+        # component named "tests" (e.g. cloning into
+        # `/home/user/tests/myrepo/`) doesn't suppress D1.
+        try:
+            relative = entry.resolve().relative_to(package_root_resolved)
+        except ValueError:
+            continue
+        if "tests" in relative.parts[:-1] or "test" in relative.parts[:-1]:
             return True
     return False
 
@@ -431,17 +439,31 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
     observed delta (the verdict can PASS without inspecting any
     Python change).
 
-    Three observation modes per operator:
+    **Lock-only classification is restricted to `kind: delta`
+    constraints.** `kind: state` constraints read the candidate
+    `CodeState` directly, not a delta — an empty Python diff leaves
+    the candidate state equal to the baseline state, but a
+    state-kind constraint like `imports subset_of []` still fails
+    whenever the baseline has any imports. target-doctor cannot know
+    baseline content, so the conservative choice is to never classify
+    state-kind constraints as lock-only (D4 may stay silent in some
+    truly-vacuous cases, but it won't emit "vacuous PASS" when the
+    actual verdict is FAIL).
+
+    Three observation modes per operator (all gated on
+    `kind == DELTA`):
 
     - Always-lock: lock regardless of `expected` (baseline-aware
       operators + collection-allow-list operators).
     - Collection-dependent (`equals` / `includes_all` / `superset_of`):
       lock when `expected` is an empty collection or a dict whose
       values are all empty collections.
-    - Numeric-dependent: for `kind: delta` constraints with a scalar
-      numeric `expected`, observed value `0` (empty Python diff)
-      satisfies the operator depending on the comparison.
+    - Numeric-dependent: scalar numeric `expected` where observed
+      value `0` (empty Python diff) satisfies the operator.
     """
+    if constraint.kind is not ConstraintKind.DELTA:
+        return False
+
     operator = constraint.operator
     expected = constraint.expected
     kind = constraint.kind

@@ -91,6 +91,27 @@ def test_d1_silent_when_tests_present(tmp_path: Path):
     assert "ADVISORY-D1" not in [a.code for a in advisories]
 
 
+def test_d1_fires_when_parent_path_contains_tests_directory(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 12, hazards.py:326):
+    `entry.parts` was checked against absolute path, so a checkout
+    under a parent directory literally named `tests` (e.g.
+    `/home/user/tests/myrepo/src/`) made every Python file count as
+    a test file. The fix uses parts *relative to* `package_root`.
+    """
+    parent = tmp_path / "tests"
+    parent.mkdir()
+    repo = parent / "myrepo"
+    repo.mkdir()
+    target = _write_target(repo / "target.yaml", _TARGET_TEST_SURFACE)
+    compiled = _compile(target)
+    package_root = repo / "src"
+    package_root.mkdir()
+    (package_root / "app.py").write_text("def foo(): return 1\n", encoding="utf-8")
+
+    advisories = detect_advisories(compiled, package_root=package_root, files_touched=None)
+    assert "ADVISORY-D1" in [a.code for a in advisories]
+
+
 def test_d1_silent_when_no_test_surface_constraint(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",
@@ -427,6 +448,31 @@ def test_d4_silent_when_scalar_delta_equals_non_zero(tmp_path: Path):
         "    target: complexity_delta.cyclomatic\n"
         "    operator: equals\n"
         "    expected: 5\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    assert "ADVISORY-D4" not in [a.code for a in advisories]
+
+
+def test_d4_silent_when_user_constraint_is_state_kind(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 12, hazards.py:459): a
+    `kind: state` constraint reads the candidate `CodeState` directly,
+    not the delta. `state imports subset_of []` (Codex's example)
+    fails whenever the baseline state has any imports — the empty
+    Python diff doesn't make this constraint satisfiable. D4's
+    "vacuous PASS" claim is incorrect here; D4 must stay silent.
+    `_is_lock_only_constraint` now gates lock-only classification on
+    `kind: delta` only.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: forbid_all_imports\n"
+        "    kind: state\n"
+        "    target: imports\n"
+        "    operator: subset_of\n"
+        "    expected: []\n",
     )
     compiled = _compile(target)
     files = (Path("README.md"), Path("pyproject.toml"))

@@ -103,14 +103,17 @@ def test_pr_body_test_id_rejects_parametrize_brackets():
     assert parsed.unclassified == ((TEST_CASES_TITLE, "tests/test_x.py::test_func[case1]"),)
 
 
-def test_pr_body_test_id_rejects_class_prefix_form():
+def test_pr_body_test_id_accepts_class_based_pytest_id():
+    """The extractor emits `test_function` as `Class::method` for
+    class-based tests (`python_test_surface_extractor.py:190`), so
+    `_test_case_id` produces `path::Class::method`. The parser must
+    accept that form (Codex review on PR #84).
+    """
     body = """## Test cases
 - tests/test_x.py::TestClass::test_method
 """
     parsed = parse_pr_body(body)
-    # Two `::` is not the canonical `file::function` form used by the
-    # delta producer.
-    assert parsed.test_ids == ()
+    assert parsed.test_ids == ("tests/test_x.py::TestClass::test_method",)
 
 
 def test_pr_body_unclassifiable_bullet_recorded():

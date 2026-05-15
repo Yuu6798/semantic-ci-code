@@ -31,16 +31,16 @@ class ParsedSections:
 
 
 def _is_test_id(value: str) -> bool:
-    # Match `_test_case_id` in delta/code_state_delta.py:354-355:
-    # `f"{entry.test_file}::{entry.test_function}"`. A bullet with a
-    # different shape (parametrize brackets, class prefix, stray spaces,
-    # GFM checklist leftovers) would compile but never match the delta.
-    if value.count("::") != 1:
+    # Match `_test_case_id` in delta/code_state_delta.py: it joins
+    # `test_file::test_function`, and `test_function` is either a bare
+    # identifier or `Class::method` for class-based tests (see
+    # test_surface/python_test_surface_extractor.py:190). Split on the
+    # first `::` only so both forms are accepted; reject parametrize
+    # brackets or other non-identifier segments.
+    path, sep, name = value.partition("::")
+    if not sep or not path or not name or " " in path or " " in name:
         return False
-    path, name = value.split("::")
-    if not path or not name or " " in path or " " in name:
-        return False
-    return name.isidentifier()
+    return all(part.isidentifier() for part in name.split("::"))
 
 
 def _is_fqn(value: str) -> bool:

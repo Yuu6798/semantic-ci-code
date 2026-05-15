@@ -46,9 +46,13 @@ _POSITIVE_DELTA_OPERATORS = frozenset(
         Operator.INCLUDES_ANY,
         Operator.SUPERSET_OF,
         Operator.SUPERSET_OF_BASELINE,
-        Operator.NOT_EQUALS,
     }
 )
+# `not_equals` is treated as a positive addition only when the expected
+# value is an empty collection (`expected: []`), which forces the
+# observed delta to contain at least one item. Other `not_equals`
+# expectations (e.g. `not_equals expected: ["x.y"]`) are vacuously
+# satisfied by an empty delta and must not suppress ADVISORY-P1 / P2.
 _NON_PYTHON_SUFFIXES = frozenset(
     {
         ".md",

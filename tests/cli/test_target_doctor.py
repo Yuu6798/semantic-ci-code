@@ -258,6 +258,45 @@ def test_p1_silent_on_feature_with_includes_all_addition(tmp_path: Path):
     assert "ADVISORY-P1" not in [a.code for a in advisories]
 
 
+def test_p1_fires_when_feature_only_has_non_empty_not_equals(tmp_path: Path):
+    """Codex review (PR #82 P2) regression: `not_equals expected:
+    ["x.y"]` against `api_surface_delta.added` is vacuously satisfied by
+    an empty delta, so it must not count as a positive addition. Only
+    `not_equals expected: []` (which forces non-empty observed) is a
+    real positive assertion.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: not_other\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: not_equals\n"
+        '    expected: ["src.api.other"]\n',
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P1" in [a.code for a in advisories]
+
+
+def test_p1_silent_when_feature_has_not_equals_empty(tmp_path: Path):
+    """`not_equals expected: []` forces the added delta to be non-empty
+    — that *is* a positive addition assertion, so P1 stays silent.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: at_least_one\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: not_equals\n"
+        "    expected: []\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P1" not in [a.code for a in advisories]
+
+
 def test_p1_silent_on_non_feature_kind(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",
@@ -277,6 +316,25 @@ def test_p2_fires_on_bugfix_without_new_cases_constraint(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",
         "intent: bugfix\nchange:\n  primary_kind: bugfix\nconstraints: []\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    assert "ADVISORY-P2" in [a.code for a in advisories]
+
+
+def test_p2_fires_when_bugfix_only_has_non_empty_not_equals_on_new_cases(tmp_path: Path):
+    """Same Codex P2 fix as P1: a `not_equals expected: ["x.test"]` on
+    `test_surface_delta.new_cases` is satisfied by an empty delta, so
+    P2 must still fire.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: bugfix\nchange:\n  primary_kind: bugfix\nconstraints:\n"
+        "  - id: not_other_test\n"
+        "    kind: delta\n"
+        "    target: test_surface_delta.new_cases\n"
+        "    operator: not_equals\n"
+        '    expected: ["tests.test_other.test_x"]\n',
     )
     compiled = _compile(target)
     advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)

@@ -322,8 +322,26 @@ def _constraints_collide(
         user_c.kind == template_c.kind
         and user_c.target == template_c.target
         and user_c.operator == template_c.operator
-        and user_c.expected == template_c.expected
+        and _canonicalize_expected(user_c.expected) == _canonicalize_expected(template_c.expected)
     )
+
+
+def _canonicalize_expected(value: object) -> object:
+    """Recursively normalize dict/list/tuple to a canonical form.
+
+    The compiler's `_freeze_expected` only flattens top-level lists into
+    tuples, leaving nested structures inside dicts untouched. Templates
+    store nested values as tuples (e.g.
+    `{"added": (), "removed": ()}`) while a YAML user constraint of the
+    same shape stays as `{"added": [], "removed": []}`. Direct `==`
+    would treat them as different, suppressing ADVISORY-D3. This helper
+    normalizes both sides before comparison.
+    """
+    if isinstance(value, dict):
+        return tuple((key, _canonicalize_expected(item)) for key, item in sorted(value.items()))
+    if isinstance(value, list | tuple):
+        return tuple(_canonicalize_expected(item) for item in value)
+    return value
 
 
 def _is_python_path(path: Path) -> bool:

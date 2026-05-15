@@ -130,6 +130,34 @@ def test_d3_fires_on_template_user_duplicate(tmp_path: Path):
     assert d3[0].evidence["template_constraint_id"].startswith("template:refactor:")
 
 
+def test_d3_fires_on_template_user_duplicate_with_nested_lists(tmp_path: Path):
+    """Codex review (PR #82) regression: template stores
+    `expected={"added": (), "removed": ()}` (tuples inside dict) while a
+    user YAML restating the same constraint parses to lists inside the
+    dict (`expected: {added: [], removed: []}`). The compiler's
+    `_freeze_expected` only flattens top-level lists, so direct `==`
+    suppressed the duplicate. The detector now canonicalizes nested
+    dict/list/tuple values before comparison.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: my_effects_lock\n"
+        "    kind: delta\n"
+        "    target: effect_changes\n"
+        "    operator: equals\n"
+        "    expected:\n"
+        "      added: []\n"
+        "      removed: []\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    d3 = [a for a in advisories if a.code == "ADVISORY-D3"]
+    assert len(d3) == 1
+    assert d3[0].evidence["user_constraint_id"] == "my_effects_lock"
+    assert d3[0].evidence["template_constraint_id"] == "template:refactor:effects_unchanged"
+
+
 def test_d3_silent_on_non_overlapping_user_constraint(tmp_path: Path):
     target = _write_target(
         tmp_path / "target.yaml",

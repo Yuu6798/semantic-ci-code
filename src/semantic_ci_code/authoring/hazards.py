@@ -466,57 +466,75 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
 
     operator = constraint.operator
     expected = constraint.expected
-    kind = constraint.kind
+    target = constraint.target
+    # A "leaf" target points at a flat collection or scalar
+    # (`effect_changes.added`, `complexity_delta.cyclomatic`,
+    # `api_surface_delta.added.fqns`) rather than a whole-delta
+    # mapping (`effect_changes`, `imports_delta`). Collection / scalar
+    # operators only have well-defined "vacuous on empty observed"
+    # semantics on leaves — on whole mappings the evaluator either
+    # type-errors or compares against the structured value, so an
+    # empty diff does not guarantee a PASS.
+    is_leaf = "." in target
 
-    # Always lock-only — vacuously satisfied by any empty observed,
-    # independent of `expected`.
+    # Baseline-aware operators work on any target shape: on an empty
+    # diff the candidate equals the baseline so the comparison is
+    # trivially satisfied.
     if operator in {
         Operator.EQUALS_BASELINE,
         Operator.SUPERSET_OF_BASELINE,
         Operator.NO_NEW_ITEMS,
         Operator.NO_REMOVED_ITEMS,
         Operator.UNCHANGED,
-        Operator.EXCLUDES_ALL,
-        Operator.SUBSET_OF,
     }:
         return True
 
+    # Collection allow-list operators (`subset_of`, `excludes_all`)
+    # only make sense on leaf collections. On whole-delta mappings
+    # they fail (e.g. `effect_changes subset_of []` — Codex review
+    # Round 13).
+    if operator in {Operator.EXCLUDES_ALL, Operator.SUBSET_OF}:
+        return is_leaf
+
     # Expected-dependent: collection or scalar.
     if operator in {Operator.EQUALS, Operator.INCLUDES_ALL, Operator.SUPERSET_OF}:
-        # Collection case: empty collection → lock.
-        if _is_empty_collection(expected):
-            return True
-        if isinstance(expected, dict) and all(
-            _is_empty_collection(value) for value in expected.values()
-        ):
-            return True
-        # Scalar numeric case: a delta constraint with observed=0
-        # satisfies `equals 0`. (`includes_all` / `superset_of` are
-        # collection-only so a scalar expected is not a lock case.)
+        # Dict-shape `equals {added: [], removed: []}` is the
+        # whole-delta zero shape — lock regardless of leafness
+        # (template:refactor:effects_unchanged uses this).
         if (
             operator is Operator.EQUALS
-            and kind is ConstraintKind.DELTA
+            and isinstance(expected, dict)
+            and all(_is_empty_collection(value) for value in expected.values())
+        ):
+            return True
+        # Empty-collection `expected` is vacuous only on a leaf.
+        if is_leaf and _is_empty_collection(expected):
+            return True
+        # Scalar `equals 0` on a delta scalar leaf (`complexity_delta.*`).
+        if (
+            is_leaf
+            and operator is Operator.EQUALS
             and _is_scalar_number(expected)
             and expected == 0
         ):
             return True
         return False
 
-    # `not_equals` is inverted: an empty observed delta satisfies
-    # `not_equals [non-empty]` (vacuous pass) but fails
-    # `not_equals []` (the empty observed equals the empty expected).
-    # For scalar delta constraints, `not_equals N` with N != 0 is
-    # lock (observed=0 satisfies); `not_equals 0` is a positive
-    # assertion that requires non-zero change.
+    # `not_equals` is inverted and only meaningful on leaves:
+    # `not_equals [non-empty]` on a leaf passes when observed is `[]`
+    # (lock); `not_equals []` requires non-empty observed (positive).
+    # Scalar `not_equals N` on a scalar leaf passes when observed (0)
+    # != N (lock iff N != 0).
     if operator is Operator.NOT_EQUALS:
-        if kind is ConstraintKind.DELTA and _is_scalar_number(expected):
+        if not is_leaf:
+            return False
+        if _is_scalar_number(expected):
             return expected != 0
         return not _is_empty_collection(expected)
 
-    # Scalar comparison operators on delta constraints — observed=0
-    # is the empty-diff value. The constraint is lock-only when the
-    # expected bound admits observed=0.
-    if kind is ConstraintKind.DELTA and _is_scalar_number(expected):
+    # Scalar comparison operators only have lock semantics on scalar
+    # leaves.
+    if is_leaf and _is_scalar_number(expected):
         if operator is Operator.LESS_THAN:
             return 0 < expected
         if operator is Operator.LESS_THAN_OR_EQUAL:
@@ -526,11 +544,11 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
         if operator is Operator.GREATER_THAN_OR_EQUAL:
             return 0 >= expected
 
-    # `within_range expected: [low, high]` on a delta target is lock
+    # `within_range expected: [low, high]` on a scalar leaf is lock
     # when low <= 0 <= high.
     if (
-        operator is Operator.WITHIN_RANGE
-        and kind is ConstraintKind.DELTA
+        is_leaf
+        and operator is Operator.WITHIN_RANGE
         and isinstance(expected, list | tuple)
         and len(expected) == 2
         and all(_is_scalar_number(item) for item in expected)

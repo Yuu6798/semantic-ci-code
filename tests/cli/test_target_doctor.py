@@ -455,6 +455,39 @@ def test_d4_silent_when_scalar_delta_equals_non_zero(tmp_path: Path):
     assert "ADVISORY-D4" not in [a.code for a in advisories]
 
 
+def test_d4_silent_when_equals_targets_whole_delta_mapping_with_list(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 13, hazards.py:480): a collection
+    `expected` on a whole-delta record target is not a vacuous pass.
+    `effect_changes` is statically typed as `record` (a mapping with
+    `added` / `removed` fields), so `equals []` compares the
+    zero-valued mapping to `[]` and VIOLATES — the verdict FAILS on
+    a config-only diff, contradicting D4's "vacuous PASS" message.
+
+    (Codex's original example used `subset_of []`, but the compiler
+    rejects collection operators on record targets up-front. `equals
+    []` reaches the evaluator because `equals` accepts any target
+    category.)
+
+    `_is_lock_only_constraint` now restricts the empty-collection
+    lock case to leaf targets (containing `.`); the dict-shape
+    zero-mapping case stays for templates like
+    `effect_changes equals {added: (), removed: ()}`.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: bad_effects_lock\n"
+        "    kind: delta\n"
+        "    target: effect_changes\n"
+        "    operator: equals\n"
+        "    expected: []\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    assert "ADVISORY-D4" not in [a.code for a in advisories]
+
+
 def test_d4_silent_when_user_constraint_is_state_kind(tmp_path: Path):
     """Codex review (PR #82 P2 Round 12, hazards.py:459): a
     `kind: state` constraint reads the candidate `CodeState` directly,

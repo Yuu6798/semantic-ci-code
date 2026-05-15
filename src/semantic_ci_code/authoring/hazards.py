@@ -393,24 +393,35 @@ def _is_lock_only_target(target: CompiledTarget) -> bool:
 def _participates_in_verdict(constraint: CompiledConstraint) -> bool:
     """True if the evaluator can route this constraint into the verdict.
 
-    Three constraint shapes are unconditionally non-participating:
+    Three constraint shapes are non-participating:
 
-    - `severity: info` — Advisor channel, never affects verdict
-      (`docs/code_semantic_ci_design.md §23.3`).
     - `kind: repair` — `evaluator.evaluator._evaluate_constraint`
       returns SKIPPED (`reason="repair_kind_p1"`) before any
       operator dispatch.
     - `operator: changed_only_in` — same evaluator surface returns
       SKIPPED (`reason="changed_only_in_p1"`).
+    - `severity: info` AND `unknown_policy in {ignore, warn}` —
+      severity keeps a VIOLATED result out of the verdict (Advisor
+      channel, `docs/code_semantic_ci_design.md §23.3`), and the
+      unknown_policy variant cannot route the constraint back in via
+      the UNKNOWN branch either.
 
-    These filters mirror the runtime semantics so target-doctor's
-    classification reflects what the verdict can actually conclude.
+    `severity: info` paired with `unknown_policy in {fail, repair}` IS
+    still considered verdict-participating — the constraint is
+    Advisor-only on the VIOLATED branch but the non-ignore
+    unknown_policy re-arms it on the UNKNOWN branch (open path /
+    extraction failure). This is precisely the configuration
+    `detect_s1` flags (`docs/brief_resultstatus_planning.md §1b.3`).
+    Filtering it out would let D4 emit "vacuous PASS" even when the
+    actual verdict can be FAIL via UNKNOWN.
     """
-    if constraint.severity is Severity.INFO:
-        return False
     if constraint.kind is ConstraintKind.REPAIR:
         return False
     if constraint.operator is Operator.CHANGED_ONLY_IN:
+        return False
+    if constraint.severity is Severity.INFO:
+        if constraint.unknown_policy in {UnknownPolicy.FAIL, UnknownPolicy.REPAIR}:
+            return True
         return False
     return True
 

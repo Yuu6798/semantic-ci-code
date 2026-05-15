@@ -223,12 +223,13 @@ def test_d4_fires_when_lock_only_target_has_extra_severity_info_user_constraint(
 ):
     """Codex review (PR #82 P2 Round 4, hazards.py:371): a refactor
     target's templates are hard lock-only, and an extra user
-    constraint with `severity: info` does not participate in the
-    verdict (`docs/code_semantic_ci_design.md §23.3`). On a config-only
-    diff, the hard locks pass vacuously and the info violation is
-    ignored — vacuous PASS. D4 must still fire. `_is_lock_only_target`
-    now filters out info-severity constraints before classification,
-    mirroring the same filter in `_is_positive_addition`.
+    constraint with `severity: info` + `unknown_policy: ignore` does
+    not participate in the verdict (`docs/code_semantic_ci_design.md
+    §23.3`). On a config-only diff, the hard locks pass vacuously and
+    the info violation is ignored — vacuous PASS. D4 must still fire.
+    `_participates_in_verdict` filters out info constraints whose
+    unknown_policy is `ignore` / `warn` before lock-only
+    classification.
     """
     target = _write_target(
         tmp_path / "target.yaml",
@@ -238,7 +239,8 @@ def test_d4_fires_when_lock_only_target_has_extra_severity_info_user_constraint(
         "    target: api_surface_delta.added\n"
         "    operator: includes_all\n"
         '    expected: ["src.api.x"]\n'
-        "    severity: info\n",
+        "    severity: info\n"
+        "    unknown_policy: ignore\n",
     )
     compiled = _compile(target)
     files = (Path("README.md"), Path("pyproject.toml"))
@@ -246,6 +248,36 @@ def test_d4_fires_when_lock_only_target_has_extra_severity_info_user_constraint(
     d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
     assert len(d4) == 1
     assert d4[0].evidence["files_touched_count"] == 2
+
+
+def test_d4_silent_when_severity_info_has_unknown_policy_fail(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 9, hazards.py:410): a `severity:
+    info` constraint with `unknown_policy: fail` can still route to
+    the verdict via the UNKNOWN branch (open path / extraction
+    failure). `detect_s1` warns about this exact configuration. So D4
+    must NOT classify the target as lock-only — the actual verdict
+    can FAIL via UNKNOWN even on a config-only diff, contradicting
+    D4's "vacuous PASS" claim. S1 fires instead to point the user at
+    the real authoring hazard.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: info_with_fail_policy\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: includes_all\n"
+        '    expected: ["src.api.x"]\n'
+        "    severity: info\n"
+        "    unknown_policy: fail\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    codes = [a.code for a in advisories]
+    assert "ADVISORY-D4" not in codes
+    # S1 fires instead — the real authoring hazard for info+fail.
+    assert "ADVISORY-S1" in codes
 
 
 def test_d4_fires_when_only_extra_user_constraint_is_subset_of(tmp_path: Path):
@@ -381,7 +413,8 @@ def test_p1_silent_when_feature_has_not_equals_empty(tmp_path: Path):
 
 def test_p1_fires_when_only_addition_constraint_is_severity_info(tmp_path: Path):
     """Codex review (PR #82 P2 Round 3, hazards.py:210): an `info`
-    severity constraint does not participate in the verdict
+    severity constraint with `unknown_policy: ignore` is truly
+    informational and does not participate in the verdict
     (`docs/code_semantic_ci_design.md §23.3` Advisor channel), so an
     empty delta still aggregates to PASS even though the constraint
     "exists". P1 must still fire to warn about the missing
@@ -395,11 +428,41 @@ def test_p1_fires_when_only_addition_constraint_is_severity_info(tmp_path: Path)
         "    target: api_surface_delta.added\n"
         "    operator: includes_all\n"
         '    expected: ["src.api.users.fetch_user_profile"]\n'
-        "    severity: info\n",
+        "    severity: info\n"
+        "    unknown_policy: ignore\n",
     )
     compiled = _compile(target)
     advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
     assert "ADVISORY-P1" in [a.code for a in advisories]
+
+
+def test_p1_silent_when_severity_info_has_unknown_policy_fail(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 9, hazards.py:410): an info
+    constraint with `unknown_policy: fail` can still route to the
+    verdict via the UNKNOWN branch (open path / extraction failure).
+    `detect_s1` even warns about this exact configuration. So an
+    info+fail addition assertion IS verdict-participating and should
+    silence P1 (the verdict can FAIL via UNKNOWN even when no addition
+    is observed). The trade is that S1 fires instead, pointing the
+    user at the actual configuration mistake.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints:\n"
+        "  - id: info_addition_with_fail_policy\n"
+        "    kind: delta\n"
+        "    target: api_surface_delta.added\n"
+        "    operator: includes_all\n"
+        '    expected: ["src.api.users.fetch_user_profile"]\n'
+        "    severity: info\n"
+        "    unknown_policy: fail\n",
+    )
+    compiled = _compile(target)
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)
+    codes = [a.code for a in advisories]
+    assert "ADVISORY-P1" not in codes
+    # S1 fires for the same constraint — the real authoring hazard.
+    assert "ADVISORY-S1" in codes
 
 
 def test_p1_silent_when_feature_uses_equals_with_non_empty_expected(tmp_path: Path):
@@ -507,8 +570,9 @@ def test_p2_fires_when_bugfix_only_has_non_empty_not_equals_on_new_cases(tmp_pat
 
 def test_p2_fires_when_bugfix_only_has_severity_info_new_cases(tmp_path: Path):
     """Same Round 3 fix as P1: an `info`-severity new_cases assertion
-    does not participate in the verdict, so an empty test_surface delta
-    still aggregates to PASS. P2 must still fire.
+    with `unknown_policy: ignore` is truly informational and does not
+    participate in the verdict, so an empty test_surface delta still
+    aggregates to PASS. P2 must still fire.
     """
     target = _write_target(
         tmp_path / "target.yaml",
@@ -518,7 +582,8 @@ def test_p2_fires_when_bugfix_only_has_severity_info_new_cases(tmp_path: Path):
         "    target: test_surface_delta.new_cases\n"
         "    operator: not_equals\n"
         "    expected: []\n"
-        "    severity: info\n",
+        "    severity: info\n"
+        "    unknown_policy: ignore\n",
     )
     compiled = _compile(target)
     advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=None)

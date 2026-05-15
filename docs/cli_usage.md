@@ -479,13 +479,50 @@ semantic-ci validate-plan --target target.yaml --adapter cursor --baseline-rev H
 
 ## Authoring subcommands (verdict 不参加)
 
-Future subcommands that live on the **Authoring** or **Advisor** surface
-(`docs/code_semantic_ci_design.md §23.3.1`) will be documented under this
-section as Brief 8 lands (`init --recipe`, `target-doctor`,
-`target-catalog`). They do not compute a verdict. Until each subcommand
-is implemented, the canonical spec is
-[`docs/brief_8_planning.md §6`](./brief_8_planning.md) and the surface
-design contract is in
-[`docs/target_authoring_surface.md`](./target_authoring_surface.md). The
-CLI parser in `src/semantic_ci_code/cli/main.py` only exposes the 8
-subcommands documented above.
+Subcommands on the **Authoring** or **Advisor** surface
+(`docs/code_semantic_ci_design.md §23.3.1`) do not compute a verdict and do
+not change the JSON envelope produced by `check` / `compare` /
+`compile-repair`. The surface design contract is in
+[`docs/target_authoring_surface.md`](./target_authoring_surface.md);
+canonical specs are in [`docs/brief_8_planning.md §6`](./brief_8_planning.md).
+
+### `semantic-ci target-doctor`
+
+```text
+semantic-ci target-doctor [--target <yaml>] [--package-root <dir>]
+                          [--baseline-rev <ref>] [--candidate-rev <ref>]
+                          [--format {human,json}] [--output <file>]
+```
+
+Audits a `target.yaml` for six authoring hazards and renders them as
+advisories. Advisor surface — advisory presence does not change the
+verdict and does not change the exit code (`docs/exit_codes.md`).
+
+| Code | What it detects |
+|---|---|
+| `ADVISORY-D1` | `test_surface_delta.*` constraint exists, but no test files (`test_*.py` / `*_test.py` / `tests/`) are visible under `--package-root`. |
+| `ADVISORY-D3` | A user constraint duplicates a template-expanded constraint (same kind/target/operator/expected). |
+| `ADVISORY-D4` | The target is lock-only and the candidate diff (`--baseline-rev` ↔ `--candidate-rev`) touches no Python files; the verdict would be a vacuous PASS. Skipped silently when neither rev is given and git is unavailable. |
+| `ADVISORY-P1` | `primary_kind: feature` has no positive addition constraint. |
+| `ADVISORY-P2` | `primary_kind: bugfix` has no `test_surface_delta.new_cases` expectation. |
+| `ADVISORY-S1` | A user constraint has `severity: info` paired with `unknown_policy in {fail, repair}`. After Brief D1-4 the warning scope narrows to extraction-cause / open_runtime UNKNOWN. |
+
+`--format json` emits the `advisory-1` envelope
+([`docs/json_schema.md`](./json_schema.md)). There is no `--strict-advice`
+flag — CI that wants to gate on advisory presence should consume the JSON
+output and apply a workflow-level policy.
+
+Examples:
+
+```bash
+semantic-ci target-doctor --target .semantic-ci/target.yaml
+semantic-ci target-doctor --target target.yaml --format json
+semantic-ci target-doctor --target target.yaml --baseline-rev origin/main \
+    --candidate-rev HEAD --format json
+```
+
+### Future Authoring subcommands
+
+`init --recipe --from-*` (Brief 8 / CSCI-42) and `target-catalog`
+(Brief 8 / CSCI-44) will land their CLI contracts under this section as
+they are implemented.

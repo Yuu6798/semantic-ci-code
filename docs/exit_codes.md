@@ -55,14 +55,17 @@ Missing or invalid targets, invalid explicit baselines, missing adapters, and
 write/path errors exit 2. If no implicit git baseline can be resolved, it
 renders against an empty `CodeState` instead of failing.
 
-`target-doctor` (Brief 8 / CSCI-43, planned) is an Advisor surface command
-and does not compute a verdict. It follows the repo-wide policy: advisory
-detection — zero or more — never changes the exit code (always 0 on
-successful run + output). Usage / configuration errors (target file
-missing or absent flag arguments, unparseable `--baseline-rev` /
-`--candidate-rev`) exit 2. Expected engine / git errors (`CompileError`
-on `target.yaml`, git revision resolution failure, git unavailable) exit
-3. Internal bugs exit 4. There is no `--strict-advice` flag; CI that
+`target-doctor` (Brief 8 / CSCI-43) is an Advisor surface command and does
+not compute a verdict. It follows the repo-wide policy: advisory detection
+— zero or more — never changes the exit code (always 0 on successful run
++ output). Usage / configuration errors (target file missing, missing
+`--package-root` directory, unparseable flags) exit 2. Expected engine /
+git errors (`CompileError` on `target.yaml`, git revision resolution
+failure when `--baseline-rev` / `--candidate-rev` is given, git
+unavailable when explicitly required) exit 3. Internal bugs exit 4. When
+neither `--baseline-rev` nor `--candidate-rev` is given and git is
+unavailable or no baseline can be resolved, ADVISORY-D4 is silently
+skipped rather than failing. There is no `--strict-advice` flag; CI that
 wants to gate on advisory presence should consume `--format json` and
 apply a workflow-level policy. Silent success on bad input is forbidden —
 the advisor surface only suppresses the verdict step, not the input

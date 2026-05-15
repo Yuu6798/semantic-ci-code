@@ -242,25 +242,42 @@ envelope version.
 | `risk_summary` | Deterministic projections in declared rendering order: `authoring_errors`, `would_violate`, `forbidden_zones`, `required_additions`, and `template_implications`. The author-facing `authoring_errors` slot lists residual spec-level errors (typically empty after Brief D1-2 / D1-3 caught them at compile); generator-facing slots stay scoped to "this implementation will likely violate / cannot touch / must add". Adapters render a two-step instruction so generators fix `target.yaml` first when `authoring_errors` is non-empty. |
 | `engine` | Python minor version and package version. |
 
-## Target-Doctor Advisory Envelope (Brief 8 / CSCI-43, planned)
+## Target-Doctor Advisory Envelope
 
-`semantic-ci target-doctor --format json` will use an independent Brief 8
-envelope. `schema_version` is not tied to the verdict, compile, compile-repair,
-or validate-plan envelopes. The full field shape is fixed in
-`docs/brief_8_planning.md §6.3` and pinned by
-`src/semantic_ci_code/schemas/doctor_advisory.schema.json` when CSCI-43 lands.
+`semantic-ci target-doctor --format json` uses an independent Brief 8
+envelope. `schema_version` is not tied to the verdict, compile,
+compile-repair, or validate-plan envelopes. The shape is pinned by
+`src/semantic_ci_code/schemas/doctor_advisory.schema.json` and
+`docs/brief_8_planning.md §6.3`.
 
 ```jsonc
 {
   "schema_version": "advisory-1",
   "subcommand": "target-doctor",
   "advisories": [
-    {"code": "ADVISORY-D1", "severity": "info", "message": "...", "evidence": {}}
+    {
+      "code": "ADVISORY-P1",
+      "severity": "info",
+      "message": "primary_kind=feature has no positive addition constraint ...",
+      "evidence": {"primary_kind": "feature"}
+    }
   ]
 }
 ```
 
-Advisory presence does not change the exit code — see `docs/exit_codes.md`.
+| Field | Meaning |
+|---|---|
+| `schema_version` | Always `"advisory-1"`. |
+| `subcommand` | Always `"target-doctor"`. |
+| `advisories[].code` | One of `ADVISORY-D1`, `ADVISORY-D3`, `ADVISORY-D4`, `ADVISORY-P1`, `ADVISORY-P2`, `ADVISORY-S1`. |
+| `advisories[].severity` | Always `"info"` — the Advisor surface never participates in the verdict (`docs/code_semantic_ci_design.md §23.3.1`). |
+| `advisories[].message` | Human-readable explanation of the hazard. |
+| `advisories[].evidence` | Per-advisory diagnostic fields (e.g. `constraint_id`, `target`, `package_root`, `files_touched_count`). |
+
+Advisories are emitted in canonical order (D1 → D3 → D4 → P1 → P2 → S1)
+with `constraint_id` as the within-code tiebreak so output is byte-identical
+across runs. Advisory presence does not change the exit code — see
+`docs/exit_codes.md`.
 
 ## Target-Catalog Reference Envelope (Brief 8 / CSCI-44, planned)
 
@@ -326,7 +343,7 @@ bump the envelope version.
 | `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 | `2` | validate-plan | Brief D3: added `risk_summary.authoring_errors` as a sibling list (positioned first). Adapter rendering surfaces a two-step "fix authoring first, then implement" instruction. |
-| `advisory-1` | target-doctor | Brief 8 / CSCI-43 (planned): initial advisory envelope. Independent schema; not tied to verdict / compile / compile-repair / validate-plan versions. |
+| `advisory-1` | target-doctor | Brief 8 / CSCI-43: initial advisory envelope. Independent schema; not tied to verdict / compile / compile-repair / validate-plan versions. |
 | `catalog-1` | target-catalog | Brief 8 / CSCI-44 (planned): initial catalog envelope. Independent schema; mirrors runtime registries via INV-5 parity. |
 
 ## v2 to v3 Diff

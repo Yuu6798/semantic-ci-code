@@ -33,14 +33,17 @@ class ParsedSections:
 def _is_test_id(value: str) -> bool:
     # Match `_test_case_id` in delta/code_state_delta.py: it joins
     # `test_file::test_function`, and `test_function` is either a bare
-    # identifier or `Class::method` for class-based tests (see
-    # test_surface/python_test_surface_extractor.py:190). Split on the
-    # first `::` only so both forms are accepted; reject parametrize
-    # brackets or other non-identifier segments.
+    # identifier or exactly `Class::method` (one level only, see
+    # test_surface/python_test_surface_extractor.py:181-195). Reject
+    # deeper nesting, parametrize brackets, and stray spaces — none of
+    # those forms are ever produced by the extractor.
     path, sep, name = value.partition("::")
     if not sep or not path or not name or " " in path or " " in name:
         return False
-    return all(part.isidentifier() for part in name.split("::"))
+    parts = name.split("::")
+    if len(parts) > 2:
+        return False
+    return all(part.isidentifier() for part in parts)
 
 
 def _is_fqn(value: str) -> bool:

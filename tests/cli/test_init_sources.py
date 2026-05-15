@@ -103,6 +103,20 @@ def test_pr_body_test_id_rejects_parametrize_brackets():
     assert parsed.unclassified == ((TEST_CASES_TITLE, "tests/test_x.py::test_func[case1]"),)
 
 
+def test_pr_body_test_id_rejects_overqualified_node_id():
+    """The extractor never nests classes (`_entries_for_test_class` only
+    walks direct method defs), so `path::TestA::TestB::test_case` is not
+    a valid extractor output and would compile into a permanently-failing
+    constraint (Codex review on PR #84).
+    """
+    body = """## Test cases
+- tests/test_x.py::TestA::TestB::test_case
+"""
+    parsed = parse_pr_body(body)
+    assert parsed.test_ids == ()
+    assert parsed.unclassified == ((TEST_CASES_TITLE, "tests/test_x.py::TestA::TestB::test_case"),)
+
+
 def test_pr_body_test_id_accepts_class_based_pytest_id():
     """The extractor emits `test_function` as `Class::method` for
     class-based tests (`python_test_surface_extractor.py:190`), so

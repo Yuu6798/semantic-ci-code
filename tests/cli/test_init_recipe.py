@@ -570,6 +570,51 @@ def test_h_test_case_must_contain_double_colon(tmp_path: Path):
     assert "_test_case_id" in result.stderr
 
 
+def test_h_test_case_rejects_parametrize_brackets(tmp_path: Path):
+    """The delta producer never emits parametrize brackets; accepting
+    them at CLI parse time would yield a permanently-failing constraint
+    (Codex review on PR #84).
+    """
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "bugfix:regression-test",
+        "--test-case",
+        "tests/test_x.py::test_y[case1]",
+    )
+    assert result.returncode == 2
+    assert "--test-case" in result.stderr
+
+
+def test_h_test_case_rejects_bare_double_colon(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "bugfix:regression-test",
+        "--test-case",
+        "::",
+    )
+    assert result.returncode == 2
+    assert "--test-case" in result.stderr
+
+
+def test_h_test_case_accepts_class_based_form(tmp_path: Path):
+    rc, data = _run_init(
+        tmp_path,
+        "--recipe",
+        "bugfix:regression-test",
+        "--test-case",
+        "tests/test_x.py::TestClass::test_method",
+    )
+    assert rc == 0
+    new_cases = next(
+        c for c in data["constraints"] if c["target"] == "test_surface_delta.new_cases"
+    )
+    assert new_cases["expected"] == ["tests/test_x.py::TestClass::test_method"]
+
+
 def test_h_add_api_rejects_empty_string(tmp_path: Path):
     result = run_semantic_ci(
         tmp_path,

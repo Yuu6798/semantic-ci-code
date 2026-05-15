@@ -19,7 +19,7 @@ from semantic_ci_code.authoring.sources.merge import (
     RecipeFlagCompatibilityError,
     merge_sources,
 )
-from semantic_ci_code.authoring.sources.pr_body import _is_fqn
+from semantic_ci_code.authoring.sources.pr_body import _is_fqn, _is_test_id
 from semantic_ci_code.cli.command_support import _internal_bug, _stderr, _usage_error
 from semantic_ci_code.cli.exit_codes import SUCCESS
 from semantic_ci_code.cli.init_recipes import RECIPES, apply_recipe
@@ -85,12 +85,16 @@ def _validate_recipe_relationship(args: Namespace) -> None:
 
 
 def _validate_test_case_format(values: list[str] | None) -> None:
+    # Reuse the same grammar used by the PR / issue parser so CLI input
+    # and Markdown bullet input are vetted consistently.
     for value in values or ():
-        if "::" not in value:
+        if not _is_test_id(value):
             raise ValueError(
                 f"--test-case value {value!r} is not in canonical 'path::name' form "
-                f"(e.g. 'tests/test_x.py::test_y'); recipe-generated constraints must "
-                f"match TestSurfaceDelta.new_cases output of code_state_delta._test_case_id"
+                f"(e.g. 'tests/test_x.py::test_y' or 'tests/test_x.py::TestClass::test_method'); "
+                f"recipe-generated constraints must match TestSurfaceDelta.new_cases output of "
+                f"code_state_delta._test_case_id (path and identifier segments only, no "
+                f"parametrize brackets or stray spaces)"
             )
 
 

@@ -431,13 +431,20 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
     observed delta (the verdict can PASS without inspecting any
     Python change).
 
-    The classification is exhaustive over the operators that admit a
-    well-defined "lock vs positive" semantic. Operators whose vacuous
-    behavior depends on `expected` (`equals` / `includes_all` /
-    `superset_of` / `not_equals`) are handled per-operator.
+    Three observation modes per operator:
+
+    - Always-lock: lock regardless of `expected` (baseline-aware
+      operators + collection-allow-list operators).
+    - Collection-dependent (`equals` / `includes_all` / `superset_of`):
+      lock when `expected` is an empty collection or a dict whose
+      values are all empty collections.
+    - Numeric-dependent: for `kind: delta` constraints with a scalar
+      numeric `expected`, observed value `0` (empty Python diff)
+      satisfies the operator depending on the comparison.
     """
     operator = constraint.operator
     expected = constraint.expected
+    kind = constraint.kind
 
     # Always lock-only — vacuously satisfied by any empty observed,
     # independent of `expected`.
@@ -452,15 +459,23 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
     }:
         return True
 
-    # Expected-dependent: lock-only when expected is "empty enough"
-    # (so the operator becomes trivially satisfied by an empty
-    # observed delta). `equals []`, `equals {added: [], removed: []}`,
-    # `includes_all []`, `superset_of []` all pass vacuously.
+    # Expected-dependent: collection or scalar.
     if operator in {Operator.EQUALS, Operator.INCLUDES_ALL, Operator.SUPERSET_OF}:
+        # Collection case: empty collection → lock.
         if _is_empty_collection(expected):
             return True
         if isinstance(expected, dict) and all(
             _is_empty_collection(value) for value in expected.values()
+        ):
+            return True
+        # Scalar numeric case: a delta constraint with observed=0
+        # satisfies `equals 0`. (`includes_all` / `superset_of` are
+        # collection-only so a scalar expected is not a lock case.)
+        if (
+            operator is Operator.EQUALS
+            and kind is ConstraintKind.DELTA
+            and _is_scalar_number(expected)
+            and expected == 0
         ):
             return True
         return False
@@ -468,10 +483,44 @@ def _is_lock_only_constraint(constraint: CompiledConstraint) -> bool:
     # `not_equals` is inverted: an empty observed delta satisfies
     # `not_equals [non-empty]` (vacuous pass) but fails
     # `not_equals []` (the empty observed equals the empty expected).
+    # For scalar delta constraints, `not_equals N` with N != 0 is
+    # lock (observed=0 satisfies); `not_equals 0` is a positive
+    # assertion that requires non-zero change.
     if operator is Operator.NOT_EQUALS:
+        if kind is ConstraintKind.DELTA and _is_scalar_number(expected):
+            return expected != 0
         return not _is_empty_collection(expected)
 
+    # Scalar comparison operators on delta constraints — observed=0
+    # is the empty-diff value. The constraint is lock-only when the
+    # expected bound admits observed=0.
+    if kind is ConstraintKind.DELTA and _is_scalar_number(expected):
+        if operator is Operator.LESS_THAN:
+            return 0 < expected
+        if operator is Operator.LESS_THAN_OR_EQUAL:
+            return 0 <= expected
+        if operator is Operator.GREATER_THAN:
+            return 0 > expected
+        if operator is Operator.GREATER_THAN_OR_EQUAL:
+            return 0 >= expected
+
+    # `within_range expected: [low, high]` on a delta target is lock
+    # when low <= 0 <= high.
+    if (
+        operator is Operator.WITHIN_RANGE
+        and kind is ConstraintKind.DELTA
+        and isinstance(expected, list | tuple)
+        and len(expected) == 2
+        and all(_is_scalar_number(item) for item in expected)
+    ):
+        low, high = expected
+        return low <= 0 <= high
+
     return False
+
+
+def _is_scalar_number(value: object) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
 
 
 def _is_empty_collection(value: object) -> bool:

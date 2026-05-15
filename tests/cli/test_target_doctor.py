@@ -371,6 +371,69 @@ def test_d4_fires_when_user_constraint_is_superset_of_empty(tmp_path: Path):
     assert len(d4) == 1
 
 
+def test_d4_fires_when_scalar_delta_constraint_is_satisfied_by_zero(tmp_path: Path):
+    """Codex review (PR #82 P2 Round 11, hazards.py:474): a scalar
+    delta guard like `complexity_delta.cyclomatic equals 0` or
+    `less_than_or_equal 0` produces observed=0 on a config-only diff
+    (no Python files touched), so the user constraint passes
+    vacuously alongside the template locks. D4 must fire.
+    `_is_lock_only_constraint` now classifies scalar delta operators
+    by checking whether observed=0 satisfies the comparison.
+    """
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: no_complexity_increase\n"
+        "    kind: delta\n"
+        "    target: complexity_delta.cyclomatic\n"
+        "    operator: less_than_or_equal\n"
+        "    expected: 0\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+
+
+def test_d4_fires_when_scalar_delta_equals_zero(tmp_path: Path):
+    """Codex Round 11: `equals 0` on a delta target is vacuously
+    satisfied by observed=0."""
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: zero_complexity_delta\n"
+        "    kind: delta\n"
+        "    target: complexity_delta.cyclomatic\n"
+        "    operator: equals\n"
+        "    expected: 0\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    d4 = [a for a in advisories if a.code == "ADVISORY-D4"]
+    assert len(d4) == 1
+
+
+def test_d4_silent_when_scalar_delta_equals_non_zero(tmp_path: Path):
+    """Codex Round 11 inverse: `equals 5` on a delta target is NOT
+    satisfied by observed=0 — verdict would FAIL on config-only diff,
+    not pass vacuously. D4 silent."""
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints:\n"
+        "  - id: requires_complexity_5\n"
+        "    kind: delta\n"
+        "    target: complexity_delta.cyclomatic\n"
+        "    operator: equals\n"
+        "    expected: 5\n",
+    )
+    compiled = _compile(target)
+    files = (Path("README.md"), Path("pyproject.toml"))
+    advisories = detect_advisories(compiled, package_root=tmp_path, files_touched=files)
+    assert "ADVISORY-D4" not in [a.code for a in advisories]
+
+
 def test_d4_fires_when_extra_user_constraint_uses_changed_only_in(tmp_path: Path):
     """Codex review (PR #82 P2 Round 8, hazards.py:420): the evaluator
     unconditionally returns SKIPPED for `Operator.CHANGED_ONLY_IN` (see

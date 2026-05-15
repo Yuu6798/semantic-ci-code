@@ -9,6 +9,7 @@ from semantic_ci_code.cli.commands.compile import run_compile
 from semantic_ci_code.cli.commands.compile_repair import run_compile_repair
 from semantic_ci_code.cli.commands.observe import run_observe
 from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
+from semantic_ci_code.cli.commands.target_doctor import run_target_doctor
 from semantic_ci_code.cli.commands.validate_plan import run_validate_plan
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
 from semantic_ci_code.cli.init_command import run_init
@@ -228,6 +229,38 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--path", default=None, help="target.yaml path to create")
     init.add_argument("--force", action="store_true", help="overwrite an existing file")
 
+    target_doctor = subcommands.add_parser(
+        "target-doctor",
+        help="render target.yaml authoring advisories (verdict 不参加)",
+    )
+    target_doctor.add_argument("--target", default=None, help="Target SVP YAML file")
+    target_doctor.add_argument(
+        "--package-root",
+        default=".",
+        help="package root used to detect ADVISORY-D1 (test_surface visibility)",
+    )
+    target_doctor.add_argument(
+        "--baseline-rev",
+        default=None,
+        help="baseline git ref for ADVISORY-D4 (config-only diff vacuous PASS)",
+    )
+    target_doctor.add_argument(
+        "--candidate-rev",
+        default=None,
+        help="candidate git ref for ADVISORY-D4; defaults to HEAD",
+    )
+    target_doctor.add_argument(
+        "--format",
+        choices=("human", "json"),
+        default="human",
+        help="output format; advisor envelope schema_version='advisory-1' (json)",
+    )
+    target_doctor.add_argument(
+        "--output",
+        default=None,
+        help="write output to this file instead of stdout",
+    )
+
     return parser
 
 
@@ -256,6 +289,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_validate_plan(args)
     if args.subcommand == "init":
         return run_init(args)
+    if args.subcommand == "target-doctor":
+        return run_target_doctor(args)
 
     parser.print_help(sys.stderr)
     return USAGE_ERROR

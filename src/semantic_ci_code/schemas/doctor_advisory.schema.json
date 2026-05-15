@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://semantic-ci/doctor_advisory.schema.json",
+  "title": "Semantic CI target-doctor advisory envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subcommand", "advisories"],
+  "properties": {
+    "schema_version": {"const": "advisory-1"},
+    "subcommand": {"const": "target-doctor"},
+    "advisories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message", "evidence"],
+        "properties": {
+          "code": {
+            "enum": [
+              "ADVISORY-D1",
+              "ADVISORY-D3",
+              "ADVISORY-D4",
+              "ADVISORY-P1",
+              "ADVISORY-P2",
+              "ADVISORY-S1"
+            ]
+          },
+          "severity": {"const": "info"},
+          "message": {"type": "string", "minLength": 1},
+          "evidence": {"type": "object"}
+        }
+      }
+    }
+  }
+}

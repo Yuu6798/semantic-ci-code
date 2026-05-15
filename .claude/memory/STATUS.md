@@ -24,11 +24,17 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-P2.5 完走 + ABCD-A 完走 + ABCD-B 着手 (CSCI-41 + CSCI-43 landed) — Brief 1〜5
-全 merged + ResultStatus split (D1-1〜D3) 全 merged + Brief 8 入口 (Authoring
-surface 設計契約 + `target-doctor` Advisor surface) merged。 `semantic-ci`
-CLI は `init` / `observe` / `compare` / `check` / `pre-commit` / `compile` /
-`compile-repair` / `validate-plan` / `target-doctor` の 9 subcommand を持ち、
+P2.5 完走 + ABCD-A 完走 + ABCD-B 3/4 landed (CSCI-41 + CSCI-43 + CSCI-42
+landed) — Brief 1〜5 全 merged + ResultStatus split (D1-1〜D3) 全 merged +
+Brief 8 入口 (Authoring surface 設計契約 + `target-doctor` Advisor surface
++ `init --recipe --from-*` Authoring + Provenance surface) merged。
+`semantic-ci` CLI は `init` (recipe / source surface 込み) / `observe` /
+`compare` / `check` / `pre-commit` / `compile` / `compile-repair` /
+`validate-plan` / `target-doctor` の 9 subcommand を持ち、 `init --recipe`
+で 4 recipe (`feature:add-api` / `bugfix:regression-test` /
+`refactor:preserve-api-with-allowlist` / `test-update:add-test-case`) と
+4 source surface (`--from-pr-body` / `--from-issue` / `--from-labels` /
+`--from-commits`) から target.yaml を deterministic に生成可能。
 Vibe Coding Adapter(Claude Code / Cursor / Codex)経由で repair guidance +
 pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
 `CompileError` (大半の authoring error)、 (b) runtime `unknown_cause` 4 値、
@@ -36,9 +42,140 @@ pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
 `target-doctor` の 6 advisory (D1/D3/D4/P1/P2/S1) で end-to-end 診断可能。
 Authoring surface (target.yaml 生成経路 / surface isolation / Advisor
 renderer exempt / `candidate_code_used: false` 固定) は
-`docs/target_authoring_surface.md` で設計契約済。
+`docs/target_authoring_surface.md` で設計契約済、 `init --recipe` の
+generator path は `authorship.generation_metadata` block を populate
+(Section F、 `candidate_code_used`/`llm_used` 固定 False sentinel)。
 
 ## 直近 merged
+
+### 2026-05-15 Session 4 — Brief 8 / CSCI-42 (`semantic-ci init --recipe --from-*` Authoring + Provenance surface) landed
+
+B 軸 (Brief 8) 実装 2 本目 = 推奨着地順 41 → 43 → **42** → 44 の 3 番目消化。
+**Codex が利用不能の例外措置で Claude が brief 起草 → 実装 → bot review
+対応 → merge を 1 session 内で全部担当** (通常運用 = Claude=design /
+Codex=implementation split との一時的乖離、 commit message に明記して次
+セッション以降の復帰を pin)。
+
+- **PR #84** (CSCI-42, `feat(brief-8): land CSCI-42 — semantic-ci init
+  --recipe + PR metadata sources (Authoring + Provenance surface)`):
+  - 新設: `src/semantic_ci_code/authoring/provenance.py`
+    (`build_generation_metadata()`) + `authoring/sources/{pr_body,issue,
+    labels,commits,merge}.py` (4 source surface parser + C1〜C4 merger) +
+    `cli/init_recipes/{_shared,feature_add_api,bugfix_regression_test,
+    refactor_preserve_api,test_update_add_test_case}.py` (4 recipe builder)
+    + `tests/cli/test_init_{recipe,sources,merge}.py` (recipe / parser /
+    merge unit + CLI integration) + `tests/architecture/
+    test_verdict_bytes_invariant.py` (INV-1 + INV-3 narrow-scope verdict
+    bytes invariant、 `target_authorship` + `validate-plan.rendered` を
+    除外する helper を提供)
+  - 更新: `cli/init_command.py` (argparse 9 新引数 + recipe dispatch +
+    canonical-grammar 検証 4 種) + `cli/main.py` (init subparser 拡張) +
+    `tests/architecture/test_surface_isolation.py` (CSCI-42 module の
+    INV-2 / INV-4 列追加、 `httpx` / `requests` / `socket` / `ssl` import
+    leak を 0 round で fail させる)
+  - 4 recipe inviolate output predicate: `feature:add-api` =
+    `api_surface_delta.added includes_all [{fqn, visibility: "public"}, …]`
+    record match (flat alias 不使用) / `bugfix:regression-test` =
+    `primary_kind: bugfix` + `new_cases includes_all` (test_case あり) または
+    `not_equals []` (なし) / `refactor:preserve-api-with-allowlist` =
+    allowlist 無し → primary_kind のみ / 有り → `api_surface.allow_changes`
+    既存 policy escape hatch / `test-update:add-test-case` =
+    `primary_kind: test_update` + `new_cases` constraint
+  - C1 (recipe ↔ label primary_kind 矛盾) / C2 (内部 label 矛盾) / C3 (recipe
+    ↔ Conventional Commits prefix 矛盾) / C4 (未消費 intent-declaring
+    section) を merger で固定、 `RecipeFlagCompatibilityError` で recipe ↔
+    flag 不整合を C1〜C4 と分離
+  - **Codex bot review 13 round 連続 P2 を順次消化** (本体 1 commit +
+    12 fix commit、 merge `999b858`):
+    - R1 = strong-layer cutoff per-field → layer-wide (層を跨いで union
+      しない原則の構造的逸脱) → `4219e4a`
+    - R2 = Python 3.12 CI fail (`tests/__init__.py` 不在で
+      `from tests.cli.helpers` が 3.12 stricter resolution で collection
+      error) + `--add-api` FQN validation 不在 (PR/issue bullet と grammar
+      不一致) → `7413f7e`
+    - R3 = bloat trim (-420 lines) + bare `--allow-fqn-prefix legacy` reject
+      (evaluator `fqn.startswith` で `legacy2.Foo` も match してしまう
+      over-broad) → `b0c5855`
+    - R4 = `--test-case` refactor recipe compat (refactor は
+      `merged.test_ids` を読まないため silent drop) + GFM `[ ] ` checkbox
+      strip + canonical test ID grammar (`::` ちょうど 1 個 / path / name
+      に空白なし / name は identifier) → `f609444`
+    - R5 = class-based pytest ID (`Class::method`、
+      `python_test_surface_extractor.py:190` で `f"{Class}::{method}"`
+      emit) を受理 (R4 で過剰 reject していたものを反転) → `c13eaed`
+    - R6 = `--test-case` CLI canonical grammar を `pr_body._is_test_id`
+      reuse で surface 跨ぎ統一 → `cfdd606`
+    - R7 = over-qualified node ID (`path::A::B::C::test`、 extractor は
+      nested class 再帰しないので invalid) reject → `ebf4c8e`
+    - R8 = non-pytest function/class name (`helper` / `Helper::test_x`、
+      extractor `_is_test_function_name`/`_is_test_class_name` filter)
+      reject → `7c76345`
+    - R9 = non-POSIX path (`\\`、 absolute `/`、 non-`.py`、 extractor
+      `relative.as_posix()` 仕様) reject → `2d9823e`
+    - R10 = doubled trailing dot (`pkg..`、 `rstrip(".")` の semantic
+      diff)、 `value[:-1]` で exactly 1 dot strip に修正 → `8a2119b`
+    - R11 = non-normalized path (`./`、 `..`、 `//` 空 segment) + ATX
+      heading reset (`# Foo` でも `current` reset、 `## ` 以外で section
+      が永続化していた) → `999b858`
+    - R12 (post-merge 遅延配信): non-normalized path / heading reset と
+      重複、 stale event として skip
+    - CI: 3.11 / 3.12 / 3.13 全 green、 **pytest 1191 passed** (+93 new
+      test、 ruff check / format 両 pass)
+  - **10 round 目で AskUserQuestion 3 択提示** (打ち止め / 漸進 /
+    根本 refactor) → user 「根本 refactor」 選択で
+    `authoring/canonical.py` 集約に着手したが途中で user stop 指示、
+    `git pull` で remote (999b858) に sync して clean state で停止
+    (canonical refactor は次セッション持ち越し、 本 PR は per-round fix
+    版で merge)
+
+**設計判断のハイライト**:
+
+1. **Codex 不在時の design / implementation split 例外運用** — 通常 AGENTS.md
+   の Claude=design / Codex=implementation を一時的に Claude が両方担当、
+   commit message に **「Implemented exceptionally by Claude Code on
+   2026-05-15 because Codex was unavailable; future Brief 8 work returns to
+   the AGENTS.md split」** を明記。 brief 起草 → 実装一気通貫は密度高い一方、
+   self-review 視点が弱まり Codex P2 chase が長引く傾向 (10 round 目まで
+   user 介入が必要だった)
+2. **trim refactor `b0c5855` (-420 lines)** — `module / class / function
+   docstring の「名前から自明」 のもの全削除` + 単一 site で呼ばれる helper
+   全 inline (`_consumes` / `_is_set` / `_check_*_consistency`) +
+   `_is_fqn` 重複定義を pr_body から import 統一。 CLAUDE.md 「Default to
+   writing no comments」 「premature abstraction を避ける」 を直接適用、
+   user 「コード行が膨れてるのが気になる」 指摘を契機に self-review で発見
+3. **AskUserQuestion で trade-off 軸を 3 択提示する pattern** — 「P2 chase
+   続けるか?」 より「打ち止め / 漸進 / 根本 refactor」 で軸を明示する方が
+   user 判断早い (本 session で初実証)
+4. **extractor actual output shape を grep してから validator を書く必要性** —
+   R5 (class-based ID) は私が「emit されない」 と思い込んで reject、 Codex
+   が `python_test_surface_extractor.py:190` を指摘して反転。 producer 仕様を
+   暗黙追従する validator が複数できると P2 chase の温床 (canonical-form
+   module 集約で根を絶つ判断は次セッションに持ち越し)
+5. **architecture test 先行** (INV-2 / INV-4 を実装より先に書く、 Session 3
+   から継承) — `test_surface_isolation.py` の CSCI_42_MODULES enumeration で
+   `httpx` / `requests` / `socket` / `ssl` import leak を 0 round で fail
+   させる仕組みを最初に書いたので、 13 round の P2 はすべて validator /
+   parser layer に limited (architecture 違反は 0 round)
+
+**修正・訂正**:
+
+1. **CI 3.12 collection error**: 私の新設 test `tests/architecture/
+   test_verdict_bytes_invariant.py` で `from tests.cli.helpers import
+   run_semantic_ci` を使ったが `tests/__init__.py` 不在 → 3.12 stricter
+   resolution で collection 段階で exit 2、 既存 architecture test は
+   `from tests.*` 不使用で偶然動いていた。 fix: minimal `_run_semantic_ci`
+   を test file 内に inline (commit `7413f7e`)
+2. **CI ruff format --check 抜け**: local は `ruff check .` のみで CI は
+   2 step (`check` + `format --check`)、 8 file が format 違反で 3.12 が
+   test 前 fail。 fix: `ruff format .` を local verification flow に追加
+   (次セッション以降の checklist 化が望ましい)
+3. **`_is_test_id` 過剰 strict (R5 で反転)**: 「`Class::method` 形式は
+   extractor が emit しない」 という思い込みで `count("::") == 1` 制約を
+   入れた → `python_test_surface_extractor.py:190` を Codex が指摘して反転
+4. **`_validate_fqn_prefix_values` の `rstrip(".")`**: `pkg..` を valid
+   と判定 → 生 `pkg..` が emit され evaluator `startswith` で永遠に
+   match しない。 fix: `value[:-1]` で exactly 1 dot strip (commit
+   `8a2119b`)
 
 ### 2026-05-15 Session 3 — Brief 8 / CSCI-43 (`semantic-ci target-doctor` Advisor surface) landed
 
@@ -398,10 +535,11 @@ evaluator_internal)、 (c) author-facing `risk_summary.authoring_errors` slot
 
 ## 次の発行順序
 
-P2.5 完走 + A (ResultStatus split) 完走 + B-1 (CSCI-41) + B-2 (CSCI-43) 完走で
-ABCD-A 軸 landed + ABCD-B 軸 2/4 landed。 残り B-3〜B-4 (Brief 8 implementation
-2 PR) / C (Brief 7 SSP) / D (P2 残課題)。 ABCD 完走で product 機能の
-ship-blocking gap が消える(`2026-05-12.md` 参照)。
+P2.5 完走 + A (ResultStatus split) 完走 + B-1 (CSCI-41) + B-2 (CSCI-43) +
+B-3 (CSCI-42) 完走で ABCD-A 軸 landed + ABCD-B 軸 3/4 landed。 残り B-4
+(Brief 8 implementation 1 PR、 `target-catalog`) / C (Brief 7 SSP) /
+D (P2 残課題)。 ABCD 完走で product 機能の ship-blocking gap が消える
+(`2026-05-12.md` 参照)。
 
 ### A. ResultStatus split — **完走 (2026-05-14/15)**
 
@@ -438,17 +576,26 @@ D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
   - **R17 deferred**: target-doctor の `--package-root` resolve を `check` と
     同じ repo-relative に揃える consistency 改善 (subdirectory 起動時のみ
     表面化、 critical でない UX 改善)
-- **B-3. CSCI-42. `semantic-ci init --recipe --from-*`**: PR body / labels /
-  commits / issue から target.yaml 生成 + `authorship.generation_metadata`
-  自動記録。 brief 未起草。 起草時必読: `docs/target_authoring_surface.md`
-  Section F (`generation_metadata` populate は generator paths 限定、 plain
-  init は TARGET_TEMPLATE 逐語維持で block 自体 absent、
-  `candidate_code_used: false` 固定)。 加えて CSCI-43 で得た知見 (advisory
-  1 つごとに inviolate predicate 1 行で書く / false negative 境界 fixture を
-  AC で要求) を継承
+- **B-3. CSCI-42. `semantic-ci init --recipe --from-*`**: **完走 (2026-05-15
+  Session 4、 PR #84)**。 4 recipe (`feature:add-api` /
+  `bugfix:regression-test` / `refactor:preserve-api-with-allowlist` /
+  `test-update:add-test-case`) + 4 source surface (`--from-pr-body` /
+  `--from-issue` / `--from-labels` / `--from-commits`) + C1〜C4 conflict
+  detection + INV-1 / INV-3 / INV-4 architecture invariant test。 Codex
+  不在の例外措置で Claude が brief 起草 → 実装 → bot review 対応 → merge
+  を 1 session 内で担当、 Codex 13 round 全部 P2 消化。 詳細は本ファイル
+  直近 merged § 2026-05-15 Session 4 参照。 follow-up:
+  - **canonical-form refactor 持ち越し**: Codex 13 round の root cause =
+    validator 重複 + extractor 出力 shape 暗黙追従。 10 round 目で user
+    指示 「根本 refactor」 を受けて `authoring/canonical.py` 集約に着手した
+    が user stop 指示で中断、 per-round fix 版で merge。 次セッションで
+    canonical helper 集約を別 PR として起こす候補 (半日規模、 `semantic-ci
+    init --recipe refactor:preserve-api-with-allowlist` で dogfood する
+    機会)
 - **B-4. CSCI-44. `semantic-ci target-catalog`**: 全 operator / template /
   match schema を機械可読 + human で出力(AI assistant / IDE 拡張用)。
-  brief 未起草
+  brief 未起草。 **Brief 8 完走の最後の 1 ピース**、 通常運用 (Claude=design
+  / Codex=implementation) 復帰想定
 
 ### C. Brief 7(SSP v0.1、 planning merged 2026-05-06 PR #50、 implementation 5 PR)
 
@@ -487,23 +634,31 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 
 ### 直近最短経路
 
-- **CSCI-42 起草**(Brief 8 / `init --recipe --from-*`、 推奨着地順 §12.2 で
-  CSCI-43 の次) — PR body / labels / commits / issue から target.yaml 生成 +
-  `authorship.generation_metadata` 自動記録。 起草時必読:
-  1. `docs/brief_8_planning.md §6.2` (`init --recipe` spec、 AC、 file 一覧、
-     exit code 規約) + §14 起草 checklist
-  2. `docs/target_authoring_surface.md` Section F (`generation_metadata`
-     populate は generator paths 限定、 plain init は TARGET_TEMPLATE 逐語維持で
-     block 自体 absent、 `candidate_code_used: false` 固定) を逐語反映
-  3. CSCI-43 で得た 16 round Codex review の教訓: (a) advisory / generator
-     仕様は「inviolate predicate 1 行」 形式で AC に明記、 (b) false negative
-     境界 fixture を AC で要求 (今回は「generation_metadata が plain init で
-     populate されない」 / 「recipe 経由で空配列を生成しない」)、 (c) INV-2
-     surface isolation test を実装より先に書いて Advisor renderer exempt の
-     boundary を `tests/architecture/test_surface_isolation.py` に閉包追加
-  4. **A 軸 follow-up 残**: `docs/brief_8_planning.md §6.3.1` line 435 の
-     `ADVISORY-S1` 文言 narrow (docs only、 CSCI-42 とは別 PR で landing)。
-     PR が並走する場合は CSCI-42 branch では §6.3.1 を編集しない
+- **CSCI-44 起草**(Brief 8 / `target-catalog`、 推奨着地順 §12.2 で
+  CSCI-42 の次、 **Brief 8 完走の最後の 1 ピース**) — 全 operator /
+  template / match schema を機械可読 + human で出力 (AI assistant / IDE
+  拡張用)。 通常運用 (Claude=design / Codex=implementation) 復帰想定。
+  起草時必読:
+  1. `docs/brief_8_planning.md §6.4` (canonical spec、 AC、 file 一覧)
+  2. CSCI-43 / CSCI-42 で得た 29 round 累計 Codex review の教訓: (a)
+     advisory / generator / catalog item 仕様は「inviolate predicate
+     1 行」 形式で AC に明記、 (b) false negative 境界 fixture を AC で
+     要求、 (c) **producer (extractor / template / operator schema /
+     match schema) の actual output shape を grep してから validator を
+     書く** (CSCI-42 R5 = `Class::method` 形式の存在を見落として reject、
+     R8 = `_is_test_function_name` / `_is_test_class_name` filter の
+     存在を見落とし、 を反転して気付いた)、 (d) `tests/architecture/`
+     test (INV-2 / INV-4) を実装より先に書く
+- **canonical-form refactor (CSCI-42 から持ち越し、 別 PR 候補)**:
+  `src/semantic_ci_code/authoring/canonical.py` 新設で
+  `is_canonical_fqn` / `is_canonical_fqn_prefix` / `is_canonical_test_id`
+  3 helper に集約、 producer 各所への doc 参照を 1 module に pin。 移行
+  先は `authoring/sources/pr_body.py` + `cli/init_command.py` の
+  `_is_fqn` / `_is_test_id` / `_validate_*` 系。 半日、 `semantic-ci init
+  --recipe refactor:preserve-api-with-allowlist` で dogfood する機会
+- **A 軸 follow-up 残**: `docs/brief_8_planning.md §6.3.1` line 435 の
+  `ADVISORY-S1` 文言 narrow (docs only、 CSCI-44 とは別 PR で landing
+  想定)。 PR が並走する場合は CSCI-44 branch では §6.3.1 を編集しない
 
 ## Frozen / Deferred
 

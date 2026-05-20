@@ -6,6 +6,11 @@ from typing import Any
 
 import yaml
 
+from semantic_ci_code.authoring.canonical import (
+    is_canonical_fqn,
+    is_canonical_fqn_prefix,
+    is_canonical_test_id,
+)
 from semantic_ci_code.authoring.sources import (
     CommitsParseError,
     LabelsParseError,
@@ -19,7 +24,6 @@ from semantic_ci_code.authoring.sources.merge import (
     RecipeFlagCompatibilityError,
     merge_sources,
 )
-from semantic_ci_code.authoring.sources.pr_body import _is_fqn, _is_test_id
 from semantic_ci_code.cli.command_support import _internal_bug, _stderr, _usage_error
 from semantic_ci_code.cli.exit_codes import SUCCESS
 from semantic_ci_code.cli.init_recipes import RECIPES, apply_recipe
@@ -85,10 +89,8 @@ def _validate_recipe_relationship(args: Namespace) -> None:
 
 
 def _validate_test_case_format(values: list[str] | None) -> None:
-    # Reuse the same grammar used by the PR / issue parser so CLI input
-    # and Markdown bullet input are vetted consistently.
     for value in values or ():
-        if not _is_test_id(value):
+        if not is_canonical_test_id(value):
             raise ValueError(
                 f"--test-case value {value!r} is not in canonical 'path::name' form "
                 f"(e.g. 'tests/test_x.py::test_y' or 'tests/test_x.py::TestClass::test_method'); "
@@ -100,7 +102,7 @@ def _validate_test_case_format(values: list[str] | None) -> None:
 
 def _validate_fqn_values(values: list[str] | None, *, flag: str) -> None:
     for value in values or ():
-        if not _is_fqn(value):
+        if not is_canonical_fqn(value):
             raise ValueError(
                 f"{flag} value {value!r} is not a valid dotted FQN (e.g. "
                 f"'pkg.module.symbol'); each segment must be a Python identifier and "
@@ -110,18 +112,8 @@ def _validate_fqn_values(values: list[str] | None, *, flag: str) -> None:
 
 
 def _validate_fqn_prefix_values(values: list[str] | None) -> None:
-    # The refactor allowlist evaluator does prefix match with
-    # `fqn.startswith(rule.fqn_prefix)`, so `legacy` would also match
-    # `legacy2.Foo`. Require exactly one trailing `.` and reject
-    # doubled trailing dots (`pkg..`) which would form a prefix that
-    # extractor-produced FQNs can never satisfy.
     for value in values or ():
-        if not value or "::" in value or not value.endswith(".") or value.startswith("."):
-            valid = False
-        else:
-            body = value[:-1]
-            valid = bool(body) and all(part.isidentifier() for part in body.split("."))
-        if not valid:
+        if not is_canonical_fqn_prefix(value):
             raise ValueError(
                 f"--allow-fqn-prefix value {value!r} is not a valid FQN prefix; the "
                 f"value must end with exactly one '.' (e.g. 'pkg.legacy.') so the "

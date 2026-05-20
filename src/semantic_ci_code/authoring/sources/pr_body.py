@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from semantic_ci_code.authoring.canonical import is_canonical_fqn, is_canonical_test_id
+
 EXPECTED_API_TITLE = "## Expected public API"
 REMOVED_API_TITLE = "## Removed public API"
 TEST_CASES_TITLE = "## Test cases"
@@ -28,38 +30,6 @@ class ParsedSections:
     removed_api_fqns: tuple[str, ...] = ()
     unclassified: tuple[tuple[str, str], ...] = ()
     seen_section_titles: tuple[str, ...] = field(default_factory=tuple)
-
-
-def _is_test_id(value: str) -> bool:
-    # Match `_test_case_id` in delta/code_state_delta.py: it joins
-    # `test_file::test_function` where the extractor's `test_file` is
-    # `resolved.relative_to(root).as_posix()` (relative, POSIX, no
-    # `.`/`..`/empty segments), and `test_function` is `test_*` or
-    # `Test*::test_*` (extractor names start with `test_` / `Test`).
-    # Reject anything the extractor never produces.
-    path, sep, name = value.partition("::")
-    if not sep or not path or not name or " " in path or " " in name:
-        return False
-    if "\\" in path or path.startswith("/") or not path.endswith(".py"):
-        return False
-    if any(seg in ("", ".", "..") for seg in path.split("/")):
-        return False
-    parts = name.split("::")
-    if not all(part.isidentifier() for part in parts):
-        return False
-    if len(parts) == 1:
-        return parts[0].startswith("test_")
-    if len(parts) == 2:
-        return parts[0].startswith("Test") and parts[1].startswith("test_")
-    return False
-
-
-def _is_fqn(value: str) -> bool:
-    if not value or "::" in value or "." not in value:
-        return False
-    if value.startswith(".") or value.endswith("."):
-        return False
-    return all(part.isidentifier() for part in value.split("."))
 
 
 def _dedup_ordered(values: tuple[str, ...]) -> tuple[str, ...]:
@@ -99,27 +69,27 @@ def parse_pr_body(text: str) -> ParsedSections:
     unclassified: list[tuple[str, str]] = []
 
     for value in sections.get(EXPECTED_API_TITLE, ()):
-        if _is_fqn(value):
+        if is_canonical_fqn(value):
             api_fqns.append(value)
         else:
             unclassified.append((EXPECTED_API_TITLE, value))
 
     for value in sections.get(REMOVED_API_TITLE, ()):
-        if _is_fqn(value):
+        if is_canonical_fqn(value):
             removed.append(value)
         else:
             unclassified.append((REMOVED_API_TITLE, value))
 
     for value in sections.get(TEST_CASES_TITLE, ()):
-        if _is_test_id(value):
+        if is_canonical_test_id(value):
             test_ids.append(value)
         else:
             unclassified.append((TEST_CASES_TITLE, value))
 
     for value in sections.get(ACCEPTANCE_CRITERIA_TITLE, ()):
-        if _is_test_id(value):
+        if is_canonical_test_id(value):
             test_ids.append(value)
-        elif _is_fqn(value):
+        elif is_canonical_fqn(value):
             api_fqns.append(value)
         else:
             unclassified.append((ACCEPTANCE_CRITERIA_TITLE, value))

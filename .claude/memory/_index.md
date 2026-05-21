@@ -7,6 +7,7 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 
 | Date | PR / commit | Outcome | Detail |
 |---|---|---|---|
+| 2026-05-21 (S5) | #96 + ugh-ecosystem PR#1 | UGH ecosystem framing 確立 (4 domain + theory + Strata 区別)、 umbrella repo `Yuu6798/ugh-ecosystem` 新設 (別 Claude Code session 経由 1 day closure、 PR #1 を 1 round fix で merge)、 semantic-ci-code/CLAUDE.md に `## Ecosystem Context` 追記 (+24 lines、 PR #96)。 Phase X-1 + X-5 landed、 Phase X-2/X-3 が中長期 queue として明示化 | `2026-05-21.md` |
 | 2026-05-21 (S4) | #95 | wrap-up protocol に step 8 (pre-push `pytest tests/discipline/` verify) 追加、 memory exception 直 push と discipline test の structural gap (main red 直撃) を 5 秒 ritual で closure。 semantic-ci 適用は overengineering 判定で見送り | `2026-05-21.md` |
 | 2026-05-21 (S3) | #88-#94 + direct push | 緊急 doc refactor 8 phase 1 日完走、 framework 自己 refactor の self-referential dogfood、 attention budget 2,500→580 lines (-77%)、 `tests/discipline/` 3 test で memory hygiene drift を CI auto-enforce 化 | `2026-05-21.md` |
 | 2026-05-21 (S2) | #87 / #88 | R17 (`target-doctor --package-root` parity, 0 round) + 経験値外部化 framework 言語化 → CLAUDE.md/AGENTS.md §5 永続化 + urgent doc refactor planning landed | `2026-05-21.md` |

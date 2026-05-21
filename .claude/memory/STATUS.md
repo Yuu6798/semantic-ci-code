@@ -25,40 +25,154 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 ## Phase
 
 P2.5 完走 + ABCD-A 完走 + ABCD-B 完走 + 緊急 doc refactor 8 phase 完走
-(2026-05-21) — Brief 1〜5 全 merged + ResultStatus split (D1-1〜D3) 全
-merged + Brief 8 (Authoring surface 設計契約 + `target-doctor` Advisor
-surface + `init --recipe --from-*` Authoring + Provenance surface +
-canonical-form refactor + `target-catalog` Authoring meta surface) 全
-landed + doc refactor (Tier A/B/C/D 階層 + `_index.md` 1-line 復元 +
-STATUS.md compaction + AGENTS.md §5 collapse + Forward Design Note 分離
-+ archive infrastructure + `tests/discipline/` 3 test + wrap-up protocol
-拡張) 全 landed。 `semantic-ci` CLI は `init` (recipe / source surface
-込み) / `observe` / `compare` / `check` / `pre-commit` / `compile` /
-`compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`
-の **10 subcommand** を持ち、 `init --recipe` で 4 recipe
-(`feature:add-api` / `bugfix:regression-test` /
-`refactor:preserve-api-with-allowlist` / `test-update:add-test-case`) と
-4 source surface (`--from-pr-body` / `--from-issue` / `--from-labels` /
-`--from-commits`) から target.yaml を deterministic に生成可能。 Vibe
-Coding Adapter (Claude Code / Cursor / Codex) 経由で repair guidance +
-pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
-`CompileError` (大半の authoring error)、 (b) runtime `unknown_cause` 4
-値、 (c) `validate-plan` の `risk_summary.authoring_errors` slot、 (d)
++ UGH ecosystem framing 確立 + Phase X-1 landed + X-5 PR #96 open
+(2026-05-21) — 本リポジトリは **[UGH
+ecosystem](https://github.com/Yuu6798/ugh-ecosystem) の code domain**
+として位置づけが explicit 化された (`CLAUDE.md ## Ecosystem Context`
+section、 X-5 = PR #96 で追加、 wrap-up 時点で open、 user merge
+予定)。 ecosystem は 4 domain (text = `ugh-audit-core` / code = 本
+repo / music = `ugh-prompt-engine` / image+video =
+`svp-video-pipeline`) + UGH 理論基盤 + archived init
+(`ugh3-metrics-lib`) で構成、 全 domain が共通の
+5-step pattern (`Declared intent → Observed state → ΔE → Verdict →
+Repair`) を実装し、 audit layer は全 domain で必ず deterministic
+(Strata 区別、 LLM-assisted は image+video の generation layer に限定)。
+本 repo の scope guard ("not a linter / type checker / test runner /
+LLM-as-judge / intent validator / intent interpreter") は ecosystem-wide
+audit-deterministic invariant (= §23.1 input neutrality) の code-domain
+specialisation として再 framing された。 既存実装は Brief 1〜5 全
+merged + ResultStatus split (D1-1〜D3) 全 merged + Brief 8 (Authoring
+surface 設計契約 + `target-doctor` Advisor + `init --recipe --from-*`
+Authoring + Provenance + canonical-form refactor + `target-catalog`
+Authoring meta surface) 全 landed + doc refactor (Tier A/B/C/D 階層 +
+`_index.md` 1-line 復元 + STATUS.md compaction + AGENTS.md §5 collapse
++ Forward Design Note 分離 + archive infrastructure +
+`tests/discipline/` 3 test + wrap-up protocol 拡張) 全 landed。
+`semantic-ci` CLI は `init` (recipe / source surface 込み) / `observe`
+/ `compare` / `check` / `pre-commit` / `compile` / `compile-repair` /
+`validate-plan` / `target-doctor` / `target-catalog` の **10
+subcommand** を持ち、 `init --recipe` で 4 recipe (`feature:add-api`
+/ `bugfix:regression-test` / `refactor:preserve-api-with-allowlist` /
+`test-update:add-test-case`) と 4 source surface (`--from-pr-body` /
+`--from-issue` / `--from-labels` / `--from-commits`) から target.yaml
+を deterministic に生成可能。 Vibe Coding Adapter (Claude Code /
+Cursor / Codex) 経由で repair guidance + pre-generation guidance を
+render 可能。 UNKNOWN は (a) compile-time `CompileError` (大半の
+authoring error)、 (b) runtime `unknown_cause` 4 値、 (c)
+`validate-plan` の `risk_summary.authoring_errors` slot、 (d)
 `target-doctor` の 6 advisory (D1/D3/D4/P1/P2/S1) で end-to-end 診断
-可能。 起動時 Tier A attention budget は **~580 lines** (target ≤ 800
-クリア、 doc refactor 前 ~2,500 lines から -77%)、 memory hygiene drift
-は `tests/discipline/` 3 test が CI で auto-enforce
-(`test_status_md_phase_single_paragraph.py` /
+可能。 起動時 Tier A attention budget は main 上で **~580 lines**
+(X-5 = PR #96 merge 後は +24 で ~604 lines 想定、 target ≤ 800
+クリア継続、 doc refactor 前 ~2,500 lines から -77%)、 memory
+hygiene drift は `tests/discipline/` 3 test が
+CI で auto-enforce (`test_status_md_phase_single_paragraph.py` /
 `test_status_md_next_queue_no_completed.py` /
 `test_index_md_entry_compactness.py`)。 wrap-up protocol step 8 で
-`pytest tests/discipline/` を memory 直 push 前 pre-push 必須化 (PR #95、
-memory exception 直 push と CI gate の structural gap closure)。 archive
-infrastructure
+`pytest tests/discipline/` を memory 直 push 前 pre-push 必須化
+(PR #95、 memory exception 直 push と CI gate の structural gap
+closure)。 archive infrastructure
 (`.claude/memory/archive/INDEX.md` + `STATUS_MERGED_LOG.md`) +
 30 日 TTL の dated log 移送 ritual が wrap-up protocol に組込済。
-Next normal implementation queue: Brief 7 / SSP v0.1 (CSCI-36 entry)。
+Next normal implementation queue: Brief 7 / SSP v0.1 (CSCI-36 entry)
++ Phase X-3 (cross-ref embedding in 残 3 ecosystem repo、 別 Claude
+Code session 委譲) を 並行 thread として走らせる、 中長期 Phase X-2
+(HA-style validation cross-domain 移植) は ecosystem 統合の core
+work として queue 末尾に常駐。
 
 ## 直近 merged
+
+### 2026-05-21 Session 5 — UGH ecosystem framing 確立 + umbrella repo (`Yuu6798/ugh-ecosystem`) 新設 + semantic-ci-code に Ecosystem Context 追記 (Phase X-1 / X-5 landed)
+
+Session 1〜4 で ABCD-A/B + 緊急 doc refactor を 1 日で全完走した直後の継続
+session。 user 主導の壁打ち session として始まり、 半年壁打ちが
+**「semantic-ci-code 単独 product 開発」 ではなく「UGH ecosystem (4 domain)
+の cross-domain 並列研究 program」 だった** ことが言語化された。 user
+による 4 link 連続提供 (`ugh-prompt-engine` / `svp-video-pipeline` /
+`ugh-audit-core` + ecosystem 統合議論) で、 ecosystem 全貌が web fetch
+経由で surface — 「Semantic CI Ecosystem」 ではなく **「UGH (Unconscious
+Gravity Hypothesis) ecosystem」** が正しい brand、 4 active domain + 1
+archived init (`ugh3-metrics-lib`) + theory foundation、 audit layer は全
+domain で deterministic / generation layer のみ image+video で
+LLM-assisted という **Strata 区別**、 text domain は HA48/HA63 (n=63)
+で既に validated、 等の事実が連続 surface した。
+
+- **`Yuu6798/ugh-ecosystem` 新設** (umbrella repo、 別 Claude Code
+  session 経由で initial PR #1 を 1 round fix で merge):
+  - day-1 minimum = README + LICENSE + .gitignore
+  - README は 4 domain status table + 5-step design pattern + Strata
+    説明 + Theory section (note.com URL は frozen、 explicit citation
+    せず) + Status section + License + "research program / OSS tool
+    両用" 明示
+  - PR #1 review fix: code domain status を「8 CLI subcommands」 と
+    誤記していたものを「ABCD-A/B complete; 10 CLI subcommands」 に修正、
+    repo 名 prefix duplicate (`Yuu6798/Yuu6798-ugh-ecosystem-repo`) を
+    `Yuu6798/ugh-ecosystem` に rename
+  - brief 設計 → 別 session 実装 → 1 round review → merge を 1 日以内
+    closure、 後続 X-3 に再利用可能な reference workflow が成立
+- **PR #96** (本 repo、 `claude/semantic-ci-discussion-Y3rob` branch、
+  Claude 直接実装、 session 終了時 open):
+  - `CLAUDE.md` 冒頭に `## Ecosystem Context` (+24 lines) 挿入
+  - 本 repo を ecosystem の code domain として位置付け、 5-step pattern
+    と 4 概念対応 (`target.yaml` / `CodeState` / constraint evaluator /
+    `RepairPlan`) を明示、 既存 Scope guard を ecosystem-wide audit-
+    deterministic invariant の specialisation として再 framing、 他 3
+    domain repo へ soft link
+  - Tier A attention budget: 580 → 604 lines、 依然 800 target 内
+  - 規模が極小 (+24 lines) なので AGENTS.md §5.2 体制別 envelope の
+    「Claude alone = 半日以下なら 0 round 可」 範囲内、 と framing で
+    AGENTS.md split を一時的に直接実装に振った
+- **Phase X 設計**: 旧 framing「semantic-ci-code 単独 external 配布」
+  を廃止、 新 framing「UGH ecosystem formalization」 を採用。 X-1
+  (umbrella repo) + X-5 (CLAUDE.md ecosystem context) が本 session で
+  landed、 X-2 (HA-style validation cross-domain 移植) は中長期 phase
+  として queue 末尾常駐、 X-3 (他 3 ecosystem repo に cross-ref
+  embedding) は別 Claude Code session 委譲予定、 X-1 続き (umbrella
+  docs/ 拡張 = vocabulary.md / strata.md / roadmap.md / theory.md 等)
+  も中長期で別 session
+
+**設計判断のハイライト**:
+
+1. **Brand 確定 = UGH ecosystem**: 「Semantic CI Ecosystem」 は session
+   序盤の framing 慣性、 user 自身も「セマンティック CI エコシステム」
+   と呼んでいたが、 ugh-audit-core README に「UGHer ecosystem」 表記が
+   既存、 UGH 理論 (note.com) が基盤、 ecosystem name = UGH ecosystem
+   / 内部の design pattern 名 = semantic CI / semantic audit、 と整理
+2. **Strata 区別が ecosystem 規律として明示化**: 「LLM を core に
+   入れない」 半年規律の真の payoff は単独 repo の品質 rule ではなく、
+   **LLM 生成 (Strata B) を別 strata に押し出して deterministic
+   auditor identity を保つ ecosystem 規律の code domain 実装** だった、
+   と本 session で初めて articulate
+3. **umbrella creation workflow の reference 化**: brief 設計 → 別
+   Claude Code session 実装 → PR review → 1 round fix → merge を 1
+   日以内 closure、 ecosystem cross-repo 作業を AGENTS.md split 体制下で
+   回す workflow として後続 X-3 で再利用可能
+4. **「公開歴史の開始」 + 「umbrella repo の役割」 を比喩 + OSS 事例
+   で user に説明**: tag の social commitment、 PyPI 再 upload 不可、
+   docs-only repo の 4 役割、 図書館 catalog / 親会社 site / シリーズ
+   概要パンフ比喩、 Kubernetes / OpenTelemetry / Rust の事例。 user の
+   素朴疑問が深堀り trigger として機能した
+5. **「N=0 ecosystem-wide」 framing の誤り発覚**: text domain
+   (ugh-audit-core) は HA48/HA63 で validated、 ecosystem 全体としては
+   partial validation phase。 「N=0 → N=1」 ではなく「text domain で確立
+   した HA-style validation を 他 3 domain に展開」 が正しい problem
+   定義、 Phase X-2 の core work として queue 化
+6. **AskUserQuestion 不使用で 1-2 paragraph opinionated 提示 → user
+   即決サイクル**: trade-off N 択 table + 私の position + 1 turn で
+   user 判断、 の loop が再現性高く機能。 「Claude 直接実装か」 等の
+   体制判断も即決された
+
+**修正・訂正**:
+
+1. **「Semantic CI Ecosystem」 呼称を私が複数 turn 維持していた誤り** —
+   user 自身も session 序盤の framing 慣性に乗っていた、 と pinpoint
+2. **「ecosystem 全体が N=0」 framing の誤り** — text domain は既に
+   validated、 と user 提供 link で発覚
+3. **「modality 拡張は Brief 6 規模の数ヶ月 work」 評価の誤り** — 実は
+   既に 3 modality (music PoC + image+video experimental) で実装済み
+4. **PR #1 review で agent が code domain status を「8 subcommands」 と
+   誤記** — agent が `STATUS.md` を読まずに repo top README 判断、
+   後続 X-3 brief で「`STATUS.md` (or equivalent) mandatory read source」
+   を明示する discipline 必要、 と pin
 
 ### 2026-05-21 Session 3 — 緊急 doc refactor 8 phase 1 日完走 + framework 自己 refactor dogfood
 
@@ -292,153 +406,29 @@ catalog builder の前提を整える依存関係。
    refactor 退避して再走 → 同 fail 確認 = 環境起因、 refactor 無関係を
    commit message に明記
 
-### 2026-05-15 Session 4 — Brief 8 / CSCI-42 (`semantic-ci init --recipe --from-*` Authoring + Provenance surface) landed
-
-B 軸 (Brief 8) 実装 2 本目 = 推奨着地順 41 → 43 → **42** → 44 の 3 番目消化。
-**Codex が利用不能の例外措置で Claude が brief 起草 → 実装 → bot review
-対応 → merge を 1 session 内で全部担当** (通常運用 = Claude=design /
-Codex=implementation split との一時的乖離、 commit message に明記して次
-セッション以降の復帰を pin)。
-
-- **PR #84** (CSCI-42, `feat(brief-8): land CSCI-42 — semantic-ci init
-  --recipe + PR metadata sources (Authoring + Provenance surface)`):
-  - 新設: `src/semantic_ci_code/authoring/provenance.py`
-    (`build_generation_metadata()`) + `authoring/sources/{pr_body,issue,
-    labels,commits,merge}.py` (4 source surface parser + C1〜C4 merger) +
-    `cli/init_recipes/{_shared,feature_add_api,bugfix_regression_test,
-    refactor_preserve_api,test_update_add_test_case}.py` (4 recipe builder)
-    + `tests/cli/test_init_{recipe,sources,merge}.py` (recipe / parser /
-    merge unit + CLI integration) + `tests/architecture/
-    test_verdict_bytes_invariant.py` (INV-1 + INV-3 narrow-scope verdict
-    bytes invariant、 `target_authorship` + `validate-plan.rendered` を
-    除外する helper を提供)
-  - 更新: `cli/init_command.py` (argparse 9 新引数 + recipe dispatch +
-    canonical-grammar 検証 4 種) + `cli/main.py` (init subparser 拡張) +
-    `tests/architecture/test_surface_isolation.py` (CSCI-42 module の
-    INV-2 / INV-4 列追加、 `httpx` / `requests` / `socket` / `ssl` import
-    leak を 0 round で fail させる)
-  - 4 recipe inviolate output predicate: `feature:add-api` =
-    `api_surface_delta.added includes_all [{fqn, visibility: "public"}, …]`
-    record match (flat alias 不使用) / `bugfix:regression-test` =
-    `primary_kind: bugfix` + `new_cases includes_all` (test_case あり) または
-    `not_equals []` (なし) / `refactor:preserve-api-with-allowlist` =
-    allowlist 無し → primary_kind のみ / 有り → `api_surface.allow_changes`
-    既存 policy escape hatch / `test-update:add-test-case` =
-    `primary_kind: test_update` + `new_cases` constraint
-  - C1 (recipe ↔ label primary_kind 矛盾) / C2 (内部 label 矛盾) / C3 (recipe
-    ↔ Conventional Commits prefix 矛盾) / C4 (未消費 intent-declaring
-    section) を merger で固定、 `RecipeFlagCompatibilityError` で recipe ↔
-    flag 不整合を C1〜C4 と分離
-  - **Codex bot review 13 round 連続 P2 を順次消化** (本体 1 commit +
-    12 fix commit、 merge `999b858`):
-    - R1 = strong-layer cutoff per-field → layer-wide (層を跨いで union
-      しない原則の構造的逸脱) → `4219e4a`
-    - R2 = Python 3.12 CI fail (`tests/__init__.py` 不在で
-      `from tests.cli.helpers` が 3.12 stricter resolution で collection
-      error) + `--add-api` FQN validation 不在 (PR/issue bullet と grammar
-      不一致) → `7413f7e`
-    - R3 = bloat trim (-420 lines) + bare `--allow-fqn-prefix legacy` reject
-      (evaluator `fqn.startswith` で `legacy2.Foo` も match してしまう
-      over-broad) → `b0c5855`
-    - R4 = `--test-case` refactor recipe compat (refactor は
-      `merged.test_ids` を読まないため silent drop) + GFM `[ ] ` checkbox
-      strip + canonical test ID grammar (`::` ちょうど 1 個 / path / name
-      に空白なし / name は identifier) → `f609444`
-    - R5 = class-based pytest ID (`Class::method`、
-      `python_test_surface_extractor.py:190` で `f"{Class}::{method}"`
-      emit) を受理 (R4 で過剰 reject していたものを反転) → `c13eaed`
-    - R6 = `--test-case` CLI canonical grammar を `pr_body._is_test_id`
-      reuse で surface 跨ぎ統一 → `cfdd606`
-    - R7 = over-qualified node ID (`path::A::B::C::test`、 extractor は
-      nested class 再帰しないので invalid) reject → `ebf4c8e`
-    - R8 = non-pytest function/class name (`helper` / `Helper::test_x`、
-      extractor `_is_test_function_name`/`_is_test_class_name` filter)
-      reject → `7c76345`
-    - R9 = non-POSIX path (`\\`、 absolute `/`、 non-`.py`、 extractor
-      `relative.as_posix()` 仕様) reject → `2d9823e`
-    - R10 = doubled trailing dot (`pkg..`、 `rstrip(".")` の semantic
-      diff)、 `value[:-1]` で exactly 1 dot strip に修正 → `8a2119b`
-    - R11 = non-normalized path (`./`、 `..`、 `//` 空 segment) + ATX
-      heading reset (`# Foo` でも `current` reset、 `## ` 以外で section
-      が永続化していた) → `999b858`
-    - R12 (post-merge 遅延配信): non-normalized path / heading reset と
-      重複、 stale event として skip
-    - CI: 3.11 / 3.12 / 3.13 全 green、 **pytest 1191 passed** (+93 new
-      test、 ruff check / format 両 pass)
-  - **10 round 目で AskUserQuestion 3 択提示** (打ち止め / 漸進 /
-    根本 refactor) → user 「根本 refactor」 選択で
-    `authoring/canonical.py` 集約に着手したが途中で user stop 指示、
-    `git pull` で remote (999b858) に sync して clean state で停止
-    (canonical refactor は次セッション持ち越し、 本 PR は per-round fix
-    版で merge)
-
-**設計判断のハイライト**:
-
-1. **Codex 不在時の design / implementation split 例外運用** — 通常 AGENTS.md
-   の Claude=design / Codex=implementation を一時的に Claude が両方担当、
-   commit message に **「Implemented exceptionally by Claude Code on
-   2026-05-15 because Codex was unavailable; future Brief 8 work returns to
-   the AGENTS.md split」** を明記。 brief 起草 → 実装一気通貫は密度高い一方、
-   self-review 視点が弱まり Codex P2 chase が長引く傾向 (10 round 目まで
-   user 介入が必要だった)
-2. **trim refactor `b0c5855` (-420 lines)** — `module / class / function
-   docstring の「名前から自明」 のもの全削除` + 単一 site で呼ばれる helper
-   全 inline (`_consumes` / `_is_set` / `_check_*_consistency`) +
-   `_is_fqn` 重複定義を pr_body から import 統一。 CLAUDE.md 「Default to
-   writing no comments」 「premature abstraction を避ける」 を直接適用、
-   user 「コード行が膨れてるのが気になる」 指摘を契機に self-review で発見
-3. **AskUserQuestion で trade-off 軸を 3 択提示する pattern** — 「P2 chase
-   続けるか?」 より「打ち止め / 漸進 / 根本 refactor」 で軸を明示する方が
-   user 判断早い (本 session で初実証)
-4. **extractor actual output shape を grep してから validator を書く必要性** —
-   R5 (class-based ID) は私が「emit されない」 と思い込んで reject、 Codex
-   が `python_test_surface_extractor.py:190` を指摘して反転。 producer 仕様を
-   暗黙追従する validator が複数できると P2 chase の温床 (canonical-form
-   module 集約で根を絶つ判断は次セッションに持ち越し)
-5. **architecture test 先行** (INV-2 / INV-4 を実装より先に書く、 Session 3
-   から継承) — `test_surface_isolation.py` の CSCI_42_MODULES enumeration で
-   `httpx` / `requests` / `socket` / `ssl` import leak を 0 round で fail
-   させる仕組みを最初に書いたので、 13 round の P2 はすべて validator /
-   parser layer に limited (architecture 違反は 0 round)
-
-**修正・訂正**:
-
-1. **CI 3.12 collection error**: 私の新設 test `tests/architecture/
-   test_verdict_bytes_invariant.py` で `from tests.cli.helpers import
-   run_semantic_ci` を使ったが `tests/__init__.py` 不在 → 3.12 stricter
-   resolution で collection 段階で exit 2、 既存 architecture test は
-   `from tests.*` 不使用で偶然動いていた。 fix: minimal `_run_semantic_ci`
-   を test file 内に inline (commit `7413f7e`)
-2. **CI ruff format --check 抜け**: local は `ruff check .` のみで CI は
-   2 step (`check` + `format --check`)、 8 file が format 違反で 3.12 が
-   test 前 fail。 fix: `ruff format .` を local verification flow に追加
-   (次セッション以降の checklist 化が望ましい)
-3. **`_is_test_id` 過剰 strict (R5 で反転)**: 「`Class::method` 形式は
-   extractor が emit しない」 という思い込みで `count("::") == 1` 制約を
-   入れた → `python_test_surface_extractor.py:190` を Codex が指摘して反転
-4. **`_validate_fqn_prefix_values` の `rstrip(".")`**: `pkg..` を valid
-   と判定 → 生 `pkg..` が emit され evaluator `startswith` で永遠に
-   match しない。 fix: `value[:-1]` で exactly 1 dot strip (commit
-   `8a2119b`)
-
 ---
 
-### 古い merged entry (5/15 Session 3 以前) — archive 参照
+### 古い merged entry (5/15 Session 4 以前) — archive 参照
 
-11 entry (2026-05-15 Session 3 + Session 2 / 2026-05-14-15 ResultStatus
-split / 2026-05-12 / 2026-05-09 / 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5
-/ 2026-05-05) は `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。
-詳細参照時は当該 archive file + 該当 dated session log
+12 entry (2026-05-15 Session 4 + Session 3 + Session 2 / 2026-05-14-15
+ResultStatus split / 2026-05-12 / 2026-05-09 / 2026-05-08 S1+S2 /
+2026-05-07 S1+S4+S5 / 2026-05-05) は
+`.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
+当該 archive file + 該当 dated session log
 (`.claude/memory/YYYY-MM-DD.md`) を参照。 Phase 1 (initial cutoff、
 `docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
-で compaction が実施された。
++ 2026-05-21 S5 wrap-up (5/15 S4 移送) で compaction が実施された。
 
 ## 次の発行順序
 
 ABCD-A (ResultStatus split) + ABCD-B (Brief 8 / CSCI-41〜44 + canonical
-refactor) 完走済。 active queue は **C (Brief 7 SSP) + D (P2 残課題)** の
-2 軸のみ。 ABCD 完走で product 機能の ship-blocking gap が消える
-(`2026-05-12.md` 参照)。
+refactor) 完走済 + UGH ecosystem framing 確立 (2026-05-21 Session 5) +
+Phase X-1 (umbrella repo `Yuu6798/ugh-ecosystem`) / X-5 (本 repo
+CLAUDE.md ecosystem context) landed。 active queue は **C (Brief 7
+SSP) + D (P2 残課題) + E (Phase X: UGH ecosystem formalization 残)**
+の 3 軸。 ABCD 完走で product 機能の ship-blocking gap が消え
+(`2026-05-12.md` 参照)、 Phase X で ecosystem-level の formalization
+(cross-ref / docs / validation 移植) を進める。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
@@ -471,6 +461,38 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
   P3a empirical alignment の reproducibility 担保(同 input → 同 output を
   semantic-ci version またぎで保証)
 
+### E. Phase X(UGH ecosystem formalization、 2026-05-21 Session 5 起草、 残 3 sub-phase)
+
+`docs/code_semantic_ci_design.md` の Phase plan 上は post-ABCD =
+external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
+ではなく「UGH ecosystem formalization」** が正しい framing と確定。
+全 sub-phase は本 repo (code domain) 単独では完結せず、 ecosystem
+4 repo (umbrella + text + code + music + image+video) を跨ぐ作業。
+
+- **E-1. Phase X-3. Cross-ref embedding in 残 3 ecosystem repo**:
+  `ugh-audit-core` / `ugh-prompt-engine` / `svp-video-pipeline` の
+  README または `CLAUDE.md` 冒頭に `## Ecosystem Context` section を
+  挿入 (本 session の PR #96 を template として再利用)。 各 repo の
+  GitHub MCP scope 外なので **別 Claude Code session 委譲**。 brief
+  起草時の必須注意点 = 「`STATUS.md` (or equivalent) を mandatory
+  read source として明示」 (umbrella PR #1 review で発覚した「repo
+  top README のみ参照で誤記」 failure mode の回避)
+- **E-2. Phase X-1 続き. Umbrella `docs/` 拡張**:
+  `Yuu6798/ugh-ecosystem` repo に `docs/vocabulary.md` (4 domain
+  vocabulary 統一表) / `docs/strata.md` (deterministic audit vs
+  LLM-assisted generation の architectural separation) /
+  `docs/roadmap.md` (Phase X 全体地図) / `docs/theory.md` (UGH 理論、
+  public 公開戦略 frozen のため初版 minimal) を順次追加。 これも
+  GitHub MCP scope 外なので別 session
+- **E-3. Phase X-2. HA-style validation cross-domain 移植** (中長期 phase):
+  text domain (`ugh-audit-core`) の HA48/HA63 (n=63) validation pattern
+  を code / music / image+video の 3 domain に展開する **ecosystem 統合
+  の core work**。 着手前に `ugh-audit-core/docs/validation.md` を確認
+  して dataset 構造を理解、 その後 code domain 版 = 公開 LLM 生成 PR
+  を N=48 集めて semantic-ci verdict と reviewer 判断の Spearman ρ を
+  計算する experiment plan を起草する。 完走 criteria は「各 domain で
+  N≥48 の external validation 蓄積」、 期間は数週間〜数ヶ月
+
 ### Sequencing decisions
 
 - **A (ResultStatus split) 完走**: 2026-05-14/15 で 4 PR (#76 / #77 / #78 /
@@ -479,20 +501,40 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 - **Brief 8 vs Brief 7**: Brief 8 先(`brief_8_planning.md §12.3` 確定)
 - **D は B/C と独立**: いつ挟んでも良い、 ただし P3a (Action 配布) を狙う
   なら D-3 hash trail が前提
+- **E (Phase X) は C/D と並行 thread**: 2026-05-21 Session 5 で確定。
+  C/D は規定路線で本 repo 単独消化、 E-1 (X-3) と E-2 (X-1 続き) は
+  ecosystem cross-repo work で別 Claude Code session 委譲、 E-3 (X-2
+  validation 移植) は中長期 phase で C/D 完走後でも構わない
+- **E-3 (HA-style validation 移植) の前提**: text domain (`ugh-audit-core`)
+  の HA48/HA63 dataset 構造の確認、 これは brief 起草前に `validation.md`
+  + `HA48_validation_results` 等を web fetch で読み込む必要
 
 ### 直近最短経路
 
-- **C-1. CSCI-36. Brief 7 / SSP v0.1 spec**: 次の normal implementation
-  entry。 `docs/ssp_protocol.md` v0.1 spec 新設 (docs only、 500-700 行、
-  Claude 単独可)。 ABCD-B 完走 + canonical refactor + R17 全 landed の
-  ため、 残務は ABCD-C / ABCD-D のみ。 起草時必読:
+- **PR #96 review / merge** (本 session で open、 ~24 lines docs only、
+  AC 8 件全 check で「Ecosystem Context section が code domain
+  framing を明示」 した状態。 user review 後 merge することで Phase X-5
+  が完走)
+- **E-1. Phase X-3. Cross-ref embedding in 残 3 ecosystem repo の brief
+  設計 + 別 session 委譲** (本 session で確定した最初の next normal
+  queue entry。 PR #96 の `## Ecosystem Context` を template として再利用、
+  `STATUS.md` mandatory read source 明示で「8 subcommand」 誤記 failure
+  mode 回避)
+- **C-1. CSCI-36. Brief 7 / SSP v0.1 spec**: 規定路線 next normal
+  implementation entry。 `docs/ssp_protocol.md` v0.1 spec 新設 (docs
+  only、 500-700 行、 Claude 単独可)。 ecosystem context が CLAUDE.md
+  に landed した後の起草になるので、 brief 内で「これは UGH ecosystem
+  の code domain における security audit という second design pattern
+  拡張」 と framing し直せる。 起草時必読:
   1. `AGENTS.md` Forward Design Note: Brief 7 / SSP v0.1 (canonical spec)
   2. `docs/brief_7_planning.md §11` 着手 checklist
   3. **`AGENTS.md` § 5 Experience Externalization Discipline** (2026-05-21
      Session 2 新設、 brief 起草前の必読 doc、 §5.6 Maintenance Practice
      7 rule + §5.7 Anti-Patterns 7 件を逐語適用)
-  4. `.claude/memory/STATUS.md` 直近 3 entries + `_index.md` Session 2
-     summary
+  4. `.claude/memory/STATUS.md` 直近 3 entries + `_index.md` 直近 5
+     summary (Session 5 含む)
+  5. **`CLAUDE.md` `## Ecosystem Context`** (本 session で追加、 brief
+     framing に ecosystem 視点を反映するため)
 - SSP tracking GitHub issue 起票 (Issue #48 close 後の受け皿、
   `brief_7_planning.md §11` で text template 固定済)
 
@@ -507,9 +549,14 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 - **D2-3. `pytest-xdist` 並列化**(deferred): D2-2 で Windows wallclock
   264.92s → 181.61s (-31.4%) で <150s 未達も実用閾値クリア。 ROI 低、 別日に
   取って単独完結が筋。 必要性は user 判断
-- **post-ABCD: 外部 readiness phase**(planning なし): 配布チャネル
-  (GitHub Action / PyPI / semver 1.0)+ onboarding (Quickstart / 比較
-  positioning / example gallery)+ community (CONTRIBUTING / SECURITY /
-  issue template)+ 外部 user feedback loop。 `2026-05-12.md` で「OSS 全体
-  ~50%、 ABCD では埋まらない別軸」 として framing、 ABCD 完走後に Phase X
-  として明示化を検討
+- **post-ABCD: 外部 readiness phase**(2026-05-21 Session 5 で **Phase X
+  = UGH ecosystem formalization** として明示化済、 §E 参照): 当初
+  framing「配布チャネル (GitHub Action / PyPI / semver 1.0) + onboarding
+  (Quickstart / 比較 positioning / example gallery) + community
+  (CONTRIBUTING / SECURITY / issue template) + 外部 user feedback loop」
+  は **「semantic-ci-code 単独 external 配布」 を前提とした古い framing**。
+  Session 5 で「半年壁打ちは UGH ecosystem 4 domain の並列研究 program
+  だった」 と reveal され、 配布 mechanism は二次的・ecosystem formalization
+  が一次的と再 framing。 配布チャネル開通 (PyPI / Action / pre-commit) は
+  技術的に半日 task で、 Phase X-2 (cross-domain validation) で empirical
+  evidence が揃った後の post-X phase に位置付ける

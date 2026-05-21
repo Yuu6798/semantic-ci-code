@@ -10,6 +10,135 @@ session wrap-up で 5 entry 超過分が同 archive に随時追記される。
 
 ---
 
+### 2026-05-15 Session 4 — Brief 8 / CSCI-42 (`semantic-ci init --recipe --from-*` Authoring + Provenance surface) landed
+
+B 軸 (Brief 8) 実装 2 本目 = 推奨着地順 41 → 43 → **42** → 44 の 3 番目消化。
+**Codex が利用不能の例外措置で Claude が brief 起草 → 実装 → bot review
+対応 → merge を 1 session 内で全部担当** (通常運用 = Claude=design /
+Codex=implementation split との一時的乖離、 commit message に明記して次
+セッション以降の復帰を pin)。
+
+- **PR #84** (CSCI-42, `feat(brief-8): land CSCI-42 — semantic-ci init
+  --recipe + PR metadata sources (Authoring + Provenance surface)`):
+  - 新設: `src/semantic_ci_code/authoring/provenance.py`
+    (`build_generation_metadata()`) + `authoring/sources/{pr_body,issue,
+    labels,commits,merge}.py` (4 source surface parser + C1〜C4 merger) +
+    `cli/init_recipes/{_shared,feature_add_api,bugfix_regression_test,
+    refactor_preserve_api,test_update_add_test_case}.py` (4 recipe builder)
+    + `tests/cli/test_init_{recipe,sources,merge}.py` (recipe / parser /
+    merge unit + CLI integration) + `tests/architecture/
+    test_verdict_bytes_invariant.py` (INV-1 + INV-3 narrow-scope verdict
+    bytes invariant、 `target_authorship` + `validate-plan.rendered` を
+    除外する helper を提供)
+  - 更新: `cli/init_command.py` (argparse 9 新引数 + recipe dispatch +
+    canonical-grammar 検証 4 種) + `cli/main.py` (init subparser 拡張) +
+    `tests/architecture/test_surface_isolation.py` (CSCI-42 module の
+    INV-2 / INV-4 列追加、 `httpx` / `requests` / `socket` / `ssl` import
+    leak を 0 round で fail させる)
+  - 4 recipe inviolate output predicate: `feature:add-api` =
+    `api_surface_delta.added includes_all [{fqn, visibility: "public"}, …]`
+    record match (flat alias 不使用) / `bugfix:regression-test` =
+    `primary_kind: bugfix` + `new_cases includes_all` (test_case あり) または
+    `not_equals []` (なし) / `refactor:preserve-api-with-allowlist` =
+    allowlist 無し → primary_kind のみ / 有り → `api_surface.allow_changes`
+    既存 policy escape hatch / `test-update:add-test-case` =
+    `primary_kind: test_update` + `new_cases` constraint
+  - C1 (recipe ↔ label primary_kind 矛盾) / C2 (内部 label 矛盾) / C3 (recipe
+    ↔ Conventional Commits prefix 矛盾) / C4 (未消費 intent-declaring
+    section) を merger で固定、 `RecipeFlagCompatibilityError` で recipe ↔
+    flag 不整合を C1〜C4 と分離
+  - **Codex bot review 13 round 連続 P2 を順次消化** (本体 1 commit +
+    12 fix commit、 merge `999b858`):
+    - R1 = strong-layer cutoff per-field → layer-wide (層を跨いで union
+      しない原則の構造的逸脱) → `4219e4a`
+    - R2 = Python 3.12 CI fail (`tests/__init__.py` 不在で
+      `from tests.cli.helpers` が 3.12 stricter resolution で collection
+      error) + `--add-api` FQN validation 不在 (PR/issue bullet と grammar
+      不一致) → `7413f7e`
+    - R3 = bloat trim (-420 lines) + bare `--allow-fqn-prefix legacy` reject
+      (evaluator `fqn.startswith` で `legacy2.Foo` も match してしまう
+      over-broad) → `b0c5855`
+    - R4 = `--test-case` refactor recipe compat (refactor は
+      `merged.test_ids` を読まないため silent drop) + GFM `[ ] ` checkbox
+      strip + canonical test ID grammar (`::` ちょうど 1 個 / path / name
+      に空白なし / name は identifier) → `f609444`
+    - R5 = class-based pytest ID (`Class::method`、
+      `python_test_surface_extractor.py:190` で `f"{Class}::{method}"`
+      emit) を受理 (R4 で過剰 reject していたものを反転) → `c13eaed`
+    - R6 = `--test-case` CLI canonical grammar を `pr_body._is_test_id`
+      reuse で surface 跨ぎ統一 → `cfdd606`
+    - R7 = over-qualified node ID (`path::A::B::C::test`、 extractor は
+      nested class 再帰しないので invalid) reject → `ebf4c8e`
+    - R8 = non-pytest function/class name (`helper` / `Helper::test_x`、
+      extractor `_is_test_function_name`/`_is_test_class_name` filter)
+      reject → `7c76345`
+    - R9 = non-POSIX path (`\\`、 absolute `/`、 non-`.py`、 extractor
+      `relative.as_posix()` 仕様) reject → `2d9823e`
+    - R10 = doubled trailing dot (`pkg..`、 `rstrip(".")` の semantic
+      diff)、 `value[:-1]` で exactly 1 dot strip に修正 → `8a2119b`
+    - R11 = non-normalized path (`./`、 `..`、 `//` 空 segment) + ATX
+      heading reset (`# Foo` でも `current` reset、 `## ` 以外で section
+      が永続化していた) → `999b858`
+    - R12 (post-merge 遅延配信): non-normalized path / heading reset と
+      重複、 stale event として skip
+    - CI: 3.11 / 3.12 / 3.13 全 green、 **pytest 1191 passed** (+93 new
+      test、 ruff check / format 両 pass)
+  - **10 round 目で AskUserQuestion 3 択提示** (打ち止め / 漸進 /
+    根本 refactor) → user 「根本 refactor」 選択で
+    `authoring/canonical.py` 集約に着手したが途中で user stop 指示、
+    `git pull` で remote (999b858) に sync して clean state で停止
+    (canonical refactor は次セッション持ち越し、 本 PR は per-round fix
+    版で merge)
+
+**設計判断のハイライト**:
+
+1. **Codex 不在時の design / implementation split 例外運用** — 通常 AGENTS.md
+   の Claude=design / Codex=implementation を一時的に Claude が両方担当、
+   commit message に **「Implemented exceptionally by Claude Code on
+   2026-05-15 because Codex was unavailable; future Brief 8 work returns to
+   the AGENTS.md split」** を明記。 brief 起草 → 実装一気通貫は密度高い一方、
+   self-review 視点が弱まり Codex P2 chase が長引く傾向 (10 round 目まで
+   user 介入が必要だった)
+2. **trim refactor `b0c5855` (-420 lines)** — `module / class / function
+   docstring の「名前から自明」 のもの全削除` + 単一 site で呼ばれる helper
+   全 inline (`_consumes` / `_is_set` / `_check_*_consistency`) +
+   `_is_fqn` 重複定義を pr_body から import 統一。 CLAUDE.md 「Default to
+   writing no comments」 「premature abstraction を避ける」 を直接適用、
+   user 「コード行が膨れてるのが気になる」 指摘を契機に self-review で発見
+3. **AskUserQuestion で trade-off 軸を 3 択提示する pattern** — 「P2 chase
+   続けるか?」 より「打ち止め / 漸進 / 根本 refactor」 で軸を明示する方が
+   user 判断早い (本 session で初実証)
+4. **extractor actual output shape を grep してから validator を書く必要性** —
+   R5 (class-based ID) は私が「emit されない」 と思い込んで reject、 Codex
+   が `python_test_surface_extractor.py:190` を指摘して反転。 producer 仕様を
+   暗黙追従する validator が複数できると P2 chase の温床 (canonical-form
+   module 集約で根を絶つ判断は次セッションに持ち越し)
+5. **architecture test 先行** (INV-2 / INV-4 を実装より先に書く、 Session 3
+   から継承) — `test_surface_isolation.py` の CSCI_42_MODULES enumeration で
+   `httpx` / `requests` / `socket` / `ssl` import leak を 0 round で fail
+   させる仕組みを最初に書いたので、 13 round の P2 はすべて validator /
+   parser layer に limited (architecture 違反は 0 round)
+
+**修正・訂正**:
+
+1. **CI 3.12 collection error**: 私の新設 test `tests/architecture/
+   test_verdict_bytes_invariant.py` で `from tests.cli.helpers import
+   run_semantic_ci` を使ったが `tests/__init__.py` 不在 → 3.12 stricter
+   resolution で collection 段階で exit 2、 既存 architecture test は
+   `from tests.*` 不使用で偶然動いていた。 fix: minimal `_run_semantic_ci`
+   を test file 内に inline (commit `7413f7e`)
+2. **CI ruff format --check 抜け**: local は `ruff check .` のみで CI は
+   2 step (`check` + `format --check`)、 8 file が format 違反で 3.12 が
+   test 前 fail。 fix: `ruff format .` を local verification flow に追加
+   (次セッション以降の checklist 化が望ましい)
+3. **`_is_test_id` 過剰 strict (R5 で反転)**: 「`Class::method` 形式は
+   extractor が emit しない」 という思い込みで `count("::") == 1` 制約を
+   入れた → `python_test_surface_extractor.py:190` を Codex が指摘して反転
+4. **`_validate_fqn_prefix_values` の `rstrip(".")`**: `pkg..` を valid
+   と判定 → 生 `pkg..` が emit され evaluator `startswith` で永遠に
+   match しない。 fix: `value[:-1]` で exactly 1 dot strip (commit
+   `8a2119b`)
+
 ### 2026-05-15 Session 2 — Brief 8 / CSCI-41 (Authoring Surface 設計契約) landed
 
 A 軸 (ResultStatus split) 完走後の同日 Session 2 で B 軸 (Brief 8) 入口の

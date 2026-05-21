@@ -638,10 +638,12 @@ D1-1 (planning PR #74) → D1-2 (PR #76) → D1-3 (PR #77) → D1-4 (PR #78) →
 D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
 2026-05-14/15 参照。 follow-up:
 
-- **CSCI-43 起草時必読**: planning §1b.3 が D1-4 PR description で約束した
-  Brief 8 `ADVISORY-S1` 文言更新の one-liner (D1-4 で authoring-cause UNKNOWN
-  が unknown_policy 非尊重になったため S1 の scope を `extraction-cause +
-  open_runtime` に narrow)
+- **ADVISORY-S1 narrow**: **完走 (2026-05-15 commit `854a528`)**。
+  `docs/brief_8_planning.md §6.3.1` の S1 行を「extraction-cause +
+  open_runtime UNKNOWN のみ `unknown_policy` 経由 verdict 影響」 に narrow
+  済、 `authoring/hazards.py` `detect_s1` の docstring + message text も
+  CSCI-43 実装時点で post-D1-4 scope を反映済 (`hazards.py:264-298`)。
+  planning §1b.3 が D1-4 PR description で約束した one-liner を消化
 
 ### B. Brief 8(Authoring Surface、 planning merged 2026-05-09 PR #73、 implementation 4 PR、 **完走 (4/4 landed)**)
 
@@ -659,11 +661,9 @@ D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
   例外を main.py に narrow) を gate。 Codex 16 round 全部 P2 消化、 R17
   (`--package-root .` cwd vs repo-root divergence) は deferred follow-up。
   詳細は本ファイル 直近 merged § 2026-05-15 Session 3 参照。 follow-up:
-  - **A 軸 follow-up 残**: `docs/brief_8_planning.md §6.3.1` line 435 の
-    `ADVISORY-S1` 文言を「extraction-cause + open_runtime UNKNOWN のみ
-    `unknown_policy` 経由 verdict 影響」 に narrow する one-liner (D1-4 で
-    authoring-cause UNKNOWN は `unknown_policy` 非尊重で常時 FAIL となった
-    ため)。 docs only、 別 PR で landing 想定
+  - **ADVISORY-S1 narrow**: **完走 (2026-05-15 commit `854a528`)**、
+    `hazards.py:264-298` で post-D1-4 scope 反映済 (§A ResultStatus split
+    follow-up 参照)
   - **R17 deferred**: target-doctor の `--package-root` resolve を `check` と
     同じ repo-relative に揃える consistency 改善 (subdirectory 起動時のみ
     表面化、 critical でない UX 改善)
@@ -731,10 +731,6 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
   entry。 起草時は `docs/brief_7_planning.md §11` checklist + AGENTS.md
   `Forward Design Note: Brief 7 / SSP v0.1` を逐語参照。 Brief 8 は
   CSCI-44 / PR #86 で完走済みのため、 B-4 待ちは存在しない
-- **A 軸 follow-up 残**: `docs/brief_8_planning.md §6.3.1` line 435 の
-  `ADVISORY-S1` 文言 narrow (docs only)。 D1-4 で authoring-cause UNKNOWN
-  は `unknown_policy` 非尊重で常時 FAIL となったため、 S1 scope を
-  extraction-cause + open_runtime UNKNOWN に narrow する one-liner
 - **R17 deferred**: target-doctor の `--package-root` resolve を `check` と
   同じ repo-relative に揃える consistency 改善。 subdirectory 起動時のみ
   表面化、 critical でない UX 改善

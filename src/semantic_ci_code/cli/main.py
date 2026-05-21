@@ -9,6 +9,7 @@ from semantic_ci_code.cli.commands.compile import run_compile
 from semantic_ci_code.cli.commands.compile_repair import run_compile_repair
 from semantic_ci_code.cli.commands.observe import run_observe
 from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
+from semantic_ci_code.cli.commands.target_catalog import run_target_catalog
 from semantic_ci_code.cli.commands.target_doctor import run_target_doctor
 from semantic_ci_code.cli.commands.validate_plan import run_validate_plan
 from semantic_ci_code.cli.exit_codes import SUCCESS, USAGE_ERROR
@@ -335,6 +336,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="write output to this file instead of stdout",
     )
 
+    target_catalog = subcommands.add_parser(
+        "target-catalog",
+        help="render target/operator/template catalog for target.yaml authoring",
+    )
+    target_catalog.add_argument(
+        "--format",
+        choices=("json", "human"),
+        default="json",
+        help="output format; catalog envelope schema_version='catalog-1' (json)",
+    )
+    target_catalog.add_argument(
+        "--kind",
+        choices=("feature", "bugfix", "refactor", "test_update"),
+        default=None,
+        help="narrow the templates section to one primary change kind",
+    )
+    target_catalog.add_argument(
+        "--target-path",
+        default=None,
+        help="narrow the targets section to one target path",
+    )
+    target_catalog.add_argument(
+        "--output",
+        default=None,
+        help="write output to this file instead of stdout",
+    )
+
     return parser
 
 
@@ -365,6 +393,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_init(args)
     if args.subcommand == "target-doctor":
         return run_target_doctor(args)
+    if args.subcommand == "target-catalog":
+        return run_target_catalog(args)
 
     parser.print_help(sys.stderr)
     return USAGE_ERROR

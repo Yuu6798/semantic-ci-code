@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://semantic-ci/target_catalog.schema.json",
+  "title": "Semantic CI target-catalog reference envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subcommand", "primary_kinds", "targets", "templates", "operators"],
+  "properties": {
+    "schema_version": {"const": "catalog-1"},
+    "subcommand": {"const": "target-catalog"},
+    "primary_kinds": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "category", "operators"],
+        "properties": {
+          "kind": {"enum": ["state", "delta", "open"]},
+          "category": {"type": "string"},
+          "operators": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "match_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["required_key", "optional_keys", "forbidden_keys"],
+            "properties": {
+              "required_key": {"type": "string"},
+              "optional_keys": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "forbidden_keys": {
+                "type": "object",
+                "additionalProperties": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "templates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["expanded_constraints"],
+        "properties": {
+          "expanded_constraints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "target", "operator", "expected", "severity", "unknown_policy"],
+              "properties": {
+                "kind": {"type": "string"},
+                "target": {"type": "string"},
+                "operator": {"type": "string"},
+                "expected": true,
+                "severity": {"type": "string"},
+                "unknown_policy": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "operators": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["applies_to_collection", "evidence_emits", "class"],
+        "properties": {
+          "applies_to_collection": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "record",
+                "string",
+                "number",
+                "scalar_number",
+                "scalar_string",
+                "scalar_bool"
+              ]
+            }
+          },
+          "evidence_emits": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "class": {"enum": ["pure", "baseline", "skipped_in_p1"]}
+        }
+      }
+    }
+  }
+}

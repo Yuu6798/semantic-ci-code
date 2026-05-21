@@ -24,6 +24,10 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
+P2.5 完走 + ABCD-A 完走 + ABCD-B 完走 (Brief 8 / CSCI-41〜44 landed).
+`semantic-ci` CLI now includes 10 subcommands, including `target-doctor` and
+`target-catalog`. Next normal implementation queue: Brief 7 / SSP v0.1.
+
 P2.5 完走 + ABCD-A 完走 + ABCD-B 3/4 landed (CSCI-41 + CSCI-43 + CSCI-42
 landed) + canonical-form refactor follow-up (PR #85) landed — Brief 1〜5
 全 merged + ResultStatus split (D1-1〜D3) 全 merged + Brief 8 入口
@@ -50,6 +54,16 @@ generator path は `authorship.generation_metadata` block を populate
 (Section F、 `candidate_code_used`/`llm_used` 固定 False sentinel)。
 
 ## 直近 merged
+
+### 2026-05-21 — Brief 8 / CSCI-44 (`semantic-ci target-catalog`) landed
+
+CSCI-44 closes the final Brief 8 implementation piece. `semantic-ci
+target-catalog` renders a machine-readable (`schema_version:
+catalog-1`) and human-readable authoring catalog derived directly from
+runtime registries (`path_schema`, `type_schema`, `match_schema`,
+`TEMPLATE_CONSTRAINTS`, `Operator`). Brief 8 is complete; the normal
+next queue returns to Brief 7 / SSP v0.1 unless a smaller follow-up is
+explicitly chosen.
 
 ### 2026-05-19 — Brief 8 canonical-form refactor (PR #85) landed
 

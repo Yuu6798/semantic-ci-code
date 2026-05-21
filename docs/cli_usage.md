@@ -521,8 +521,55 @@ semantic-ci target-doctor --target target.yaml --baseline-rev origin/main \
     --candidate-rev HEAD --format json
 ```
 
-### Future Authoring subcommands
+### `semantic-ci target-catalog`
 
-`init --recipe --from-*` (Brief 8 / CSCI-42) and `target-catalog`
-(Brief 8 / CSCI-44) will land their CLI contracts under this section as
-they are implemented.
+```text
+semantic-ci target-catalog [--format {json,human}]
+                           [--kind {feature,bugfix,refactor,test_update}]
+                           [--target-path <path>]
+                           [--output <file>]
+```
+
+Renders the authoring catalog used by assistants, IDE extensions, and
+external tools to generate valid `target.yaml` files. This is an Authoring
+meta surface: it does not read a target file, does not extract code, and does
+not compute or change a verdict.
+
+The JSON envelope is independent of verdict / compile schema versions:
+
+```json
+{
+  "schema_version": "catalog-1",
+  "subcommand": "target-catalog",
+  "primary_kinds": ["bugfix", "feature", "refactor", "test_update"],
+  "targets": {},
+  "templates": {},
+  "operators": {}
+}
+```
+
+Catalog contents are derived from the runtime registries, not duplicated in the
+formatter:
+
+- `primary_kinds`: `ChangeKind` enum values.
+- `targets`: `compiler.path_schema` valid paths, `compiler.type_schema`
+  categories, and `framework.match_schema` partial-record match rules.
+- `templates`: `compiler.templates.TEMPLATE_CONSTRAINTS` expanded constraints.
+- `operators`: `framework.constraint_types.Operator` values plus compile-time
+  compatibility checks from `compiler.operator_schema` / `compiler.type_schema`.
+
+Filters narrow one section only. `--kind feature` narrows `templates` to the
+feature templates while leaving `targets`, `operators`, and `primary_kinds`
+unchanged. `--target-path api_surface_delta.added` narrows `targets` to that
+single entry while leaving `templates` and `operators` unchanged. The two
+filters can be combined.
+
+Examples:
+
+```bash
+semantic-ci target-catalog --format json
+semantic-ci target-catalog --format human
+semantic-ci target-catalog --kind feature --format json
+semantic-ci target-catalog --target-path api_surface_delta.added --format human
+semantic-ci target-catalog --format json --output target-catalog.json
+```

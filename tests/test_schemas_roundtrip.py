@@ -19,6 +19,9 @@ CODE_STATE_SCHEMA_PATH = (
 CODE_STATE_DELTA_SCHEMA_PATH = (
     REPO_ROOT / "src" / "semantic_ci_code" / "schemas" / "code_state_delta.schema.json"
 )
+TARGET_CATALOG_SCHEMA_PATH = (
+    REPO_ROOT / "src" / "semantic_ci_code" / "schemas" / "target_catalog.schema.json"
+)
 
 FEATURE_SCHEMA_SAMPLE_YAML = """
 intent: "fetch_user_profile を追加"
@@ -39,7 +42,12 @@ constraints:
 
 
 def test_committed_json_schemas_are_valid_json_schema_documents():
-    for path in (TARGET_SCHEMA_PATH, CODE_STATE_SCHEMA_PATH, CODE_STATE_DELTA_SCHEMA_PATH):
+    for path in (
+        TARGET_SCHEMA_PATH,
+        CODE_STATE_SCHEMA_PATH,
+        CODE_STATE_DELTA_SCHEMA_PATH,
+        TARGET_CATALOG_SCHEMA_PATH,
+    ):
         schema = json.loads(path.read_text(encoding="utf-8"))
         Draft202012Validator.check_schema(schema)
 

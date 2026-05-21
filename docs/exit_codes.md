@@ -71,6 +71,12 @@ apply a workflow-level policy. Silent success on bad input is forbidden —
 the advisor surface only suppresses the verdict step, not the input
 validation step.
 
+`target-catalog` (Brief 8 / CSCI-44) is an Authoring meta surface command and
+does not compute a verdict. Successful catalog rendering exits 0. Invalid
+filters or flags (for example an unknown `--target-path`) exit 2 with a
+did-you-mean hint when available. Expected output / filesystem failures exit 3.
+Internal bugs exit 4.
+
 ## Error Streams
 
 Stdout is reserved for JSON or human report output. Expected diagnostic messages

@@ -180,6 +180,20 @@ def test_inv1_verdict_bytes_stable_across_metadata_variants(tmp_path: Path):
     assert _evaluator_derived_hash(payload_a) == _evaluator_derived_hash(payload_b)
 
 
+def test_inv1_target_catalog_does_not_perturb_verdict_bytes(tmp_path: Path):
+    baseline, candidate = _materialise_virtual_pair(tmp_path)
+    target = tmp_path / "target.yaml"
+    target.write_text(_hand_written_target(), encoding="utf-8")
+
+    before = _run_compare(tmp_path, target, baseline, candidate)
+    rc, stdout = _run_semantic_ci(tmp_path, "target-catalog", "--format", "json")
+    assert rc == 0
+    assert json.loads(stdout)["schema_version"] == "catalog-1"
+    after = _run_compare(tmp_path, target, baseline, candidate)
+
+    assert _evaluator_derived_hash(before) == _evaluator_derived_hash(after)
+
+
 def test_inv3_provenance_block_absence_or_presence_does_not_affect_verdict(
     tmp_path: Path,
 ):

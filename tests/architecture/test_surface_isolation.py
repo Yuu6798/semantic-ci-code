@@ -1,4 +1,4 @@
-"""Brief 8 / CSCI-43 architecture invariants.
+"""Brief 8 / CSCI-43/44 architecture invariants.
 
 INV-2 (`docs/brief_8_planning.md §5.2`): `cli.commands.check` and the
 other verdict-bearing handlers must not transitively import the new
@@ -9,8 +9,8 @@ The Advisor surface (`compile-repair`, `validate-plan`,
 `repair_compiler/adapters/*`) is explicitly exempt from INV-2 (see
 `docs/target_authoring_surface.md` Section E).
 
-INV-4: target-doctor and the authoring layer must not transitively
-import `httpx`, `requests`, `openai`, `anthropic`, or `urllib3`. The
+INV-4: target-doctor, target-catalog, and the authoring layer must not transitively
+import `httpx`, `requests`, `openai`, `anthropic`, `urllib3`, `socket`, or `ssl`. The
 brief is fully deterministic; LLM / network paths land in Brief 8b, not
 in Brief 8.
 """
@@ -33,8 +33,12 @@ VERDICT_PATH_HANDLERS = (
 AUTHORING_FORBIDDEN_FOR_VERDICT_PATH = (
     "semantic_ci_code.authoring",
     "semantic_ci_code.authoring.advisory",
+    "semantic_ci_code.authoring.catalog",
     "semantic_ci_code.authoring.hazards",
+    "semantic_ci_code.cli.commands.target_catalog",
     "semantic_ci_code.cli.commands.target_doctor",
+    "semantic_ci_code.cli.output.catalog_human",
+    "semantic_ci_code.cli.output.catalog_json",
     "semantic_ci_code.cli.output.doctor_human",
     "semantic_ci_code.cli.output.doctor_json",
 )
@@ -45,6 +49,15 @@ NETWORK_LLM_FORBIDDEN = (
     "openai",
     "anthropic",
     "urllib3",
+    "socket",
+    "ssl",
+)
+
+CSCI_44_MODULES = (
+    "semantic_ci_code.authoring.catalog",
+    "semantic_ci_code.cli.commands.target_catalog",
+    "semantic_ci_code.cli.output.catalog_human",
+    "semantic_ci_code.cli.output.catalog_json",
 )
 
 
@@ -164,6 +177,7 @@ def test_inv2_main_dispatcher_is_excluded_from_isolation():
     """
     closure = _transitive_closure("semantic_ci_code.cli.main")
     assert "semantic_ci_code.cli.commands.target_doctor" in closure
+    assert "semantic_ci_code.cli.commands.target_catalog" in closure
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +203,16 @@ def test_inv4_authoring_hazards_does_not_import_network_or_llm():
     closure = _transitive_closure("semantic_ci_code.authoring.hazards")
     leaks = sorted(m for m in closure if _is_forbidden_match(m, NETWORK_LLM_FORBIDDEN))
     assert not leaks, f"authoring.hazards INV-4 violation: {leaks}"
+
+
+def test_inv4_csci44_modules_do_not_import_network_or_llm():
+    failures: dict[str, list[str]] = {}
+    for module in CSCI_44_MODULES:
+        closure = _transitive_closure(module)
+        leaks = sorted(m for m in closure if _is_forbidden_match(m, NETWORK_LLM_FORBIDDEN))
+        if leaks:
+            failures[module] = leaks
+    assert not failures, f"CSCI-44 INV-4 violation: {failures}"
 
 
 # ---------------------------------------------------------------------------

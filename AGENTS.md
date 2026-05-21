@@ -180,14 +180,16 @@ maintenance practice を遵守しないと PR #84 の状態に戻る。
 | Practice | Anti-Pattern | Enforcement |
 |---|---|---|
 | brief 起草前に memory log + 直近 3 dated entries 読む | memory log skip → 過去 session trap 再発生 | `CLAUDE.md` § Required Reading (Tier A) |
-| §15.1 Schema grounding (producer 出力 shape grep 後 validator) | 思い込みで validator 書く → `Class::method` 受理忘れ系 trap | `docs/brief_8_planning.md §15.1` + (Phase 6: schema-grep check) |
+| §15.1 Schema grounding (producer 出力 shape grep 後 validator) | 思い込みで validator 書く → `Class::method` 受理忘れ系 trap | `docs/brief_8_planning.md §15.1` + (future hardening: schema-grep check) |
 | §15 checklist 全項目 (規模に関係なく) | 「短い brief だから」 で §15 skip | `docs/brief_8_planning.md §15` (8 sub-checklist) |
 | 新 module 追加時に architecture test の prefix match cover を確認 | prefix match → 個別 enumeration に regress / prefix を緩める | `tests/architecture/test_surface_isolation.py` |
-| dogfood で fail case + pass case 両方を実演 | pass case 1 件のみで「動いた」 → no-op gate 検出不能 | (Phase 6: dual-case dogfood check) |
+| dogfood で fail case + pass case 両方を実演 | pass case 1 件のみで「動いた」 → no-op gate 検出不能 | (future hardening: dual-case dogfood check) |
 | AskUserQuestion で trade-off 軸 3-4 択提示 | 単純な yes/no 問い → user 判断遅延 | (pattern catalog、 PR #84 R10 / #85 / 5/21 で再現性確認) |
 | Codex 不在時の Claude exception scope ≤ 半日 | 1 日規模を Claude 単独押し込み → 13+ round chase | (体制 envelope §5.2、 PR #84 vs #85 の境界) |
-| review 5+ round → PR merge 後に「曖昧だった spec」 を docs/test に encode | round 内修正のみで完了 → trail が memory log だけに残り再参照されない | (Phase 6: round-count-to-encoding check) |
-| PR merge 直後に STATUS.md `次の発行順序` を sweep (完走 entry 削除) | 「後で」 と先送り → stale entry 蓄積 (5/21 で ADVISORY-S1 + R17 で 2 連続発生) | `CLAUDE.md` rule (Required Reading) + (Phase 6: status-drift check) |
+| review 5+ round → PR merge 後に「曖昧だった spec」 を docs/test に encode | round 内修正のみで完了 → trail が memory log だけに残り再参照されない | (future hardening: round-count-to-encoding check) |
+| PR merge 直後に STATUS.md `次の発行順序` を sweep (完走 entry 削除) | 「後で」 と先送り → stale entry 蓄積 (5/21 で ADVISORY-S1 + R17 で 2 連続発生) | `tests/discipline/test_status_md_next_queue_no_completed.py` |
+| STATUS.md `## Phase` は 1 paragraph 厳守 | 新 paragraph 追加 + 旧 paragraph 残置 (5/21 で Codex も再発) | `tests/discipline/test_status_md_phase_single_paragraph.py` |
+| `_index.md` 各 entry の cell ≤ 500 chars | essay cell に膨張 (Phase 2 で 53KB → 5KB 復元の前例) | `tests/discipline/test_index_md_entry_compactness.py` |
 
 ### 5.6 Cross-Reference
 

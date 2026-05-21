@@ -338,6 +338,15 @@ later sessions can resume without losing context.
    `tests/discipline/test_status_md_phase_single_paragraph.py` (Phase 6)
    で自動検出される rule)
 7. `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
+8. **memory 直 push 前に `pytest tests/discipline/ -q --no-cov` を実行
+   し 3 test 全 pass を確認**。 fail がある場合は step 4-6 のいずれかで
+   drift が残っているので push せず該当 file を修正。 memory exception
+   (`.claude/memory/` 直 main push 許可) は **PR ceremony を省く**
+   ためのものだが、 PR 経由と異なり **post-hoc 検出のみ** なので
+   discipline test 違反があると main branch が直接 red になる。
+   step 8 (約 5 秒) を **必ず実行** することで、 memory exception の
+   速度メリットを保持しつつ品質崩壊を構造的に抑止する。 同 rule は
+   Codex / 並列 agent / 任意の direct main push 経路すべてに適用
 
 Anti-pattern (`AGENTS.md §5.5` の対応 row 参照):
 
@@ -351,6 +360,10 @@ Anti-pattern (`AGENTS.md §5.5` の対応 row 参照):
   drift)
 - archive 移送を「後で」 と先送り (30 日経過 dated entry の archive 移送
   を session wrap-up 時に必ず実行、 後述 archive policy 参照)
+- **discipline test の pre-push verification を skip して memory を直
+  main push する** (step 8 違反): post-hoc 検出のみのため main red を
+  直接引き起こす。 PR 経由なら CI 赤で merge ブロックされて検出するが、
+  memory exception 直 push では fail 後の main が red になるまで気付かない
 
 ### Archive policy (compaction TTL)
 

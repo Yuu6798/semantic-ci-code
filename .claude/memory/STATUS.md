@@ -24,34 +24,34 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-P2.5 完走 + ABCD-A 完走 + ABCD-B 完走 (Brief 8 / CSCI-41〜44 landed).
-`semantic-ci` CLI now includes 10 subcommands, including `target-doctor` and
-`target-catalog`. Next normal implementation queue: Brief 7 / SSP v0.1.
-
-P2.5 完走 + ABCD-A 完走 + ABCD-B 3/4 landed (CSCI-41 + CSCI-43 + CSCI-42
-landed) + canonical-form refactor follow-up (PR #85) landed — Brief 1〜5
-全 merged + ResultStatus split (D1-1〜D3) 全 merged + Brief 8 入口
+P2.5 完走 + ABCD-A 完走 + ABCD-B 完走 (Brief 8 / CSCI-41〜44 全 landed) —
+Brief 1〜5 全 merged + ResultStatus split (D1-1〜D3) 全 merged + Brief 8
 (Authoring surface 設計契約 + `target-doctor` Advisor surface +
-`init --recipe --from-*` Authoring + Provenance surface) merged +
+`init --recipe --from-*` Authoring + Provenance surface + canonical-form
+refactor (PR #85) + `target-catalog` Authoring meta surface) 全 landed。
 `authoring/canonical.py` 3 helper (`is_canonical_fqn` /
 `is_canonical_fqn_prefix` / `is_canonical_test_id`) で producer-spec 単一
-source of truth 成立。 `semantic-ci` CLI は `init` (recipe / source surface
-込み) / `observe` / `compare` / `check` / `pre-commit` / `compile` /
-`compile-repair` / `validate-plan` / `target-doctor` の 9 subcommand を持ち、
-`init --recipe` で 4 recipe (`feature:add-api` / `bugfix:regression-test` /
-`refactor:preserve-api-with-allowlist` / `test-update:add-test-case`) と
-4 source surface (`--from-pr-body` / `--from-issue` / `--from-labels` /
-`--from-commits`) から target.yaml を deterministic に生成可能。
-Vibe Coding Adapter(Claude Code / Cursor / Codex)経由で repair guidance +
-pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
-`CompileError` (大半の authoring error)、 (b) runtime `unknown_cause` 4 値、
-(c) `validate-plan` の `risk_summary.authoring_errors` slot、 (d)
-`target-doctor` の 6 advisory (D1/D3/D4/P1/P2/S1) で end-to-end 診断可能。
-Authoring surface (target.yaml 生成経路 / surface isolation / Advisor
-renderer exempt / `candidate_code_used: false` 固定) は
+source of truth 成立、 `authoring/catalog.py` で 4 registry を mirror した
+machine-readable catalog を `schema_version="catalog-1"` で出力。
+`semantic-ci` CLI は `init` (recipe / source surface 込み) / `observe` /
+`compare` / `check` / `pre-commit` / `compile` / `compile-repair` /
+`validate-plan` / `target-doctor` / `target-catalog` の **10 subcommand**
+を持ち、 `init --recipe` で 4 recipe (`feature:add-api` /
+`bugfix:regression-test` / `refactor:preserve-api-with-allowlist` /
+`test-update:add-test-case`) と 4 source surface (`--from-pr-body` /
+`--from-issue` / `--from-labels` / `--from-commits`) から target.yaml を
+deterministic に生成可能。 Vibe Coding Adapter(Claude Code / Cursor /
+Codex)経由で repair guidance + pre-generation guidance を render 可能。
+UNKNOWN は (a) compile-time `CompileError` (大半の authoring error)、
+(b) runtime `unknown_cause` 4 値、 (c) `validate-plan` の
+`risk_summary.authoring_errors` slot、 (d) `target-doctor` の 6 advisory
+(D1/D3/D4/P1/P2/S1) で end-to-end 診断可能。 Authoring surface
+(target.yaml 生成経路 / surface isolation / Advisor renderer exempt /
+`candidate_code_used: false` 固定) は
 `docs/target_authoring_surface.md` で設計契約済、 `init --recipe` の
 generator path は `authorship.generation_metadata` block を populate
-(Section F、 `candidate_code_used`/`llm_used` 固定 False sentinel)。
+(Section F、 `candidate_code_used` / `llm_used` 固定 False sentinel)。
+Next normal implementation queue: Brief 7 / SSP v0.1。
 
 ## 直近 merged
 
@@ -627,11 +627,10 @@ evaluator_internal)、 (c) author-facing `risk_summary.authoring_errors` slot
 
 ## 次の発行順序
 
-P2.5 完走 + A (ResultStatus split) 完走 + B-1 (CSCI-41) + B-2 (CSCI-43) +
-B-3 (CSCI-42) + canonical refactor follow-up (PR #85) 完走で ABCD-A 軸
-landed + ABCD-B 軸 3/4 landed。 残り B-4 (Brief 8 implementation 1 PR、
-`target-catalog`) / C (Brief 7 SSP) / D (P2 残課題)。 ABCD 完走で product
-機能の ship-blocking gap が消える (`2026-05-12.md` 参照)。
+P2.5 完走 + A (ResultStatus split) 完走 + B (Brief 8 / CSCI-41〜44 +
+canonical refactor) 完走で ABCD-A / ABCD-B 両軸 landed。 残り C (Brief 7
+SSP) / D (P2 残課題)。 ABCD 完走で product 機能の ship-blocking gap が
+消える (`2026-05-12.md` 参照)。
 
 ### A. ResultStatus split — **完走 (2026-05-14/15)**
 
@@ -644,7 +643,7 @@ D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
   が unknown_policy 非尊重になったため S1 の scope を `extraction-cause +
   open_runtime` に narrow)
 
-### B. Brief 8(Authoring Surface、 planning merged 2026-05-09 PR #73、 implementation 4 PR、 2/4 landed)
+### B. Brief 8(Authoring Surface、 planning merged 2026-05-09 PR #73、 implementation 4 PR、 **完走 (4/4 landed)**)
 
 推奨着地順 41 → 43 → 42 → 44(`docs/brief_8_planning.md §12.2`)。
 
@@ -682,10 +681,14 @@ D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
     test、 0 review round clean merge。 `init --recipe refactor:preserve-
     api-with-allowlist` で §23.1 自己検証成立。 詳細は本ファイル 直近
     merged § 2026-05-19 参照
-- **B-4. CSCI-44. `semantic-ci target-catalog`**: 全 operator / template /
-  match schema を機械可読 + human で出力(AI assistant / IDE 拡張用)。
-  brief 未起草。 **Brief 8 完走の最後の 1 ピース**、 通常運用 (Claude=design
-  / Codex=implementation) 復帰想定
+- **B-4. CSCI-44. `semantic-ci target-catalog`**: **完走 (2026-05-21、
+  PR #86)**。 全 target / operator / template / match schema を機械可読 +
+  human で出力 (`schema_version="catalog-1"`)、 INV-5 catalog ↔
+  implementation parity を 5 cross-test で固定 (key set / match_schema /
+  template constraints / operator class / evidence_emits AST 抽出)、
+  `--kind` / `--target-path` filter は independent narrow、
+  determinism + PYTHONHASHSEED invariance test 込み。 詳細は本ファイル
+  直近 merged § 2026-05-21 参照
 
 ### C. Brief 7(SSP v0.1、 planning merged 2026-05-06 PR #50、 implementation 5 PR)
 
@@ -724,30 +727,17 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 
 ### 直近最短経路
 
-- **CSCI-44 paste 待ち**(Brief 8 / `target-catalog`、 推奨着地順 §12.2 で
-  CSCI-42 の次、 **Brief 8 完走の最後の 1 ピース**) — 全 operator /
-  template / match schema を機械可読 + human で出力 (AI assistant / IDE
-  拡張用)。 **Task Brief は 2026-05-19 セッションで起草済**、 paste-ready
-  ブロックが 5/19 chat 履歴に残置 (Codex 起動可能日に直接 paste 可)。
-  通常運用 (Claude=design / Codex=implementation) 復帰想定。 paste 時の
-  hint 候補: 「`authoring/canonical` の 3 predicate (`is_canonical_fqn` /
-  `is_canonical_fqn_prefix` / `is_canonical_test_id`) を catalog builder
-  でも使う、 重複定義禁止」 を口頭追加 (PR #85 で canonical module が
-  立った後の brief なので、 paste 前の brief 編集 or 口頭 hint は user
-  判断)。 起草時必読 (再開時):
-  1. `docs/brief_8_planning.md §6.4` (canonical spec、 AC、 file 一覧)
-  2. CSCI-43 / CSCI-42 で得た 29 round 累計 Codex review の教訓: (a)
-     advisory / generator / catalog item 仕様は「inviolate predicate
-     1 行」 形式で AC に明記、 (b) false negative 境界 fixture を AC で
-     要求、 (c) **producer (extractor / template / operator schema /
-     match schema) の actual output shape を grep してから validator を
-     書く** (CSCI-42 R5 = `Class::method` 形式の存在を見落として reject、
-     R8 = `_is_test_function_name` / `_is_test_class_name` filter の
-     存在を見落とし、 を反転して気付いた)、 (d) `tests/architecture/`
-     test (INV-2 / INV-4) を実装より先に書く
+- **C-1. CSCI-36. Brief 7 / SSP v0.1 spec**: 次の normal implementation
+  entry。 起草時は `docs/brief_7_planning.md §11` checklist + AGENTS.md
+  `Forward Design Note: Brief 7 / SSP v0.1` を逐語参照。 Brief 8 は
+  CSCI-44 / PR #86 で完走済みのため、 B-4 待ちは存在しない
 - **A 軸 follow-up 残**: `docs/brief_8_planning.md §6.3.1` line 435 の
-  `ADVISORY-S1` 文言 narrow (docs only、 CSCI-44 とは別 PR で landing
-  想定)。 PR が並走する場合は CSCI-44 branch では §6.3.1 を編集しない
+  `ADVISORY-S1` 文言 narrow (docs only)。 D1-4 で authoring-cause UNKNOWN
+  は `unknown_policy` 非尊重で常時 FAIL となったため、 S1 scope を
+  extraction-cause + open_runtime UNKNOWN に narrow する one-liner
+- **R17 deferred**: target-doctor の `--package-root` resolve を `check` と
+  同じ repo-relative に揃える consistency 改善。 subdirectory 起動時のみ
+  表面化、 critical でない UX 改善
 
 ## Frozen / Deferred
 

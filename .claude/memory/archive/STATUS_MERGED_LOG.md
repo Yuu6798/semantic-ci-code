@@ -293,3 +293,77 @@ evaluator_internal)、 (c) author-facing `risk_summary.authoring_errors` slot
   anchoring + hard/soft/info severity routing
 - **Brief 5 planning** (PR #44): `docs/archive/brief_5_planning.md` 起草
 
+### 2026-05-15 Session 3 — Brief 8 / CSCI-43 (`semantic-ci target-doctor` Advisor surface) landed
+
+B 軸 (Brief 8) 実装 1 本目 = 推奨着地順 41 → **43** → 42 → 44 の 2 番目消化。
+docs only の CSCI-41 (Session 2) を実装に展開し、 6 advisory (D1/D3/D4/P1/P2/S1)
+を verdict 不参加で検出する `target-doctor` subcommand を landed。
+
+- **PR #82** (CSCI-43, `feat(brief-8): land CSCI-43 — semantic-ci target-doctor
+  (Advisor surface)`): `cli/commands/target_doctor.py` + `authoring/hazards.py`
+  + `authoring/advisory.py` + `cli/output/doctor_human.py` /
+  `doctor_json.py` 新設、 `tests/architecture/test_surface_isolation.py` で
+  INV-2 (verdict-bearing module = `check` / `compare` / `pre_commit` + engine
+  の transitive imports に doctor module が混入しない) + INV-4 (CLI dispatcher
+  例外を main.py に narrow) を gate。 schemas/doctor_advisory.schema.json で
+  envelope を `schema_version="advisory-1"` で固定、 exit code は §6.3.3 規約
+  (advisory ≥ 0 でも 0、 入力エラー 2、 engine エラー 3、 unhandled 4)。
+  **Codex bot review 16 round 全部 P2 消化** (本体 1 commit + 16 fix commit、
+  merge `66b6fc2`):
+  - R1: SKIPPED-by-design operator 経由の D4 misclassification → 418cef0 で
+    `_evaluator_skipped_baseline` フィルタを D4 入力に直結
+  - R2: `not_equals(non-empty)` を addition と誤検知して P1/P2 を握り潰し →
+    bd38702 で `not_equals` を `expected=={empty}` のみ addition 扱いに narrow
+  - R3: zero-magnitude `not_equals` / `lock` を P1/P2 addition と誤検知 →
+    0928f63 で「非 info + 非 empty addition」 の論理積で P1/P2 を gate
+  - R4-R6: `equals_baseline` / `subset_of` / rename `old_path` の D4 分類
+    取りこぼし → c06c0fa / 2f36864 / 14df79c で順次 fix
+  - R7: `severity: info` constraint を D4 lock-only 判定に混ぜると vacuous
+    addition と区別不能 → de2fb90 で info constraint 除外
+  - R8: dict-nested expected の意味的等価重複が D3 で抜け → 1bf6c97 で
+    nested expected を canonicalize してから duplicate check
+  - R9: `unknown_policy in {fail, repair}` 起因の info constraint が
+    S1 評価 + D4 lock-only 評価で扱い不一致 → c197bac で `_is_lock_only_user_constraint`
+    に unknown-routing 例外を追加
+  - R10-R12: zero-shape / partial-dict expected を lock-only と誤分類して D4
+    suppression が false-negative 化 → b41f6de / e040f83 / e190f2f で 3 段階に
+    narrow (vacuous predicate → zero-delta scalar lock → delta observation 限定)
+  - R13-R14: `--package-root` 配下外の path / open path を D1 / D4 で
+    扱い間違え → e190f2f / 673f5e4 で path scope を package-root に narrow + open
+    paths を D4 lock-only から除外、 P1 を semantic surface に narrow
+  - R15: leaf target が collection lock-only と誤分類されて D4 false negative
+    → 6394a14 で leaf target requirement を追加
+  - R16: D4 numstat が repo 全体を走査して package-root 外を含む → 11b7893 で
+    numstat を `--package-root` slice に restrict
+  - R17 (post-merge): `--package-root .` resolve が cwd vs `check` の
+    repo-root で divergence → **完走 (R17 / PR #87)**。 `target-doctor` の
+    `--package-root` を repo-root relative に揃え、 symlink escape guard も
+    `check` / `pre-commit` / `validate-plan` と対称化
+  - CI: 3.11 / 3.12 / 3.13 全 green、 **pytest 1072 passed** (+66 new test
+    = 53 CLI doctor + 7 architecture + 6 D4 git integration)、 ruff check /
+    ruff format ✅
+
+**設計判断のハイライト**:
+
+1. **INV-2 architecture test を実装より先に書く** — Session 2 メモで「surface
+   boundary を docs に書く前に既存実装の boundary 仕様を inventory する」
+   pattern を pin したのが効いた。 `tests/architecture/test_surface_isolation.py`
+   を最初に書いて verdict-bearing module 群の transitive imports を closure
+   で固定すると、 `target-doctor` 実装中の incidental import が即 fail で
+   検出され、 Advisor renderer exempt の boundary を実装側で逐語固定できる
+2. **「lock-only と vacuous-pass」 の境界が D4 false-negative の主因** —
+   R10〜R12 の 3 round で「lock-only に見える predicate が delta observation
+   起因なら vacuous でない」 / 「zero-magnitude が必ずしも lock とは限らない」
+   / 「partial-dict expected は subset 評価で意味を持つ」 という 3 重 narrow が
+   必要だった。 D4 brief を起草する時点で「lock vs vacuous」 の inviolate
+   definition を §6.3.1 に書ききれていなかった反省、 CSCI-42 brief 起草時に
+   先に「authoring 生成経路における lock vs vacuous の境界」 を design.md
+   §23.3.1 でカバーすべきか確認
+3. **16 round 全部 P2 = 仕様 vs 実装の boundary が曖昧** — operator semantics /
+   severity / SKIPPED / git / scalar / path domain / source filter のそれぞれで
+   「target-doctor 実装が boundary を 1 mm 越えていた」 が累積、 Brief 8 §6.3.1
+   の advisory spec が「inviolate predicate」 形式で書かれていなかったため
+   実装が連続的に推測した結果。 CSCI-42 / CSCI-44 brief では「advisory 1 つ
+   ごとに inviolate predicate 1 行」 + 「false negative の境界 fixture を AC で
+   要求」 する pattern を継承
+

@@ -24,36 +24,116 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-P2.5 完走 + ABCD-A 完走 + ABCD-B 完走 (Brief 8 / CSCI-41〜44 全 landed) —
-Brief 1〜5 全 merged + ResultStatus split (D1-1〜D3) 全 merged + Brief 8
-(Authoring surface 設計契約 + `target-doctor` Advisor surface +
-`init --recipe --from-*` Authoring + Provenance surface + canonical-form
-refactor (PR #85) + `target-catalog` Authoring meta surface) 全 landed。
-`authoring/canonical.py` 3 helper (`is_canonical_fqn` /
-`is_canonical_fqn_prefix` / `is_canonical_test_id`) で producer-spec 単一
-source of truth 成立、 `authoring/catalog.py` で 4 registry を mirror した
-machine-readable catalog を `schema_version="catalog-1"` で出力。
-`semantic-ci` CLI は `init` (recipe / source surface 込み) / `observe` /
-`compare` / `check` / `pre-commit` / `compile` / `compile-repair` /
-`validate-plan` / `target-doctor` / `target-catalog` の **10 subcommand**
-を持ち、 `init --recipe` で 4 recipe (`feature:add-api` /
-`bugfix:regression-test` / `refactor:preserve-api-with-allowlist` /
-`test-update:add-test-case`) と 4 source surface (`--from-pr-body` /
-`--from-issue` / `--from-labels` / `--from-commits`) から target.yaml を
-deterministic に生成可能。 Vibe Coding Adapter(Claude Code / Cursor /
-Codex)経由で repair guidance + pre-generation guidance を render 可能。
-UNKNOWN は (a) compile-time `CompileError` (大半の authoring error)、
-(b) runtime `unknown_cause` 4 値、 (c) `validate-plan` の
-`risk_summary.authoring_errors` slot、 (d) `target-doctor` の 6 advisory
-(D1/D3/D4/P1/P2/S1) で end-to-end 診断可能。 Authoring surface
-(target.yaml 生成経路 / surface isolation / Advisor renderer exempt /
-`candidate_code_used: false` 固定) は
-`docs/target_authoring_surface.md` で設計契約済、 `init --recipe` の
-generator path は `authorship.generation_metadata` block を populate
-(Section F、 `candidate_code_used` / `llm_used` 固定 False sentinel)。
-Next normal implementation queue: Brief 7 / SSP v0.1。
+P2.5 完走 + ABCD-A 完走 + ABCD-B 完走 + 緊急 doc refactor 8 phase 完走
+(2026-05-21) — Brief 1〜5 全 merged + ResultStatus split (D1-1〜D3) 全
+merged + Brief 8 (Authoring surface 設計契約 + `target-doctor` Advisor
+surface + `init --recipe --from-*` Authoring + Provenance surface +
+canonical-form refactor + `target-catalog` Authoring meta surface) 全
+landed + doc refactor (Tier A/B/C/D 階層 + `_index.md` 1-line 復元 +
+STATUS.md compaction + AGENTS.md §5 collapse + Forward Design Note 分離
++ archive infrastructure + `tests/discipline/` 3 test + wrap-up protocol
+拡張) 全 landed。 `semantic-ci` CLI は `init` (recipe / source surface
+込み) / `observe` / `compare` / `check` / `pre-commit` / `compile` /
+`compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`
+の **10 subcommand** を持ち、 `init --recipe` で 4 recipe
+(`feature:add-api` / `bugfix:regression-test` /
+`refactor:preserve-api-with-allowlist` / `test-update:add-test-case`) と
+4 source surface (`--from-pr-body` / `--from-issue` / `--from-labels` /
+`--from-commits`) から target.yaml を deterministic に生成可能。 Vibe
+Coding Adapter (Claude Code / Cursor / Codex) 経由で repair guidance +
+pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
+`CompileError` (大半の authoring error)、 (b) runtime `unknown_cause` 4
+値、 (c) `validate-plan` の `risk_summary.authoring_errors` slot、 (d)
+`target-doctor` の 6 advisory (D1/D3/D4/P1/P2/S1) で end-to-end 診断
+可能。 起動時 Tier A attention budget は **~580 lines** (target ≤ 800
+クリア、 doc refactor 前 ~2,500 lines から -77%)、 memory hygiene drift
+は `tests/discipline/` 3 test が CI で auto-enforce
+(`test_status_md_phase_single_paragraph.py` /
+`test_status_md_next_queue_no_completed.py` /
+`test_index_md_entry_compactness.py`)。 archive infrastructure
+(`.claude/memory/archive/INDEX.md` + `STATUS_MERGED_LOG.md`) +
+30 日 TTL の dated log 移送 ritual が wrap-up protocol に組込済。
+Next normal implementation queue: Brief 7 / SSP v0.1 (CSCI-36 entry)。
 
 ## 直近 merged
+
+### 2026-05-21 Session 3 — 緊急 doc refactor 8 phase 1 日完走 + framework 自己 refactor dogfood
+
+Session 2 末尾の user 「doc 膨張で agent noise が増える懸念」 提起から
+即時 reality check + 定量化 (起動時 attention budget ~2,500 lines、
+target 800 を大幅超過) → `docs/doc_refactor_planning.md` 起草 (PR #88) →
+**同日中に 8 phase 全完走**。 Codex 利用可 + Claude 単独並列の最大効率
+運用で **9 PR landed + 4 direct push** (memory exception)。 framework
+自身が自分自身を refactor する self-referential dogfood が成立。
+
+- **PR #87** R17: target-doctor `--package-root` repo-root parity (PR #87、
+  PR review monitoring + merge)
+- **PR #88** `docs/doc_refactor_planning.md` 新設 (緊急 plan、 8 phase
+  spec + 9 bloat source + sequencing + risk mitigation +
+  self-referential note)
+- **PR #89** Phase 0: CLAUDE.md `Required Reading` を Tier A/B/C/D 4
+  階層に再構成 + 800 line budget pin
+- **PR #90** Phase 3: AGENTS.md §5 を 8 sub-section → 6 sub-section に
+  collapse (209 → 88 lines)、 Practice + Anti-Pattern + Enforcement を
+  3 列 table に統合、 Phase 6 marker 設置
+- **PR #91** Phase 4: AGENTS.md Forward Design Note (220 lines) を
+  `docs/ssp_protocol_design_note.md` (新 doc 253 lines) に分離、 AGENTS.md
+  に pointer 1 段落のみ残置 (425 → 218 lines、 -60%)
+- **PR #92** Phase 7: CLAUDE.md `終了時ルール (自動トリガー)` を 3-step
+  → 7-step + Anti-pattern list + Archive policy TTL table に拡張。
+  Codex bot review 2 round 連続 P2 消化 (R1 = step 4/5 順序 race の sweep
+  before compaction 修正 commit `75244c7`、 R2 = multi-line inline code
+  span が CommonMark spec で space に正規化される rendering bug 3 箇所を
+  単一行化 commit `f78d111`)
+- **PR #93** Phase 6: `tests/discipline/` 新設 + 3 test
+  (`test_status_md_phase_single_paragraph.py` /
+  `test_status_md_next_queue_no_completed.py` /
+  `test_index_md_entry_compactness.py`) を Codex implementation。 doc rule
+  単独依存を構造的に脱却、 CI で memory hygiene drift を auto-enforce
+- **PR #94** Phase 5: `.claude/memory/archive/INDEX.md` 新設 + TTL contract
+  pin。 実 file 移送は 2026-06-01 以降の TTL-driven ritual に発火 (今日
+  時点最古 dated log = 5/2 = 19 日経過、 30 日 TTL 未達)
+- direct push (memory exception):
+  - `bf8ce8f` ADVISORY-S1 stale entry 削除 (実は 5/15 commit `854a528` で
+    既に landing 済の発見)
+  - `3be25d4` Session 2 wrap-up + CLAUDE.md / AGENTS.md §5 (Experience
+    Externalization Discipline) 永続化
+  - `4783728` Phase 2: `_index.md` 53,953 → 5,251 bytes (**-90%**)、 essay
+    化 cell を 1-line index 本来仕様に復元、 27 entry の時系列正規化
+  - `0db925f` Phase 1: STATUS.md 831 → 505 lines、 `## 直近 merged` 古い
+    10 entry を archive 移送 + `次の発行順序` §A/§B 完走 entry 削除
+
+**累計効果**: 起動時 Tier A attention budget が **~2,500 lines → ~580
+lines (-77%)** に圧縮、 target ≤ 800 を大幅クリア。 情報損失ゼロ (全
+archive 移送 + dated session log は原文保存)。
+
+**設計判断のハイライト**:
+
+1. **bloat 懸念に対する即時 reality check + 定量化** — 「気をつけます」
+   ではなく現状の line count を提示、 problem の規模を共有してから
+   planning doc を起こす流れが速かった
+2. **8 phase の sequencing を ROI 順に設計** — Phase 0 → 2 → 1 を
+   連続実行で 1,340 lines 削減を最初に achieve、 target 達成見込みを
+   user 確信させてから後続 phase へ
+3. **Codex / Claude 体制別運用最適化** — Phase 6 (`tests/discipline/`
+   実装) を Codex 利用可日に最大効率で発注、 残 phase は Claude 単独で
+   並列実行。 Phase 4 を Phase 3 branch から chain することで merge
+   conflict を構造的回避
+4. **Codex review P2 を framework self-test として framing** — PR #92
+   R1 / R2 は新 wrap-up protocol の logical / physical correctness を
+   bot が catch、 規律自体の自己検証の成功例
+5. **self-referential dogfood の意図的設置** — planning doc に「完了後は
+   本 doc を archive/ 移送 (self-referential dogfood example)」 を明記
+6. **discipline test 3 件 が CI auto-enforce 化** — doc rule 単独依存を
+   構造的に脱却、 次 session 以降の memory hygiene drift が CI fail で
+   即検出される状態に到達
+
+**修正・訂正**:
+
+1. **PR #92 R1** (step order race): 順序を sweep → compaction に swap
+2. **PR #92 R2** (multi-line inline code span): 3 箇所を単一行化
+3. **Phase 5 acceptance** の 30 日 TTL 事前条件不成立 → infrastructure
+   設置のみ landed として planning doc 追記
 
 ### 2026-05-21 Session 2 — R17 (target-doctor `--package-root` parity) landed (PR #87) + 経験値外部化 framework 永続化
 
@@ -338,90 +418,17 @@ Codex=implementation split との一時的乖離、 commit message に明記し�
    match しない。 fix: `value[:-1]` で exactly 1 dot strip (commit
    `8a2119b`)
 
-### 2026-05-15 Session 3 — Brief 8 / CSCI-43 (`semantic-ci target-doctor` Advisor surface) landed
-
-B 軸 (Brief 8) 実装 1 本目 = 推奨着地順 41 → **43** → 42 → 44 の 2 番目消化。
-docs only の CSCI-41 (Session 2) を実装に展開し、 6 advisory (D1/D3/D4/P1/P2/S1)
-を verdict 不参加で検出する `target-doctor` subcommand を landed。
-
-- **PR #82** (CSCI-43, `feat(brief-8): land CSCI-43 — semantic-ci target-doctor
-  (Advisor surface)`): `cli/commands/target_doctor.py` + `authoring/hazards.py`
-  + `authoring/advisory.py` + `cli/output/doctor_human.py` /
-  `doctor_json.py` 新設、 `tests/architecture/test_surface_isolation.py` で
-  INV-2 (verdict-bearing module = `check` / `compare` / `pre_commit` + engine
-  の transitive imports に doctor module が混入しない) + INV-4 (CLI dispatcher
-  例外を main.py に narrow) を gate。 schemas/doctor_advisory.schema.json で
-  envelope を `schema_version="advisory-1"` で固定、 exit code は §6.3.3 規約
-  (advisory ≥ 0 でも 0、 入力エラー 2、 engine エラー 3、 unhandled 4)。
-  **Codex bot review 16 round 全部 P2 消化** (本体 1 commit + 16 fix commit、
-  merge `66b6fc2`):
-  - R1: SKIPPED-by-design operator 経由の D4 misclassification → 418cef0 で
-    `_evaluator_skipped_baseline` フィルタを D4 入力に直結
-  - R2: `not_equals(non-empty)` を addition と誤検知して P1/P2 を握り潰し →
-    bd38702 で `not_equals` を `expected=={empty}` のみ addition 扱いに narrow
-  - R3: zero-magnitude `not_equals` / `lock` を P1/P2 addition と誤検知 →
-    0928f63 で「非 info + 非 empty addition」 の論理積で P1/P2 を gate
-  - R4-R6: `equals_baseline` / `subset_of` / rename `old_path` の D4 分類
-    取りこぼし → c06c0fa / 2f36864 / 14df79c で順次 fix
-  - R7: `severity: info` constraint を D4 lock-only 判定に混ぜると vacuous
-    addition と区別不能 → de2fb90 で info constraint 除外
-  - R8: dict-nested expected の意味的等価重複が D3 で抜け → 1bf6c97 で
-    nested expected を canonicalize してから duplicate check
-  - R9: `unknown_policy in {fail, repair}` 起因の info constraint が
-    S1 評価 + D4 lock-only 評価で扱い不一致 → c197bac で `_is_lock_only_user_constraint`
-    に unknown-routing 例外を追加
-  - R10-R12: zero-shape / partial-dict expected を lock-only と誤分類して D4
-    suppression が false-negative 化 → b41f6de / e040f83 / e190f2f で 3 段階に
-    narrow (vacuous predicate → zero-delta scalar lock → delta observation 限定)
-  - R13-R14: `--package-root` 配下外の path / open path を D1 / D4 で
-    扱い間違え → e190f2f / 673f5e4 で path scope を package-root に narrow + open
-    paths を D4 lock-only から除外、 P1 を semantic surface に narrow
-  - R15: leaf target が collection lock-only と誤分類されて D4 false negative
-    → 6394a14 で leaf target requirement を追加
-  - R16: D4 numstat が repo 全体を走査して package-root 外を含む → 11b7893 で
-    numstat を `--package-root` slice に restrict
-  - R17 (post-merge): `--package-root .` resolve が cwd vs `check` の
-    repo-root で divergence → **完走 (R17 / PR #87)**。 `target-doctor` の
-    `--package-root` を repo-root relative に揃え、 symlink escape guard も
-    `check` / `pre-commit` / `validate-plan` と対称化
-  - CI: 3.11 / 3.12 / 3.13 全 green、 **pytest 1072 passed** (+66 new test
-    = 53 CLI doctor + 7 architecture + 6 D4 git integration)、 ruff check /
-    ruff format ✅
-
-**設計判断のハイライト**:
-
-1. **INV-2 architecture test を実装より先に書く** — Session 2 メモで「surface
-   boundary を docs に書く前に既存実装の boundary 仕様を inventory する」
-   pattern を pin したのが効いた。 `tests/architecture/test_surface_isolation.py`
-   を最初に書いて verdict-bearing module 群の transitive imports を closure
-   で固定すると、 `target-doctor` 実装中の incidental import が即 fail で
-   検出され、 Advisor renderer exempt の boundary を実装側で逐語固定できる
-2. **「lock-only と vacuous-pass」 の境界が D4 false-negative の主因** —
-   R10〜R12 の 3 round で「lock-only に見える predicate が delta observation
-   起因なら vacuous でない」 / 「zero-magnitude が必ずしも lock とは限らない」
-   / 「partial-dict expected は subset 評価で意味を持つ」 という 3 重 narrow が
-   必要だった。 D4 brief を起草する時点で「lock vs vacuous」 の inviolate
-   definition を §6.3.1 に書ききれていなかった反省、 CSCI-42 brief 起草時に
-   先に「authoring 生成経路における lock vs vacuous の境界」 を design.md
-   §23.3.1 でカバーすべきか確認
-3. **16 round 全部 P2 = 仕様 vs 実装の boundary が曖昧** — operator semantics /
-   severity / SKIPPED / git / scalar / path domain / source filter のそれぞれで
-   「target-doctor 実装が boundary を 1 mm 越えていた」 が累積、 Brief 8 §6.3.1
-   の advisory spec が「inviolate predicate」 形式で書かれていなかったため
-   実装が連続的に推測した結果。 CSCI-42 / CSCI-44 brief では「advisory 1 つ
-   ごとに inviolate predicate 1 行」 + 「false negative の境界 fixture を AC で
-   要求」 する pattern を継承
-
 ---
 
-### 古い merged entry (5/15 Session 2 以前) — archive 参照
+### 古い merged entry (5/15 Session 3 以前) — archive 参照
 
-10 entry (2026-05-15 Session 2 / 2026-05-14-15 ResultStatus split /
-2026-05-12 / 2026-05-09 / 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 /
-2026-05-05) は `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。
+11 entry (2026-05-15 Session 3 + Session 2 / 2026-05-14-15 ResultStatus
+split / 2026-05-12 / 2026-05-09 / 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5
+/ 2026-05-05) は `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。
 詳細参照時は当該 archive file + 該当 dated session log
-(`.claude/memory/YYYY-MM-DD.md`) を参照。 Phase 1
-(`docs/doc_refactor_planning.md`) 由来の compaction。
+(`.claude/memory/YYYY-MM-DD.md`) を参照。 Phase 1 (initial cutoff、
+`docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
+で compaction が実施された。
 
 ## 次の発行順序
 

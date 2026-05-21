@@ -7,8 +7,8 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 
 | Date | PR / commit | Outcome | Detail |
 |---|---|---|---|
+| 2026-05-21 (S4) | #95 | wrap-up protocol に step 8 (pre-push `pytest tests/discipline/` verify) 追加、 memory exception 直 push と discipline test の structural gap (main red 直撃) を 5 秒 ritual で closure。 semantic-ci 適用は overengineering 判定で見送り | `2026-05-21.md` |
 | 2026-05-21 (S3) | #88-#94 + direct push | 緊急 doc refactor 8 phase 1 日完走、 framework 自己 refactor の self-referential dogfood、 attention budget 2,500→580 lines (-77%)、 `tests/discipline/` 3 test で memory hygiene drift を CI auto-enforce 化 | `2026-05-21.md` |
-|---|---|---|---|
 | 2026-05-21 (S2) | #87 / #88 | R17 (`target-doctor --package-root` parity, 0 round) + 経験値外部化 framework 言語化 → CLAUDE.md/AGENTS.md §5 永続化 + urgent doc refactor planning landed | `2026-05-21.md` |
 | 2026-05-21 (S1) | #86 | Brief 8 / CSCI-44 (`semantic-ci target-catalog`) → ABCD-B 完走、 INV-5 cross-test 5 件 + AST 抽出で registry mirror | `2026-05-21.md` |
 | 2026-05-19 | #85 | Brief 8 / canonical-form refactor (`authoring/canonical.py` 3 helper + 48 producer-spec contract test、 §23.1 self-validation) | `2026-05-19.md` |

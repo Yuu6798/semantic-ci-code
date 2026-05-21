@@ -50,7 +50,10 @@ pre-generation guidance を render 可能。 UNKNOWN は (a) compile-time
 は `tests/discipline/` 3 test が CI で auto-enforce
 (`test_status_md_phase_single_paragraph.py` /
 `test_status_md_next_queue_no_completed.py` /
-`test_index_md_entry_compactness.py`)。 archive infrastructure
+`test_index_md_entry_compactness.py`)。 wrap-up protocol step 8 で
+`pytest tests/discipline/` を memory 直 push 前 pre-push 必須化 (PR #95、
+memory exception 直 push と CI gate の structural gap closure)。 archive
+infrastructure
 (`.claude/memory/archive/INDEX.md` + `STATUS_MERGED_LOG.md`) +
 30 日 TTL の dated log 移送 ritual が wrap-up protocol に組込済。
 Next normal implementation queue: Brief 7 / SSP v0.1 (CSCI-36 entry)。

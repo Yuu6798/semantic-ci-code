@@ -309,10 +309,65 @@ later sessions can resume without losing context.
 - 「done for today」「that's all」
 - 手動: `/wrap-up`
 
-実行内容:
-- 会話の振り返りサマリーを `.claude/memory/YYYY-MM-DD.md` に保存
-- `_index.md` に 1 行サマリーを追記
-- `CLAUDE.md` への更新候補があればユーザーに提案する
+実行内容 (本 wrap-up):
+
+1. 会話の振り返りサマリーを `.claude/memory/YYYY-MM-DD.md` に保存
+   (新規 file or 同日 Session N として追記)
+2. `_index.md` に **1-2 行** サマリーを追記 (本来仕様の index format、
+   essay 化 anti-pattern を回避。 col: Date | PR/commit | One-line
+   outcome | Detail。 `docs/doc_refactor_planning.md` Phase 2 で復元
+   された format に従う)
+3. **30 日以上前の dated entries を `archive/YYYY-MM/` に移送**
+   (自動 compaction、 移送後の `_index.md` 該当行は 1 行 summary + archive
+   path に書換、 dated file 本体は archive に原文保存)
+4. **`STATUS.md 次の発行順序` の sweep** (CLAUDE.md rule:
+   `If a CSCI / Brief / D# item is closed, remove the corresponding
+   entry from 次の発行順序`。 stale entry 検出時は削除して 直近 merged
+   に移送、 `tests/discipline/test_status_md_next_queue_no_completed.py`
+   (Phase 6 で導入予定) で自動検出される rule)。 **step 5 (直近 merged
+   compaction) より先に行うこと** — sweep が完走 entry を 直近 merged
+   に move したのち compaction で 5 cap を再評価する単一 pass を実現する
+   ため (PR #92 review で指摘)
+5. **`STATUS.md ## 直近 merged` で 5 entries 超過分を
+   `archive/STATUS_MERGED_LOG.md` に移送** (Phase 1 で確立した archive
+   経路、 最新 5 のみ inline、 残りは archive 参照)。 step 4 の sweep
+   後に実行することで「sweep が cap 超過を再導入する」 race を回避
+6. **`STATUS.md ## Phase` の上書き check** (新 paragraph 追加時は旧
+   paragraph を必ず削除、 1 paragraph 厳守。 5/21 で Codex / Claude
+   両方が再発させた drift category、
+   `tests/discipline/test_status_md_phase_single_paragraph.py` (Phase 6)
+   で自動検出される rule)
+7. `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
+
+Anti-pattern (`AGENTS.md §5.5` の対応 row 参照):
+
+- `_index.md` entry を essay 化させる (Phase 2 で 53KB → 5KB 復元の前例、
+  cell ≤ 500 chars constraint は
+  `tests/discipline/test_index_md_entry_compactness.py` で enforce 予定)
+- 完走済 CSCI を `次の発行順序` に残置 (5/21 で ADVISORY-S1 + R17 で 2
+  連続発生、 PR merge 直後の即時 sweep が必須)
+- `## Phase` に新 paragraph を追加するが旧 paragraph を残置 (5/21 で
+  Codex follow-up で初回発生、 Claude の今回 session 直前にも発生する
+  drift)
+- archive 移送を「後で」 と先送り (30 日経過 dated entry の archive 移送
+  を session wrap-up 時に必ず実行、 後述 archive policy 参照)
+
+### Archive policy (compaction TTL)
+
+`.claude/memory/` の disk-resident artifact は以下の TTL で archive 移送:
+
+| Artifact | TTL | 移送先 | 移送後の本体 source |
+|---|---|---|---|
+| dated session log `YYYY-MM-DD.md` | 30 日 | `archive/YYYY-MM/YYYY-MM-DD.md` | 原文保存 (情報損失ゼロ) |
+| `_index.md` の対応 entry | 同上 | inline → 1 行 summary + archive path 追記 | 詳細は archive file 経由で参照可 |
+| `STATUS.md ## 直近 merged` entry | 直近 5 を超えた時点 | `archive/STATUS_MERGED_LOG.md` 末尾 | 原文保存 |
+| `STATUS.md 次の発行順序` の 完走 entry | merge と同時 | `## 直近 merged` の新 entry に変換 | 完走宣言として保存 |
+| `STATUS.md ## Phase` paragraph | 上書き時 | (保存しない、 1 paragraph 厳守) | 旧 phase の history は dated session log / `_index.md` に分散保存 |
+
+Archive infrastructure は `.claude/memory/archive/` directory + index file
+(`archive/INDEX.md`) で管理 (Phase 5 で完備予定)。 archive 移送は
+**memory exception 枠**で main 直 push 可能 (本 Git Workflow の例外
+section 参照)。
 
 ### サマリーの構成 (慣例フォーマット)
 

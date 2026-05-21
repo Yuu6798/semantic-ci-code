@@ -326,21 +326,22 @@ later sessions can resume without losing context.
    compaction) より先に行うこと** — sweep が完走 entry を 直近 merged
    に move したのち compaction で 5 cap を再評価する単一 pass を実現する
    ため (PR #92 review で指摘)
-5. **`STATUS.md ## 直近 merged` で 5 entries 超過分を `archive/
-   STATUS_MERGED_LOG.md` に移送** (Phase 1 で確立した archive 経路、
-   最新 5 のみ inline、 残りは archive 参照)。 step 4 の sweep 後に
-   実行することで「sweep が cap 超過を再導入する」 race を回避
+5. **`STATUS.md ## 直近 merged` で 5 entries 超過分を
+   `archive/STATUS_MERGED_LOG.md` に移送** (Phase 1 で確立した archive
+   経路、 最新 5 のみ inline、 残りは archive 参照)。 step 4 の sweep
+   後に実行することで「sweep が cap 超過を再導入する」 race を回避
 6. **`STATUS.md ## Phase` の上書き check** (新 paragraph 追加時は旧
    paragraph を必ず削除、 1 paragraph 厳守。 5/21 で Codex / Claude
-   両方が再発させた drift category、 `tests/discipline/test_status_md_
-   phase_single_paragraph.py` (Phase 6) で自動検出される rule)
+   両方が再発させた drift category、
+   `tests/discipline/test_status_md_phase_single_paragraph.py` (Phase 6)
+   で自動検出される rule)
 7. `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
 
 Anti-pattern (`AGENTS.md §5.5` の対応 row 参照):
 
 - `_index.md` entry を essay 化させる (Phase 2 で 53KB → 5KB 復元の前例、
-  cell ≤ 500 chars constraint は `tests/discipline/test_index_md_entry_
-  compactness.py` で enforce 予定)
+  cell ≤ 500 chars constraint は
+  `tests/discipline/test_index_md_entry_compactness.py` で enforce 予定)
 - 完走済 CSCI を `次の発行順序` に残置 (5/21 で ADVISORY-S1 + R17 で 2
   連続発生、 PR merge 直後の即時 sweep が必須)
 - `## Phase` に新 paragraph を追加するが旧 paragraph を残置 (5/21 で

@@ -65,24 +65,58 @@ When other docs need to point at the live tracker, they MUST link to
 
 ## Required Reading Before Editing
 
-Claude Code (and any agent acting in this repository) MUST consult the
-following before taking any action that changes the repo:
+Claude Code (and any agent acting in this repository) MUST consult these
+docs before taking any action that changes the repo. Reading load is
+**tiered** to keep startup attention budget bounded (target: Tier A ≤
+800 lines). Read up to the tier that matches your task scope.
 
-1. **`.claude/memory/STATUS.md`** — current phase, live next-issue queue,
-   frozen / deferred items.
-2. **`.claude/memory/_index.md`** — one-line summary of every prior session;
-   read at minimum the latest 3 entries.
-3. **`.claude/memory/YYYY-MM-DD.md`** for the most recent dated session(s)
-   when the current task is a continuation, a fix, or a follow-up of recent
-   decisions.
-4. **`AGENTS.md`** for the Task Brief / Completion Summary protocol, and the
-   `Forward Design Note` for any work that touches Brief 7 / SSP.
-5. **`docs/code_semantic_ci_design.md`** §23 (engine contract / boundary)
-   before changing engine, evaluator, repair compiler, or adapter behavior.
+### Tier A — Always required at startup (target ≤ 800 lines)
 
-Skipping memory and inventing context from scratch is a documented
-recurring failure mode. If the memory is stale or incomplete, surface that
-in the response rather than acting without it.
+1. **This file (`CLAUDE.md`)** — repository policy and operating
+   contract (`Required Reading` / Engine Contract / Session Memory /
+   Experience Externalization)
+2. **`.claude/memory/STATUS.md` §`## Phase` (1 paragraph) + §`次の発行順序`**
+   — current project state + active next-issue queue. Skip the full
+   `## 直近 merged` log unless investigating a specific recent PR
+3. **`.claude/memory/_index.md` の直近 5 entries** — 1-2 line index
+   form (essay entries are a bloat anti-pattern, see
+   `docs/doc_refactor_planning.md` Phase 2)
+4. **`AGENTS.md` §1-§4** — Message Flow + Task Brief / Completion
+   Summary format + Escalation Rules + Branch Rules
+
+Skipping Tier A and inventing context from scratch is a documented
+recurring failure mode. If a Tier A doc is stale or incomplete,
+surface that in the response rather than acting without it.
+
+### Tier B — Required before drafting a new brief (target ≤ 300 lines)
+
+1. **`AGENTS.md` §5 Experience Externalization Discipline** — anti-pattern
+   list + maintenance practice (after Phase 3 compaction, ≤ 80 lines)
+2. **`docs/brief_8_planning.md §15` brief drafting checklist** — 8
+   sub-checklist, 20 round 蒸留
+3. **Relevant `docs/<topic>_planning.md` section** — the planning doc
+   for the brief / phase being drafted
+
+### Tier C — On-demand for the specific task
+
+- `docs/brief_*_planning.md` (full read of the relevant planning doc)
+- 直近 3 dated session logs (`.claude/memory/YYYY-MM-DD.md`) in full
+- Related case study (`docs/multi_agent_audit_case.md` /
+  `docs/dogfooding_TC10_report.md` / etc.)
+- `docs/code_semantic_ci_design.md` §23 (engine contract / boundary)
+  before changing engine, evaluator, repair compiler, or adapter
+  behavior
+- `AGENTS.md` Forward Design Note (Brief 7 / SSP) only when touching
+  Brief 7 work
+
+### Tier D — Debug / archeology only
+
+- `.claude/memory/archive/` — compacted historical session logs
+- 30 日以上前の dated session logs
+- 旧 `STATUS.md ## 直近 merged` log (after Phase 1 archive)
+
+If the memory is stale or incomplete, surface that in the response
+rather than acting without it.
 
 ## Tech Stack
 

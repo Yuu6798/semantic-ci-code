@@ -163,13 +163,13 @@ Anti-Pattern-to-Test-Map / Cross-Ref)。
 **Acceptance**: AGENTS.md ≤ 300 lines。 Forward Design Note 内容は移送先で
 完全保存。
 
-### Phase 5: **Archive infrastructure** (PR、 半日)
+### Phase 5: **Archive infrastructure** (PR、 半日) — **infrastructure landed (2026-05-21)**
 
 `.claude/memory/archive/` directory 構造を確立:
 
 ```
 .claude/memory/archive/
-├── YYYY-MM/                  # 30 日経過 dated session logs
+├── YYYY-MM/                  # 30 日経過 dated session logs (TTL-driven、 incremental)
 │   ├── 2026-05-02.md
 │   └── ...
 ├── STATUS_MERGED_LOG.md      # STATUS.md `## 直近 merged` から移送した古い entries
@@ -182,8 +182,20 @@ Compaction policy (memory wrap-up 時に自動実行):
 - `_index.md` の該当行を 1 行に collapse + archive path 追記
 - session log dated file 自体は原文保存 (情報損失ゼロ)
 
-**Acceptance**: 30 日以上前の dated entries (5/2-5/7 等、 6 files) が
+**Acceptance (originally)**: 30 日以上前の dated entries (5/2-5/7 等、 6 files) が
 archive 移送、 `_index.md` で 1 行参照可能。
+
+**Phase 5 actual landing (2026-05-21 Session 2、 commit `<this PR>`)**:
+本 phase 起動時 (2026-05-21) の dated session log 最古は 2026-05-02
+(19 日経過)、 **30 日 TTL に到達した entry は存在しない**。 したがって
+本 PR は **archive infrastructure 設置 (INDEX.md + TTL contract pin) のみ
+を land**、 実 file 移送は次回 wrap-up trigger 以降の TTL-driven ritual
+として発火する。 次回 entry 移送発生予定: 2026-06-01 以降 (5/2 entry が
+30 日に到達)。 STATUS_MERGED_LOG.md は Phase 1 で既に landed 済 (`0db925f`)。
+
+- 新設: `.claude/memory/archive/INDEX.md` (本 archive directory の Tier D
+  専用 索引、 layout / 移送 protocol / TTL contract / Phase 6 cross-ref +
+  archive 由来 4 phase log を pin)
 
 ### Phase 6: **Test-enforced rule への変換** (PR、 1-2 日)
 

@@ -4,6 +4,30 @@ This file defines the repository-level operating policy for Claude Code and rela
 agent workflows. Keep product details in `docs/<topic>.md` and keep task handoff
 format rules in `AGENTS.md`.
 
+## Ecosystem Context
+
+This repository is the **code domain** of the
+[UGH ecosystem](https://github.com/Yuu6798/ugh-ecosystem), a multi-domain
+semantic audit framework. The ecosystem implements a single design pattern
+across modalities:
+
+    Declared intent → Observed state → ΔE → Verdict → Repair
+
+`semantic-ci-code` specialises this for Python code: `target.yaml` is the
+declared intent, `CodeState` is the observed state, the constraint evaluator
+produces the verdict, and `RepairPlan` is the repair surface. The Scope
+guard under `## Project Overview` below is the code-domain specialisation of
+the ecosystem-wide invariant that the audit layer is always deterministic
+and reproducible from recorded inputs alone (= `docs/code_semantic_ci_design.md`
+§23.1 input neutrality, framed at ecosystem scope).
+
+Other component domains (independent repos, own release cadences):
+[text](https://github.com/Yuu6798/ugh-audit-core),
+[music](https://github.com/Yuu6798/ugh-prompt-engine),
+[image+video](https://github.com/Yuu6798/svp-video-pipeline).
+Cross-domain vocabulary, strata definition, and ecosystem roadmap live in
+the umbrella repo; this `CLAUDE.md` keeps to code-domain policy.
+
 ## Project Overview
 
 Semantic CI Code Edition is a deterministic semantic CI layer for code changes.

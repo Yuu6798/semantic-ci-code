@@ -100,6 +100,7 @@ Planning (open):
 
 - [Brief 7 — Semantic Security Protocol v0.1](docs/brief_7_planning.md) — SAST + SCA, Python only, independent envelope, Sensor Provenance Invariant
 - [ResultStatus authoring/extraction split](docs/brief_resultstatus_planning.md) — C+B (compile-time pushback + `unknown_cause` sibling field), 5 PR split, validate-plan v2 — boundary with Brief 8 (Authoring Surface) pinned in §1b
+- [Doc Refactoring Plan (urgent, 2026-05-21)](docs/doc_refactor_planning.md) — startup attention budget 2,500 → 800 lines compaction, Tier A/B/C/D 階層化, archive infrastructure, test-enforced rule conversion, 8 phase / 4-6 day scope
 
 Reference / archived (completed briefs, retained for context — see [`docs/archive/README.md`](docs/archive/README.md)):
 

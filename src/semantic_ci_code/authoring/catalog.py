@@ -39,7 +39,11 @@ def build_catalog(
     target_path_filter: str | None = None,
 ) -> dict[str, Any]:
     valid_targets = set(path_schema.valid_target_paths())
-    if target_path_filter is not None and target_path_filter not in valid_targets:
+    if (
+        target_path_filter is not None
+        and target_path_filter not in valid_targets
+        and not path_schema.is_open_path(target_path_filter)
+    ):
         suggestions = path_schema.suggest_targets(target_path_filter, sorted(valid_targets))
         message = f"unknown target path: {target_path_filter!r}"
         if suggestions:

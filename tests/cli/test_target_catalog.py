@@ -58,6 +58,16 @@ def test_target_path_filter_narrows_targets_only():
     assert payload["operators"] == full["operators"]
 
 
+def test_target_path_filter_accepts_open_dimension_path():
+    payload = _catalog("--target-path", "python_specific.value")
+    assert list(payload["targets"]) == ["python_specific.value"]
+    entry = payload["targets"]["python_specific.value"]
+    assert entry["kind"] == "open"
+    assert entry["category"] == "unknown_open"
+    assert "match_schema" not in entry
+    assert "equals" in entry["operators"]
+
+
 def test_kind_and_target_path_filters_are_independent():
     payload = _catalog("--kind", "bugfix", "--target-path", "effect_changes.added")
     assert list(payload["templates"]) == ["bugfix"]

@@ -562,7 +562,9 @@ Filters narrow one section only. `--kind feature` narrows `templates` to the
 feature templates while leaving `targets`, `operators`, and `primary_kinds`
 unchanged. `--target-path api_surface_delta.added` narrows `targets` to that
 single entry while leaving `templates` and `operators` unchanged. The two
-filters can be combined.
+filters can be combined. `--target-path` also accepts valid open-dimension
+paths such as `python_specific.value`; these render as `kind: open` with
+`category: unknown_open`.
 
 Examples:
 

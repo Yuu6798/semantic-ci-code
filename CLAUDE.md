@@ -294,3 +294,33 @@ later sessions can resume without losing context.
 
 `.claude/memory/` の運用ログのみ、 main 直 push の唯一の例外として認められている。
 これ以外の変更はすべて feature branch + PR の通常フローを守る。
+
+## Experience Externalization (経験値の外部化)
+
+AI 開発 (Claude / Codex / 並列 agent 運用) は session 跨ぎの暗黙知を継承
+しない: Claude は long-term memory を持たず、 Codex は PR 単位の review
+trail 以外を学習しない。 user の壁打ち経験も session 跨ぎで永続化されない
+限り消失する。
+
+この制約下で再現性を維持する唯一の方法は、 経験値を **明示 artifact** に
+強制的に外部化することである:
+
+- **docs** に encode (planning / spec / case study / authoring guide)
+- **test** に encode (`tests/architecture/` invariant test、 producer-spec
+  contract test、 parametrize で near-miss shape を列挙)
+- **checklist** に encode (`docs/brief_8_planning.md §15` brief drafting
+  checklist 8 sub-section、 20 round 蒸留)
+- **pattern catalog** に encode (AskUserQuestion N 択 trade-off / dogfood
+  fail+pass 両方実演 / architecture test 先行 等)
+
+経験を「腕の感」 として個人 / agent に閉じる形は AI 開発では **機能しない**。
+PR #82 (16 round) / PR #84 (13 round) の累計 29 round で表面化した P2 を
+`tests/authoring/test_canonical.py` 48 cases + `tests/architecture/` 16
+tests に encode した結果、 後続 PR #85 / #86 / #87 が 0 round で landing
+した因果は本リポジトリの empirical base case。
+
+詳細な 3-tier 分類 (codified / repo-specific / session-tacit)、 review
+round 数を leading quality indicator として運用する原則、 規律を壊さない
+ための maintenance practice、 anti-pattern 列挙は `AGENTS.md` §
+Experience Externalization Discipline に集約。 新 brief 起草前 / 新
+architectural pattern 導入前は逐語参照する。

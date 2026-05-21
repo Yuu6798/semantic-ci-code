@@ -55,7 +55,76 @@ Next normal implementation queue: Brief 7 / SSP v0.1。
 
 ## 直近 merged
 
-### 2026-05-21 — Brief 8 / CSCI-44 (`semantic-ci target-catalog`) landed
+### 2026-05-21 Session 2 — R17 (target-doctor `--package-root` parity) landed (PR #87) + 経験値外部化 framework 永続化
+
+Session 1 (CSCI-44) 完了直後の継続 session。 当初プランの Brief 7 (CSCI-36)
+entry に対して user の判断で先に **A 軸 follow-up = ADVISORY-S1 narrow**
+を確認 → 既に 2026-05-15 commit `854a528` で landing 済と判明、 STATUS.md
+の stale entry 削除のみ (commit `bf8ce8f` direct main) で 5 分 closure。
+続いて **R17 deferred** (target-doctor `--package-root` resolve を
+`check` と同じ repo-root 相対に揃える consistency 改善) の brief 起草 →
+Codex paste → PR #87 → 0 round merge を達成。
+
+- **PR #87** (`fix(target-doctor): resolve --package-root against repo
+  root (parity with check)`、 merge `469385e`):
+  - `target_doctor.py:_resolve_package_root` を repo-root aware 版に置換
+    (+31/-1): absolute reject / `..` escape reject / `repo_root(Path.cwd())`
+    with cwd fallback / `is_relative_to` symlink defense の 4 layer
+  - `tests/cli/test_target_doctor.py` (+218/-1): 6 tests 追加 (subdir
+    parity / `.` parity / D4 filter parity / abs reject / parent escape /
+    git unavailable fallback) + bonus symlink reject (Windows skip)
+  - STATUS.md (+7/-8): R17 deferred 3 sites を完走表記に書換 (Codex 側で
+    自発的更新、 brief Scope IN に明示した効果)
+  - CI 3/3 green (3.11 / 3.12 / 3.13)、 local 1269 passed (1261 baseline
+    + 8 new、 0 regression)、 ruff check / format 両 pass
+
+**経験値外部化 framework 永続化**: PR #82 (16 round) / #84 (13 round) /
+#85 (0 round) / #86 (0 round) / #87 (0 round) の empirical envelope を
+data 表として整理、 「29 round 累計 P2 を `test_canonical.py` 48 cases +
+`tests/architecture/` 16 tests に encode した結果として後続 0 round 達成」
+の因果を言語化。 **CLAUDE.md** に Experience Externalization (経験値の
+外部化) section 軽 (~25 lines、 principle 1 paragraph + 4 item bullet +
+AGENTS.md pointer)、 **AGENTS.md** § 5. Experience Externalization
+Discipline substantial (~180 lines、 8 sub-section: 5.1 Principle / 5.2
+Empirical Envelope / 5.3 Three-Tier Externalization (codified / repo-
+specific / session-tacit) / 5.4 Round Count as Leading Quality Indicator /
+5.5 体制別 envelope / 5.6 Maintenance Practice 7 rule / 5.7
+Anti-Patterns 7 件 / 5.8 Cross-Reference) を追記、 新 brief 起草前 / 新
+architectural pattern 導入前の必読 doc に位置付け。
+
+**設計判断のハイライト**:
+
+1. **「経験値の外部化」 を AI 開発 discipline 規律として明示化** —
+   Claude long-term memory 不在制約が **強制的 externalization discipline**
+   として逆説的に働く framing を §5.1 で言語化、 「ベテランの暗黙知」 が
+   AI 開発では機能しないという principle を policy doc 化
+2. **Review round 数を leading quality indicator として運用** — §5.4 で
+   0 / 1-3 / 5-10 / 10+ の round 数解釈表を pin、 「同じ trap は二度発生
+   させない」 ための encoding work を 5+ round 時に必須化
+3. **体制別 envelope を §5.5 で明示** — split (Codex=impl) で 1 日規模
+   0 round / Claude alone で半日以下 0 round / Claude exception で 1 日
+   規模は 13+ round chase、 の経験的 envelope を data 付きで pin。
+   「Codex が intrinsically 速い」 framing を回避、 「規律 infrastructure
+   揃った状態の split 運用」 が正しい framing
+4. **Maintenance Practice 7 rule (§5.6) + Anti-Patterns 7 件 (§5.7)** —
+   memory log skip 禁止 / §15 checklist 強制 / prefix match 自動 cover
+   保持 / round trail を必ず docs/test に encode / dogfood fail+pass 両方
+   / Claude exception scope ≤ 半日 / STATUS.md 次の発行順序 即時更新 等、
+   実証済 operational rule を逐語化
+5. **本 session 自体が経験値外部化 discipline の自己言及的実演** —
+   反省会で気付いた pattern を即座に CLAUDE.md / AGENTS.md に encode
+   する loop が、 言語化した規律の自己適用例として記録に値する。 §5
+   全 sub-section が本 session 中に書かれた事実は、 discipline の
+   reusability を即時実証している
+
+**修正・訂正**:
+
+1. **A 軸 follow-up「残」 表記が stale** (実体は 2026-05-15 完了済) —
+   brief 起草前の事前確認で発覚、 5 分で stale 削除 closure (commit
+   `bf8ce8f`)。 §5.7 Anti-Patterns #7 「STATUS.md `次の発行順序` 更新を
+   後で先送り」 として明示化、 maintenance practice の重要性を再確認
+
+### 2026-05-21 Session 1 — Brief 8 / CSCI-44 (`semantic-ci target-catalog`) landed
 
 CSCI-44 closes the final Brief 8 implementation piece. `semantic-ci
 target-catalog` renders a machine-readable (`schema_version:
@@ -730,9 +799,18 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 ### 直近最短経路
 
 - **C-1. CSCI-36. Brief 7 / SSP v0.1 spec**: 次の normal implementation
-  entry。 起草時は `docs/brief_7_planning.md §11` checklist + AGENTS.md
-  `Forward Design Note: Brief 7 / SSP v0.1` を逐語参照。 Brief 8 は
-  CSCI-44 / PR #86 で完走済みのため、 B-4 待ちは存在しない
+  entry。 `docs/ssp_protocol.md` v0.1 spec 新設 (docs only、 500-700 行、
+  Claude 単独可)。 ABCD-B 完走 + canonical refactor + R17 全 landed の
+  ため、 残務は ABCD-C / ABCD-D のみ。 起草時必読:
+  1. `AGENTS.md` Forward Design Note: Brief 7 / SSP v0.1 (canonical spec)
+  2. `docs/brief_7_planning.md §11` 着手 checklist
+  3. **`AGENTS.md` § 5 Experience Externalization Discipline** (2026-05-21
+     Session 2 新設、 brief 起草前の必読 doc、 §5.6 Maintenance Practice
+     7 rule + §5.7 Anti-Patterns 7 件を逐語適用)
+  4. `.claude/memory/STATUS.md` 直近 3 entries + `_index.md` Session 2
+     summary
+- SSP tracking GitHub issue 起票 (Issue #48 close 後の受け皿、
+  `brief_7_planning.md §11` で text template 固定済)
 
 ## Frozen / Deferred
 

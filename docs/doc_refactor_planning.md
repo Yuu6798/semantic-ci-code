@@ -197,21 +197,25 @@ archive 移送、 `_index.md` で 1 行参照可能。
   専用 索引、 layout / 移送 protocol / TTL contract / Phase 6 cross-ref +
   archive 由来 4 phase log を pin)
 
-### Phase 6: **Test-enforced rule への変換** (PR、 1-2 日)
+### Phase 6: **Test-enforced rule への変換** (部分完走: 3/4 + 2 新 rule)
 
-`tests/discipline/` (新設) に doc rule の自動 check を実装:
+`tests/discipline/` で doc rule の自動 check を実装。 初回 slice では
+STATUS.md / `_index.md` hygiene の 3 test と、 Phase paragraph / index
+compactness の 2 新 rule を landed。 残 candidate は future hardening として
+保持。
 
-| AGENTS.md §5.7 anti-pattern | 変換先 test | 検出方法 |
+| Rule | Status / test | 検出方法 |
 |---|---|---|
-| `STATUS.md 次の発行順序` 更新先送り | `tests/discipline/test_status_md_drift.py` | git log で直近 merged PR の CSCI ID 抽出 → `次の発行順序` に残っていれば fail |
-| memory log skip | `tests/discipline/test_memory_freshness.py` | session 起動時に `_index.md` 最新 entry の date と現在 date を比較、 1 日以上開いていたら warn |
-| dogfood single-case | (既存 dogfood test pattern を `must_have_fail_and_pass_case` で強制) | dogfood fixture が fail case + pass case の両方を含むかの constraint |
-| prefix match → 個別 enumeration regression | (既存 `tests/architecture/test_surface_isolation.py` で cover 済) | n/a |
-| §15 checklist skip | 未自動化 (brief 起草は agent 側 process)、 brief PR の reviewer comment で catch | n/a |
+| `STATUS.md 次の発行順序` 更新先送り | implemented: `tests/discipline/test_status_md_next_queue_no_completed.py` | queue heading / primary bullet に `完走` / `landed` marker が残っていれば fail |
+| `STATUS.md ## Phase` duplicate paragraph | implemented: `tests/discipline/test_status_md_phase_single_paragraph.py` | `## Phase` section の paragraph count が 1 でなければ fail |
+| `_index.md` essay cell 化 | implemented: `tests/discipline/test_index_md_entry_compactness.py` | table cell が 500 chars を超えれば fail |
+| schema-grep check | future hardening | producer 出力 shape grep 後に validator / catalog mirror を固定 |
+| dogfood single-case | future hardening | dogfood fixture が fail case + pass case の両方を含むかの constraint |
+| round-count-to-encoding check | future hardening | review 5+ round の曖昧 spec が docs/test に encode されたかを検査 |
 
-**Acceptance**: 3-4 件の anti-pattern が test 化、 該当 `AGENTS.md §5`
-entry を **「`tests/discipline/test_X.py` で enforce 済」** の 1 行に圧縮
-可能。
+**Acceptance**: 部分完走 (3 implemented + 2 new rule)。 残 3 candidate
+(schema-grep / dual-case dogfood / round-count) は Phase 6 v2 の future
+hardening として保持。
 
 ### Phase 7: **Memory wrap-up protocol の更新** (CLAUDE.md edit、 半日)
 

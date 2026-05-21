@@ -279,19 +279,18 @@ with `constraint_id` as the within-code tiebreak so output is byte-identical
 across runs. Advisory presence does not change the exit code — see
 `docs/exit_codes.md`.
 
-## Target-Catalog Reference Envelope (Brief 8 / CSCI-44, planned)
+## Target-Catalog Reference Envelope (Brief 8 / CSCI-44)
 
-`semantic-ci target-catalog --format json` will use an independent Brief 8
+`semantic-ci target-catalog --format json` uses an independent Brief 8
 envelope listing every registered target / operator / template / match
-schema. The full shape is fixed in `docs/brief_8_planning.md §6.4` and pinned
-by `src/semantic_ci_code/schemas/target_catalog.schema.json` when CSCI-44
-lands.
+schema. The full shape is pinned by
+`src/semantic_ci_code/schemas/target_catalog.schema.json`.
 
 ```jsonc
 {
   "schema_version": "catalog-1",
   "subcommand": "target-catalog",
-  "primary_kinds": ["feature", "bugfix", "refactor", "test_update"],
+  "primary_kinds": ["bugfix", "feature", "refactor", "test_update"],
   "targets": {},
   "templates": {},
   "operators": {}
@@ -300,7 +299,8 @@ lands.
 
 The catalog content is required to stay byte-identical to the runtime
 registries (INV-5 catalog ↔ implementation parity, see
-`docs/brief_8_planning.md §5.2`).
+`docs/brief_8_planning.md §5.2`). `--kind` narrows only the `templates`
+section, and `--target-path` narrows only the `targets` section.
 
 ## Compatibility Policy
 
@@ -344,7 +344,7 @@ bump the envelope version.
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 | `2` | validate-plan | Brief D3: added `risk_summary.authoring_errors` as a sibling list (positioned first). Adapter rendering surfaces a two-step "fix authoring first, then implement" instruction. |
 | `advisory-1` | target-doctor | Brief 8 / CSCI-43: initial advisory envelope. Independent schema; not tied to verdict / compile / compile-repair / validate-plan versions. |
-| `catalog-1` | target-catalog | Brief 8 / CSCI-44 (planned): initial catalog envelope. Independent schema; mirrors runtime registries via INV-5 parity. |
+| `catalog-1` | target-catalog | Brief 8 / CSCI-44: initial catalog envelope. Independent schema; mirrors runtime registries via INV-5 parity. |
 
 ## v2 to v3 Diff
 

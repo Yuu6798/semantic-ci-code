@@ -10,6 +10,7 @@ invariants.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -1174,6 +1175,222 @@ def _git(repo: Path, *args: str) -> None:
     )
 
 
+def _git_head(repo: Path) -> str:
+    return subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def test_package_root_resolves_repo_relative_from_subdirectory(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    (repo / "src").mkdir()
+    (repo / "src" / "mod.py").write_text("def foo(): return 1\n", encoding="utf-8")
+    subdir = repo / "subdir"
+    subdir.mkdir()
+    target = _write_target(repo / "target.yaml", _TARGET_TEST_SURFACE)
+
+    root_result = run_semantic_ci(
+        repo,
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        "src",
+        "--format",
+        "json",
+    )
+    subdir_result = run_semantic_ci(
+        subdir,
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        "src",
+        "--format",
+        "json",
+    )
+
+    assert root_result.returncode == 0, root_result.stderr
+    assert subdir_result.returncode == 0, subdir_result.stderr
+    assert parse_json(root_result.stdout) == parse_json(subdir_result.stdout)
+    assert "ADVISORY-D1" in [a["code"] for a in parse_json(subdir_result.stdout)["advisories"]]
+
+
+def test_package_root_dot_resolves_to_repo_root_from_subdirectory(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_mod.py").write_text("def test_foo(): assert True\n", encoding="utf-8")
+    subdir = repo / "subdir"
+    subdir.mkdir()
+    target = _write_target(repo / "target.yaml", _TARGET_TEST_SURFACE)
+
+    result = run_semantic_ci(
+        subdir,
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        ".",
+        "--format",
+        "json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "ADVISORY-D1" not in [a["code"] for a in parse_json(result.stdout)["advisories"]]
+
+
+def test_d4_package_root_filter_matches_from_repo_root_and_subdirectory(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "src").mkdir()
+    (repo / "src" / "in_scope.py").write_text("def foo(): return 1\n", encoding="utf-8")
+    (repo / "README.md").write_text("baseline\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = _git_head(repo)
+    _git(repo, "checkout", "-b", "feature")
+    (repo / "README.md").write_text("updated docs\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "docs change")
+    target = _write_target(
+        repo / "target.yaml",
+        "intent: refactor\nchange:\n  primary_kind: refactor\nconstraints: []\n",
+    )
+    subdir = repo / "subdir"
+    subdir.mkdir()
+
+    args = (
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        "src",
+        "--baseline-rev",
+        baseline_sha,
+        "--candidate-rev",
+        "HEAD",
+        "--format",
+        "json",
+    )
+    root_result = run_semantic_ci(repo, *args)
+    subdir_result = run_semantic_ci(subdir, *args)
+
+    assert root_result.returncode == 0, root_result.stderr
+    assert subdir_result.returncode == 0, subdir_result.stderr
+    root_d4 = next(
+        a for a in parse_json(root_result.stdout)["advisories"] if a["code"] == "ADVISORY-D4"
+    )
+    subdir_d4 = next(
+        a for a in parse_json(subdir_result.stdout)["advisories"] if a["code"] == "ADVISORY-D4"
+    )
+    assert (
+        root_d4["evidence"]["files_touched_count"] == subdir_d4["evidence"]["files_touched_count"]
+    )
+    assert root_d4["evidence"]["sample_files"] == subdir_d4["evidence"]["sample_files"]
+
+
+def test_package_root_rejects_absolute_path(tmp_path: Path):
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints: []\n",
+    )
+
+    result = run_semantic_ci(
+        tmp_path,
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        str(tmp_path),
+    )
+
+    assert result.returncode == 2
+    assert "--package-root must be relative for target-doctor" in result.stderr
+
+
+def test_package_root_rejects_parent_escape(tmp_path: Path):
+    target = _write_target(
+        tmp_path / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints: []\n",
+    )
+
+    result = run_semantic_ci(
+        tmp_path,
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        "../../etc",
+    )
+
+    assert result.returncode == 2
+    assert "--package-root must stay within repo for target-doctor" in result.stderr
+
+
+def test_package_root_falls_back_to_cwd_when_git_unavailable(tmp_path: Path, monkeypatch):
+    from semantic_ci_code.cli.commands import target_doctor
+
+    monkeypatch.setattr(target_doctor, "is_git_available", lambda: False)
+    (tmp_path / "src" / "tests").mkdir(parents=True)
+    (tmp_path / "src" / "tests" / "test_mod.py").write_text(
+        "def test_foo(): assert True\n", encoding="utf-8"
+    )
+    target = _write_target(tmp_path / "target.yaml", _TARGET_TEST_SURFACE)
+
+    result = run_semantic_ci(
+        tmp_path,
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        "src",
+        "--format",
+        "json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "ADVISORY-D1" not in [a["code"] for a in parse_json(result.stdout)["advisories"]]
+
+
+def test_package_root_rejects_symlink_escape(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = repo / "linked"
+    try:
+        os.symlink(outside, link, target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink unavailable on this platform: {exc}")
+    target = _write_target(
+        repo / "target.yaml",
+        "intent: feature\nchange:\n  primary_kind: feature\nconstraints: []\n",
+    )
+
+    result = run_semantic_ci(
+        repo,
+        "target-doctor",
+        "--target",
+        str(target),
+        "--package-root",
+        "linked",
+    )
+
+    assert result.returncode == 2
+    assert "--package-root escapes repo root via symlink" in result.stderr
+
+
 def test_d4_cli_integration_with_git(tmp_path: Path):
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -1304,7 +1521,7 @@ def test_d4_cli_fires_when_python_diff_is_outside_package_root(tmp_path: Path):
         "--target",
         str(repo / "target.yaml"),
         "--package-root",
-        str(repo / "src"),
+        "src",
         "--baseline-rev",
         baseline_sha,
         "--candidate-rev",

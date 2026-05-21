@@ -75,7 +75,37 @@ def run_target_doctor(args: Namespace) -> int:
 
 
 def _resolve_package_root(raw: str | None) -> Path:
-    candidate = Path(raw or ".").resolve()
+    raw_path = Path(raw or ".")
+    if raw_path.is_absolute() or raw_path.drive:
+        raise TargetDoctorUsageError(
+            f"--package-root must be relative for target-doctor: {raw_path}"
+        )
+
+    parts: list[str] = []
+    for part in raw_path.parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if not parts:
+                raise TargetDoctorUsageError(
+                    f"--package-root must stay within repo for target-doctor: {raw_path}"
+                )
+            parts.pop()
+            continue
+        parts.append(part)
+    normalized = Path(*parts) if parts else Path(".")
+
+    base = Path.cwd()
+    if is_git_available():
+        try:
+            base = repo_root(Path.cwd())
+        except GitError:
+            base = Path.cwd()
+
+    resolved_base = base.resolve()
+    candidate = (resolved_base / normalized).resolve()
+    if not candidate.is_relative_to(resolved_base):
+        raise TargetDoctorUsageError(f"--package-root escapes repo root via symlink: {candidate}")
     if not candidate.exists():
         raise TargetDoctorUsageError(f"--package-root does not exist: {candidate}")
     if not candidate.is_dir():

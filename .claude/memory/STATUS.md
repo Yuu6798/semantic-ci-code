@@ -312,8 +312,9 @@ docs only の CSCI-41 (Session 2) を実装に展開し、 6 advisory (D1/D3/D4/
   - R16: D4 numstat が repo 全体を走査して package-root 外を含む → 11b7893 で
     numstat を `--package-root` slice に restrict
   - R17 (post-merge): `--package-root .` resolve が cwd vs `check` の
-    repo-root で divergence → **deferred follow-up** (subdirectory 起動時のみ
-    表面化、 critical でない UX consistency 改善、 別 PR 候補)
+    repo-root で divergence → **完走 (R17 / PR #87)**。 `target-doctor` の
+    `--package-root` を repo-root relative に揃え、 symlink escape guard も
+    `check` / `pre-commit` / `validate-plan` と対称化
   - CI: 3.11 / 3.12 / 3.13 全 green、 **pytest 1072 passed** (+66 new test
     = 53 CLI doctor + 7 architecture + 6 D4 git integration)、 ruff check /
     ruff format ✅
@@ -664,9 +665,10 @@ D3 (PR #79) すべて main landed。 詳細は本ファイル 直近 merged §
   - **ADVISORY-S1 narrow**: **完走 (2026-05-15 commit `854a528`)**、
     `hazards.py:264-298` で post-D1-4 scope 反映済 (§A ResultStatus split
     follow-up 参照)
-  - **R17 deferred**: target-doctor の `--package-root` resolve を `check` と
-    同じ repo-relative に揃える consistency 改善 (subdirectory 起動時のみ
-    表面化、 critical でない UX 改善)
+  - **R17**: **完走 (PR #87)**。 target-doctor の `--package-root` resolve を
+    `check` と同じ repo-relative に揃え、 subdirectory cwd からの
+    `--package-root src` / `--package-root .` の divergence を解消。 symlink
+    escape guard も `check` / `pre-commit` / `validate-plan` と対称化
 - **B-3. CSCI-42. `semantic-ci init --recipe --from-*`**: **完走 (2026-05-15
   Session 4、 PR #84)**。 4 recipe (`feature:add-api` /
   `bugfix:regression-test` / `refactor:preserve-api-with-allowlist` /
@@ -731,9 +733,6 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
   entry。 起草時は `docs/brief_7_planning.md §11` checklist + AGENTS.md
   `Forward Design Note: Brief 7 / SSP v0.1` を逐語参照。 Brief 8 は
   CSCI-44 / PR #86 で完走済みのため、 B-4 待ちは存在しない
-- **R17 deferred**: target-doctor の `--package-root` resolve を `check` と
-  同じ repo-relative に揃える consistency 改善。 subdirectory 起動時のみ
-  表面化、 critical でない UX 改善
 
 ## Frozen / Deferred
 

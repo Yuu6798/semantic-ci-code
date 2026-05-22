@@ -319,7 +319,12 @@ Compares git refs using temporary detached worktrees. Defaults are:
 
 `--package-root` is repo-relative and is resolved inside each materialized tree.
 Without `--allow-dirty`, a dirty working tree emits a warning and still checks
-the `HEAD` commit. With `--allow-dirty`, the working tree is used as candidate.
+the `HEAD` commit. With `--allow-dirty`, the working tree is used as candidate
+**only when `--candidate-rev` is not given (i.e., candidate defaults to
+`HEAD`)**. If `--candidate-rev <ref>` is explicit, the named ref is always
+materialized into a temporary worktree and used as candidate; `--allow-dirty`
+in that combination is ignored (with a stderr warning) so an explicit candidate
+ref is never silently overridden by the host's working tree.
 
 `check` caches ref-backed `CodeState` extraction under
 `<repo>/.semantic-ci/cache/code_state/` by default. The cache key includes the

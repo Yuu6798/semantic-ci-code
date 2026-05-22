@@ -72,7 +72,13 @@ def run_check(args: Namespace) -> int:
             repo_root=root,
             no_fetch=args.no_fetch,
         )
+        candidate_rev_explicit = args.candidate_rev is not None
         candidate_ref = resolve_candidate(args.candidate_rev)
+        # `--allow-dirty` opts into "use working tree as candidate". When the
+        # user also passes an explicit `--candidate-rev`, that explicit ref
+        # MUST win: silently substituting the working tree would violate the
+        # CLI's input-provenance contract (see issue #97).
+        candidate_uses_working_tree = args.allow_dirty and not candidate_rev_explicit
         package_root = _package_root_relative(args.package_root)
         mode = resolve_execution_mode(args.mode)
         dimensions = dimensions_for_mode(mode)
@@ -86,6 +92,12 @@ def run_check(args: Namespace) -> int:
 
         if args.verbose:
             _stderr(f"resolved baseline={baseline_ref} candidate={candidate_ref}")
+        if args.allow_dirty and candidate_rev_explicit:
+            _stderr(
+                "warning: --allow-dirty has no effect when --candidate-rev is "
+                "explicit; materializing the candidate ref instead of using "
+                "the working tree."
+            )
         if not args.allow_dirty and candidate_ref == "HEAD" and is_dirty(root):
             _stderr(
                 "working tree is dirty; using HEAD commit. "
@@ -95,7 +107,7 @@ def run_check(args: Namespace) -> int:
         with materialize_ref(root, baseline_ref, prefix="semantic-ci-baseline-") as baseline_dir:
             candidate_context = (
                 nullcontext(root)
-                if args.allow_dirty
+                if candidate_uses_working_tree
                 else materialize_ref(root, candidate_ref, prefix="semantic-ci-candidate-")
             )
             with candidate_context as candidate_dir:
@@ -142,7 +154,7 @@ def run_check(args: Namespace) -> int:
                     dimensions=dimensions,
                     dimensions_tuple=dimensions_tuple,
                     cache_root=cache_root,
-                    use_cache=use_cache and not args.allow_dirty,
+                    use_cache=use_cache and not candidate_uses_working_tree,
                     cache_stats=cache_stats,
                     cache_max_bytes=cache_max_bytes,
                     verbose=args.verbose,
@@ -151,7 +163,7 @@ def run_check(args: Namespace) -> int:
         delta = compute_code_state_delta(baseline, candidate)
         entries = (
             numstat_range(root, baseline_ref)
-            if args.allow_dirty
+            if candidate_uses_working_tree
             else numstat_range(root, baseline_ref, candidate_ref)
         )
         files_touched, loc_delta = summarize_numstat(entries)

@@ -129,10 +129,6 @@ def _run_check(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _verdict(result: subprocess.CompletedProcess[str]) -> str:
-    return json.loads(result.stdout)["verdict"]
-
-
 def _observed_for(constraint_id: str, payload: dict) -> list:
     for entry in payload["results"]:
         if entry["constraint_id"] == constraint_id:
@@ -176,9 +172,7 @@ def test_same_ref_both_sides_yields_no_violations(tmp_path: Path, allow_dirty: b
 
 
 @pytest.mark.parametrize("allow_dirty", [False, True])
-def test_explicit_candidate_rev_not_overridden_by_working_tree(
-    tmp_path: Path, allow_dirty: bool
-):
+def test_explicit_candidate_rev_not_overridden_by_working_tree(tmp_path: Path, allow_dirty: bool):
     """inv-2: explicit --candidate-rev wins over the working tree.
 
     With or without --allow-dirty, the verdict must depend only on the
@@ -217,7 +211,4 @@ def test_explicit_candidate_rev_not_overridden_by_working_tree(
     ]
     assert leaked_targets == [], leaked_targets
     if allow_dirty:
-        assert (
-            "--allow-dirty has no effect when --candidate-rev is explicit"
-            in result.stderr
-        )
+        assert "--allow-dirty has no effect when --candidate-rev is explicit" in result.stderr

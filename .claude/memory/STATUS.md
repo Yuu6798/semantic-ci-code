@@ -25,8 +25,12 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 ## Phase
 
 P2.5 完走 + ABCD-A 完走 + ABCD-B 完走 + 緊急 doc refactor 8 phase 完走
-+ UGH ecosystem framing 確立 + Phase X-1 landed + X-5 PR #96 open
-(2026-05-21) — 本リポジトリは **[UGH
++ UGH ecosystem framing 確立 + Phase X-1 landed + X-5 PR #96 open +
+**Issue #97 (`--allow-dirty` provenance bug) Phase 1 mitigation landed
+(PR #98, merge `bf4af3b`) + Source-selection redesign 正式採用 (PR #99
+= `docs/source_selection_planning.md` 406 lines, 3 phase × 7 lock-in,
+aggressive style, Phase 2 → 3a → 3b strict order)** (2026-05-22) —
+本リポジトリは **[UGH
 ecosystem](https://github.com/Yuu6798/ugh-ecosystem) の code domain**
 として位置づけが explicit 化された (`CLAUDE.md ## Ecosystem Context`
 section、 X-5 = PR #96 で追加、 wrap-up 時点で open、 user merge
@@ -63,7 +67,7 @@ authoring error)、 (b) runtime `unknown_cause` 4 値、 (c)
 `target-doctor` の 6 advisory (D1/D3/D4/P1/P2/S1) で end-to-end 診断
 可能。 起動時 Tier A attention budget は main 上で **~580 lines**
 (X-5 = PR #96 merge 後は +24 で ~604 lines 想定、 target ≤ 800
-クリア継続、 doc refactor 前 ~2,500 lines から -77%)、 memory
+クリア継続、 doc refactor 前 ~2,500 lines から -76% 〜 -77% 帯)、 memory
 hygiene drift は `tests/discipline/` 3 test が
 CI で auto-enforce (`test_status_md_phase_single_paragraph.py` /
 `test_status_md_next_queue_no_completed.py` /
@@ -73,13 +77,107 @@ CI で auto-enforce (`test_status_md_phase_single_paragraph.py` /
 closure)。 archive infrastructure
 (`.claude/memory/archive/INDEX.md` + `STATUS_MERGED_LOG.md`) +
 30 日 TTL の dated log 移送 ritual が wrap-up protocol に組込済。
-Next normal implementation queue: Brief 7 / SSP v0.1 (CSCI-36 entry)
-+ Phase X-3 (cross-ref embedding in 残 3 ecosystem repo、 別 Claude
-Code session 委譲) を 並行 thread として走らせる、 中長期 Phase X-2
-(HA-style validation cross-domain 移植) は ecosystem 統合の core
-work として queue 末尾に常駐。
+Next normal implementation queue: **F (source-selection redesign Phase
+2 → 3a → 3b、 PR #99 lock-in に従い 3 PR 順次、 strict order)** +
+Brief 7 / SSP v0.1 (CSCI-36 entry) + Phase X-3 (cross-ref embedding in
+残 3 ecosystem repo、 別 Claude Code session 委譲) を 並行 thread と
+して走らせる、 中長期 Phase X-2 (HA-style validation cross-domain 移植)
+は ecosystem 統合の core work として queue 末尾に常駐。
 
 ## 直近 merged
+
+### 2026-05-22 — Issue #97 (`--allow-dirty` provenance bug) Phase 1 mitigation landed (PR #98) + Source-selection redesign 正式採用 (PR #99)
+
+`langchain-ai/langchain` への blind random sampling で発覚した
+`semantic-ci check --candidate-rev <SHA> --allow-dirty` の provenance
+bug を 1 day で closure し、 同 session 内で design hole を planning doc
+に encode して正式採用までを 2 PR cascade で land。 `claude/repository-issue-review-BVt9Y`
+branch を 2 PR で連続 reuse。
+
+- **PR #98** (merged `bf4af3b`、 0 round):
+  `fix(check): preserve explicit --candidate-rev under --allow-dirty (#97)`
+  - `check.py` に `candidate_uses_working_tree = allow_dirty AND
+    candidate_rev is None` derived predicate、 explicit `--candidate-rev`
+    + `--allow-dirty` 同時指定で warning + ref materialize に変更
+  - 2 副次 call site (cache write 抑制 / numstat range) を derived
+    predicate 経由に rewire
+  - `tests/architecture/test_check_provenance.py` 新設 = §23.1 CLI-layer
+    mirror、 inv-1 (A==B → empty observed) / inv-2 (working-tree-only
+    symbols が evidence に漏れない) を `allow_dirty ∈ {False, True}` で
+    parametrize、 計 4 invariant
+  - `tests/cli/test_check.py` に 2 new integration test (warning fires /
+    bare `--allow-dirty` unchanged)
+  - `docs/cli_usage.md` で `--allow-dirty` × `--candidate-rev` の interaction
+    semantics を pin
+  - CI 3/3 green (3.11 / 3.12 / 3.13)、 1284 passed (baseline 1281 + new 3)、
+    ruff clean
+  - PR body で "A deeper fix is deferred to a Phase 2 Task Brief" と明示
+    宣言、 後続 PR #99 の前提を pin
+- **PR #99** (open at session wrap-up、 docs only):
+  `docs(planning): adopt source-selection redesign (Phase 2 / 3a / 3b)`
+  - `docs/source_selection_planning.md` 新設 (406 lines、 12 section)
+  - 7 sub-question を `§3` lock-in 表で encode、 全 sub-decision
+    aggressive / clean-cut style から derive (no alias / no deprecation /
+    hard delete)
+  - 3 PR 構成: Phase 2 (`--candidate-source {commit, working-tree}` +
+    `--allow-dirty` 削除 + JSON envelope provenance) / Phase 3a (対称
+    `--baseline-source` + `staged-index` 追加 + 4 conflict rule pin +
+    degenerate warning + source × source matrix docs) / Phase 3b
+    (`pre-commit` subcommand 削除 + `.pre-commit-hooks.yaml` rewrite)
+  - `§7 Decisions rejected / not adopted` で 4 rejected options を rationale
+    付き永続化 (Phase 2.5 / `--allow-dirty` alias / `--candidate-source=auto`
+    / engine-level source enum)
+  - `§8 Phase ordering` で strict order を pin (Phase 3a は Phase 2 が
+    main にあるまで開始不可、 Phase 3b は Phase 3a が main にあるまで
+    開始不可、 published hook break 回避)
+  - `§9 Required Reading` で Phase 2 brief drafter の必読 7 件を列挙
+  - `§11` Phase 3b PR cross-phase acceptance criteria (grep clean /
+    migration note / schema_version 維持 / `§23.1` doc 明示) を pin
+  - `CLAUDE.md` Design Documents table に planning doc 行追加
+
+**設計判断のハイライト**:
+
+1. **「Phase 1 mitigation を land + 同 session 内で Phase 2+ redesign
+   を planning doc に encode」 ritual**: PR #98 body の "deferred"
+   宣言を session 内で消化、 context cohesion が高い間に rejected
+   options の rationale を precise に pin。 別 session で planning
+   doc を起こすより rejected options が遺漏しにくい
+2. **7 sub-question を 4-style trade-off comparison で 1 turn 確定**:
+   conservative / additive / symmetry-first / aggressive の 4 style
+   提示 → 各 style における 7 sub-decision の derived position を
+   表で展開 → user 1 turn 判断で X = aggressive 確定。 AGENTS.md
+   §5.7 「AskUserQuestion N 択 trade-off 提示」 pattern を style 軸
+   に応用、 個別問い 7 個を 1 メタ問いに圧縮
+3. **`§7 Rejected options` を planning doc に **永続化する new pattern**:
+   通常の planning doc は採用案 + 採用理由を書くが、 「却下案 + 却下
+   理由」 を 4 件明示 pin することで future agent が同 trap を踏まない。
+   §5.3 Three-Tier Externalization codified tier に「rejected options」
+   を加える pattern
+4. **`§23.1 input neutrality` を CLI redesign で reinforce**: engine
+   signature `engine.check_pair(baseline_path, candidate_path, intent)`
+   不変、 sourcing は CLI-layer 単独責務、 planning doc §4.4 で
+   `code_semantic_ci_design.md §23.1` text に「engine は path-snapshot
+   しか見ない」 を明示追記する task を Phase 2 brief に組み込み。
+   半年規律の延長線上に 3 phase redesign を pin
+5. **「aggressive / clean-cut」 style が repo culture と整合**: scope
+   guard / §23.1 / 経験値外部化 / Tier A budget compaction、 いずれも
+   「shim を増やさず削除すべきものは削除する」 規律。 PR #98 が recent
+   enough で external caller pin が無いことを hard delete 採用の論拠
+   として明示
+
+**修正・訂正**:
+
+1. **当初 4 phase 案 (Phase 2 / 2.5 / 3a / 3b) を Phase 3 に統合**:
+   `--baseline-source` 単独追加 phase は同一 user-facing API axis を
+   2 PR に分割するコストが merit を上回ると分析、 Phase 3a に統合
+2. **JSON provenance を Phase 3a に defer する案を 当初提示**:
+   X = aggressive 採用により「Phase 2 で envelope の 2 値 enum を
+   land しないと Phase 1 mitigation の warning が残るだけになる」 と
+   再考、 Phase 2 に前倒し
+3. **PR title `(#97)` suffix**: GitHub squash merge 時の自動補完で
+   issue # が PR title に紛れた、 worth noting だが behavior 上の
+   問題なし。 今後 PR title に issue # を含めるかは convention 議論
+   として保留
 
 ### 2026-05-21 Session 5 — UGH ecosystem framing 確立 + umbrella repo (`Yuu6798/ugh-ecosystem`) 新設 + semantic-ci-code に Ecosystem Context 追記 (Phase X-1 / X-5 landed)
 
@@ -331,104 +429,31 @@ runtime registries (`path_schema`, `type_schema`, `match_schema`,
 next queue returns to Brief 7 / SSP v0.1 unless a smaller follow-up is
 explicitly chosen.
 
-### 2026-05-19 — Brief 8 canonical-form refactor (PR #85) landed
-
-CSCI-42 PR #84 持ち越しの canonical-form refactor を 1 PR で消化。
-Codex 不在 2 連続 session のため AskUserQuestion 4 択 (A 別 Claude 委譲 /
-B 私が CSCI-44 実装 / C-1 canonical refactor / C-2 A 軸 follow-up) で
-user 「C-1」 確定 = 例外運用 2 連続を避ける + canonical が CSCI-44
-catalog builder の前提を整える依存関係。
-
-- **PR #85** (`refactor(brief-8): consolidate canonical-form validators in
-  authoring/canonical.py`、 merge `7908faf` → main):
-  - 新設: `src/semantic_ci_code/authoring/canonical.py` (3 public helper
-    `is_canonical_fqn` / `is_canonical_fqn_prefix` / `is_canonical_test_id` +
-    producer-side spec module docstring) + `tests/authoring/test_canonical.py`
-    (48 parametrize cases、 CSCI-42 review trail で表面化した near-miss shape
-    群を直接 encode = `Class::method` 受理 / `pkg..` reject / non-POSIX path /
-    `[param]` bracket / non-`test_` prefix / over-qualified node ID 等)
-  - 更新: `authoring/sources/pr_body.py` (`_is_fqn` / `_is_test_id` 削除 +
-    canonical 経由 import、 -29 lines) + `cli/init_command.py` (3 validator
-    を canonical 経由化 + `_validate_fqn_prefix_values` inline 判定 extract、
-    -19 lines)
-  - **dogfood** = `init --recipe refactor:preserve-api-with-allowlist` を
-    2 ケース実走: (a) allowlist 無し → E_VIOLATION + 3 added public symbols
-    期待通り、 (b) `--allow-fqn-prefix authoring.canonical.` 付与 →
-    verdict=pass 4/4 satisfied = §23.1 自己検証成立
-  - **CI 3/3 green (3.11 / 3.12 / 3.13)、 0 review round で clean merge**
-    (5/15 Session 4 の 13 round と対極、 brief 起草前の §15.1 Schema
-    grounding 実走 + producer 出力 shape contract test 化が効いた)
-  - 1238 passed (1190 baseline + 48 new、 0 regression)、 ruff check / format
-    両 pass
-
-**設計判断のハイライト**:
-
-1. **AskUserQuestion 4 択で trade-off 軸を明示** — 「規模 × 例外運用 ×
-   依存関係」 軸で 4 択化、 user 判断 1 ターンで C-1 確定。 5/15 Session 4
-   で確立した「trade-off 軸 N 択提示」 pattern を継承
-2. **canonical module 置き場所 = `authoring/` package 直下に公開化** —
-   旧 `authoring/sources/pr_body.py` の private `_is_fqn` / `_is_test_id`
-   が `cli/init_command.py` から underscored 名で import されていた smell
-   を解消。 producer-side spec (api-surface extractor / evaluator allowlist
-   startswith / `code_state_delta._test_case_id`) を module docstring に
-   逐語 pin、 producer 各所への doc 参照を 1 module に集約
-3. **3 helper 揃えで producer spec 単一 source of truth contract 成立** —
-   STATUS.md 持ち越し記述通り `is_canonical_fqn` / `is_canonical_fqn_prefix` /
-   `is_canonical_test_id` の 3 helper、 prefix variant も `init_command.py`
-   inline から canonical に extract
-4. **architecture invariant の prefix match が新 module を自動 cover** —
-   `AUTHORING_FORBIDDEN_FOR_VERDICT_PATH = ("semantic_ci_code.authoring",
-   ...)` の `module.startswith(banned + ".")` で `authoring.canonical` も
-   追加 enumeration なしで INV-2 / INV-4 が cover、 architecture test 先行の
-   pattern が本 PR でも効いた
-5. **CSCI-42 13 round の教訓を test 化** — CSCI-42 review trail で表面化
-   した near-miss shape 群 (12 種類) を `test_canonical.py` 48 parametrize
-   cases に直接 encode。 producer 出力 shape を再 grep して contract 明示化
-   (CSCI-43/42 教訓 #4 「producer 出力 shape を grep してから validator」)
-6. **dogfood で fail / pass 両方を実演** — allowlist 無し fail + allowlist
-   有り pass を **両方** 見せる pattern は CI integrity test の最小単位、
-   single case dogfood は no-op gate (D5 FINDING-1 と同 trap) を検出できない
-
-**修正・訂正**:
-
-1. **uv tool venv 内 dev deps 不足** — `pytest` が `/root/.local/share/uv/
-   tools/pytest/bin/python` 隔離 venv にあり `pip install pydantic` が
-   見えない → `uv tool install --reinstall --with pydantic --with pyyaml
-   --with jsonschema --with pip-audit --with pytest-cov --with ruff pytest`
-   で venv 内に dev deps 全部入れ直し
-2. **CI 環境の `commit.gpgsign true` で test commit が remote signing
-   400 fail** — global config 変更は CLAUDE.md `NEVER update the git
-   config` 違反、 project helper 改変は scope creep。 `GIT_CONFIG_COUNT=1
-   GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false pytest -q` で
-   per-invocation override に narrow
-3. **`test_schemas_roundtrip.py::test_json_schema_drift_check_passes`
-   pre-existing fail** — subprocess PYTHONPATH 起因、 `git stash` で
-   refactor 退避して再走 → 同 fail 確認 = 環境起因、 refactor 無関係を
-   commit message に明記
-
 ---
 
-### 古い merged entry (5/15 Session 4 以前) — archive 参照
+### 古い merged entry (2026-05-19 以前) — archive 参照
 
-12 entry (2026-05-15 Session 4 + Session 3 + Session 2 / 2026-05-14-15
-ResultStatus split / 2026-05-12 / 2026-05-09 / 2026-05-08 S1+S2 /
-2026-05-07 S1+S4+S5 / 2026-05-05) は
+13 entry (2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
+2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
+2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
 `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
 当該 archive file + 該当 dated session log
 (`.claude/memory/YYYY-MM-DD.md`) を参照。 Phase 1 (initial cutoff、
 `docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
-+ 2026-05-21 S5 wrap-up (5/15 S4 移送) で compaction が実施された。
++ 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
+で compaction が実施された。
 
 ## 次の発行順序
 
 ABCD-A (ResultStatus split) + ABCD-B (Brief 8 / CSCI-41〜44 + canonical
 refactor) 完走済 + UGH ecosystem framing 確立 (2026-05-21 Session 5) +
-Phase X-1 (umbrella repo `Yuu6798/ugh-ecosystem`) / X-5 (本 repo
-CLAUDE.md ecosystem context) landed。 active queue は **C (Brief 7
-SSP) + D (P2 残課題) + E (Phase X: UGH ecosystem formalization 残)**
-の 3 軸。 ABCD 完走で product 機能の ship-blocking gap が消え
-(`2026-05-12.md` 参照)、 Phase X で ecosystem-level の formalization
-(cross-ref / docs / validation 移植) を進める。
+Phase X-1 / X-5 landed + **Issue #97 Phase 1 mitigation landed
+(PR #98) + Source-selection redesign 採用 (PR #99 = `docs/source_selection_planning.md`)** (2026-05-22)。
+active queue は **C (Brief 7 SSP) + D (P2 残課題) + E (Phase X 残) +
+F (source-selection redesign Phase 2 → 3a → 3b)** の 4 軸。 ABCD 完走
+で product 機能の ship-blocking gap が消え (`2026-05-12.md` 参照)、
+Phase X で ecosystem-level formalization、 F で CLI source-selection
+hole の構造的閉鎖を進める。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
@@ -493,6 +518,40 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
   計算する experiment plan を起草する。 完走 criteria は「各 domain で
   N≥48 の external validation 蓄積」、 期間は数週間〜数ヶ月
 
+### F. Source-selection redesign(planning merged 2026-05-22 PR #99、 implementation 3 PR、 strict order)
+
+`docs/source_selection_planning.md` (X = aggressive / clean-cut style、
+7 sub-decision lock-in)。 順序: Phase 2 → 3a → 3b、 **strict order**
+(Phase 3a は Phase 2 が main にあるまで開始不可、 Phase 3b は Phase 3a
+が main にあるまで開始不可、 published `.pre-commit-hooks.yaml` break
+回避)。
+
+- **F-1. Phase 2. `--candidate-source` + `--allow-dirty` 削除 + JSON
+  provenance**(~120 LOC + ~30 LOC envelope + ~40 doc + 5 test): `check`
+  に `--candidate-source {commit, working-tree}` 追加 (default `commit`)、
+  `--allow-dirty` を hard delete、 envelope に
+  `engine.{baseline,candidate}.{source,rev}` 追加 + `schema_version`
+  minor bump、 conflict (`working-tree` + explicit `--candidate-rev`) は
+  usage error exit 2。 起草時 `docs/source_selection_planning.md §9
+  Required Reading` 7 件遵守 + `§3` lock-in + `§4` Phase 2 scope を逐語
+  引用、 §7 rejected options 4 件を self-check
+- **F-2. Phase 3a. 対称 `--baseline-source` + `staged-index`**(~150 LOC +
+  ~60 doc + 10 test): `--baseline-source {commit, working-tree, staged-index}`
+  追加、 `--candidate-source` enum に `staged-index` 追加、 4 conflict
+  permutation 全 usage error exit 2、 degenerate (両側同 volatile source) は
+  warning + verdict 続行、 default rev pin (`staged-index` 候補 → baseline
+  default = HEAD commit)、 `cli_usage.md` に source × source matrix、
+  `code_semantic_ci_design.md §23.2` Application Matrix refresh。 起草は
+  Phase 2 が main 上にあるまで保留
+- **F-3. Phase 3b. `pre-commit` subcommand 削除 + migration**(~50 LOC
+  mostly deletions + ~30 doc + 2 test): `pre-commit` subcommand 削除、
+  `.pre-commit-hooks.yaml` を `check --candidate-source=staged-index` に
+  rewrite、 README / `cli_usage.md` / `exit_codes.md` / `json_schema.md` /
+  `code_semantic_ci_design.md` から `pre-commit` 言及削除 + migration note
+  追加。 Phase 3b PR で planning doc §11 cross-phase acceptance criteria
+  (grep clean / `§23.1` doc 明示 / migration note 等 8 件) を verify。
+  起草は Phase 3a が main 上にあるまで保留
+
 ### Sequencing decisions
 
 - **A (ResultStatus split) 完走**: 2026-05-14/15 で 4 PR (#76 / #77 / #78 /
@@ -508,6 +567,13 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 - **E-3 (HA-style validation 移植) の前提**: text domain (`ugh-audit-core`)
   の HA48/HA63 dataset 構造の確認、 これは brief 起草前に `validation.md`
   + `HA48_validation_results` 等を web fetch で読み込む必要
+- **F (source-selection redesign) は C/D/E と独立**: いつ挟んでも良い、
+  ただし F-1 → F-2 → F-3 の strict order は厳守 (planning doc §8)。
+  `pre-commit` subcommand を使う external user が main を track している
+  場合 Phase 3b 単独 land で hook が break するため Phase 3a 必須先行
+- **F の規模**: 全 3 PR 合計で ~320 LOC + ~130 doc + 17 test、 1 PR 平均
+  ~100 LOC で経験値外部化 envelope (AGENTS.md §5.2) 上 1 day 完走可能枠
+  内、 split / Claude alone どちらでも妥当
 
 ### 直近最短経路
 
@@ -515,25 +581,34 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
   AC 8 件全 check で「Ecosystem Context section が code domain
   framing を明示」 した状態。 user review 後 merge することで Phase X-5
   が完走)
+- **PR #99 review / merge** (2026-05-22 wrap-up 時点 open、 docs only
+  ~406 lines、 lock-in style 承認が acceptance core。 merge することで
+  Phase F = source-selection redesign が正式採用 = Phase 2 brief 起草の
+  starting gun)
+- **F-1. Phase 2 Task Brief 起草** (PR #99 merge 後の最初の next normal
+  implementation entry): `docs/source_selection_planning.md §3 lock-in` +
+  `§4 Phase 2 scope` を逐語引用、 `§9 Required Reading` 7 件遵守
+  (planning doc / `§23.1` / PR #98 / `cli_usage.md` / `json_schema.md` /
+  AGENTS.md §5.6+§5.7 / brief drafting checklist)、 `§7 rejected options
+  4 件` を brief 起草中 self-check
 - **E-1. Phase X-3. Cross-ref embedding in 残 3 ecosystem repo の brief
-  設計 + 別 session 委譲** (本 session で確定した最初の next normal
-  queue entry。 PR #96 の `## Ecosystem Context` を template として再利用、
-  `STATUS.md` mandatory read source 明示で「8 subcommand」 誤記 failure
-  mode 回避)
+  設計 + 別 session 委譲** (2026-05-21 Session 5 で確定、 PR #96 の
+  `## Ecosystem Context` を template として再利用、 `STATUS.md` mandatory
+  read source 明示で「8 subcommand」 誤記 failure mode 回避)
 - **C-1. CSCI-36. Brief 7 / SSP v0.1 spec**: 規定路線 next normal
-  implementation entry。 `docs/ssp_protocol.md` v0.1 spec 新設 (docs
-  only、 500-700 行、 Claude 単独可)。 ecosystem context が CLAUDE.md
-  に landed した後の起草になるので、 brief 内で「これは UGH ecosystem
-  の code domain における security audit という second design pattern
-  拡張」 と framing し直せる。 起草時必読:
+  implementation entry (F-1 と並行発行可、 docs only / Claude 単独可)。
+  `docs/ssp_protocol.md` v0.1 spec 新設 (500-700 行)、 ecosystem context
+  landed 後の起草なので「これは UGH ecosystem の code domain における
+  security audit という second design pattern 拡張」 と framing 可能。
+  起草時必読:
   1. `AGENTS.md` Forward Design Note: Brief 7 / SSP v0.1 (canonical spec)
   2. `docs/brief_7_planning.md §11` 着手 checklist
   3. **`AGENTS.md` § 5 Experience Externalization Discipline** (2026-05-21
      Session 2 新設、 brief 起草前の必読 doc、 §5.6 Maintenance Practice
      7 rule + §5.7 Anti-Patterns 7 件を逐語適用)
   4. `.claude/memory/STATUS.md` 直近 3 entries + `_index.md` 直近 5
-     summary (Session 5 含む)
-  5. **`CLAUDE.md` `## Ecosystem Context`** (本 session で追加、 brief
+     summary
+  5. **`CLAUDE.md` `## Ecosystem Context`** (Session 5 で追加、 brief
      framing に ecosystem 視点を反映するため)
 - SSP tracking GitHub issue 起票 (Issue #48 close 後の受け皿、
   `brief_7_planning.md §11` で text template 固定済)

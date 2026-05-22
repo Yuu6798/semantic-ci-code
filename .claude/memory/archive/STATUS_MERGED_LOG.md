@@ -10,6 +10,86 @@ session wrap-up で 5 entry 超過分が同 archive に随時追記される。
 
 ---
 
+### 2026-05-19 — Brief 8 canonical-form refactor (PR #85) landed
+
+CSCI-42 PR #84 持ち越しの canonical-form refactor を 1 PR で消化。
+Codex 不在 2 連続 session のため AskUserQuestion 4 択 (A 別 Claude 委譲 /
+B 私が CSCI-44 実装 / C-1 canonical refactor / C-2 A 軸 follow-up) で
+user 「C-1」 確定 = 例外運用 2 連続を避ける + canonical が CSCI-44
+catalog builder の前提を整える依存関係。
+
+- **PR #85** (`refactor(brief-8): consolidate canonical-form validators in
+  authoring/canonical.py`、 merge `7908faf` → main):
+  - 新設: `src/semantic_ci_code/authoring/canonical.py` (3 public helper
+    `is_canonical_fqn` / `is_canonical_fqn_prefix` / `is_canonical_test_id` +
+    producer-side spec module docstring) + `tests/authoring/test_canonical.py`
+    (48 parametrize cases、 CSCI-42 review trail で表面化した near-miss shape
+    群を直接 encode = `Class::method` 受理 / `pkg..` reject / non-POSIX path /
+    `[param]` bracket / non-`test_` prefix / over-qualified node ID 等)
+  - 更新: `authoring/sources/pr_body.py` (`_is_fqn` / `_is_test_id` 削除 +
+    canonical 経由 import、 -29 lines) + `cli/init_command.py` (3 validator
+    を canonical 経由化 + `_validate_fqn_prefix_values` inline 判定 extract、
+    -19 lines)
+  - **dogfood** = `init --recipe refactor:preserve-api-with-allowlist` を
+    2 ケース実走: (a) allowlist 無し → E_VIOLATION + 3 added public symbols
+    期待通り、 (b) `--allow-fqn-prefix authoring.canonical.` 付与 →
+    verdict=pass 4/4 satisfied = §23.1 自己検証成立
+  - **CI 3/3 green (3.11 / 3.12 / 3.13)、 0 review round で clean merge**
+    (5/15 Session 4 の 13 round と対極、 brief 起草前の §15.1 Schema
+    grounding 実走 + producer 出力 shape contract test 化が効いた)
+  - 1238 passed (1190 baseline + 48 new、 0 regression)、 ruff check / format
+    両 pass
+
+**設計判断のハイライト**:
+
+1. **AskUserQuestion 4 択で trade-off 軸を明示** — 「規模 × 例外運用 ×
+   依存関係」 軸で 4 択化、 user 判断 1 ターンで C-1 確定。 5/15 Session 4
+   で確立した「trade-off 軸 N 択提示」 pattern を継承
+2. **canonical module 置き場所 = `authoring/` package 直下に公開化** —
+   旧 `authoring/sources/pr_body.py` の private `_is_fqn` / `_is_test_id`
+   が `cli/init_command.py` から underscored 名で import されていた smell
+   を解消。 producer-side spec (api-surface extractor / evaluator allowlist
+   startswith / `code_state_delta._test_case_id`) を module docstring に
+   逐語 pin、 producer 各所への doc 参照を 1 module に集約
+3. **3 helper 揃えで producer spec 単一 source of truth contract 成立** —
+   STATUS.md 持ち越し記述通り `is_canonical_fqn` / `is_canonical_fqn_prefix` /
+   `is_canonical_test_id` の 3 helper、 prefix variant も `init_command.py`
+   inline から canonical に extract
+4. **architecture invariant の prefix match が新 module を自動 cover** —
+   `AUTHORING_FORBIDDEN_FOR_VERDICT_PATH = ("semantic_ci_code.authoring",
+   ...)` の `module.startswith(banned + ".")` で `authoring.canonical` も
+   追加 enumeration なしで INV-2 / INV-4 が cover、 architecture test 先行の
+   pattern が本 PR でも効いた
+5. **CSCI-42 13 round の教訓を test 化** — CSCI-42 review trail で表面化
+   した near-miss shape 群 (12 種類) を `test_canonical.py` 48 parametrize
+   cases に直接 encode。 producer 出力 shape を再 grep して contract 明示化
+   (CSCI-43/42 教訓 #4 「producer 出力 shape を grep してから validator」)
+6. **dogfood で fail / pass 両方を実演** — allowlist 無し fail + allowlist
+   有り pass を **両方** 見せる pattern は CI integrity test の最小単位、
+   single case dogfood は no-op gate (D5 FINDING-1 と同 trap) を検出できない
+
+**修正・訂正**:
+
+1. **uv tool venv 内 dev deps 不足** — `pytest` が `/root/.local/share/uv/
+   tools/pytest/bin/python` 隔離 venv にあり `pip install pydantic` が
+   見えない → `uv tool install --reinstall --with pydantic --with pyyaml
+   --with jsonschema --with pip-audit --with pytest-cov --with ruff pytest`
+   で venv 内に dev deps 全部入れ直し
+2. **CI 環境の `commit.gpgsign true` で test commit が remote signing
+   400 fail** — global config 変更は CLAUDE.md `NEVER update the git
+   config` 違反、 project helper 改変は scope creep。 `GIT_CONFIG_COUNT=1
+   GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false pytest -q` で
+   per-invocation override に narrow
+3. **`test_schemas_roundtrip.py::test_json_schema_drift_check_passes`
+   pre-existing fail** — subprocess PYTHONPATH 起因、 `git stash` で
+   refactor 退避して再走 → 同 fail 確認 = 環境起因、 refactor 無関係を
+   commit message に明記
+
+(移送: 2026-05-22 wrap-up、 cap 5 entry 超過分 = 当時最古の 5/19 を
+本 archive に移送)
+
+---
+
 ### 2026-05-15 Session 4 — Brief 8 / CSCI-42 (`semantic-ci init --recipe --from-*` Authoring + Provenance surface) landed
 
 B 軸 (Brief 8) 実装 2 本目 = 推奨着地順 41 → 43 → **42** → 44 の 3 番目消化。

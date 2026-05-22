@@ -30,6 +30,13 @@ from pathlib import Path
 
 import pytest
 
+# `python -m semantic_ci_code.cli` resolves the package via PYTHONPATH when the
+# package was not installed (e.g. when running `pytest -q` against a fresh
+# checkout that relies on pyproject's `pythonpath = ["src"]`). pytest's
+# pythonpath setting only affects the in-process interpreter, not subprocess
+# children, so the helper below has to pass `src/` explicitly.
+SRC_ROOT = Path(__file__).resolve().parents[2] / "src"
+
 TARGET_FEATURE = """\
 intent: feature-shaped change
 change:
@@ -119,6 +126,10 @@ def _build_two_commit_repo(tmp_path: Path) -> tuple[Path, str, str]:
 def _run_check(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = "1"
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        f"{SRC_ROOT}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(SRC_ROOT)
+    )
     return subprocess.run(
         [sys.executable, "-m", "semantic_ci_code.cli", "check", *args],
         cwd=repo,

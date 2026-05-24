@@ -33,8 +33,8 @@ def resolve_format(
 def use_color(no_color_flag: bool) -> bool:
     if no_color_flag:
         return False
-    if os.environ.get("NO_COLOR"):
-        return False
     if os.environ.get("FORCE_COLOR"):
         return True
+    if os.environ.get("NO_COLOR"):
+        return False
     return sys.stdout.isatty()

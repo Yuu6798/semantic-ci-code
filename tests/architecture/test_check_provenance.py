@@ -1,225 +1,182 @@
-"""Issue #97 — `check` candidate provenance invariants.
-
-The CLI layer's mirror of engine §23.1 (input-side provenance neutrality):
-an explicit `--candidate-rev <ref>` is the declared candidate-state input,
-and no other CLI flag (including `--allow-dirty`) may silently substitute
-a different source.
-
-These tests pin two consequences of that contract:
-
-* **inv-1**: when both refs resolve to the same commit, `check` reports
-  no removed-API / no-new-effects violations, regardless of the host
-  clone's working-tree HEAD state or the `--allow-dirty` flag.
-* **inv-2**: when `--candidate-rev <SHA>` is explicit, the verdict
-  depends only on the named refs — not on the host working tree.
-  Diverging the working tree from the candidate ref must NOT change
-  the verdict, with or without `--allow-dirty`.
-
-The tests intentionally diverge the host's working tree from both
-refs so a regression that leaks working-tree content into candidate
-extraction would change the verdict.
-"""
-
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
 import sys
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-import pytest
-
-# `python -m semantic_ci_code.cli` resolves the package via PYTHONPATH when the
-# package was not installed (e.g. when running `pytest -q` against a fresh
-# checkout that relies on pyproject's `pythonpath = ["src"]`). pytest's
-# pythonpath setting only affects the in-process interpreter, not subprocess
-# children, so the helper below has to pass `src/` explicitly.
-SRC_ROOT = Path(__file__).resolve().parents[2] / "src"
-
-TARGET_FEATURE = """\
-intent: feature-shaped change
-change:
-  primary_kind: feature
-"""
-
 BASELINE_SOURCE = """\
-def public_fn() -> int:
-    return 1
+VALUE = 1
+
+
+def existing() -> int:
+    return VALUE
 """
 
 CANDIDATE_SOURCE = """\
-def public_fn() -> int:
-    return 2
+VALUE = 1
 
 
-def public_added() -> int:
-    return 3
+def existing() -> int:
+    return VALUE
+
+
+def added() -> int:
+    return VALUE + 1
 """
 
-# A working-tree state that, if it leaked into candidate extraction,
-# would inject new effects (`nonlocal` declaration, module reassignment)
-# and a removed public API.
-LEAKY_WORKING_TREE_SOURCE = """\
-import os
-
-CONST = 1
-CONST = 2
-
-def public_fn() -> int:
-    return os.getpid()
-
-def _wrapper():
-    leaked_state = 0
-    def inner():
-        nonlocal leaked_state
-        leaked_state += 1
-    return inner
+TARGET_PASS = """\
+intent: add a public API
+change:
+  primary_kind: feature
+constraints:
+  - id: added_api_present
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_any
+    expected:
+      - fqn: mod.added
+        kind: function
+        visibility: public
 """
+
+VERDICT_FIELDS: tuple[str, ...] = ("verdict", "summary", "results", "repair_plan")
+
+
+def test_inv1_default_commit_source_does_not_leak_working_tree(tmp_path: Path):
+    repo = _init_repo(tmp_path)
+    before = _run_check(repo)
+
+    _write(repo / "mod.py", BASELINE_SOURCE)
+    after = _run_check(repo)
+
+    assert _evaluator_projection(before) == _evaluator_projection(after)
+    assert after["engine"]["candidate"] == before["engine"]["candidate"]
+    assert after["engine"]["candidate"]["source"] == "commit"
+
+
+def test_inv2_explicit_candidate_rev_wins_over_working_tree(tmp_path: Path):
+    repo = _init_repo(tmp_path)
+    candidate_sha = _git(repo, "rev-parse", "HEAD")
+    _write(repo / "mod.py", BASELINE_SOURCE)
+
+    payload = _run_check(repo, "--candidate-rev", candidate_sha)
+
+    assert payload["verdict"] == "pass"
+    assert payload["engine"]["candidate"] == {
+        "source": "commit",
+        "rev": candidate_sha,
+    }
+
+
+def test_inv2b_working_tree_source_is_visible_without_candidate_rev(tmp_path: Path):
+    repo = _init_repo_without_candidate_commit(tmp_path)
+    default_commit = _run_check(repo, expected_rc=1)
+
+    _write(repo / "mod.py", CANDIDATE_SOURCE)
+    working_tree = _run_check(repo, "--candidate-source", "working-tree")
+
+    assert default_commit["verdict"] == "fail"
+    assert working_tree["verdict"] == "pass"
+    assert working_tree["engine"]["candidate"] == {
+        "source": "working-tree",
+        "rev": None,
+    }
+
+
+def _run_check(repo: Path, *extra_args: str, expected_rc: int = 0) -> dict:
+    rc, stdout = _run_semantic_ci(
+        repo,
+        "check",
+        "--mode",
+        "smoke",
+        "--no-fetch",
+        "--format",
+        "json",
+        "--no-cache",
+        *extra_args,
+    )
+    assert rc == expected_rc, stdout
+    return json.loads(stdout)
+
+
+def _run_semantic_ci(cwd: Path, *args: str) -> tuple[int, str]:
+    from semantic_ci_code.cli.main import main
+
+    saved_cwd = Path.cwd()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    try:
+        os.chdir(cwd)
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            try:
+                rc = main(list(args))
+            except SystemExit as exc:
+                rc = exc.code if isinstance(exc.code, int) else 1
+        return rc, stdout.getvalue()
+    finally:
+        os.chdir(saved_cwd)
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+
+def _init_repo(tmp_path: Path) -> Path:
+    repo = _init_repo_without_candidate_commit(tmp_path)
+    _write(repo / "mod.py", CANDIDATE_SOURCE)
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "candidate")
+    return repo
+
+
+def _init_repo_without_candidate_commit(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir(parents=True)
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "Semantic CI")
+    _git(repo, "config", "user.email", "semantic-ci@example.invalid")
+    _write(repo / "mod.py", BASELINE_SOURCE)
+    _write(repo / "target.yaml", TARGET_PASS)
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "refs/remotes/origin/main", baseline_sha)
+    _git(repo, "switch", "-c", "feature")
+    return repo
 
 
 def _git(repo: Path, *args: str) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=repo,
-        env={
-            **os.environ,
+    env = os.environ.copy()
+    env.update(
+        {
             "GIT_AUTHOR_NAME": "Semantic CI",
             "GIT_AUTHOR_EMAIL": "semantic-ci@example.invalid",
             "GIT_COMMITTER_NAME": "Semantic CI",
             "GIT_COMMITTER_EMAIL": "semantic-ci@example.invalid",
-        },
-        capture_output=True,
-        text=True,
-        check=True,
+            "GIT_AUTHOR_DATE": "2024-01-01T00:00:00+00:00",
+            "GIT_COMMITTER_DATE": "2024-01-01T00:00:00+00:00",
+        }
     )
-    return completed.stdout
-
-
-def _build_two_commit_repo(tmp_path: Path) -> tuple[Path, str, str]:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _git(repo, "init", "-q", "-b", "main")
-    _git(repo, "config", "user.name", "Semantic CI")
-    _git(repo, "config", "user.email", "semantic-ci@example.invalid")
-    _git(repo, "config", "commit.gpgsign", "false")
-    _git(repo, "config", "tag.gpgsign", "false")
-
-    pkg = repo / "pkg"
-    pkg.mkdir()
-    (pkg / "__init__.py").write_text("", encoding="utf-8")
-    (pkg / "mod.py").write_text(BASELINE_SOURCE, encoding="utf-8")
-    (repo / "target.yaml").write_text(TARGET_FEATURE, encoding="utf-8")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-q", "-m", "baseline")
-    baseline_sha = _git(repo, "rev-parse", "HEAD").strip()
-    _git(repo, "update-ref", "refs/remotes/origin/main", baseline_sha)
-
-    (pkg / "mod.py").write_text(CANDIDATE_SOURCE, encoding="utf-8")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-q", "-m", "candidate")
-    candidate_sha = _git(repo, "rev-parse", "HEAD").strip()
-
-    return repo, baseline_sha, candidate_sha
-
-
-def _run_check(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    env = os.environ.copy()
-    env["PYTHONHASHSEED"] = "1"
-    existing_pythonpath = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = (
-        f"{SRC_ROOT}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(SRC_ROOT)
-    )
-    return subprocess.run(
-        [sys.executable, "-m", "semantic_ci_code.cli", "check", *args],
+    result = subprocess.run(
+        ["git", *args],
         cwd=repo,
         env=env,
-        capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
         check=False,
     )
-
-
-def _observed_for(constraint_id: str, payload: dict) -> list:
-    for entry in payload["results"]:
-        if entry["constraint_id"] == constraint_id:
-            return entry["evidence"]["observed"]
-    raise AssertionError(f"constraint {constraint_id!r} not in payload")
-
-
-@pytest.mark.parametrize("allow_dirty", [False, True])
-def test_same_ref_both_sides_yields_no_violations(tmp_path: Path, allow_dirty: bool):
-    """inv-1: A == B → zero removed-API / zero new-effects observed entries.
-
-    The host working tree is intentionally divergent so a working-tree
-    leak would inject false positives.
-    """
-    repo, baseline_sha, _ = _build_two_commit_repo(tmp_path)
-    # Diverge the working tree from baseline_sha so leakage would be visible.
-    (repo / "pkg" / "mod.py").write_text(LEAKY_WORKING_TREE_SOURCE, encoding="utf-8")
-
-    args = [
-        "--no-fetch",
-        "--no-cache",
-        "--baseline-rev",
-        baseline_sha,
-        "--candidate-rev",
-        baseline_sha,
-        "--package-root",
-        "pkg",
-        "--format",
-        "json",
-    ]
-    if allow_dirty:
-        args.append("--allow-dirty")
-
-    result = _run_check(repo, *args)
-
     assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert payload["verdict"] == "pass"
-    assert _observed_for("template:feature:no_removed_api", payload) == []
-    assert _observed_for("template:feature:no_new_effects", payload) == []
+    return result.stdout.strip()
 
 
-@pytest.mark.parametrize("allow_dirty", [False, True])
-def test_explicit_candidate_rev_not_overridden_by_working_tree(tmp_path: Path, allow_dirty: bool):
-    """inv-2: explicit --candidate-rev wins over the working tree.
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
-    With or without --allow-dirty, the verdict must depend only on the
-    named refs. A divergent working tree must not change the verdict.
-    """
-    repo, baseline_sha, candidate_sha = _build_two_commit_repo(tmp_path)
-    # Diverge the working tree from candidate_sha so leakage would be visible.
-    (repo / "pkg" / "mod.py").write_text(LEAKY_WORKING_TREE_SOURCE, encoding="utf-8")
 
-    args = [
-        "--no-fetch",
-        "--no-cache",
-        "--baseline-rev",
-        baseline_sha,
-        "--candidate-rev",
-        candidate_sha,
-        "--package-root",
-        "pkg",
-        "--format",
-        "json",
-    ]
-    if allow_dirty:
-        args.append("--allow-dirty")
-
-    result = _run_check(repo, *args)
-
-    assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert payload["verdict"] == "pass"
-    # No nonlocal leak from the working tree.
-    new_effects = _observed_for("template:feature:no_new_effects", payload)
-    leaked_targets = [
-        entry
-        for entry in new_effects
-        if isinstance(entry, dict) and str(entry.get("fqn", "")).startswith("nonlocal:")
-    ]
-    assert leaked_targets == [], leaked_targets
-    if allow_dirty:
-        assert "--allow-dirty has no effect when --candidate-rev is explicit" in result.stderr
+def _evaluator_projection(payload: dict) -> dict:
+    return {key: payload[key] for key in VERDICT_FIELDS}

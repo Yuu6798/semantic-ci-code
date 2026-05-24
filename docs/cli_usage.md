@@ -307,7 +307,8 @@ semantic-ci compare --baseline-dir base --candidate-dir candidate --format gh-ac
 semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--target <yaml>] [--package-root <repo-relative-dir>]
                   [--format {json,human,sarif,gh-actions}] [--output <file>]
-                  [--strict-repair] [--no-fetch] [--allow-dirty]
+                  [--strict-repair] [--no-fetch]
+                  [--candidate-source {commit,working-tree}]
                   [--mode {smoke,full}] [--no-cache] [--cache-dir <dir>]
                   [--cache-max-bytes <int>]
 ```
@@ -318,13 +319,17 @@ Compares git refs using temporary detached worktrees. Defaults are:
 - candidate: `HEAD`
 
 `--package-root` is repo-relative and is resolved inside each materialized tree.
-Without `--allow-dirty`, a dirty working tree emits a warning and still checks
-the `HEAD` commit. With `--allow-dirty`, the working tree is used as candidate
-**only when `--candidate-rev` is not given (i.e., candidate defaults to
-`HEAD`)**. If `--candidate-rev <ref>` is explicit, the named ref is always
-materialized into a temporary worktree and used as candidate; `--allow-dirty`
-in that combination is ignored (with a stderr warning) so an explicit candidate
-ref is never silently overridden by the host's working tree.
+`--candidate-source` selects where the candidate snapshot comes from:
+
+- `commit` (default): evaluate the resolved candidate commit (`HEAD` unless
+  `--candidate-rev` is provided). Uncommitted working-tree changes are ignored
+  and no dirty-tree warning is emitted.
+- `working-tree`: evaluate the current working tree as candidate. This cannot
+  be combined with `--candidate-rev`. With `--verbose`, a clean working tree
+  emits a note that the source is equivalent to `HEAD`.
+
+JSON output from `check` records source provenance under
+`engine.baseline` and `engine.candidate`.
 
 `check` caches ref-backed `CodeState` extraction under
 `<repo>/.semantic-ci/cache/code_state/` by default. The cache key includes the
@@ -353,7 +358,7 @@ Examples:
 ```bash
 semantic-ci check
 semantic-ci check --baseline-rev origin/main --candidate-rev HEAD --target target.yaml
-semantic-ci check --allow-dirty --package-root src/semantic_ci_code
+semantic-ci check --candidate-source working-tree --package-root src/semantic_ci_code
 semantic-ci check --mode smoke
 semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600
@@ -443,7 +448,7 @@ needed.
 ```text
 semantic-ci validate-plan --target <yaml> --adapter {claude-code,cursor,codex}
                           [--baseline-rev <ref> | --baseline-dir <dir>]
-                          [--package-root <rel>] [--no-fetch] [--allow-dirty]
+                          [--package-root <rel>] [--no-fetch]
                           [--format {text,json}] [--output <file>] [--no-color]
 ```
 

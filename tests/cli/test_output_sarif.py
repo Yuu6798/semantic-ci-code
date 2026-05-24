@@ -295,4 +295,4 @@ def test_compile_rejects_sarif_format():
 def test_regular_json_payload_schema_version_remains_current():
     data = payload(run_semantic_ci(Path.cwd(), *compare_args(REPAIR_TARGET), "--format", "json"))
 
-    assert data["schema_version"] == "5"
+    assert data["schema_version"] == "6"

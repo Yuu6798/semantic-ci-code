@@ -70,7 +70,7 @@ def test_compare_fail_fixture_exits_one():
 def test_compare_json_shape_contains_full_report_fields():
     data = payload(run_cli(*compare_args(PASS_TARGET), "--format", "json"))
 
-    assert data["schema_version"] == "5"
+    assert data["schema_version"] == "6"
     assert data["subcommand"] == "compare"
     assert data["intent"] == "add a public API"
     assert data["primary_kind"] == "feature"

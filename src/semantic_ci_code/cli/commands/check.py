@@ -282,6 +282,8 @@ def _resolve_baseline_ref(args: Namespace, *, repo_root: Path) -> str:
             repo_root=repo_root,
             no_fetch=args.no_fetch,
         )
+    # Volatile baselines do not have a commit ref. Keep a stable placeholder
+    # for helper signatures; callers must gate ref usage on source == "commit".
     return "HEAD"
 
 

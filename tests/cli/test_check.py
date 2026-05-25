@@ -252,7 +252,7 @@ def test_volatile_source_conflicts_with_explicit_rev(
     )
 
     assert result.returncode == 2
-    assert expected_message in result.stderr
+    assert result.stderr == f"{expected_message}\n"
 
 
 @pytest.mark.parametrize("source", ("working-tree", "staged-index"))

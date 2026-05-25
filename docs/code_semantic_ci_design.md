@@ -541,6 +541,25 @@ input_hash = hash(
 
 `mypy` / `pyright` / `radon` / `griffe` などはバージョンアップで出力が変わる可能性がある。Semantic CI が再現性を名乗るなら、これらすべての version を hash trail に含める必要がある。
 
+2026-05-25 実装: CodeState cache key は package-level version に加えて
+`extractor_versions` map を含む。各 entry は extractor dimension ごとに
+実装 source を SHA-256 fingerprint 化した 16 桁 digest:
+
+- `api_surface` -> `semantic_ci_code/api_surface/`
+- `effects` -> `semantic_ci_code/effects/`
+- `imports` -> `semantic_ci_code/imports/`
+- `complexity` -> `semantic_ci_code/complexity/`
+- `test_surface` -> `semantic_ci_code/test_surface/`
+- `module_graph` -> `semantic_ci_code/module_graph/`
+
+全 dimension は共通依存として `pipeline/python_code_state.py` と
+`domain/state_schema.py` も hash に含める。cache key には実際に抽出する
+dimension の fingerprint だけを入れるため、例えば smoke mode では
+`complexity` 実装変更で smoke cache は落ちない。これにより開発中 /
+source-tree 実行中に package version が同じままでも、該当 extractor 実装変更で
+cache が自動 invalidate される。JSON verdict envelope には出さず cache
+internal に留める。Round-trip log (§10.3) への露出は future work。
+
 ### 10.3 Round-trip Log
 
 各段階の中間生成物の hash を chain として記録:
@@ -624,7 +643,7 @@ svp-rpe-code/
 
 ## 12. フェーズ計画
 
-> **現在地(2026-05-25 時点)**: **P2.5 + Brief 8 完走 + source-selection Phase 3b 完走** — Brief 1〜5 と Brief 8 全 merged。`semantic-ci` CLI 9 subcommand release 可能状態(`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`)。pre-commit hook integration は `check --candidate-source=staged-index` に集約済み。P2 残課題のうち lock violation short-circuit と per-extractor timeout は実装済み。次は **Brief 7 (SSP v0.1)** または per-extractor version hash の brief 化。Brief 進捗の詳細は §25 参照。
+> **現在地(2026-05-25 時点)**: **P2.5 + Brief 8 完走 + source-selection Phase 3b 完走** — Brief 1〜5 と Brief 8 全 merged。`semantic-ci` CLI 9 subcommand release 可能状態(`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`)。pre-commit hook integration は `check --candidate-source=staged-index` に集約済み。P2 残課題のうち lock violation short-circuit / per-extractor timeout / per-extractor version hash は実装済み。次は **Brief 7 (SSP v0.1)** または Round-trip log / incremental extraction の brief 化。Brief 進捗の詳細は §25 参照。
 >
 > **§21 / §22 による前倒し反映**: Generator Adapter(元 P5)と Repair Compiler は **P2.5** に、TypeScript extractor(元 P3b)は **P2.5 並列** に移動済み。後者は 2026-05-06 Session 2 で **凍結**(下記 P3b 参照)。本節の元計画と §21/§22 で記述が分かれている箇所は §21/§22 が優先。
 

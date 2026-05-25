@@ -14,6 +14,7 @@ from semantic_ci_code.cli.code_state_cache import (
     cache_key,
     effective_exclude_key,
     evict_to_budget,
+    extractor_versions,
     key_meta,
     write_cached_code_state,
 )
@@ -90,6 +91,7 @@ def test_cache_key_changes_for_each_axis():
         "dimensions_sorted_tuple": ("api_surface", "effects", "imports"),
         "python_xy": "3.11",
         "package_version_value": "0.1.0",
+        "extractor_versions_value": _extractor_versions("v1"),
         "code_state_schema_version": CODE_STATE_SCHEMA_VERSION,
         "cache_format_version": CACHE_FORMAT_VERSION,
     }
@@ -102,6 +104,7 @@ def test_cache_key_changes_for_each_axis():
         {"dimensions_sorted_tuple": None},
         {"python_xy": "3.12"},
         {"package_version_value": "0.2.0"},
+        {"extractor_versions_value": _extractor_versions("v2")},
         {"cache_format_version": CACHE_FORMAT_VERSION + 1},
         {"effective_exclude_key_value": (".", ("generated",))},
     ]
@@ -149,6 +152,7 @@ def test_unknown_package_metadata_source_fingerprint_invalidates_cache_key(monke
         "mode": ExecutionMode.SMOKE,
         "dimensions_sorted_tuple": ("api_surface", "effects", "imports"),
         "python_xy": "3.11",
+        "extractor_versions_value": _extractor_versions("v1"),
     }
 
     monkeypatch.setattr(code_state_cache, "package_version", lambda: "0.0.0+unknown")
@@ -159,6 +163,66 @@ def test_unknown_package_metadata_source_fingerprint_invalidates_cache_key(monke
     after = code_state_cache.key_for_state(**base)
 
     assert after != before
+
+
+def test_extractor_versions_are_deterministic_and_cover_p1_dimensions():
+    first = extractor_versions()
+    second = extractor_versions()
+
+    assert first == second
+    assert set(first) == {
+        "api_surface",
+        "effects",
+        "imports",
+        "complexity",
+        "test_surface",
+        "module_graph",
+    }
+    assert all(len(value) == 16 for value in first.values())
+
+
+def test_extractor_version_change_invalidates_cache_key():
+    base = {
+        "tree_object_id": "tree-a",
+        "package_root_relpath_posix": Path("pkg"),
+        "mode": ExecutionMode.SMOKE,
+        "dimensions_sorted_tuple": ("api_surface", "effects", "imports"),
+        "python_xy": "3.11",
+        "package_version_value": "0.1.0",
+    }
+
+    before = code_state_cache.key_for_state(
+        **base,
+        extractor_versions_value=_extractor_versions("v1"),
+    )
+    after = code_state_cache.key_for_state(
+        **base,
+        extractor_versions_value={**_extractor_versions("v1"), "imports": "changed"},
+    )
+
+    assert after != before
+
+
+def test_unextracted_dimension_version_does_not_invalidate_smoke_cache_key():
+    base = {
+        "tree_object_id": "tree-a",
+        "package_root_relpath_posix": Path("pkg"),
+        "mode": ExecutionMode.SMOKE,
+        "dimensions_sorted_tuple": ("api_surface", "effects", "imports"),
+        "python_xy": "3.11",
+        "package_version_value": "0.1.0",
+    }
+
+    before = code_state_cache.key_for_state(
+        **base,
+        extractor_versions_value=_extractor_versions("v1"),
+    )
+    after = code_state_cache.key_for_state(
+        **base,
+        extractor_versions_value={**_extractor_versions("v1"), "complexity": "changed"},
+    )
+
+    assert after == before
 
 
 def test_installed_package_metadata_is_used_without_source_fingerprint(monkeypatch):
@@ -661,6 +725,17 @@ def test_project_dependencies_are_unchanged():
 
 def _boom_extractor(*args, **kwargs):
     raise RuntimeError("extractor should not be called on cache hit")
+
+
+def _extractor_versions(suffix: str) -> dict[str, str]:
+    return {
+        "api_surface": f"api-{suffix}",
+        "effects": f"effects-{suffix}",
+        "imports": f"imports-{suffix}",
+        "complexity": f"complexity-{suffix}",
+        "test_surface": f"test-{suffix}",
+        "module_graph": f"graph-{suffix}",
+    }
 
 
 def _write_cache_blob(path: Path, content: str, *, mtime: float) -> Path:

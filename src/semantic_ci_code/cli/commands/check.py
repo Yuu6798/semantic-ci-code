@@ -11,6 +11,7 @@ from semantic_ci_code.cli.code_state_cache import (
     current_python_xy,
     dimensions_for_cache,
     effective_exclude_key,
+    extractor_versions,
     key_for_state,
     key_meta,
     package_root_cache_path,
@@ -110,6 +111,7 @@ def run_check(args: Namespace) -> int:
         cache_stats = CacheStats(disabled=not use_cache)
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
+        extractor_versions_value = extractor_versions() if use_cache else None
 
         if args.verbose:
             _stderr(
@@ -172,6 +174,7 @@ def run_check(args: Namespace) -> int:
                 use_cache=use_cache and not baseline_volatile,
                 cache_stats=cache_stats,
                 cache_max_bytes=cache_max_bytes,
+                extractor_versions_value=extractor_versions_value,
                 timeout_seconds=extractor_timeout,
                 verbose=args.verbose,
             )
@@ -191,6 +194,7 @@ def run_check(args: Namespace) -> int:
                 use_cache=use_cache and not candidate_volatile,
                 cache_stats=cache_stats,
                 cache_max_bytes=cache_max_bytes,
+                extractor_versions_value=extractor_versions_value,
                 timeout_seconds=extractor_timeout,
                 verbose=args.verbose,
             )
@@ -382,6 +386,7 @@ def _extract_code_state(
     use_cache: bool,
     cache_stats: CacheStats,
     cache_max_bytes: int,
+    extractor_versions_value: dict[str, str] | None,
     timeout_seconds: float | None,
     verbose: bool,
 ) -> CodeStateExtraction:
@@ -401,6 +406,7 @@ def _extract_code_state(
     tree_id = tree_object_id(ref, package_root_posix.as_posix(), cwd=repo_root)
     python_xy = current_python_xy()
     exclude_key = effective_exclude_key(extract_config, tree_root=tree_root)
+    extractor_versions_value = extractor_versions_value or extractor_versions()
     key = key_for_state(
         tree_object_id=tree_id,
         package_root_relpath_posix=package_root_posix,
@@ -408,6 +414,7 @@ def _extract_code_state(
         dimensions_sorted_tuple=dimensions_tuple,
         effective_exclude_key_value=exclude_key,
         python_xy=python_xy,
+        extractor_versions_value=extractor_versions_value,
     )
     log = _stderr if verbose else None
     cached = read_cached_code_state(cache_root, key, stats=cache_stats, log=log)
@@ -431,6 +438,7 @@ def _extract_code_state(
             dimensions_sorted_tuple=dimensions_tuple,
             effective_exclude_key_value=exclude_key,
             python_xy=python_xy,
+            extractor_versions_value=extractor_versions_value,
         ),
         stats=cache_stats,
         max_bytes=cache_max_bytes,

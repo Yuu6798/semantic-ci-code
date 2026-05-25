@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Final
 
 from pydantic import ValidationError
 
@@ -17,11 +17,20 @@ from semantic_ci_code.cli.output.json_formatter import UNKNOWN_VERSION, package_
 from semantic_ci_code.domain.state_schema import CodeState
 from semantic_ci_code.framework.extract_config import ExtractConfig
 
-CACHE_FORMAT_VERSION = 2
+CACHE_FORMAT_VERSION = 3
 CODE_STATE_SCHEMA_VERSION = "1"
 DEFAULT_CACHE_MAX_BYTES = 100 * 1024 * 1024
 DEFAULT_EVICTION_LOW_WATER = 0.8
 STALE_TMP_SECONDS = 60 * 60
+_EXTRACTOR_SOURCE_MAP: Final[dict[str, tuple[str, ...]]] = {
+    "api_surface": ("api_surface/",),
+    "effects": ("effects/",),
+    "imports": ("imports/",),
+    "complexity": ("complexity/",),
+    "test_surface": ("test_surface/",),
+    "module_graph": ("module_graph/",),
+}
+_COMMON_EXTRACTOR_DEPS: Final = ("pipeline/python_code_state.py", "domain/state_schema.py")
 
 LogFn = Callable[[str], None]
 
@@ -113,6 +122,19 @@ def cache_package_version() -> str:
     return f"{UNKNOWN_VERSION}.source.{_source_fingerprint()}"
 
 
+def extractor_versions() -> dict[str, str]:
+    """Return deterministic source fingerprints for each extractor dimension."""
+
+    package_root = Path(__file__).resolve().parents[1]
+    return {
+        dimension: _fingerprint_paths(
+            package_root,
+            _extractor_source_paths(package_root, source_paths),
+        )
+        for dimension, source_paths in sorted(_EXTRACTOR_SOURCE_MAP.items())
+    }
+
+
 def cache_key(
     *,
     tree_object_id: str,
@@ -121,10 +143,15 @@ def cache_key(
     dimensions_sorted_tuple: tuple[str, ...] | None,
     python_xy: str,
     package_version_value: str,
+    extractor_versions_value: dict[str, str] | None = None,
     effective_exclude_key_value: tuple[str, tuple[str, ...]] = ("", ()),
     code_state_schema_version: str = CODE_STATE_SCHEMA_VERSION,
     cache_format_version: int = CACHE_FORMAT_VERSION,
 ) -> str:
+    extractor_versions_payload = _extractor_versions_for_key(
+        extractor_versions_value if extractor_versions_value is not None else extractor_versions(),
+        dimensions_sorted_tuple,
+    )
     payload = {
         "cache_format_version": cache_format_version,
         "code_state_schema_version": code_state_schema_version,
@@ -135,6 +162,7 @@ def cache_key(
             "config_root": effective_exclude_key_value[0],
             "patterns": list(effective_exclude_key_value[1]),
         },
+        "extractor_versions": extractor_versions_payload,
         "mode": mode.value,
         "package_root": package_root_relpath_posix.as_posix(),
         "package_version": package_version_value,
@@ -154,7 +182,12 @@ def key_meta(
     effective_exclude_key_value: tuple[str, tuple[str, ...]] = ("", ()),
     python_xy: str | None = None,
     package_version_value: str | None = None,
+    extractor_versions_value: dict[str, str] | None = None,
 ) -> dict[str, Any]:
+    extractor_versions_payload = _extractor_versions_for_key(
+        extractor_versions_value if extractor_versions_value is not None else extractor_versions(),
+        dimensions_sorted_tuple,
+    )
     return {
         "tree_object_id": tree_object_id,
         "package_root": package_root_relpath_posix.as_posix(),
@@ -168,6 +201,7 @@ def key_meta(
         },
         "python_xy": python_xy or current_python_xy(),
         "package_version": package_version_value or cache_package_version(),
+        "extractor_versions": extractor_versions_payload,
     }
 
 
@@ -180,6 +214,7 @@ def key_for_state(
     effective_exclude_key_value: tuple[str, tuple[str, ...]] = ("", ()),
     python_xy: str | None = None,
     package_version_value: str | None = None,
+    extractor_versions_value: dict[str, str] | None = None,
     code_state_schema_version: str = CODE_STATE_SCHEMA_VERSION,
     cache_format_version: int = CACHE_FORMAT_VERSION,
 ) -> str:
@@ -190,6 +225,7 @@ def key_for_state(
         dimensions_sorted_tuple=dimensions_sorted_tuple,
         python_xy=python_xy or current_python_xy(),
         package_version_value=package_version_value or cache_package_version(),
+        extractor_versions_value=extractor_versions_value,
         effective_exclude_key_value=effective_exclude_key_value,
         code_state_schema_version=code_state_schema_version,
         cache_format_version=cache_format_version,
@@ -308,6 +344,16 @@ def _cache_path(cache_root: Path, key: str) -> Path:
     return cache_root / "code_state" / f"{key}.json"
 
 
+def _extractor_versions_for_key(
+    versions: dict[str, str],
+    dimensions_sorted_tuple: tuple[str, ...] | None,
+) -> dict[str, str]:
+    if dimensions_sorted_tuple is None:
+        return dict(sorted(versions.items()))
+    selected = set(dimensions_sorted_tuple)
+    return {dimension: versions[dimension] for dimension in sorted(selected & versions.keys())}
+
+
 def _log(log: LogFn | None, message: str) -> None:
     if log is not None:
         log(message)
@@ -348,11 +394,38 @@ def _file_record(path: Path) -> tuple[Path, float, int] | None:
 
 def _source_fingerprint() -> str:
     package_root = Path(__file__).resolve().parents[1]
+    return _fingerprint_paths(
+        package_root,
+        tuple(
+            sorted(
+                package_root.rglob("*.py"),
+                key=lambda candidate: candidate.relative_to(package_root).as_posix(),
+            )
+        ),
+    )
+
+
+def _extractor_source_paths(
+    package_root: Path,
+    source_paths: tuple[str, ...],
+) -> tuple[Path, ...]:
+    paths: set[Path] = set()
+    for raw_path in source_paths:
+        path = package_root / raw_path
+        if path.is_dir():
+            paths.update(path.rglob("*.py"))
+        else:
+            paths.add(path)
+    for raw_path in _COMMON_EXTRACTOR_DEPS:
+        paths.add(package_root / raw_path)
+    return tuple(
+        sorted(paths, key=lambda candidate: candidate.relative_to(package_root).as_posix())
+    )
+
+
+def _fingerprint_paths(package_root: Path, paths: tuple[Path, ...]) -> str:
     digest = hashlib.sha256()
-    for path in sorted(
-        package_root.rglob("*.py"),
-        key=lambda candidate: candidate.relative_to(package_root).as_posix(),
-    ):
+    for path in paths:
         relative = path.relative_to(package_root).as_posix()
         digest.update(relative.encode("utf-8"))
         digest.update(b"\0")

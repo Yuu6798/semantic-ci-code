@@ -164,7 +164,7 @@ def test_no_fetch_skips_fetch_commands(tmp_path: Path):
     assert not any(command[1] == "fetch" for command in records)
 
 
-def test_allow_dirty_uses_working_directory_as_candidate(tmp_path: Path):
+def test_candidate_source_working_tree_uses_working_directory_as_candidate(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     write_file(repo / "mod.py", CANDIDATE_SOURCE)
 
@@ -176,75 +176,142 @@ def test_allow_dirty_uses_working_directory_as_candidate(tmp_path: Path):
         "--no-fetch",
         "--format",
         "json",
-        "--allow-dirty",
+        "--candidate-source",
+        "working-tree",
     )
 
     assert result.returncode == 0
     assert payload(result)["verdict"] == "pass"
 
 
-def test_dirty_without_allow_dirty_warns_and_uses_head_commit(tmp_path: Path):
+def test_default_candidate_source_commit_uses_head_without_dirty_warning(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     write_file(repo / "mod.py", CANDIDATE_SOURCE)
 
     result = run_semantic_ci(repo, "check", "--mode", "smoke", "--no-fetch", "--format", "json")
 
     assert result.returncode == 1
-    assert "working tree is dirty; using HEAD commit" in result.stderr
+    assert "working tree is dirty" not in result.stderr
     assert payload(result)["verdict"] == "fail"
 
 
-def test_explicit_candidate_rev_with_allow_dirty_ignores_working_tree(tmp_path: Path):
-    """Regression test for #97: when --candidate-rev is explicit, --allow-dirty
-    must NOT silently substitute the working tree for the candidate.
-    """
+def test_candidate_source_working_tree_conflicts_with_candidate_rev(tmp_path: Path):
     repo = init_repo(tmp_path)
     candidate_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
-    # Diverge the working tree from `candidate_sha` so that a working-tree
-    # leak would change the verdict.
-    write_file(repo / "mod.py", BAD_SOURCE)
 
     result = run_semantic_ci(
         repo,
         "check",
-        "--mode",
-        "smoke",
-        "--no-fetch",
+        "--candidate-source",
+        "working-tree",
         "--candidate-rev",
         candidate_sha,
-        "--allow-dirty",
         "--format",
         "json",
     )
 
-    assert result.returncode == 0
-    assert payload(result)["verdict"] == "pass"
-    assert "--allow-dirty has no effect when --candidate-rev is explicit" in result.stderr
+    assert result.returncode == 2
+    assert (
+        "error: --candidate-source=working-tree is incompatible with --candidate-rev"
+        in result.stderr
+    )
 
 
-def test_allow_dirty_without_explicit_candidate_rev_still_uses_working_tree(
-    tmp_path: Path,
-):
-    """The bare `--allow-dirty` semantics is preserved: with no explicit
-    --candidate-rev, the working tree is still used as candidate.
-    """
-    repo = init_repo_without_candidate_commit(tmp_path)
-    write_file(repo / "mod.py", CANDIDATE_SOURCE)
+def test_candidate_source_working_tree_clean_verbose_note(tmp_path: Path):
+    repo = init_repo(tmp_path)
 
     result = run_semantic_ci(
         repo,
+        "--verbose",
         "check",
         "--mode",
         "smoke",
         "--no-fetch",
-        "--allow-dirty",
+        "--candidate-source",
+        "working-tree",
         "--format",
         "json",
     )
 
     assert result.returncode == 0
-    assert payload(result)["verdict"] == "pass"
-    assert "--allow-dirty has no effect" not in result.stderr
+    assert (
+        "note: candidate source = working tree (no uncommitted changes detected; "
+        "equivalent to HEAD)."
+    ) in result.stderr
+
+
+def test_check_json_provenance_for_commit_and_working_tree_sources(tmp_path: Path):
+    repo = init_repo(tmp_path / "commit-default")
+    baseline_sha = git(repo, "rev-parse", "origin/main").stdout.strip()
+    candidate_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    default_commit = payload(
+        run_semantic_ci(repo, "check", "--mode", "smoke", "--no-fetch", "--format", "json")
+    )
+    assert list(default_commit["engine"]) == [
+        "baseline",
+        "candidate",
+        "extractor_pyver",
+        "package_version",
+    ]
+    assert default_commit["engine"]["baseline"] == {
+        "source": "commit",
+        "rev": baseline_sha,
+    }
+    assert default_commit["engine"]["candidate"] == {
+        "source": "commit",
+        "rev": candidate_sha,
+    }
+
+    working_tree_repo = init_repo_without_candidate_commit(tmp_path / "working-tree")
+    write_file(working_tree_repo / "mod.py", CANDIDATE_SOURCE)
+    working_tree_baseline_sha = git(working_tree_repo, "rev-parse", "origin/main").stdout.strip()
+    working_tree = payload(
+        run_semantic_ci(
+            working_tree_repo,
+            "check",
+            "--mode",
+            "smoke",
+            "--no-fetch",
+            "--candidate-source",
+            "working-tree",
+            "--format",
+            "json",
+        )
+    )
+    assert working_tree["engine"]["baseline"] == {
+        "source": "commit",
+        "rev": working_tree_baseline_sha,
+    }
+    assert working_tree["engine"]["candidate"] == {
+        "source": "working-tree",
+        "rev": None,
+    }
+
+    explicit_repo = init_repo(tmp_path / "explicit-ref")
+    explicit_baseline_sha = git(explicit_repo, "rev-parse", "origin/main").stdout.strip()
+    explicit_candidate_sha = git(explicit_repo, "rev-parse", "HEAD").stdout.strip()
+    explicit = payload(
+        run_semantic_ci(
+            explicit_repo,
+            "check",
+            "--mode",
+            "smoke",
+            "--no-fetch",
+            "--candidate-rev",
+            explicit_candidate_sha,
+            "--format",
+            "json",
+        )
+    )
+    assert explicit["engine"]["baseline"] == {
+        "source": "commit",
+        "rev": explicit_baseline_sha,
+    }
+    assert explicit["engine"]["candidate"] == {
+        "source": "commit",
+        "rev": explicit_candidate_sha,
+    }
 
 
 def test_worktree_cleanup_on_success(tmp_path: Path):

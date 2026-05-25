@@ -90,7 +90,8 @@ go to stderr.
 | Extract config error | 3 | `extract config error: <pyproject.toml>: <reason>` |
 | Extractor error | 3 | `extractor failed: <name> at <path>: <reason>` |
 | Git unavailable | 3 | `git is required for 'check'; install git or use 'compare'` or the subcommand-specific equivalent. |
-| Dirty working tree in `check` | 0/1 | Warning, unless `--allow-dirty` is used. |
+| Dirty working tree in `check` with default `--candidate-source commit` | 0/1 | No warning; the resolved candidate commit is evaluated. |
+| `check --candidate-source working-tree --candidate-rev <ref>` | 2 | `error: --candidate-source=working-tree is incompatible with --candidate-rev` |
 | Internal bug | 4 | `internal error: <one-line>; rerun with --verbose for traceback` |
 
 With `--verbose`, expected engine errors also print a traceback after the

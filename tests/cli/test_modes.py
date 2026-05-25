@@ -185,7 +185,7 @@ def test_smoke_json_envelope_reports_mode_and_skipped_summary(tmp_path: Path):
     data = payload(result)
 
     assert result.returncode == 0
-    assert data["schema_version"] == "5"
+    assert data["schema_version"] == "6"
     assert data["mode"] == "smoke"
     assert data["summary"]["skipped"] == 1
     assert data["results"][-1]["status"] == "skipped"

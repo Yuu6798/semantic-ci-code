@@ -52,7 +52,7 @@ def sample_repair_plan():
 
 def verdict_envelope() -> dict:
     return {
-        "schema_version": "5",
+        "schema_version": "6",
         "subcommand": "compare",
         "verdict": "fail",
         "repair_plan": repair_plan_dict(),
@@ -220,7 +220,7 @@ def test_compile_repair_warns_when_verdict_envelope_schema_version_unexpected():
 
     assert result.returncode == 0
     assert "schema_version='99'" in result.stderr
-    assert "expected '5'" in result.stderr
+    assert "expected '6'" in result.stderr
 
 
 def test_compile_repair_no_warning_when_verdict_envelope_schema_version_matches():
@@ -263,7 +263,8 @@ def test_check_json_pipes_directly_into_compile_repair(tmp_path: Path):
         repo,
         "check",
         "--no-fetch",
-        "--allow-dirty",
+        "--candidate-source",
+        "working-tree",
         "--no-cache",
         "--format",
         "json",

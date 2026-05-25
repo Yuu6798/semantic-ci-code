@@ -56,7 +56,7 @@ def test_observe_happy_path_outputs_schema_v1_code_state_json():
 
     assert result.returncode == 0
     assert result.stderr == ""
-    assert payload["schema_version"] == "5"
+    assert payload["schema_version"] == "6"
     assert payload["subcommand"] == "observe"
     assert payload["verdict"] is None
     assert payload["repair_plan"] is None
@@ -89,7 +89,7 @@ def test_observe_format_json_explicit():
     result = run_cli("observe", "--package-root", str(OBSERVE_PKG), "--format", "json")
 
     assert result.returncode == 0
-    assert parse_json(result.stdout)["schema_version"] == "5"
+    assert parse_json(result.stdout)["schema_version"] == "6"
     assert result.stderr == ""
 
 
@@ -122,7 +122,7 @@ def test_output_file_writes_json_and_leaves_stdout_empty(tmp_path: Path):
 
     assert result.returncode == 0
     assert result.stdout == ""
-    assert parse_json(output.read_text(encoding="utf-8"))["schema_version"] == "5"
+    assert parse_json(output.read_text(encoding="utf-8"))["schema_version"] == "6"
 
 
 def test_output_path_that_is_directory_exits_usage_error(tmp_path: Path):

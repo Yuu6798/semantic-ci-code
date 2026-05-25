@@ -609,7 +609,9 @@ def test_atomic_write_leaves_no_tmp_on_success_and_no_json_on_replace_failure(
     assert not tuple((failing_dir / "code_state").glob("*.tmp"))
 
 
-def test_allow_dirty_skips_candidate_cache_but_keeps_baseline_cache(tmp_path: Path):
+def test_candidate_source_working_tree_skips_candidate_cache_but_keeps_baseline_cache(
+    tmp_path: Path,
+):
     repo = init_repo_without_candidate_commit(tmp_path)
     write_file(repo / "mod.py", CANDIDATE_SOURCE)
     cache_dir = tmp_path / "cache"
@@ -622,7 +624,8 @@ def test_allow_dirty_skips_candidate_cache_but_keeps_baseline_cache(tmp_path: Pa
         "--format",
         "json",
         "--no-fetch",
-        "--allow-dirty",
+        "--candidate-source",
+        "working-tree",
         "--cache-dir",
         str(cache_dir),
     )
@@ -678,7 +681,7 @@ def test_non_cache_subcommands_emit_disabled_cache_stats(tmp_path: Path):
 
     for result in (compare, observe, compile_result, pre_commit):
         assert result.returncode == 0
-        assert payload(result)["schema_version"] == "5"
+        assert payload(result)["schema_version"] == "6"
         assert payload(result)["cache"] == {
             "hit": 0,
             "miss": 0,

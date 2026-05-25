@@ -43,6 +43,7 @@ from semantic_ci_code.cli.git_runtime import (
     repo_root,
     resolve_baseline,
     resolve_candidate,
+    run_git,
     tree_object_id,
 )
 from semantic_ci_code.cli.modes import dimensions_for_mode, resolve_execution_mode
@@ -63,6 +64,16 @@ from semantic_ci_code.repair import emit_repair_plan
 
 def run_check(args: Namespace) -> int:
     try:
+        candidate_source = args.candidate_source
+        candidate_uses_working_tree = candidate_source == "working-tree"
+        candidate_rev_explicit = args.candidate_rev is not None
+        if candidate_uses_working_tree and candidate_rev_explicit:
+            return _usage_error(
+                ValueError(
+                    "error: --candidate-source=working-tree is incompatible with --candidate-rev"
+                )
+            )
+
         if not is_git_available():
             raise GitNotFoundError("git is required for 'check'; install git or use 'compare'")
 
@@ -72,13 +83,11 @@ def run_check(args: Namespace) -> int:
             repo_root=root,
             no_fetch=args.no_fetch,
         )
-        candidate_rev_explicit = args.candidate_rev is not None
         candidate_ref = resolve_candidate(args.candidate_rev)
-        # `--allow-dirty` opts into "use working tree as candidate". When the
-        # user also passes an explicit `--candidate-rev`, that explicit ref
-        # MUST win: silently substituting the working tree would violate the
-        # CLI's input-provenance contract (see issue #97).
-        candidate_uses_working_tree = args.allow_dirty and not candidate_rev_explicit
+        baseline_rev = _resolve_commit_sha(root, baseline_ref)
+        candidate_rev = (
+            None if candidate_uses_working_tree else _resolve_commit_sha(root, candidate_ref)
+        )
         package_root = _package_root_relative(args.package_root)
         mode = resolve_execution_mode(args.mode)
         dimensions = dimensions_for_mode(mode)
@@ -92,16 +101,10 @@ def run_check(args: Namespace) -> int:
 
         if args.verbose:
             _stderr(f"resolved baseline={baseline_ref} candidate={candidate_ref}")
-        if args.allow_dirty and candidate_rev_explicit:
+        if candidate_uses_working_tree and args.verbose and not is_dirty(root):
             _stderr(
-                "warning: --allow-dirty has no effect when --candidate-rev is "
-                "explicit; materializing the candidate ref instead of using "
-                "the working tree."
-            )
-        if not args.allow_dirty and candidate_ref == "HEAD" and is_dirty(root):
-            _stderr(
-                "working tree is dirty; using HEAD commit. "
-                "pass --allow-dirty to evaluate working directory."
+                "note: candidate source = working tree (no uncommitted changes "
+                "detected; equivalent to HEAD)."
             )
 
         with materialize_ref(root, baseline_ref, prefix="semantic-ci-baseline-") as baseline_dir:
@@ -185,6 +188,10 @@ def run_check(args: Namespace) -> int:
             loc_delta=loc_delta,
             mode=mode.value,
             cache_stats=cache_stats,
+            baseline_source="commit",
+            baseline_rev=baseline_rev,
+            candidate_source=candidate_source,
+            candidate_rev=candidate_rev,
         )
         output_status = _write_output(
             _render_payload(payload, args, subcommand="check"), args.output
@@ -241,6 +248,10 @@ def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Pa
     if not path.is_dir():
         raise ValueError(f"{label} package_root is not a directory: {path}")
     return path
+
+
+def _resolve_commit_sha(repo_root: Path, ref: str) -> str:
+    return run_git(["rev-parse", "--verify", f"{ref}^{{commit}}"], cwd=repo_root).strip()
 
 
 def _extract_code_state(

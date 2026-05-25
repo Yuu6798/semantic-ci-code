@@ -17,7 +17,7 @@ from semantic_ci_code.evaluator import ConstraintResult, ResultStatus, Verdict
 from semantic_ci_code.evaluator.operators import CanonicalMapping
 from semantic_ci_code.repair import RepairCategory, RepairInstruction, RepairPlan
 
-SCHEMA_VERSION = "5"
+SCHEMA_VERSION = "6"
 PACKAGE_NAME = "semantic-ci-code"
 UNKNOWN_VERSION = "0.0.0+unknown"
 
@@ -40,7 +40,17 @@ def build_payload(
     loc_delta: LocDelta | None = None,
     mode: str | None = None,
     cache_stats: Any | None = None,
+    baseline_source: str | None = None,
+    baseline_rev: str | None = None,
+    candidate_source: str | None = None,
+    candidate_rev: str | None = None,
 ) -> dict[str, Any]:
+    engine = _engine_payload(
+        baseline_source=baseline_source,
+        baseline_rev=baseline_rev,
+        candidate_source=candidate_source,
+        candidate_rev=candidate_rev,
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "subcommand": subcommand,
@@ -69,10 +79,7 @@ def build_payload(
         "files_touched": files_touched,
         "loc_delta": _serialize_loc_delta(loc_delta or LocDelta()),
         "cache": _serialize_cache_stats(cache_stats),
-        "engine": {
-            "extractor_pyver": f"{sys.version_info.major}.{sys.version_info.minor}",
-            "package_version": package_version(),
-        },
+        "engine": engine,
     }
 
 
@@ -119,6 +126,23 @@ def build_compile_payload(
 
 def dump_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
+
+
+def _engine_payload(
+    *,
+    baseline_source: str | None = None,
+    baseline_rev: str | None = None,
+    candidate_source: str | None = None,
+    candidate_rev: str | None = None,
+) -> dict[str, Any]:
+    engine: dict[str, Any] = {}
+    if baseline_source is not None or baseline_rev is not None:
+        engine["baseline"] = {"source": baseline_source, "rev": baseline_rev}
+    if candidate_source is not None or candidate_rev is not None:
+        engine["candidate"] = {"source": candidate_source, "rev": candidate_rev}
+    engine["extractor_pyver"] = f"{sys.version_info.major}.{sys.version_info.minor}"
+    engine["package_version"] = package_version()
+    return engine
 
 
 def _summary(verdict: Verdict, repair_plan: RepairPlan | None) -> dict[str, int]:

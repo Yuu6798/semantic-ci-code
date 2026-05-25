@@ -89,7 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="execution mode; defaults to SEMANTIC_CI_MODE or full",
     )
     check.add_argument("--no-fetch", action="store_true")
-    check.add_argument("--allow-dirty", action="store_true")
+    check.add_argument(
+        "--candidate-source",
+        choices=("commit", "working-tree"),
+        default="commit",
+        help="candidate snapshot source: commit ref or working tree",
+    )
     check.add_argument("--no-cache", action="store_true", help="disable CodeState cache")
     check.add_argument(
         "--cache-dir",
@@ -214,11 +219,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="write rendered output to this file instead of stdout",
     )
     validate_plan.add_argument("--no-fetch", action="store_true")
-    validate_plan.add_argument(
-        "--allow-dirty",
-        action="store_true",
-        help="accepted for CLI consistency; validate-plan reads only the baseline",
-    )
     validate_plan.add_argument(
         "--no-color",
         action="store_true",

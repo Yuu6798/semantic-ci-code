@@ -1105,6 +1105,11 @@ semantic CI の core engine は **PR 専用ではなく、汎用的な 2-state �
 
 `CodeState` は frozen Pydantic schema として抽象化されているため、**どこから観測されたかを engine は問わない**。これは §2 の 3-state RPE モデル（baseline と observed が両方 CodeState 型）の自然な帰結であり、§21.2 pre-generation validation の前提条件でもある。
 
+CLI-layer source resolution (`--candidate-source` / future
+`--baseline-source`) is the only adapter between user intent and the engine's
+path-snapshot contract. The engine MUST NOT learn about "working tree" or
+"staged index" as input categories; it only sees two materialized directories.
+
 PR は最初の主要ユースケースだが、唯一のユースケースではない。Engine の入力契約を生成元から分離することで、後続フェーズでの応用範囲を確保する。
 
 ### 23.2 Application Matrix

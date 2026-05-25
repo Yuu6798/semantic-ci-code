@@ -34,10 +34,9 @@ the user to pass `--target`.
 
 ## Excluding Files From Extraction
 
-Extractor commands (`observe`, `compare`, `check`, `pre-commit`, and the
-baseline-reading paths of `validate-plan`) read optional operational extraction
-config from the nearest `pyproject.toml` found by walking upward from the
-package root:
+Extractor commands (`observe`, `compare`, `check`, and the baseline-reading
+paths of `validate-plan`) read optional operational extraction config from the
+nearest `pyproject.toml` found by walking upward from the package root:
 
 ```toml
 [tool.semantic_ci_code.extract]
@@ -50,9 +49,9 @@ exclude = [
 ```
 
 Patterns are interpreted relative to the `pyproject.toml` parent directory,
-not the current working directory and not the package root. `compare`, `check`,
-and `pre-commit` discover config independently for baseline and candidate
-trees, so historical config changes are respected.
+not the current working directory and not the package root. `compare` and
+`check` discover config independently for baseline and candidate trees, so
+historical config changes are respected.
 
 This is not `.gitignore` syntax. Patterns are stdlib-only `fnmatch` with
 limited recursive support. For recursive subtree exclusion, prefer literal
@@ -211,14 +210,14 @@ authorship:
 Without an explicit format:
 
 - `observe` defaults to JSON.
-- `compare`, `check`, `pre-commit`, and `compile` use human output on a TTY and
-  JSON when piped, redirected, or written with `--output`.
+- `compare`, `check`, and `compile` use human output on a TTY and JSON when
+  piped, redirected, or written with `--output`.
 - `--output <file>` defaults to JSON.
 
 `sarif` and `gh-actions` are CI integration formats for verdict-producing
-subcommands only: `compare`, `check`, and `pre-commit`. `observe` and `compile`
-reject them with usage error 2. `sarif` emits SARIF 2.1.0 JSON and can be used
-with `--output`. `gh-actions` emits GitHub workflow commands (`::error`,
+subcommands only: `compare` and `check`. `observe` and `compile` reject them
+with usage error 2. `sarif` emits SARIF 2.1.0 JSON and can be used with
+`--output`. `gh-actions` emits GitHub workflow commands (`::error`,
 `::warning`, `::notice`) to stdout and rejects `--output` because workflow
 commands must be written to the job log.
 
@@ -228,15 +227,15 @@ Color is enabled only for human output when stdout is a TTY. `--no-color` and
 
 ## Execution Modes
 
-`check` and `pre-commit` accept `--mode {smoke,full}`. `full` is the default
-and preserves the existing behavior. `smoke` is a faster partial run that
-extracts only `api_surface`, `imports`, and `effects`; constraints that target
-unextracted dimensions are reported as `skipped` and do not affect the verdict.
+`check` accepts `--mode {smoke,full}`. `full` is the default and preserves the
+existing behavior. `smoke` is a faster partial run that extracts only
+`api_surface`, `imports`, and `effects`; constraints that target unextracted
+dimensions are reported as `skipped` and do not affect the verdict.
 
 If `--mode` is omitted, `SEMANTIC_CI_MODE=smoke|full` can override the default.
 An explicit `--mode` flag always wins over the environment. CodeState caching
-is available for `check` and `pre-commit`; worktree reuse and extractor
-memoization remain deferred.
+is available for `check`; worktree reuse and extractor memoization remain
+deferred.
 
 ## `semantic-ci observe`
 
@@ -353,6 +352,11 @@ Common source combinations:
 JSON output from `check` records source provenance under
 `engine.baseline` and `engine.candidate`.
 
+**Migrated in Phase 3b**: `semantic-ci pre-commit [...]` became
+`semantic-ci check --candidate-source=staged-index [...]`. The evaluation
+semantics are identical for the hook use case: the baseline is the `HEAD`
+commit and the candidate is the staged index.
+
 `check` caches ref-backed `CodeState` extraction under
 `<repo>/.semantic-ci/cache/code_state/` by default. The cache key includes the
 package subtree object id, package root, execution mode, extracted dimensions,
@@ -388,36 +392,6 @@ semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600
 semantic-ci check --format sarif --output semantic-ci.sarif
 semantic-ci check --format gh-actions
-```
-
-## `semantic-ci pre-commit`
-
-```text
-semantic-ci pre-commit [--target <yaml>] [--package-root <repo-relative-dir>]
-                       [--format {json,human,sarif,gh-actions}] [--output <file>]
-                       [--strict-repair] [--mode {smoke,full}]
-                       [--no-cache] [--cache-dir <dir>]
-                       [--cache-max-bytes <int>]
-```
-
-Compares `HEAD` against the staged index. The staged index is exported with
-`git checkout-index`, so unstaged working-tree changes are ignored. If there are
-no staged files, the command returns an empty PASS payload with exit 0.
-
-`pre-commit` uses the same CodeState cache as `check`. Baseline `HEAD` is keyed
-by the package subtree object id; the staged candidate is keyed by
-`git write-tree`, so identical staged content can hit cache across repeated
-runs. `--no-cache`, `SEMANTIC_CI_NO_CACHE=1`, `--cache-dir`, and
-`--cache-max-bytes` have the same meaning as they do for `check`.
-
-Examples:
-
-```bash
-semantic-ci pre-commit --target target.yaml
-semantic-ci pre-commit --strict-repair
-semantic-ci pre-commit --mode smoke
-semantic-ci pre-commit --cache-dir .semantic-ci/cache
-semantic-ci pre-commit --format gh-actions
 ```
 
 ## `semantic-ci compile`

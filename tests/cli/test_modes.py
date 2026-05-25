@@ -63,12 +63,19 @@ def test_check_accepts_smoke_full_and_defaults_to_full(tmp_path: Path):
     assert payload(default)["mode"] == "full"
 
 
-def test_pre_commit_accepts_smoke_full_and_defaults_to_full(tmp_path: Path):
+def test_check_staged_index_accepts_smoke_full_and_defaults_to_full(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
+    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
 
-    smoke = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
-    full = run_semantic_ci(repo, "pre-commit", "--mode", "full", "--format", "json")
-    default = run_semantic_ci(repo, "pre-commit", "--format", "json")
+    smoke = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--mode", "smoke", "--format", "json"
+    )
+    full = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--mode", "full", "--format", "json"
+    )
+    default = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--format", "json"
+    )
 
     assert smoke.returncode == 0
     assert payload(smoke)["mode"] == "smoke"
@@ -81,24 +88,31 @@ def test_pre_commit_accepts_smoke_full_and_defaults_to_full(tmp_path: Path):
 def test_invalid_mode_flag_exits_usage_error(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
 
-    result = run_semantic_ci(repo, "pre-commit", "--mode", "quick", "--format", "json")
+    result = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--mode", "quick", "--format", "json"
+    )
 
     assert result.returncode == 2
 
 
 def test_semantic_ci_mode_env_overrides_default_and_flag_wins(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
+    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
 
     from_env = run_semantic_ci(
         repo,
-        "pre-commit",
+        "check",
+        "--candidate-source",
+        "staged-index",
         "--format",
         "json",
         extra_env={"SEMANTIC_CI_MODE": "smoke"},
     )
     flag_wins = run_semantic_ci(
         repo,
-        "pre-commit",
+        "check",
+        "--candidate-source",
+        "staged-index",
         "--mode",
         "full",
         "--format",
@@ -107,7 +121,9 @@ def test_semantic_ci_mode_env_overrides_default_and_flag_wins(tmp_path: Path):
     )
     invalid_env = run_semantic_ci(
         repo,
-        "pre-commit",
+        "check",
+        "--candidate-source",
+        "staged-index",
         "--format",
         "json",
         extra_env={"SEMANTIC_CI_MODE": "quick"},
@@ -181,7 +197,9 @@ def test_smoke_json_envelope_reports_mode_and_skipped_summary(tmp_path: Path):
     (repo / "target.yaml").write_text(COMPLEXITY_TARGET, encoding="utf-8")
     stage_changes(repo, {"mod.py": "VALUE = 1\n\ndef existing():\n    return VALUE\n"})
 
-    result = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
+    result = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--mode", "smoke", "--format", "json"
+    )
     data = payload(result)
 
     assert result.returncode == 0
@@ -198,7 +216,9 @@ def test_smoke_human_output_marks_partial_mode_and_skipped_constraints(tmp_path:
 
     no_color = run_semantic_ci(
         repo,
-        "pre-commit",
+        "check",
+        "--candidate-source",
+        "staged-index",
         "--mode",
         "smoke",
         "--format",
@@ -207,7 +227,9 @@ def test_smoke_human_output_marks_partial_mode_and_skipped_constraints(tmp_path:
     )
     color = run_semantic_ci(
         repo,
-        "pre-commit",
+        "check",
+        "--candidate-source",
+        "staged-index",
         "--mode",
         "smoke",
         "--format",
@@ -229,12 +251,18 @@ def test_smoke_verdict_exit_matrix_matches_full_semantics(tmp_path: Path):
         {"mod.py": CANDIDATE_SOURCE},
     )
 
-    pass_result = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
+    pass_result = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--mode", "smoke", "--format", "json"
+    )
     (repo / "target.yaml").write_text(REPAIR_TARGET, encoding="utf-8")
-    repair_result = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
+    repair_result = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--mode", "smoke", "--format", "json"
+    )
     repair_strict = run_semantic_ci(
         repo,
-        "pre-commit",
+        "check",
+        "--candidate-source",
+        "staged-index",
         "--mode",
         "smoke",
         "--format",
@@ -242,7 +270,9 @@ def test_smoke_verdict_exit_matrix_matches_full_semantics(tmp_path: Path):
         "--strict-repair",
     )
     (repo / "target.yaml").write_text(TARGET_FAIL, encoding="utf-8")
-    fail_result = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
+    fail_result = run_semantic_ci(
+        repo, "check", "--candidate-source", "staged-index", "--mode", "smoke", "--format", "json"
+    )
 
     assert pass_result.returncode == 0
     assert payload(pass_result)["verdict"] == "pass"
@@ -261,13 +291,15 @@ def test_smoke_is_faster_than_full(tmp_path: Path):
     extra_env = _slow_full_only_dimensions_env(tmp_path)
     runs = 3
 
-    full_times = [_timed_pre_commit(repo, "full", extra_env=extra_env) for _ in range(runs)]
-    smoke_times = [_timed_pre_commit(repo, "smoke", extra_env=extra_env) for _ in range(runs)]
+    full_times = [_timed_check_staged_index(repo, "full", extra_env=extra_env) for _ in range(runs)]
+    smoke_times = [
+        _timed_check_staged_index(repo, "smoke", extra_env=extra_env) for _ in range(runs)
+    ]
 
     assert statistics.median(smoke_times) <= statistics.median(full_times) * 0.7
 
 
-def _timed_pre_commit(
+def _timed_check_staged_index(
     repo: Path,
     mode: str,
     *,
@@ -276,7 +308,9 @@ def _timed_pre_commit(
     start = time.perf_counter()
     result = run_semantic_ci_subprocess(
         repo,
-        "pre-commit",
+        "check",
+        "--candidate-source",
+        "staged-index",
         "--mode",
         mode,
         "--format",

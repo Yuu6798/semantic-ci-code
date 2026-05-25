@@ -1,12 +1,10 @@
 """Unit tests for ``_resolve_package_root`` symlink escape guards.
 
-A fork PR is the canonical use case for ``semantic-ci check`` and
-``semantic-ci pre-commit``: an attacker may push a tree where the
-package root is a symlink pointing outside the worktree, causing the
-extractor to read ``.py`` files from anywhere on the runner. The
-``validate-plan`` command already enforces ``Path.is_relative_to`` after
-resolving symlinks; these tests pin the same defense for ``check`` and
-``pre-commit`` so the three CLI surfaces stay symmetric.
+A fork PR is the canonical use case for ``semantic-ci check``: an attacker
+may push a tree where the package root is a symlink pointing outside the
+worktree, causing the extractor to read ``.py`` files from anywhere on the
+runner. The ``validate-plan`` command already enforces ``Path.is_relative_to``
+after resolving symlinks; these tests pin the same defense for ``check``.
 """
 
 from __future__ import annotations
@@ -19,9 +17,6 @@ import pytest
 from semantic_ci_code.cli.commands.check import (
     _resolve_package_root as check_resolve_package_root,
 )
-from semantic_ci_code.cli.commands.pre_commit import (
-    _resolve_package_root as pre_commit_resolve_package_root,
-)
 
 
 def _symlink_or_skip(target: Path, link: Path) -> None:
@@ -31,12 +26,7 @@ def _symlink_or_skip(target: Path, link: Path) -> None:
         pytest.skip(f"symlink creation is not available in this environment: {exc}")
 
 
-@pytest.mark.parametrize(
-    "resolver",
-    [check_resolve_package_root, pre_commit_resolve_package_root],
-    ids=["check", "pre_commit"],
-)
-def test_symlink_escape_in_package_root_is_rejected(tmp_path: Path, resolver) -> None:
+def test_symlink_escape_in_package_root_is_rejected(tmp_path: Path) -> None:
     tree_root = tmp_path / "tree"
     outside = tmp_path / "outside"
     tree_root.mkdir()
@@ -48,28 +38,18 @@ def test_symlink_escape_in_package_root_is_rejected(tmp_path: Path, resolver) ->
     _symlink_or_skip(outside, escape_link)
 
     with pytest.raises(ValueError, match=r"escapes tree"):
-        resolver(tree_root, Path("pkg"), "baseline")
+        check_resolve_package_root(tree_root, Path("pkg"), "baseline")
 
 
-@pytest.mark.parametrize(
-    "resolver",
-    [check_resolve_package_root, pre_commit_resolve_package_root],
-    ids=["check", "pre_commit"],
-)
-def test_relative_traversal_in_package_root_is_rejected(tmp_path: Path, resolver) -> None:
+def test_relative_traversal_in_package_root_is_rejected(tmp_path: Path) -> None:
     tree_root = tmp_path / "tree"
     tree_root.mkdir()
 
     with pytest.raises(ValueError, match=r"escapes tree"):
-        resolver(tree_root, Path("../outside"), "candidate")
+        check_resolve_package_root(tree_root, Path("../outside"), "candidate")
 
 
-@pytest.mark.parametrize(
-    "resolver",
-    [check_resolve_package_root, pre_commit_resolve_package_root],
-    ids=["check", "pre_commit"],
-)
-def test_symlink_inside_tree_resolves_normally(tmp_path: Path, resolver) -> None:
+def test_symlink_inside_tree_resolves_normally(tmp_path: Path) -> None:
     tree_root = tmp_path / "tree"
     real_pkg = tree_root / "real_pkg"
     real_pkg.mkdir(parents=True)
@@ -77,5 +57,5 @@ def test_symlink_inside_tree_resolves_normally(tmp_path: Path, resolver) -> None
     inside_link = tree_root / "pkg"
     _symlink_or_skip(real_pkg, inside_link)
 
-    resolved = resolver(tree_root, Path("pkg"), "baseline")
+    resolved = check_resolve_package_root(tree_root, Path("pkg"), "baseline")
     assert resolved == real_pkg.resolve()

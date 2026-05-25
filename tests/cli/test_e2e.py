@@ -55,16 +55,34 @@ def test_e2e_check_subcommand(tmp_path: Path):
     assert data["verdict"] in {"pass", "repair", "fail"}
 
 
-def test_e2e_pre_commit_subcommand(tmp_path: Path):
+def test_e2e_check_staged_index_source(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
 
-    result = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--candidate-source",
+        "staged-index",
+        "--mode",
+        "smoke",
+        "--format",
+        "json",
+    )
     data = payload(result)
 
     assert result.returncode in {0, 1}
-    assert data["subcommand"] == "pre-commit"
+    assert data["subcommand"] == "check"
+    assert data["engine"]["candidate"]["source"] == "staged-index"
     assert data["verdict"] in {"pass", "repair", "fail"}
+
+
+def test_pre_commit_subcommand_is_removed(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "pre-commit")
+
+    assert result.returncode == 2
+    assert "invalid choice" in result.stderr
+    assert "pre-commit" in result.stderr
 
 
 def test_e2e_compile_subcommand():
@@ -93,8 +111,9 @@ def test_e2e_help_lists_all_subcommands():
     result = run_console(COMPILE, "--help")
 
     assert result.returncode == 0
-    for name in ("observe", "compare", "check", "pre-commit", "compile", "init"):
+    for name in ("observe", "compare", "check", "compile", "init"):
         assert name in result.stdout
+    assert "pre-commit" not in result.stdout
 
 
 def test_docs_for_brief_4_cli_exist_and_are_linked_from_readme():

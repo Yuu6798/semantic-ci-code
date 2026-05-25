@@ -7,7 +7,6 @@ parsing output text.
 |---:|---|---|
 | `0` | Pass | `Verdict.result == pass`. |
 | `0` | Repair advisory | `Verdict.result == repair` without `--strict-repair`. |
-| `0` | No staged work | `semantic-ci pre-commit` with an empty staged index. |
 | `0` | Initialized target | `semantic-ci init` created or overwrote the target file. |
 | `1` | Semantic failure | `Verdict.result == fail`. |
 | `1` | Strict repair | `Verdict.result == repair` with `--strict-repair`. |
@@ -23,11 +22,10 @@ parsing output text.
 Existing output files without `--force` and write/path errors exit 2. It has no
 normal engine-error path; exit 3 remains reserved by the global policy.
 
-`compare`, `check`, and `pre-commit` map PASS/REPAIR/FAIL through the table
-above. `--strict-repair` changes only REPAIR from exit 0 to exit 1.
-`check --mode smoke` and `pre-commit --mode smoke` use the same exit-code
-policy; skipped constraints are reported in output but do not contribute to
-PASS, REPAIR, or FAIL.
+`compare` and `check` map PASS/REPAIR/FAIL through the table above.
+`--strict-repair` changes only REPAIR from exit 0 to exit 1. `check --mode
+smoke` uses the same exit-code policy; skipped constraints are reported in
+output but do not contribute to PASS, REPAIR, or FAIL.
 
 Constraints with `severity: info` violate as advisory only: they appear in
 output as `category: info` instructions but never change the verdict or the

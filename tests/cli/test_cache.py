@@ -18,7 +18,6 @@ from semantic_ci_code.cli.code_state_cache import (
     write_cached_code_state,
 )
 from semantic_ci_code.cli.commands import check as check_command
-from semantic_ci_code.cli.commands import pre_commit as pre_commit_command
 from semantic_ci_code.cli.modes import ExecutionMode
 from semantic_ci_code.domain.state_schema import CodeState
 from semantic_ci_code.framework.extract_config import ExtractConfig
@@ -77,92 +76,6 @@ def test_check_uses_cached_codestate_without_calling_extractor_on_second_run(
     assert payload(second)["cache"] == {
         "hit": 2,
         "miss": 0,
-        "invalid": 0,
-        "write_failed": 0,
-        "disabled": False,
-    }
-
-
-def test_pre_commit_uses_cached_codestate_without_calling_extractor_on_second_run(
-    tmp_path: Path,
-    monkeypatch,
-):
-    repo = init_repo_without_candidate_commit(tmp_path)
-    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
-    cache_dir = tmp_path / "cache"
-
-    first = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--cache-dir",
-        str(cache_dir),
-    )
-    monkeypatch.setattr(pre_commit_command, "extract_python_code_state", _boom_extractor)
-    second = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--cache-dir",
-        str(cache_dir),
-    )
-
-    assert first.returncode == 0
-    assert second.returncode == 0
-    assert payload(first)["cache"]["miss"] == 2
-    assert payload(second)["cache"]["hit"] == 2
-
-
-def test_pre_commit_staged_tree_change_misses_candidate_cache(tmp_path: Path):
-    repo = init_repo_without_candidate_commit(tmp_path)
-    cache_dir = tmp_path / "cache"
-    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
-    first = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--cache-dir",
-        str(cache_dir),
-    )
-    second = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--cache-dir",
-        str(cache_dir),
-    )
-
-    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE + "\nVALUE_2 = 2\n"})
-    third = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--cache-dir",
-        str(cache_dir),
-    )
-
-    assert first.returncode == 0
-    assert second.returncode == 0
-    assert third.returncode == 0
-    assert payload(second)["cache"]["hit"] == 2
-    assert payload(third)["cache"] == {
-        "hit": 1,
-        "miss": 1,
         "invalid": 0,
         "write_failed": 0,
         "disabled": False,
@@ -355,43 +268,6 @@ def test_no_cache_flag_and_env_skip_cache_file_creation(tmp_path: Path):
     assert payload(env)["cache"]["disabled"] is True
 
 
-def test_pre_commit_no_cache_flag_and_env_skip_cache_file_creation(tmp_path: Path):
-    repo = init_repo_without_candidate_commit(tmp_path)
-    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
-
-    flag_dir = tmp_path / "flag-cache"
-    env_dir = tmp_path / "env-cache"
-    flag = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--no-cache",
-        "--cache-dir",
-        str(flag_dir),
-    )
-    env = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--cache-dir",
-        str(env_dir),
-        extra_env={"SEMANTIC_CI_NO_CACHE": "1"},
-    )
-
-    assert flag.returncode == 0
-    assert env.returncode == 0
-    assert not flag_dir.exists()
-    assert not env_dir.exists()
-    assert payload(flag)["cache"]["disabled"] is True
-    assert payload(env)["cache"]["disabled"] is True
-
-
 def test_cache_dir_override_accepts_relative_and_absolute_paths(tmp_path: Path):
     repo = init_repo(tmp_path)
     relative_dir = Path("relative-cache")
@@ -416,39 +292,6 @@ def test_cache_dir_override_accepts_relative_and_absolute_paths(tmp_path: Path):
         "--format",
         "json",
         "--no-fetch",
-        "--cache-dir",
-        str(absolute_dir),
-    )
-
-    assert relative.returncode == 0
-    assert absolute.returncode == 0
-    assert (repo / relative_dir / "code_state").exists()
-    assert (absolute_dir / "code_state").exists()
-
-
-def test_pre_commit_cache_dir_override_accepts_relative_and_absolute_paths(tmp_path: Path):
-    repo = init_repo_without_candidate_commit(tmp_path)
-    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
-    relative_dir = Path("relative-cache")
-    absolute_dir = tmp_path / "absolute-cache"
-
-    relative = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
-        "--cache-dir",
-        str(relative_dir),
-    )
-    absolute = run_semantic_ci(
-        repo,
-        "pre-commit",
-        "--mode",
-        "smoke",
-        "--format",
-        "json",
         "--cache-dir",
         str(absolute_dir),
     )
@@ -689,15 +532,12 @@ def test_other_subcommands_do_not_create_cache_files(tmp_path: Path):
     cache_root = repo / ".semantic-ci" / "cache"
 
     observe = run_semantic_ci(repo, "observe", "--package-root", ".", "--format", "json")
-    pre_commit = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
 
     assert observe.returncode == 0
-    assert pre_commit.returncode == 0
     assert not cache_root.exists()
 
 
-def test_non_cache_subcommands_emit_disabled_cache_stats(tmp_path: Path):
-    repo = init_repo_without_candidate_commit(tmp_path)
+def test_non_cache_subcommands_emit_disabled_cache_stats():
     compare = run_semantic_ci(
         REPO_ROOT,
         "compare",
@@ -726,9 +566,8 @@ def test_non_cache_subcommands_emit_disabled_cache_stats(tmp_path: Path):
         "--format",
         "json",
     )
-    pre_commit = run_semantic_ci(repo, "pre-commit", "--mode", "smoke", "--format", "json")
 
-    for result in (compare, observe, compile_result, pre_commit):
+    for result in (compare, observe, compile_result):
         assert result.returncode == 0
         assert payload(result)["schema_version"] == "6"
         assert payload(result)["cache"] == {
@@ -736,7 +575,7 @@ def test_non_cache_subcommands_emit_disabled_cache_stats(tmp_path: Path):
             "miss": 0,
             "invalid": 0,
             "write_failed": 0,
-            "disabled": True if payload(result)["subcommand"] != "pre-commit" else False,
+            "disabled": True,
         }
 
 

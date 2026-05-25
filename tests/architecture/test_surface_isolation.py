@@ -27,7 +27,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2] / "src"
 VERDICT_PATH_HANDLERS = (
     "semantic_ci_code.cli.commands.check",
     "semantic_ci_code.cli.commands.compare",
-    "semantic_ci_code.cli.commands.pre_commit",
 )
 
 AUTHORING_FORBIDDEN_FOR_VERDICT_PATH = (
@@ -156,14 +155,6 @@ def test_inv2_compare_handler_does_not_import_authoring_modules():
         m for m in closure if _is_forbidden_match(m, AUTHORING_FORBIDDEN_FOR_VERDICT_PATH)
     )
     assert not leaks, f"cli.commands.compare INV-2 violation: {leaks}"
-
-
-def test_inv2_pre_commit_handler_does_not_import_authoring_modules():
-    closure = _transitive_closure("semantic_ci_code.cli.commands.pre_commit")
-    leaks = sorted(
-        m for m in closure if _is_forbidden_match(m, AUTHORING_FORBIDDEN_FOR_VERDICT_PATH)
-    )
-    assert not leaks, f"cli.commands.pre_commit INV-2 violation: {leaks}"
 
 
 def test_inv2_main_dispatcher_is_excluded_from_isolation():
@@ -299,9 +290,3 @@ def test_inv2_compare_handler_does_not_import_init_recipe_or_sources():
     closure = _transitive_closure("semantic_ci_code.cli.commands.compare")
     leaks = sorted(m for m in closure if _is_forbidden_match(m, CSCI_42_FORBIDDEN_FOR_VERDICT_PATH))
     assert not leaks, f"cli.commands.compare INV-2 violation (CSCI-42): {leaks}"
-
-
-def test_inv2_pre_commit_handler_does_not_import_init_recipe_or_sources():
-    closure = _transitive_closure("semantic_ci_code.cli.commands.pre_commit")
-    leaks = sorted(m for m in closure if _is_forbidden_match(m, CSCI_42_FORBIDDEN_FOR_VERDICT_PATH))
-    assert not leaks, f"cli.commands.pre_commit INV-2 violation (CSCI-42): {leaks}"

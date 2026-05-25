@@ -61,7 +61,7 @@ semantic-ci check --target target.yaml
 Check staged changes before committing:
 
 ```bash
-semantic-ci pre-commit --target target.yaml
+semantic-ci check --candidate-source=staged-index --target target.yaml
 ```
 
 Dry-compile a target file:

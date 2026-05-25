@@ -6,34 +6,39 @@ identifies safe follow-up work, but does not delete tests.
 
 Snapshot:
 
-- Date: 2026-05-09
+- Date: 2026-05-25
 - Command: `python -m pytest -q --no-cov tests/cli`
-- Result: `232 passed, 4 skipped, 1 deselected in 161.18s` on Windows Codex desktop
+- Result: `420 passed, 3 skipped, 1 deselected in 105.16s` on Windows Codex desktop
 - Scope: CLI tests only; default run excludes the single `slow` smoke/full benchmark
 
 ## File Map
 
 | File | Tests | Default invocation | Subprocess retained for | Primary role |
 |---|---:|---|---|---|
-| `tests/cli/test_cache.py` | 28 | in-process | none | CodeState cache hit/miss, eviction, cache key axes |
-| `tests/cli/test_check.py` | 25 | in-process | PYTHONHASHSEED determinism | git ref resolution, worktree materialization, dirty handling, cleanup |
+| `tests/cli/test_cache.py` | 26 | in-process | none | CodeState cache hit/miss, eviction, cache key axes |
+| `tests/cli/test_check.py` | 34 | in-process | PYTHONHASHSEED determinism | git ref resolution, source selection, worktree materialization, cleanup |
 | `tests/cli/test_compare.py` | 40 | in-process | PYTHONHASHSEED determinism | `compare` contract, target discovery, JSON/human rendering, output routing |
 | `tests/cli/test_compare_partial_match.py` | 1 | in-process | none | partial-match end-to-end regression |
 | `tests/cli/test_compile.py` | 13 | in-process | PYTHONHASHSEED determinism | `compile` envelope, policy serialization, target errors |
 | `tests/cli/test_compile_repair.py` | 17 | in-process | none | `compile-repair` pipe/input/output behavior |
-| `tests/cli/test_e2e.py` | 8 | in-process | `--version` and `--help` console-script smoke | shallow release sanity layer |
+| `tests/cli/test_e2e.py` | 9 | in-process | `--version` and `--help` console-script smoke | shallow release sanity layer |
 | `tests/cli/test_extract_config_cli.py` | 3 | in-process | none | extractor exclude CLI integration and error routing |
 | `tests/cli/test_helpers.py` | 3 | in-process | none | in-process CLI invoker and git-template isolation coverage |
-| `tests/cli/test_init_command.py` | 5 | in-process | none | `init` scaffold and overwrite behavior |
+| `tests/cli/test_init_command.py` | 8 | in-process | none | `init` scaffold, overwrite behavior, and hidden-flag guards |
+| `tests/cli/test_init_merge.py` | 26 | in-process | none | `init --recipe` source merge and conflict routing |
+| `tests/cli/test_init_recipe.py` | 52 | in-process | none | `init --recipe` generated target shapes and validation |
+| `tests/cli/test_init_sources.py` | 29 | direct unit | none | PR body / issue / label / commit source parsers |
 | `tests/cli/test_json_formatter.py` | 2 | direct unit | none | JSON formatter edge behavior |
-| `tests/cli/test_modes.py` | 10 | in-process | slow benchmark opt-in uses subprocess | smoke/full mode behavior and benchmark |
+| `tests/cli/test_modes.py` | 9 | in-process | slow benchmark opt-in uses subprocess | smoke/full mode behavior and benchmark |
 | `tests/cli/test_observe.py` | 21 | in-process | console script, python module, legacy script, PYTHONHASHSEED determinism | `observe` contract, entrypoints, output schema |
 | `tests/cli/test_output_gh_actions.py` | 12 | in-process | PYTHONHASHSEED determinism | GitHub Actions annotation output |
 | `tests/cli/test_output_sarif.py` | 13 | in-process | PYTHONHASHSEED determinism | SARIF output |
 | `tests/cli/test_overlay.py` | 7 | direct unit | none | `numstat` parser and delta overlay |
-| `tests/cli/test_pre_commit.py` | 12 | in-process | PYTHONHASHSEED determinism | staged-index export and pre-commit semantics |
-| `tests/cli/test_pre_commit_manifest.py` | 2 | direct unit | none | static pre-commit manifest validation |
-| `tests/cli/test_resolve_package_root.py` | 6 | direct unit | none | package-root path guard behavior |
+| `tests/cli/test_pre_commit_manifest.py` | 3 | direct unit + in-process hook command smoke | none | static pre-commit manifest validation for `check --candidate-source=staged-index` |
+| `tests/cli/test_resolve_package_root.py` | 3 | direct unit | none | `check` package-root path guard behavior |
+| `tests/cli/test_staged_index.py` | 1 | direct unit | none | staged-index export materialization and cleanup |
+| `tests/cli/test_target_catalog.py` | 16 | in-process + subprocess determinism | PYTHONHASHSEED determinism | `target-catalog` authoring meta surface |
+| `tests/cli/test_target_doctor.py` | 66 | in-process | none | `target-doctor` advisory detection and package-root behavior |
 | `tests/cli/test_validate_plan.py` | 9 | in-process | none | `validate-plan` baseline/input/output behavior |
 
 ## Runtime Findings
@@ -58,8 +63,9 @@ process startup:
 
 - `test_check.py` creates git repositories, materializes worktrees, and verifies
   cleanup and shallow-clone behavior.
-- `test_cache.py` and `test_pre_commit.py` exercise real cache files and staged
-  index export.
+- `test_cache.py` exercises real cache files. Staged-index export is covered by
+  `test_staged_index.py` and the `check --candidate-source=staged-index`
+  smoke tests.
 - D2-2 migrated the verdict-shape `check` cases to `compare`, but the retained
   `check` tests are intentionally git-specific.
 - Some retained git-specific smoke tests pass `--mode smoke` and `--no-fetch`
@@ -72,20 +78,22 @@ process startup:
   source of CLI-suite cost.
 
 The Windows local target of `<150s` was not reached by D2-2 alone. The measured
-improvement was roughly 39.2% (`264.92s` to `161.18s`). Further reduction now
-requires either parallel execution (`pytest-xdist`) or a deeper split between
-real-git smoke tests and direct unit tests for cache/check internals.
+improvement was roughly 39.2% (`264.92s` to `161.18s`). After later CLI surface
+cleanup and test movement, this snapshot measures `tests/cli` at `105.16s`.
+Further reduction below this level likely requires either parallel execution
+(`pytest-xdist`) or a deeper split between real-git smoke tests and direct unit
+tests for cache/check internals.
 
 ## Coverage Categories
 
 | Category | Tests/files | Reduction stance |
 |---|---|---|
 | Entry points | `test_observe.py`, `test_e2e.py` | Keep. These catch packaging and module invocation regressions. |
-| Command verdict matrix | `test_compare.py`, `test_check.py`, `test_pre_commit.py` | Keep one matrix per command. These commands differ in materialization and exit-code behavior. |
+| Command verdict matrix | `test_compare.py`, `test_check.py` | Keep one matrix per verdict command. Staged-index hook semantics now run through `check --candidate-source=staged-index`. |
 | Formatter serialization | `test_compare.py`, `test_compile.py` | Candidate for moving some assertions to direct formatter unit tests, avoiding subprocess. |
-| Target discovery and compile errors | `test_compare.py`, `test_compile.py`, `test_check.py`, `test_pre_commit.py` | Keep representative command-level coverage, but avoid testing identical loader behavior in every command. |
-| Git runtime behavior | `test_check.py`, `test_pre_commit.py` | Keep. These are not redundant with non-git tests. |
-| Determinism | `test_observe.py`, `test_compare.py`, `test_check.py`, `test_pre_commit.py`, `test_compile.py` | Keep for now. If reduced later, preserve at least one non-git and one git-backed subprocess determinism test. |
+| Target discovery and compile errors | `test_compare.py`, `test_compile.py`, `test_check.py` | Keep representative command-level coverage, but avoid testing identical loader behavior in every command. |
+| Git runtime behavior | `test_check.py`, `test_staged_index.py` | Keep. These are not redundant with non-git tests. |
+| Determinism | `test_observe.py`, `test_compare.py`, `test_check.py`, `test_compile.py` | Keep for now. If reduced later, preserve at least one non-git and one git-backed subprocess determinism test. |
 | Dependency invariant | `test_observe.py`, `test_compare.py` | Candidate for consolidation into one repository-level dependency invariant test. |
 | E2E smoke | `test_e2e.py` | Keep shallow. Do not add detailed assertions here. |
 
@@ -145,8 +153,6 @@ These look expensive but still protect behavior that is not covered elsewhere.
   failure, not just happy path.
 - `test_shallow_clone_fetch_fallback_resolves_origin_main`: covers CI clone
   behavior.
-- `test_pre_commit_ignores_unstaged_working_directory_changes`: distinguishes
-  staged-index semantics from working-tree semantics.
 - `test_subprocess_determinism_across_hash_seeds` in git-backed commands:
   expensive, but protects deterministic JSON across separate processes.
 
@@ -177,7 +183,7 @@ repositories once per `tests/cli` run:
 
 - `full`: baseline commit on `main`, remote-tracking `origin/main`, and a
   feature commit.
-- `short`: baseline commit only, used by staged-index `pre-commit` tests.
+- `short`: baseline commit only, used by staged-index `check` tests.
 - `topic_only`: no default baseline branch, used by missing-baseline tests.
 
 Tests continue to call the existing `init_repo` helpers. Those helpers clone or

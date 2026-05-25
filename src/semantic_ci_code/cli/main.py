@@ -8,7 +8,6 @@ from semantic_ci_code.cli.commands.compare import run_compare
 from semantic_ci_code.cli.commands.compile import run_compile
 from semantic_ci_code.cli.commands.compile_repair import run_compile_repair
 from semantic_ci_code.cli.commands.observe import run_observe
-from semantic_ci_code.cli.commands.pre_commit import run_pre_commit
 from semantic_ci_code.cli.commands.target_catalog import run_target_catalog
 from semantic_ci_code.cli.commands.target_doctor import run_target_doctor
 from semantic_ci_code.cli.commands.validate_plan import run_validate_plan
@@ -113,47 +112,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="maximum cache size in bytes; 0 disables eviction",
     )
     check.add_argument(
-        "--no-color",
-        action="store_true",
-        default=argparse.SUPPRESS,
-        help="disable ANSI color in human output",
-    )
-
-    pre_commit = subcommands.add_parser(
-        "pre-commit",
-        help="compare staged index against HEAD",
-    )
-    pre_commit.add_argument("--target", default=None, help="Target SVP YAML file")
-    pre_commit.add_argument(
-        "--package-root",
-        default=".",
-        help="repo-relative Python package root inside HEAD and the staged index",
-    )
-    pre_commit.add_argument("--format", choices=_VERDICT_FORMATS, default=None)
-    pre_commit.add_argument(
-        "--output",
-        default=None,
-        help="write output to this file instead of stdout",
-    )
-    pre_commit.add_argument("--strict-repair", action="store_true")
-    pre_commit.add_argument(
-        "--mode",
-        choices=("smoke", "full"),
-        default=None,
-        help="execution mode; defaults to SEMANTIC_CI_MODE or full",
-    )
-    pre_commit.add_argument("--no-cache", action="store_true", help="disable CodeState cache")
-    pre_commit.add_argument(
-        "--cache-dir",
-        default=None,
-        help="cache root directory; defaults to <repo>/.semantic-ci/cache",
-    )
-    pre_commit.add_argument(
-        "--cache-max-bytes",
-        default=None,
-        help="maximum cache size in bytes; 0 disables eviction",
-    )
-    pre_commit.add_argument(
         "--no-color",
         action="store_true",
         default=argparse.SUPPRESS,
@@ -387,8 +345,6 @@ def main(argv: list[str] | None = None) -> int:
         return run_compare(args)
     if args.subcommand == "check":
         return run_check(args)
-    if args.subcommand == "pre-commit":
-        return run_pre_commit(args)
     if args.subcommand == "compile":
         return run_compile(args)
     if args.subcommand == "compile-repair":

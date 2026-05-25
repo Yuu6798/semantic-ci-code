@@ -308,7 +308,8 @@ semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--target <yaml>] [--package-root <repo-relative-dir>]
                   [--format {json,human,sarif,gh-actions}] [--output <file>]
                   [--strict-repair] [--no-fetch]
-                  [--candidate-source {commit,working-tree}]
+                  [--baseline-source {commit,working-tree,staged-index}]
+                  [--candidate-source {commit,working-tree,staged-index}]
                   [--mode {smoke,full}] [--no-cache] [--cache-dir <dir>]
                   [--cache-max-bytes <int>]
 ```
@@ -319,14 +320,35 @@ Compares git refs using temporary detached worktrees. Defaults are:
 - candidate: `HEAD`
 
 `--package-root` is repo-relative and is resolved inside each materialized tree.
-`--candidate-source` selects where the candidate snapshot comes from:
+`--baseline-source` and `--candidate-source` select where each snapshot comes
+from:
 
-- `commit` (default): evaluate the resolved candidate commit (`HEAD` unless
-  `--candidate-rev` is provided). Uncommitted working-tree changes are ignored
-  and no dirty-tree warning is emitted.
-- `working-tree`: evaluate the current working tree as candidate. This cannot
-  be combined with `--candidate-rev`. With `--verbose`, a clean working tree
-  emits a note that the source is equivalent to `HEAD`.
+- `commit` (default): evaluate a resolved commit ref. Baseline uses
+  `--baseline-rev` or the `origin/main` -> `main` -> `master` fallback;
+  candidate uses `--candidate-rev` or `HEAD`. When
+  `--candidate-source staged-index` is used and `--baseline-rev` is omitted,
+  baseline commit defaults to `HEAD` to match pre-commit-style semantics.
+- `working-tree`: evaluate the current working tree. It cannot be combined with
+  the same side's `--*-rev` flag. With `--verbose`,
+  `--candidate-source working-tree` emits a note when the working tree is clean
+  and therefore equivalent to `HEAD`.
+- `staged-index`: evaluate the current staged index, exported with
+  `git checkout-index`. It cannot be combined with the same side's `--*-rev`
+  flag.
+
+If baseline and candidate use the same volatile source (`working-tree` or
+`staged-index`), `check` emits a warning and still runs; the verdict reports no
+drift by construction because both sides materialize the same snapshot.
+
+Common source combinations:
+
+| Use case | `--baseline-source` | `--candidate-source` | Notes |
+|---|---|---|---|
+| PR review / CI gate | `commit` | `commit` | Default. Compares baseline ref to candidate ref. |
+| Pre-commit-style simulation | `commit` | `staged-index` | Baseline defaults to `HEAD` unless `--baseline-rev` is given. |
+| Working-tree trial | `commit` | `working-tree` | Compares a baseline ref to uncommitted local files. |
+| Self-check working tree | `working-tree` | `working-tree` | Degenerate no-drift comparison; warning emitted. |
+| Self-check staged index | `staged-index` | `staged-index` | Degenerate no-drift comparison; warning emitted. |
 
 JSON output from `check` records source provenance under
 `engine.baseline` and `engine.candidate`.
@@ -359,6 +381,8 @@ Examples:
 semantic-ci check
 semantic-ci check --baseline-rev origin/main --candidate-rev HEAD --target target.yaml
 semantic-ci check --candidate-source working-tree --package-root src/semantic_ci_code
+semantic-ci check --candidate-source staged-index --target target.yaml
+semantic-ci check --baseline-source working-tree --candidate-source staged-index
 semantic-ci check --mode smoke
 semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600

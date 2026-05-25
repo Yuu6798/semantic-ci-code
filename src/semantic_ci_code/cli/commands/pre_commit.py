@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import tempfile
 from argparse import Namespace
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 
 from semantic_ci_code.cli.code_state_cache import (
@@ -42,12 +39,12 @@ from semantic_ci_code.cli.git_runtime import (
     GitNotFoundError,
     is_git_available,
     repo_root,
-    run_git,
     staged_tree_object_id,
     tree_object_id,
 )
 from semantic_ci_code.cli.modes import dimensions_for_mode, resolve_execution_mode
 from semantic_ci_code.cli.output.json_formatter import build_payload
+from semantic_ci_code.cli.staged_index import export_staged_index
 from semantic_ci_code.cli.target_loader import (
     TargetUsageError,
     discover_target,
@@ -92,7 +89,7 @@ def run_pre_commit(args: Namespace) -> int:
         staged_tree = staged_tree_object_id(root)
 
         with materialize_ref(root, "HEAD", prefix="semantic-ci-baseline-") as baseline_dir:
-            with _export_index(root, prefix="semantic-ci-candidate-") as candidate_dir:
+            with export_staged_index(root, prefix="semantic-ci-candidate-") as candidate_dir:
                 baseline_root = _resolve_package_root(baseline_dir, package_root, "baseline")
                 candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
                 baseline_config = load_extract_config_for_cli(
@@ -186,17 +183,6 @@ def run_pre_commit(args: Namespace) -> int:
         return _engine_error(exc, args)
     except Exception as exc:
         return _internal_bug(exc, args)
-
-
-@contextmanager
-def _export_index(repo_root: Path, *, prefix: str) -> Iterator[Path]:
-    with tempfile.TemporaryDirectory(prefix=prefix) as temp_dir:
-        export_root = Path(temp_dir)
-        run_git(
-            ["checkout-index", f"--prefix={export_root.as_posix()}/", "-a"],
-            cwd=repo_root,
-        )
-        yield export_root
 
 
 def _emit_empty_pass(

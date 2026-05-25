@@ -85,7 +85,7 @@ bump beyond the current CLI schema version.
 | `files_touched` | Git diff file count. Zero for `observe` and `compare`. |
 | `loc_delta` | Git diff line count. Zero for `observe` and `compare`. |
 | `cache` | Cache stats for this invocation: `hit`, `miss`, `invalid`, `write_failed`, and `disabled`. |
-| `engine` | Python minor version, package version, and optional source provenance. `check` includes `engine.baseline` and `engine.candidate` sub-objects with `{source, rev}`; `source` is `commit` or `working-tree`, and `rev` is a resolved commit SHA for commit-backed sources or `null` for the working tree. Other verdict-producing subcommands may omit these sub-objects. |
+| `engine` | Python minor version, package version, and optional source provenance. `check` includes `engine.baseline` and `engine.candidate` sub-objects with `{source, rev}`; `source` is `commit`, `working-tree`, or `staged-index`, and `rev` is a resolved commit SHA for commit-backed sources or `null` for volatile sources. Other verdict-producing subcommands may omit these sub-objects. |
 
 Extractor exclude config changes cache identity but not the JSON envelope shape.
 `check` and `pre-commit` include the effective exclude key in their internal
@@ -353,7 +353,7 @@ bump the envelope version.
 | `4` | verdict, compile | Added `target_authorship` to verdict envelopes and `compiled_target.authorship` to compile envelopes. |
 | `5` | verdict, compile | Added Match Schema partial-record semantics for set operators, compile-time validation for partial dict expected records, flat projection aliases, and `evidence.matched` for `excludes_all` violations. |
 | `5` | verdict | Brief D1-4: added optional `results[].unknown_cause` and `repair_plan.instructions[].unknown_cause` (values: `authoring` / `extraction` / `open_runtime` / `evaluator_internal`). Nested optional diagnostic field; no bump per the compatibility exception above. Authoring-cause UNKNOWN routes to `verdict: "fail"` regardless of `unknown_policy`. |
-| `6` | verdict, compile | Source-selection Phase 2: replaced `check --allow-dirty` with `--candidate-source {commit,working-tree}` and added `check` source provenance under `engine.baseline` / `engine.candidate`. The compile envelope keeps the shared schema version but its shape is unchanged in v6. |
+| `6` | verdict, compile | Source-selection Phase 2/3a: replaced `check --allow-dirty` with explicit source selection, added `check` source provenance under `engine.baseline` / `engine.candidate`, then extended the source enum with `staged-index`. The compile envelope keeps the shared schema version but its shape is unchanged in v6. |
 | `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 | `2` | validate-plan | Brief D3: added `risk_summary.authoring_errors` as a sibling list (positioned first). Adapter rendering surfaces a two-step "fix authoring first, then implement" instruction. |
@@ -403,11 +403,16 @@ bump the envelope version.
 
 - `semantic-ci check` now records source provenance in the JSON envelope:
   `engine.baseline` and `engine.candidate` each have `{source, rev}`.
-- `source` is `"commit"` or `"working-tree"`. `rev` is the resolved commit SHA
-  when `source == "commit"` and `null` when `source == "working-tree"`.
-- `check --candidate-source {commit,working-tree}` replaces the removed
-  `check --allow-dirty` flag. The CLI layer still materializes two directories
-  for the engine; the engine does not receive source-category enums.
+- `source` is `"commit"`, `"working-tree"`, or `"staged-index"`. `rev` is the
+  resolved commit SHA when `source == "commit"` and `null` for volatile sources.
+- `check --candidate-source {commit,working-tree}` replaced the removed
+  `check --allow-dirty` flag in Phase 2. Phase 3a adds
+  `--baseline-source {commit,working-tree,staged-index}` and extends
+  `--candidate-source` with `staged-index` without bumping the schema version:
+  adding an enum value to this optional provenance field is covered by the
+  compatibility policy above.
+- The CLI layer still materializes two directories for the engine; the engine
+  does not receive source-category enums.
 
 ## validate-plan v1 to v2 Diff
 

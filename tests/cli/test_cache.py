@@ -634,6 +634,55 @@ def test_candidate_source_working_tree_skips_candidate_cache_but_keeps_baseline_
     assert len(tuple((cache_dir / "code_state").glob("*.json"))) == 1
 
 
+def test_candidate_source_staged_index_skips_candidate_cache_but_keeps_baseline_cache(
+    tmp_path: Path,
+):
+    repo = init_repo_without_candidate_commit(tmp_path)
+    stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
+    cache_dir = tmp_path / "cache"
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--mode",
+        "smoke",
+        "--format",
+        "json",
+        "--no-fetch",
+        "--candidate-source",
+        "staged-index",
+        "--cache-dir",
+        str(cache_dir),
+    )
+
+    assert result.returncode == 0
+    assert len(tuple((cache_dir / "code_state").glob("*.json"))) == 1
+
+
+def test_baseline_source_staged_index_skips_baseline_cache_but_keeps_candidate_cache(
+    tmp_path: Path,
+):
+    repo = init_repo(tmp_path)
+    cache_dir = tmp_path / "cache"
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--mode",
+        "smoke",
+        "--format",
+        "json",
+        "--no-fetch",
+        "--baseline-source",
+        "staged-index",
+        "--cache-dir",
+        str(cache_dir),
+    )
+
+    assert result.returncode == 1
+    assert len(tuple((cache_dir / "code_state").glob("*.json"))) == 1
+
+
 def test_other_subcommands_do_not_create_cache_files(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     write_file(repo / "mod.py", CANDIDATE_SOURCE)

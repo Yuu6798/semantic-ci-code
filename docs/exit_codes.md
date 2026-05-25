@@ -92,6 +92,10 @@ go to stderr.
 | Git unavailable | 3 | `git is required for 'check'; install git or use 'compare'` or the subcommand-specific equivalent. |
 | Dirty working tree in `check` with default `--candidate-source commit` | 0/1 | No warning; the resolved candidate commit is evaluated. |
 | `check --candidate-source working-tree --candidate-rev <ref>` | 2 | `error: --candidate-source=working-tree is incompatible with --candidate-rev` |
+| `check --candidate-source staged-index --candidate-rev <ref>` | 2 | `error: --candidate-source=staged-index is incompatible with --candidate-rev` |
+| `check --baseline-source working-tree --baseline-rev <ref>` | 2 | `error: --baseline-source=working-tree is incompatible with --baseline-rev` |
+| `check --baseline-source staged-index --baseline-rev <ref>` | 2 | `error: --baseline-source=staged-index is incompatible with --baseline-rev` |
+| `check --baseline-source <volatile> --candidate-source <same volatile>` | 0/1 | Warning: verdict will report no drift by construction. |
 | Internal bug | 4 | `internal error: <one-line>; rerun with --verbose for traceback` |
 
 With `--verbose`, expected engine errors also print a traceback after the

@@ -3,6 +3,8 @@ from __future__ import annotations
 import pickle
 from pathlib import Path
 
+import pytest
+
 from semantic_ci_code.cli.git_runtime import GitCommandError
 
 from .git_helpers import (
@@ -16,6 +18,7 @@ from .git_helpers import (
     init_repo_without_candidate_commit,
     init_topic_only_repo,
     run,
+    stage_changes,
     write_file,
 )
 from .helpers import REPO_ROOT, parse_json, payload, run_semantic_ci, run_semantic_ci_subprocess
@@ -27,6 +30,9 @@ COMPARE_PASS_TARGET = COMPARE_FIXTURES / "target_pass.yaml"
 COMPARE_REPAIR_TARGET = COMPARE_FIXTURES / "target_repair.yaml"
 COMPARE_FAIL_TARGET = COMPARE_FIXTURES / "target_fail.yaml"
 COMPARE_INVALID_TARGET = COMPARE_FIXTURES / "target_invalid.yaml"
+TARGET_NO_USER_CONSTRAINTS = (
+    "intent: no user constraints\nchange:\n  primary_kind: feature\nconstraints: []\n"
+)
 
 
 def compare_args(target: Path = COMPARE_PASS_TARGET) -> list[str]:
@@ -195,26 +201,87 @@ def test_default_candidate_source_commit_uses_head_without_dirty_warning(tmp_pat
     assert payload(result)["verdict"] == "fail"
 
 
-def test_candidate_source_working_tree_conflicts_with_candidate_rev(tmp_path: Path):
+@pytest.mark.parametrize(
+    ("side", "source", "rev_flag", "expected_message"),
+    (
+        (
+            "candidate",
+            "working-tree",
+            "--candidate-rev",
+            "error: --candidate-source=working-tree is incompatible with --candidate-rev",
+        ),
+        (
+            "candidate",
+            "staged-index",
+            "--candidate-rev",
+            "error: --candidate-source=staged-index is incompatible with --candidate-rev",
+        ),
+        (
+            "baseline",
+            "working-tree",
+            "--baseline-rev",
+            "error: --baseline-source=working-tree is incompatible with --baseline-rev",
+        ),
+        (
+            "baseline",
+            "staged-index",
+            "--baseline-rev",
+            "error: --baseline-source=staged-index is incompatible with --baseline-rev",
+        ),
+    ),
+)
+def test_volatile_source_conflicts_with_explicit_rev(
+    tmp_path: Path,
+    side: str,
+    source: str,
+    rev_flag: str,
+    expected_message: str,
+):
     repo = init_repo(tmp_path)
-    candidate_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+    sha = git(repo, "rev-parse", "HEAD").stdout.strip()
 
     result = run_semantic_ci(
         repo,
         "check",
-        "--candidate-source",
-        "working-tree",
-        "--candidate-rev",
-        candidate_sha,
+        f"--{side}-source",
+        source,
+        rev_flag,
+        sha,
         "--format",
         "json",
     )
 
     assert result.returncode == 2
-    assert (
-        "error: --candidate-source=working-tree is incompatible with --candidate-rev"
-        in result.stderr
+    assert result.stderr == f"{expected_message}\n"
+
+
+@pytest.mark.parametrize("source", ("working-tree", "staged-index"))
+def test_same_volatile_source_warns_and_runs(tmp_path: Path, source: str):
+    repo = init_repo_without_candidate_commit(tmp_path)
+    write_file(repo / "target.yaml", TARGET_NO_USER_CONSTRAINTS)
+
+    result = run_semantic_ci(
+        repo,
+        "--verbose",
+        "check",
+        "--mode",
+        "smoke",
+        "--no-fetch",
+        "--baseline-source",
+        source,
+        "--candidate-source",
+        source,
+        "--format",
+        "json",
     )
+
+    assert result.returncode == 0
+    assert (
+        "warning: baseline and candidate resolve to the same "
+        f"{source} snapshot; verdict will report no drift by construction."
+    ) in result.stderr
+    assert payload(result)["engine"]["baseline"] == {"source": source, "rev": None}
+    assert payload(result)["engine"]["candidate"] == {"source": source, "rev": None}
 
 
 def test_candidate_source_working_tree_clean_verbose_note(tmp_path: Path):
@@ -288,6 +355,56 @@ def test_check_json_provenance_for_commit_and_working_tree_sources(tmp_path: Pat
         "rev": None,
     }
 
+    staged_repo = init_repo_without_candidate_commit(tmp_path / "staged-candidate")
+    stage_changes(staged_repo, {"mod.py": CANDIDATE_SOURCE})
+    staged_baseline_sha = git(staged_repo, "rev-parse", "HEAD").stdout.strip()
+    staged = payload(
+        run_semantic_ci(
+            staged_repo,
+            "check",
+            "--mode",
+            "smoke",
+            "--no-fetch",
+            "--candidate-source",
+            "staged-index",
+            "--format",
+            "json",
+        )
+    )
+    assert staged["engine"]["baseline"] == {
+        "source": "commit",
+        "rev": staged_baseline_sha,
+    }
+    assert staged["engine"]["candidate"] == {
+        "source": "staged-index",
+        "rev": None,
+    }
+    assert staged["verdict"] == "pass"
+
+    staged_baseline_repo = init_repo(tmp_path / "staged-baseline")
+    staged_baseline_candidate_sha = git(staged_baseline_repo, "rev-parse", "HEAD").stdout.strip()
+    staged_baseline = payload(
+        run_semantic_ci(
+            staged_baseline_repo,
+            "check",
+            "--mode",
+            "smoke",
+            "--no-fetch",
+            "--baseline-source",
+            "staged-index",
+            "--format",
+            "json",
+        )
+    )
+    assert staged_baseline["engine"]["baseline"] == {
+        "source": "staged-index",
+        "rev": None,
+    }
+    assert staged_baseline["engine"]["candidate"] == {
+        "source": "commit",
+        "rev": staged_baseline_candidate_sha,
+    }
+
     explicit_repo = init_repo(tmp_path / "explicit-ref")
     explicit_baseline_sha = git(explicit_repo, "rev-parse", "origin/main").stdout.strip()
     explicit_candidate_sha = git(explicit_repo, "rev-parse", "HEAD").stdout.strip()
@@ -312,6 +429,28 @@ def test_check_json_provenance_for_commit_and_working_tree_sources(tmp_path: Pat
         "source": "commit",
         "rev": explicit_candidate_sha,
     }
+
+
+def test_candidate_source_staged_index_defaults_baseline_to_head(tmp_path: Path):
+    repo = init_repo(tmp_path)
+    head = git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--mode",
+        "smoke",
+        "--no-fetch",
+        "--candidate-source",
+        "staged-index",
+        "--format",
+        "json",
+    )
+
+    data = payload(result)
+    assert result.returncode == 1
+    assert data["engine"]["baseline"] == {"source": "commit", "rev": head}
+    assert data["engine"]["candidate"] == {"source": "staged-index", "rev": None}
 
 
 def test_worktree_cleanup_on_success(tmp_path: Path):

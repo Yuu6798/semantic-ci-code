@@ -106,6 +106,21 @@ def test_inv2b_working_tree_source_is_visible_without_candidate_rev(tmp_path: Pa
     }
 
 
+def test_inv2c_staged_index_source_is_visible_without_candidate_rev(tmp_path: Path):
+    repo = _init_repo_without_candidate_commit(tmp_path)
+    _write(repo / "mod.py", CANDIDATE_SOURCE)
+    _git(repo, "add", "mod.py")
+
+    payload = _run_check(repo, "--candidate-source", "staged-index")
+
+    assert payload["verdict"] == "pass"
+    assert payload["engine"]["baseline"]["source"] == "commit"
+    assert payload["engine"]["candidate"] == {
+        "source": "staged-index",
+        "rev": None,
+    }
+
+
 def _run_check(repo: Path, *extra_args: str, expected_rc: int = 0) -> dict:
     rc, stdout = _run_semantic_ci(
         repo,

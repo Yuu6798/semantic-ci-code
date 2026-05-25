@@ -165,6 +165,11 @@ first, then user constraints in YAML order.
 built-in template constraints only. User constraints still observe the original
 semantic state and delta.
 
+The compile envelope shares the CLI `SCHEMA_VERSION` constant with verdict
+envelopes for compatibility, but v6 does not add source provenance fields to
+`compile`; its envelope shape is unchanged from v5 except for the shared version
+number.
+
 ## Compile-Repair Envelope
 
 `semantic-ci compile-repair --format json` uses an independent Brief 5 envelope.
@@ -348,7 +353,7 @@ bump the envelope version.
 | `4` | verdict, compile | Added `target_authorship` to verdict envelopes and `compiled_target.authorship` to compile envelopes. |
 | `5` | verdict, compile | Added Match Schema partial-record semantics for set operators, compile-time validation for partial dict expected records, flat projection aliases, and `evidence.matched` for `excludes_all` violations. |
 | `5` | verdict | Brief D1-4: added optional `results[].unknown_cause` and `repair_plan.instructions[].unknown_cause` (values: `authoring` / `extraction` / `open_runtime` / `evaluator_internal`). Nested optional diagnostic field; no bump per the compatibility exception above. Authoring-cause UNKNOWN routes to `verdict: "fail"` regardless of `unknown_policy`. |
-| `6` | verdict, compile | Source-selection Phase 2: replaced `check --allow-dirty` with `--candidate-source {commit,working-tree}` and added `check` source provenance under `engine.baseline` / `engine.candidate`. |
+| `6` | verdict, compile | Source-selection Phase 2: replaced `check --allow-dirty` with `--candidate-source {commit,working-tree}` and added `check` source provenance under `engine.baseline` / `engine.candidate`. The compile envelope keeps the shared schema version but its shape is unchanged in v6. |
 | `1` | compile-repair | Initial Brief 5 repair compiler rendering envelope. |
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 | `2` | validate-plan | Brief D3: added `risk_summary.authoring_errors` as a sibling list (positioned first). Adapter rendering surfaces a two-step "fix authoring first, then implement" instruction. |

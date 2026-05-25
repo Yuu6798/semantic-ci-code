@@ -248,6 +248,12 @@ def test_check_json_provenance_for_commit_and_working_tree_sources(tmp_path: Pat
     default_commit = payload(
         run_semantic_ci(repo, "check", "--mode", "smoke", "--no-fetch", "--format", "json")
     )
+    assert list(default_commit["engine"]) == [
+        "baseline",
+        "candidate",
+        "extractor_pyver",
+        "package_version",
+    ]
     assert default_commit["engine"]["baseline"] == {
         "source": "commit",
         "rev": baseline_sha,

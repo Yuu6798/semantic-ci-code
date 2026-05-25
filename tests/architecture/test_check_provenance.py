@@ -28,6 +28,14 @@ def added() -> int:
     return VALUE + 1
 """
 
+LEAKY_WORKING_TREE_SOURCE = """\
+VALUE = 999
+
+
+def existing() -> int:
+    return VALUE
+"""
+
 TARGET_PASS = """\
 intent: add a public API
 change:
@@ -50,12 +58,23 @@ def test_inv1_default_commit_source_does_not_leak_working_tree(tmp_path: Path):
     repo = _init_repo(tmp_path)
     before = _run_check(repo)
 
-    _write(repo / "mod.py", BASELINE_SOURCE)
+    _write(repo / "mod.py", LEAKY_WORKING_TREE_SOURCE)
     after = _run_check(repo)
+    leaky_working_tree = _run_check(
+        repo,
+        "--candidate-source",
+        "working-tree",
+        expected_rc=1,
+    )
 
     assert _evaluator_projection(before) == _evaluator_projection(after)
+    assert _evaluator_projection(before) != _evaluator_projection(leaky_working_tree)
     assert after["engine"]["candidate"] == before["engine"]["candidate"]
     assert after["engine"]["candidate"]["source"] == "commit"
+    assert leaky_working_tree["engine"]["candidate"] == {
+        "source": "working-tree",
+        "rev": None,
+    }
 
 
 def test_inv2_explicit_candidate_rev_wins_over_working_tree(tmp_path: Path):

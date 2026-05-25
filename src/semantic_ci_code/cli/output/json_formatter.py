@@ -135,14 +135,13 @@ def _engine_payload(
     candidate_source: str | None = None,
     candidate_rev: str | None = None,
 ) -> dict[str, Any]:
-    engine: dict[str, Any] = {
-        "extractor_pyver": f"{sys.version_info.major}.{sys.version_info.minor}",
-        "package_version": package_version(),
-    }
+    engine: dict[str, Any] = {}
     if baseline_source is not None or baseline_rev is not None:
         engine["baseline"] = {"source": baseline_source, "rev": baseline_rev}
     if candidate_source is not None or candidate_rev is not None:
         engine["candidate"] = {"source": candidate_source, "rev": candidate_rev}
+    engine["extractor_pyver"] = f"{sys.version_info.major}.{sys.version_info.minor}"
+    engine["package_version"] = package_version()
     return engine
 
 

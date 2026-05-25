@@ -13,8 +13,9 @@ Filtering and categories are fixed for P1:
 * hard violations and ``unknown_policy=fail`` unknowns are ``fix_required``.
 * soft violations and ``unknown_policy=repair`` unknowns are ``suggested``.
 * info violations are ``info``.
-* ``unknown_policy=warn`` unknowns and all ``SKIPPED`` constraints are
-  ``unresolved``.
+* ``unknown_policy=warn`` unknowns and evaluator ``SKIPPED`` constraints are
+  ``unresolved``, except post-hard-failure short-circuit skips which are not
+  actionable repair instructions.
 
 Instruction order preserves ``verdict.results`` order after filtering. The
 repair plan mirrors ``verdict.result`` exactly and does not re-aggregate.
@@ -56,6 +57,7 @@ _NAMED_EVIDENCE_KEYS: Final = frozenset(
     {"observed", "expected", "added", "removed", "missing", "extra"}
 )
 _TUPLE_EVIDENCE_KEYS: Final = ("added", "removed", "missing", "extra")
+_SHORT_CIRCUIT_SKIP_ERROR_CODE: Final = "E_HARD_LOCK_SHORT_CIRCUIT"
 _TEMPLATE_REPAIR_CODES: Final = frozenset(
     {
         "R_API_REMOVED",
@@ -244,6 +246,8 @@ def _category_or_none(result: ConstraintResult) -> RepairCategory | None:
             return None
 
     if result.status is ResultStatus.SKIPPED:
+        if result.error_code == _SHORT_CIRCUIT_SKIP_ERROR_CODE:
+            return None
         return RepairCategory.UNRESOLVED
 
     raise AssertionError(f"Unhandled result status: {result.status}")

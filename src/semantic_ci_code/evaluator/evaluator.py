@@ -62,6 +62,42 @@ E_OPERATOR_TARGET_MISMATCH: Final = "E_OPERATOR_TARGET_MISMATCH"
 E_OPERATOR_UNSUPPORTED_P1: Final = "E_OPERATOR_UNSUPPORTED_P1"
 E_REPAIR_KIND_UNSUPPORTED_P1: Final = "E_REPAIR_KIND_UNSUPPORTED_P1"
 E_DIMENSION_SKIPPED: Final = "E_DIMENSION_SKIPPED"
+E_HARD_LOCK_SHORT_CIRCUIT: Final = "E_HARD_LOCK_SHORT_CIRCUIT"
+_LOCK_SHORT_CIRCUIT_OPERATORS: Final = frozenset(
+    {
+        Operator.EQUALS_BASELINE,
+        Operator.SUPERSET_OF_BASELINE,
+        Operator.NO_NEW_ITEMS,
+        Operator.NO_REMOVED_ITEMS,
+        Operator.UNCHANGED,
+    }
+)
+_DENY_STYLE_LOCK_OPERATORS: Final = frozenset({Operator.EXCLUDES_ALL, Operator.SUBSET_OF})
+_DELTA_LOCK_COLLECTION_TARGETS: Final = frozenset(
+    {
+        "api_surface_delta.added",
+        "api_surface_delta.added.fqns",
+        "api_surface_delta.removed",
+        "api_surface_delta.removed_public",
+        "api_surface_delta.changed",
+        "effect_changes.added",
+        "effect_changes.removed",
+        "effect_changes.added.fqns",
+        "imports_delta.added",
+        "imports_delta.added.modules",
+        "imports_delta.removed",
+        "test_surface_delta.new_files",
+        "test_surface_delta.new_cases",
+        "test_surface_delta.removed_cases",
+        "type_changes",
+    }
+)
+_EMPTY_EQUALS_LOCK_RECORD_TARGETS: Final = {
+    "api_surface_delta": frozenset({"added", "removed", "changed"}),
+    "effect_changes": frozenset({"added", "removed"}),
+    "imports_delta": frozenset({"added", "removed"}),
+    "test_surface_delta": frozenset({"new_files", "new_cases", "removed_cases"}),
+}
 
 _TARGET_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
 _CODE_STATE_FIELDS = frozenset(CodeState.model_fields) | {"api_surface_public"}
@@ -176,8 +212,14 @@ def evaluate_constraints(
 ) -> Verdict:
     """Evaluate compiled constraints against baseline/candidate states and delta."""
 
-    results = tuple(
-        _evaluate_constraint(
+    results: list[ConstraintResult] = []
+    short_circuited = False
+    for constraint in compiled.constraints:
+        if short_circuited:
+            results.append(_short_circuit_skipped_result(constraint))
+            continue
+
+        result = _evaluate_constraint(
             constraint,
             delta=delta,
             baseline=baseline,
@@ -186,9 +228,73 @@ def evaluate_constraints(
             api_surface_allow_changes=compiled.api_surface_allow_changes,
             extracted_dimensions=extracted_dimensions,
         )
-        for constraint in compiled.constraints
+        results.append(result)
+        if _should_short_circuit(constraint, result):
+            short_circuited = True
+
+    result_tuple = tuple(results)
+    return Verdict(result=_aggregate(result_tuple), results=result_tuple)
+
+
+def _should_short_circuit(constraint: CompiledConstraint, result: ConstraintResult) -> bool:
+    if not _is_user_lock_result(constraint, result):
+        return False
+    if result.status is ResultStatus.VIOLATED:
+        return True
+    return result.status is ResultStatus.UNKNOWN and result.unknown_cause is UnknownCause.AUTHORING
+
+
+def _is_user_lock_result(constraint: CompiledConstraint, result: ConstraintResult) -> bool:
+    # The current TargetSVP model has no distinct ``lock`` operator. The
+    # explicit lock slice is user-authored preserve/deny invariants; template
+    # hard invariants and positive change requirements continue to evaluate
+    # fully so multi-violation repair guidance is not hidden by the first
+    # non-lock failure.
+    if result.source is not ConstraintSource.USER or result.severity is not Severity.HARD:
+        return False
+    return (
+        result.operator in _LOCK_SHORT_CIRCUIT_OPERATORS
+        or _is_equals_empty_delta_lock(constraint)
+        or _is_deny_style_delta_lock(constraint)
     )
-    return Verdict(result=_aggregate(results), results=results)
+
+
+def _is_equals_empty_delta_lock(constraint: CompiledConstraint) -> bool:
+    if constraint.kind is not ConstraintKind.DELTA or constraint.operator is not Operator.EQUALS:
+        return False
+    if constraint.target in _DELTA_LOCK_COLLECTION_TARGETS:
+        return _is_empty_collection_literal(constraint.expected)
+    return _is_full_zero_record_lock_literal(constraint.target, constraint.expected)
+
+
+def _is_deny_style_delta_lock(constraint: CompiledConstraint) -> bool:
+    return (
+        constraint.kind is ConstraintKind.DELTA
+        and constraint.operator in _DENY_STYLE_LOCK_OPERATORS
+        and constraint.target in _DELTA_LOCK_COLLECTION_TARGETS
+    )
+
+
+def _is_full_zero_record_lock_literal(target: str, value: JsonValue) -> bool:
+    expected_keys = _EMPTY_EQUALS_LOCK_RECORD_TARGETS.get(target)
+    if expected_keys is None or not isinstance(value, dict):
+        return False
+    return frozenset(value) == expected_keys and all(
+        _is_empty_collection_literal(item) for item in value.values()
+    )
+
+
+def _is_empty_collection_literal(value: JsonValue) -> bool:
+    return isinstance(value, list | tuple | set | frozenset) and len(value) == 0
+
+
+def _short_circuit_skipped_result(constraint: CompiledConstraint) -> ConstraintResult:
+    return _result(
+        constraint,
+        ResultStatus.SKIPPED,
+        E_HARD_LOCK_SHORT_CIRCUIT,
+        reason="hard_lock_short_circuit",
+    )
 
 
 def _evaluate_constraint(

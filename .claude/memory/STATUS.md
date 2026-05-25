@@ -449,11 +449,11 @@ ABCD-A (ResultStatus split) + ABCD-B (Brief 8 / CSCI-41〜44 + canonical
 refactor) 完走済 + UGH ecosystem framing 確立 (2026-05-21 Session 5) +
 Phase X-1 / X-5 landed + **Issue #97 Phase 1 mitigation landed
 (PR #98) + Source-selection redesign 採用 (PR #99 = `docs/source_selection_planning.md`)** (2026-05-22)。
-active queue は **C (Brief 7 SSP) + D (P2 残課題) + E (Phase X 残) +
-F (source-selection redesign Phase 2 → 3a → 3b)** の 4 軸。 ABCD 完走
-で product 機能の ship-blocking gap が消え (`2026-05-12.md` 参照)、
-Phase X で ecosystem-level formalization、 F で CLI source-selection
-hole の構造的閉鎖を進める。
+active queue は **C (Brief 7 SSP) + E (Phase X 残)** の 2 軸。
+D (P2 残課題 3 件) + F (source-selection redesign 3 phase) は 2026-05-25
+session で全完走 (PR #100〜#105)。 ABCD 完走で product 機能の ship-blocking
+gap が消え (`2026-05-12.md` 参照)、 Phase X で ecosystem-level formalization
+を進める。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
@@ -474,17 +474,6 @@ Brief 8 §12.3 で **Brief 8 を Brief 7 より先発行**確定。
 - **C-4. CSCI-39. pip-audit Adapter** (SCA): lockfile parser + advisory db hash
 - **C-5. CSCI-40. `semantic-ci ssp` subcommand 群**: ssp-to-sarif 変換 + e2e
 
-### D. P2 残課題(planning なし、 brief 化が必要、 3 件)
-
-`design.md §25` P2 Brief 群:
-
-- **D-1. Lock violation 即 fail**(§8.2 / Brief 3 #8): `lock` operator
-  完全実装の一部として violation 検出と同時に hard fail
-- **D-2. Performance budget per-extractor timeout**(§18 / Brief 3 #5):
-  巨大 repo の extractor runaway 保護、 incremental extraction の foundation
-- **D-3. Hash trail per-extractor version**(§10 / Brief 3 #9 残部):
-  P3a empirical alignment の reproducibility 担保(同 input → 同 output を
-  semantic-ci version またぎで保証)
 
 ### E. Phase X(UGH ecosystem formalization、 2026-05-21 Session 5 起草、 残 3 sub-phase)
 
@@ -517,40 +506,6 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
   を N=48 集めて semantic-ci verdict と reviewer 判断の Spearman ρ を
   計算する experiment plan を起草する。 完走 criteria は「各 domain で
   N≥48 の external validation 蓄積」、 期間は数週間〜数ヶ月
-
-### F. Source-selection redesign(planning merged 2026-05-22 PR #99、 implementation 3 PR、 strict order)
-
-`docs/source_selection_planning.md` (X = aggressive / clean-cut style、
-7 sub-decision lock-in)。 順序: Phase 2 → 3a → 3b、 **strict order**
-(Phase 3a は Phase 2 が main にあるまで開始不可、 Phase 3b は Phase 3a
-が main にあるまで開始不可、 published `.pre-commit-hooks.yaml` break
-回避)。
-
-- **F-1. Phase 2. `--candidate-source` + `--allow-dirty` 削除 + JSON
-  provenance**(~120 LOC + ~30 LOC envelope + ~40 doc + 5 test): `check`
-  に `--candidate-source {commit, working-tree}` 追加 (default `commit`)、
-  `--allow-dirty` を hard delete、 envelope に
-  `engine.{baseline,candidate}.{source,rev}` 追加 + `schema_version`
-  minor bump、 conflict (`working-tree` + explicit `--candidate-rev`) は
-  usage error exit 2。 起草時 `docs/source_selection_planning.md §9
-  Required Reading` 7 件遵守 + `§3` lock-in + `§4` Phase 2 scope を逐語
-  引用、 §7 rejected options 4 件を self-check
-- **F-2. Phase 3a. 対称 `--baseline-source` + `staged-index`**(~150 LOC +
-  ~60 doc + 10 test): `--baseline-source {commit, working-tree, staged-index}`
-  追加、 `--candidate-source` enum に `staged-index` 追加、 4 conflict
-  permutation 全 usage error exit 2、 degenerate (両側同 volatile source) は
-  warning + verdict 続行、 default rev pin (`staged-index` 候補 → baseline
-  default = HEAD commit)、 `cli_usage.md` に source × source matrix、
-  `code_semantic_ci_design.md §23.2` Application Matrix refresh。 起草は
-  Phase 2 が main 上にあるまで保留
-- **F-3. Phase 3b. `pre-commit` subcommand 削除 + migration**(~50 LOC
-  mostly deletions + ~30 doc + 2 test): `pre-commit` subcommand 削除、
-  `.pre-commit-hooks.yaml` を `check --candidate-source=staged-index` に
-  rewrite、 README / `cli_usage.md` / `exit_codes.md` / `json_schema.md` /
-  `code_semantic_ci_design.md` から `pre-commit` 言及削除 + migration note
-  追加。 Phase 3b PR で planning doc §11 cross-phase acceptance criteria
-  (grep clean / `§23.1` doc 明示 / migration note 等 8 件) を verify。
-  起草は Phase 3a が main 上にあるまで保留
 
 ### Sequencing decisions
 

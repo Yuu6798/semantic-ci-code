@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, ExitStack, nullcontext
 from pathlib import Path
 
 from semantic_ci_code.cli.code_state_cache import (
@@ -32,7 +32,7 @@ from semantic_ci_code.cli.extract_config_runtime import (
     load_extract_config_for_cli,
     make_exclude_reporter,
 )
-from semantic_ci_code.cli.git_diff import numstat_range
+from semantic_ci_code.cli.git_diff import numstat_cached, numstat_range
 from semantic_ci_code.cli.git_runtime import (
     GitCommandError,
     GitConfigError,
@@ -48,6 +48,7 @@ from semantic_ci_code.cli.git_runtime import (
 )
 from semantic_ci_code.cli.modes import dimensions_for_mode, resolve_execution_mode
 from semantic_ci_code.cli.output.json_formatter import build_payload
+from semantic_ci_code.cli.staged_index import export_staged_index
 from semantic_ci_code.cli.target_loader import (
     TargetUsageError,
     discover_target,
@@ -61,33 +62,36 @@ from semantic_ci_code.framework.extract_config import ExtractConfig, ExtractConf
 from semantic_ci_code.pipeline import ExtractorError, extract_python_code_state
 from semantic_ci_code.repair import emit_repair_plan
 
+_VOLATILE_SOURCES = frozenset(("working-tree", "staged-index"))
+
 
 def run_check(args: Namespace) -> int:
     try:
+        baseline_source = args.baseline_source
         candidate_source = args.candidate_source
-        candidate_uses_working_tree = candidate_source == "working-tree"
+        baseline_volatile = _is_volatile_source(baseline_source)
+        candidate_volatile = _is_volatile_source(candidate_source)
+        baseline_rev_explicit = args.baseline_rev is not None
         candidate_rev_explicit = args.candidate_rev is not None
-        if candidate_uses_working_tree and candidate_rev_explicit:
-            return _usage_error(
-                ValueError(
-                    "error: --candidate-source=working-tree is incompatible with --candidate-rev"
-                )
-            )
+        _reject_incompatible_rev(
+            side="baseline",
+            source=baseline_source,
+            explicit_rev=baseline_rev_explicit,
+        )
+        _reject_incompatible_rev(
+            side="candidate",
+            source=candidate_source,
+            explicit_rev=candidate_rev_explicit,
+        )
 
         if not is_git_available():
             raise GitNotFoundError("git is required for 'check'; install git or use 'compare'")
 
         root = repo_root(Path.cwd())
-        baseline_ref = resolve_baseline(
-            args.baseline_rev,
-            repo_root=root,
-            no_fetch=args.no_fetch,
-        )
+        baseline_ref = _resolve_baseline_ref(args, repo_root=root)
         candidate_ref = resolve_candidate(args.candidate_rev)
-        baseline_rev = _resolve_commit_sha(root, baseline_ref)
-        candidate_rev = (
-            None if candidate_uses_working_tree else _resolve_commit_sha(root, candidate_ref)
-        )
+        baseline_rev = None if baseline_volatile else _resolve_commit_sha(root, baseline_ref)
+        candidate_rev = None if candidate_volatile else _resolve_commit_sha(root, candidate_ref)
         package_root = _package_root_relative(args.package_root)
         mode = resolve_execution_mode(args.mode)
         dimensions = dimensions_for_mode(mode)
@@ -100,74 +104,94 @@ def run_check(args: Namespace) -> int:
         compiled = load_compiled_target(target_path)
 
         if args.verbose:
-            _stderr(f"resolved baseline={baseline_ref} candidate={candidate_ref}")
-        if candidate_uses_working_tree and args.verbose and not is_dirty(root):
+            _stderr(
+                f"resolved baseline={baseline_ref} ({baseline_source}) "
+                f"candidate={candidate_ref} ({candidate_source})"
+            )
+        if candidate_source == "working-tree" and args.verbose and not is_dirty(root):
             _stderr(
                 "note: candidate source = working tree (no uncommitted changes "
                 "detected; equivalent to HEAD)."
             )
-
-        with materialize_ref(root, baseline_ref, prefix="semantic-ci-baseline-") as baseline_dir:
-            candidate_context = (
-                nullcontext(root)
-                if candidate_uses_working_tree
-                else materialize_ref(root, candidate_ref, prefix="semantic-ci-candidate-")
+        if baseline_source == candidate_source and baseline_volatile:
+            _stderr(
+                "warning: baseline and candidate resolve to the same "
+                f"{baseline_source} snapshot; verdict will report no drift by construction."
             )
-            with candidate_context as candidate_dir:
-                baseline_root = _resolve_package_root(baseline_dir, package_root, "baseline")
-                candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
-                baseline_config = load_extract_config_for_cli(
-                    baseline_root,
-                    args,
-                    search_boundary=baseline_dir,
-                )
-                candidate_config = load_extract_config_for_cli(
-                    candidate_root,
-                    args,
-                    search_boundary=candidate_dir,
-                )
-                if args.verbose:
-                    _stderr(f"extracting baseline package_root={baseline_root}")
-                baseline = _extract_code_state(
-                    package_root=package_root,
-                    resolved_package_root=baseline_root,
-                    tree_root=baseline_dir,
-                    extract_config=baseline_config,
-                    repo_root=root,
+
+        with ExitStack() as stack:
+            baseline_dir = stack.enter_context(
+                _source_context(
+                    root,
+                    source=baseline_source,
                     ref=baseline_ref,
-                    mode=mode,
-                    dimensions=dimensions,
-                    dimensions_tuple=dimensions_tuple,
-                    cache_root=cache_root,
-                    use_cache=use_cache,
-                    cache_stats=cache_stats,
-                    cache_max_bytes=cache_max_bytes,
-                    verbose=args.verbose,
+                    prefix="semantic-ci-baseline-",
                 )
-                if args.verbose:
-                    _stderr(f"extracting candidate package_root={candidate_root}")
-                candidate = _extract_code_state(
-                    package_root=package_root,
-                    resolved_package_root=candidate_root,
-                    tree_root=candidate_dir,
-                    extract_config=candidate_config,
-                    repo_root=root,
+            )
+            candidate_dir = stack.enter_context(
+                _source_context(
+                    root,
+                    source=candidate_source,
                     ref=candidate_ref,
-                    mode=mode,
-                    dimensions=dimensions,
-                    dimensions_tuple=dimensions_tuple,
-                    cache_root=cache_root,
-                    use_cache=use_cache and not candidate_uses_working_tree,
-                    cache_stats=cache_stats,
-                    cache_max_bytes=cache_max_bytes,
-                    verbose=args.verbose,
+                    prefix="semantic-ci-candidate-",
                 )
+            )
+            baseline_root = _resolve_package_root(baseline_dir, package_root, "baseline")
+            candidate_root = _resolve_package_root(candidate_dir, package_root, "candidate")
+            baseline_config = load_extract_config_for_cli(
+                baseline_root,
+                args,
+                search_boundary=baseline_dir,
+            )
+            candidate_config = load_extract_config_for_cli(
+                candidate_root,
+                args,
+                search_boundary=candidate_dir,
+            )
+            if args.verbose:
+                _stderr(f"extracting baseline package_root={baseline_root}")
+            baseline = _extract_code_state(
+                package_root=package_root,
+                resolved_package_root=baseline_root,
+                tree_root=baseline_dir,
+                extract_config=baseline_config,
+                repo_root=root,
+                ref=baseline_ref,
+                mode=mode,
+                dimensions=dimensions,
+                dimensions_tuple=dimensions_tuple,
+                cache_root=cache_root,
+                use_cache=use_cache and not baseline_volatile,
+                cache_stats=cache_stats,
+                cache_max_bytes=cache_max_bytes,
+                verbose=args.verbose,
+            )
+            if args.verbose:
+                _stderr(f"extracting candidate package_root={candidate_root}")
+            candidate = _extract_code_state(
+                package_root=package_root,
+                resolved_package_root=candidate_root,
+                tree_root=candidate_dir,
+                extract_config=candidate_config,
+                repo_root=root,
+                ref=candidate_ref,
+                mode=mode,
+                dimensions=dimensions,
+                dimensions_tuple=dimensions_tuple,
+                cache_root=cache_root,
+                use_cache=use_cache and not candidate_volatile,
+                cache_stats=cache_stats,
+                cache_max_bytes=cache_max_bytes,
+                verbose=args.verbose,
+            )
 
         delta = compute_code_state_delta(baseline, candidate)
-        entries = (
-            numstat_range(root, baseline_ref)
-            if candidate_uses_working_tree
-            else numstat_range(root, baseline_ref, candidate_ref)
+        entries = _numstat_entries(
+            root,
+            baseline_source=baseline_source,
+            baseline_ref=baseline_ref,
+            candidate_source=candidate_source,
+            candidate_ref=candidate_ref,
         )
         files_touched, loc_delta = summarize_numstat(entries)
         delta = overlay_delta(delta, files_touched=files_touched, loc_delta=loc_delta)
@@ -188,7 +212,7 @@ def run_check(args: Namespace) -> int:
             loc_delta=loc_delta,
             mode=mode.value,
             cache_stats=cache_stats,
-            baseline_source="commit",
+            baseline_source=baseline_source,
             baseline_rev=baseline_rev,
             candidate_source=candidate_source,
             candidate_rev=candidate_rev,
@@ -236,6 +260,64 @@ def _package_root_relative(raw_path: str) -> Path:
             continue
         parts.append(part)
     return Path(*parts) if parts else Path(".")
+
+
+def _is_volatile_source(source: str) -> bool:
+    return source in _VOLATILE_SOURCES
+
+
+def _reject_incompatible_rev(*, side: str, source: str, explicit_rev: bool) -> None:
+    if _is_volatile_source(source) and explicit_rev:
+        raise ValueError(f"error: --{side}-source={source} is incompatible with --{side}-rev")
+
+
+def _resolve_baseline_ref(args: Namespace, *, repo_root: Path) -> str:
+    if args.baseline_rev is not None:
+        return args.baseline_rev
+    if args.baseline_source == "commit" and args.candidate_source == "staged-index":
+        return "HEAD"
+    if args.baseline_source == "commit":
+        return resolve_baseline(
+            None,
+            repo_root=repo_root,
+            no_fetch=args.no_fetch,
+        )
+    return "HEAD"
+
+
+def _source_context(
+    repo_root: Path,
+    *,
+    source: str,
+    ref: str,
+    prefix: str,
+) -> AbstractContextManager[Path]:
+    if source == "commit":
+        return materialize_ref(repo_root, ref, prefix=prefix)
+    if source == "working-tree":
+        return nullcontext(repo_root)
+    if source == "staged-index":
+        return export_staged_index(repo_root, prefix=prefix)
+    raise ValueError(f"unknown source: {source}")
+
+
+def _numstat_entries(
+    repo_root: Path,
+    *,
+    baseline_source: str,
+    baseline_ref: str,
+    candidate_source: str,
+    candidate_ref: str,
+):
+    if baseline_source != "commit":
+        return ()
+    if candidate_source == "commit":
+        return numstat_range(repo_root, baseline_ref, candidate_ref)
+    if candidate_source == "working-tree":
+        return numstat_range(repo_root, baseline_ref)
+    if candidate_source == "staged-index":
+        return numstat_cached(repo_root, baseline_ref)
+    raise ValueError(f"unknown candidate source: {candidate_source}")
 
 
 def _resolve_package_root(tree_root: Path, package_root: Path, label: str) -> Path:

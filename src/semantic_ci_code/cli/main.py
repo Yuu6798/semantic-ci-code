@@ -90,10 +90,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check.add_argument("--no-fetch", action="store_true")
     check.add_argument(
-        "--candidate-source",
-        choices=("commit", "working-tree"),
+        "--baseline-source",
+        choices=("commit", "working-tree", "staged-index"),
         default="commit",
-        help="candidate snapshot source: commit ref or working tree",
+        help="baseline snapshot source: commit ref, working tree, or staged index",
+    )
+    check.add_argument(
+        "--candidate-source",
+        choices=("commit", "working-tree", "staged-index"),
+        default="commit",
+        help="candidate snapshot source: commit ref, working tree, or staged index",
     )
     check.add_argument("--no-cache", action="store_true", help="disable CodeState cache")
     check.add_argument(

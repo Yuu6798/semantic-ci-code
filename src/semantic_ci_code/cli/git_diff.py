@@ -74,8 +74,11 @@ def staged_paths(repo_root: Path) -> tuple[Path, ...]:
     return tuple(Path(item) for item in stdout.split("\0") if item)
 
 
-def numstat_cached(repo_root: Path) -> tuple[NumstatEntry, ...]:
-    return parse_numstat(run_git(["diff", "--cached", "--numstat", "-z", "-M"], cwd=repo_root))
+def numstat_cached(repo_root: Path, baseline: str | None = None) -> tuple[NumstatEntry, ...]:
+    args = ["diff", "--cached", "--numstat", "-z", "-M"]
+    if baseline is not None:
+        args.append(baseline)
+    return parse_numstat(run_git(args, cwd=repo_root))
 
 
 def numstat_range(

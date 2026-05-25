@@ -1105,28 +1105,33 @@ semantic CI の core engine は **PR 専用ではなく、汎用的な 2-state �
 
 `CodeState` は frozen Pydantic schema として抽象化されているため、**どこから観測されたかを engine は問わない**。これは §2 の 3-state RPE モデル（baseline と observed が両方 CodeState 型）の自然な帰結であり、§21.2 pre-generation validation の前提条件でもある。
 
-CLI-layer source resolution (`--candidate-source` / future
-`--baseline-source`) is the only adapter between user intent and the engine's
-path-snapshot contract. The engine MUST NOT learn about "working tree" or
-"staged index" as input categories; it only sees two materialized directories.
+CLI-layer source resolution (`--baseline-source` / `--candidate-source`) is the
+only adapter between user intent and the engine's path-snapshot contract. The
+engine MUST NOT learn about "working tree" or "staged index" as input
+categories; it only sees two materialized directories.
 
 PR は最初の主要ユースケースだが、唯一のユースケースではない。Engine の入力契約を生成元から分離することで、後続フェーズでの応用範囲を確保する。
 
 ### 23.2 Application Matrix
 
-`CodeState` を「実コード抽出」以外から供給することで、以下の用途が成立する:
+`CodeState` source selection is a CLI-layer concern. The application surface
+chooses `(baseline-source, candidate-source)`, materializes two directories,
+and then calls the same engine contract from §23.1.
 
-| 用途 | baseline 取得 | candidate 取得 | intent 由来 | フェーズ |
+| Application surface | baseline source | candidate source | intent source | Phase |
 |---|---|---|---|---|
-| **PR review** | git baseline ref | git candidate ref | `.semantic-ci/intent.yaml` | P1 (Brief 4) |
-| **pre-commit hook** | HEAD | staged tree | working intent | §21.5, P3+ |
-| **任意 2 リビジョン比較** | 任意 commit | 任意 commit | 任意 yaml | P1 (Brief 4) |
-| **retrospective audit** | 過去 tag | 過去 tag | 過去 spec を再現 | P3+ |
-| **nightly regression scan** | 24h 前 main | 現 main | observation only | §19.5, P3+ |
-| **pre-generation validation** | 現コード | AI 提案 state（予測） | AI 依頼 spec | §21.2, P2.5 |
-| **what-if simulation** | 現コード | hypothetical state | 設計仮説 | §21, P2.5+ |
-| **contract testing** | expected state | actual state | contract spec | 応用領域 |
-| **educational simulator** | mock state | mock state | 学習用 spec | 応用領域 |
+| **PR review / CI gate** | `commit` (`--baseline-rev` or fallback) | `commit` (`--candidate-rev` or `HEAD`) | target.yaml | P1 / source-selection Phase 2 |
+| **pre-merge local trial** | `commit` | `working-tree` | working target.yaml | source-selection Phase 2 |
+| **pre-commit-style simulation** | `commit` (`HEAD` by default) | `staged-index` | working target.yaml | source-selection Phase 3a |
+| **staged-index self-check** | `staged-index` | `staged-index` | working target.yaml | source-selection Phase 3a (degenerate warning) |
+| **working-tree self-check** | `working-tree` | `working-tree` | working target.yaml | source-selection Phase 3a (degenerate warning) |
+| **arbitrary 2 revision comparison** | `commit` | `commit` | arbitrary yaml | P1 (Brief 4) |
+| **retrospective audit** | historical tag / commit | historical tag / commit | reconstructed historical spec | P3+ |
+| **nightly regression scan** | previous main | current main | observation only | §19.5, P3+ |
+| **pre-generation validation** | current CodeState | virtual / predicted CodeState | AI request spec | §21.2, P2.5 |
+| **what-if simulation** | current CodeState | hypothetical state | design hypothesis | §21, P2.5+ |
+| **contract testing** | expected state | actual state | contract spec | application domain |
+| **educational simulator** | mock state | mock state | learning spec | application domain |
 
 「実コードがそこに存在する」という前提を engine から切り離すことで、AI 時代の vibe coding workflow（§21）と監査・教育・契約テストといった他用途の両方を同一 engine でカバーできる。
 

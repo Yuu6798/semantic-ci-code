@@ -181,12 +181,11 @@ src/semantic_ci_code/
   scope.py
   api_surface/           # Python public-symbol extractor (CSCI-5)
   cli/                   # CLI surface (Brief 4 / 4b / 4d / 5)
-    main.py              # argparse entry; subparser for 8 subcommands
+    main.py              # argparse entry; subparser for 9 subcommands
     commands/            # one module per subcommand
       observe.py
       compare.py
       check.py
-      pre_commit.py
       compile.py
       compile_repair.py  # Brief 5
       validate_plan.py   # Brief 5
@@ -246,7 +245,7 @@ Status legend: **ACTIVE** (current spec/contract, AI agents should read first) /
 | Document | Status | Purpose |
 |---|---|---|
 | `docs/code_semantic_ci_design.md` | ACTIVE | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop. Single source of truth for engine semantics |
-| `docs/cli_usage.md` | ACTIVE | User-facing CLI contract for all 8 subcommands (`observe` / `compare` / `check` / `pre-commit` / `compile` / `init` / `compile-repair` / `validate-plan`), target discovery, format selection, target authorship, severity routing |
+| `docs/cli_usage.md` | ACTIVE | User-facing CLI contract for all 9 subcommands (`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`), target discovery, format selection, target authorship, severity routing |
 | `docs/exit_codes.md` | ACTIVE | Stable CLI exit code policy (0 / 1 / 2 / 3 / 4) for CI integration, including `--strict-repair`, `severity: info` Advisor channel, and per-subcommand notes |
 | `docs/json_schema.md` | ACTIVE | CLI JSON envelopes — verdict / compile at `schema_version="4"`, compile-repair / validate-plan at independent `schema_version="1"`. Includes compatibility policy and v2→v3 / v3→v4 diffs |
 | `docs/cli_test_inventory.md` | ACTIVE | CLI test coverage inventory, runtime notes, and conservative reduction candidates |

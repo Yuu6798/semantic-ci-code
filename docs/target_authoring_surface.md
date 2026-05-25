@@ -85,9 +85,9 @@ byte-identical.
 ## E. Authoring / Advisor / Provenance surfaces are not reachable from the evaluator
 
 The verdict-bearing modules — `evaluator/`, `compiler/`, `pipeline/`,
-`repair/`, and the verdict subcommand handlers `check` / `compare` /
-`pre-commit` — must not import the new Authoring or target-audit modules
-(`init --recipe`, `target-doctor`, `target-catalog`).
+`repair/`, and the verdict subcommand handlers `check` / `compare` must not
+import the new Authoring or target-audit modules (`init --recipe`,
+`target-doctor`, `target-catalog`).
 
 The Advisor surface itself is **explicitly exempt** from this isolation rule.
 `compile-repair` and `validate-plan` are Advisor subcommands; their adapter
@@ -102,7 +102,7 @@ Brief 8 fixes the isolation structurally:
 
 - **INV-2 (Surface isolation)**: the transitive import closure of
   `cli/commands/check.py` (and the other verdict-path command handlers
-  `compare.py` / `pre_commit.py`) does not contain `init`, `target-doctor`,
+  `compare.py`) does not contain `init`, `target-doctor`,
   `target-catalog`, or any new `authoring/` module. `cli/main.py` subparser
   registration is excluded — it is a dispatcher concern, not a
   verdict-semantic one. `compile-repair` / `validate-plan` and

@@ -624,7 +624,7 @@ svp-rpe-code/
 
 ## 12. フェーズ計画
 
-> **現在地(2026-05-21 時点)**: **P2.5 + Brief 8 完走** — Brief 1〜5 と Brief 8 全 merged。`semantic-ci` CLI 10 subcommand release 可能状態(`init` / `observe` / `compare` / `check` / `pre-commit` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`)。次は **Brief 7 (SSP v0.1)** または P2 残課題(lock / per-extractor timeout / per-extractor version hash)の brief 化。Brief 進捗の詳細は §25 参照。
+> **現在地(2026-05-25 時点)**: **P2.5 + Brief 8 完走 + source-selection Phase 3b 完走** — Brief 1〜5 と Brief 8 全 merged。`semantic-ci` CLI 9 subcommand release 可能状態(`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`)。pre-commit hook integration は `check --candidate-source=staged-index` に集約済み。次は **Brief 7 (SSP v0.1)** または P2 残課題(lock / per-extractor timeout / per-extractor version hash)の brief 化。Brief 進捗の詳細は §25 参照。
 >
 > **§21 / §22 による前倒し反映**: Generator Adapter(元 P5)と Repair Compiler は **P2.5** に、TypeScript extractor(元 P3b)は **P2.5 並列** に移動済み。後者は 2026-05-06 Session 2 で **凍結**(下記 P3b 参照)。本節の元計画と §21/§22 で記述が分かれている箇所は §21/§22 が優先。
 
@@ -864,13 +864,15 @@ metadata is unavailable during source-tree execution, the package-version key
 component falls back to a deterministic source fingerprint so extractor changes
 invalidate stale entries.
 
-CSCI-27 closes the leave-able cache slice: `pre-commit` uses the same CodeState
-cache for both HEAD and the staged index (`git write-tree`), verdict JSON
-schema v3 reports cache stats, and cache writes trigger size-based best-effort
-eviction. Cache misses, corrupt entries, write failures, and eviction failures
-fall back to normal extraction; engine semantics remain unchanged. Worktree
-caching, incremental extraction, per-extractor timeouts, parallel extraction,
-shared caches, target-level cache policy, and explicit cache prune commands
+CSCI-27 closed the leave-able cache slice: verdict JSON schema v3 reports cache
+stats and cache writes trigger size-based best-effort eviction. Source-selection
+Phase 3b later removed the dedicated `pre-commit` subcommand; hook use cases now
+run through `check --candidate-source=staged-index`, where volatile staged-index
+snapshots suppress candidate cache writes. Cache misses, corrupt entries, write
+failures, and eviction failures fall back to normal extraction; engine semantics
+remain unchanged. Worktree caching, incremental extraction, per-extractor
+timeouts, parallel extraction, shared caches, target-level cache policy, and
+explicit cache prune commands
 remain deferred.
 
 baseline は git ref で content-addressable にキャッシュする:
@@ -1051,7 +1053,7 @@ vibe coding workflow の各段階で gate を提供:
 ### 21.5 IDE / pre-commit integration
 
 CI 待ちの feedback loop を短縮するため:
-- pre-commit hook 統合（軽量モード、partial extraction）
+- pre-commit hook 統合（`.pre-commit-hooks.yaml` から `check --candidate-source=staged-index` を呼ぶ）
 - LSP server 化（IDE 内 real-time gate、P3 以降）
 
 ## 22. Multi-language Phasing
@@ -1206,8 +1208,8 @@ semantic-ci-code observe --target=HEAD
 # パターン D: 任意 snapshot ディレクトリ
 semantic-ci-code check --baseline-dir=./snap_a --candidate-dir=./snap_b
 
-# パターン E: pre-commit
-semantic-ci-code check --baseline=HEAD --candidate=staged
+# パターン E: pre-commit hook
+semantic-ci check --candidate-source=staged-index
 ```
 
 Engine 本体は同一で、CLI が baseline/candidate の取得経路を切り替えるだけ。実装コスト差は引数パースの増分のみ。
@@ -1234,7 +1236,7 @@ generic comparator として設計することの帰結:
 
 ACTIVE 仕様 / 契約:
 
-- [`cli_usage.md`](./cli_usage.md) — CLI contract (10 subcommands, including `target-doctor` and `target-catalog`)
+- [`cli_usage.md`](./cli_usage.md) — CLI contract (9 subcommands, including `target-doctor` and `target-catalog`)
 - [`exit_codes.md`](./exit_codes.md) — exit code policy
 - [`json_schema.md`](./json_schema.md) — verdict / compile / compile-repair / validate-plan / target-catalog envelopes
 - [`cli_test_inventory.md`](./cli_test_inventory.md) — CLI test coverage map

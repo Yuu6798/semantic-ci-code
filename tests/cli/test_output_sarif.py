@@ -57,11 +57,19 @@ def test_check_sarif_outputs_sarif_document(tmp_path: Path):
     assert json.loads(result.stdout)["version"] == "2.1.0"
 
 
-def test_pre_commit_sarif_outputs_sarif_document(tmp_path: Path):
+def test_check_staged_index_sarif_outputs_sarif_document(tmp_path: Path):
     repo = init_repo_without_candidate_commit(tmp_path)
     stage_changes(repo, {"mod.py": CANDIDATE_SOURCE})
     result = run_semantic_ci(
-        repo, "pre-commit", "--mode", "smoke", "--format", "sarif", "--no-cache"
+        repo,
+        "check",
+        "--candidate-source",
+        "staged-index",
+        "--mode",
+        "smoke",
+        "--format",
+        "sarif",
+        "--no-cache",
     )
 
     assert result.returncode == 0

@@ -5,7 +5,7 @@ Semantic CI CLI output is JSON by default in non-TTY contexts and when
 
 The CLI has two envelopes:
 
-- verdict envelope: `observe`, `compare`, `check`, `pre-commit`
+- verdict envelope: `observe`, `compare`, `check`
 - compile envelope: `compile`
 
 Both are deterministic: field order is fixed by insertion order and JSON is
@@ -71,7 +71,7 @@ bump beyond the current CLI schema version.
 | Field | Meaning |
 |---|---|
 | `schema_version` | CLI JSON schema version. Currently `"6"`. |
-| `subcommand` | One of `observe`, `compare`, `check`, `pre-commit`. |
+| `subcommand` | One of `observe`, `compare`, `check`. |
 | `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
 | `intent` | Target intent, or `null` for `observe`. |
@@ -88,11 +88,11 @@ bump beyond the current CLI schema version.
 | `engine` | Python minor version, package version, and optional source provenance. `check` includes `engine.baseline` and `engine.candidate` sub-objects with `{source, rev}`; `source` is `commit`, `working-tree`, or `staged-index`, and `rev` is a resolved commit SHA for commit-backed sources or `null` for volatile sources. Other verdict-producing subcommands may omit these sub-objects. |
 
 Extractor exclude config changes cache identity but not the JSON envelope shape.
-`check` and `pre-commit` include the effective exclude key in their internal
-CodeState cache key; schema version `"5"` was unchanged by this operational
-cache-key extension. The first run after upgrading from a version without this
-cache-key axis will rebuild CodeState cache entries once, even when no exclude
-patterns are configured.
+`check` includes the effective exclude key in its internal CodeState cache key;
+schema version `"5"` was unchanged by this operational cache-key extension. The
+first run after upgrading from a version without this cache-key axis will
+rebuild CodeState cache entries once, even when no exclude patterns are
+configured.
 
 ## Compile Envelope
 
@@ -364,9 +364,9 @@ bump the envelope version.
 
 - Added top-level `cache` to verdict and compile envelopes.
 - Shape: `{hit: int, miss: int, invalid: int, write_failed: int, disabled: bool}`.
-- `check` and `pre-commit` report real cache activity. `observe`, `compare`, and
-  `compile` emit `disabled: true` with zero counters because they do not use the
-  CodeState cache.
+- `check` reports real cache activity. `observe`, `compare`, and `compile` emit
+  `disabled: true` with zero counters because they do not use the CodeState
+  cache.
 - Migration: consumers reading v2 can treat a missing `cache` field as
   `{hit: 0, miss: 0, invalid: 0, write_failed: 0, disabled: true}`.
 

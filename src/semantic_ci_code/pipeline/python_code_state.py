@@ -6,11 +6,12 @@ their outputs in the matching ``CodeState`` fields. It intentionally does
 not compute deltas, evaluate constraints, repair specs, read intent YAML,
 run dynamic coverage, or expose CLI wiring.
 
-Failure policy is fail-fast. Any extractor exception is wrapped in
-``ExtractorError`` with the extractor name and the best-known file path,
-then re-raised with the original exception as ``__cause__``. Partial
-results, ``unknown_policy`` integration, and extraction tolerance are
-deferred to a later brief (see ``docs/code_semantic_ci_design.md`` section 6.2).
+Failure policy is fail-fast unless a per-dimension timeout is explicitly
+provided. Any extractor exception is wrapped in ``ExtractorError`` with the
+extractor name and the best-known file path, then re-raised with the original
+exception as ``__cause__``. A timed-out dimension falls back to the CodeState
+schema default and is reported through ``CodeStateExtraction`` so the evaluator
+can route affected constraints as extraction-cause UNKNOWN.
 
 The paths variant is intentionally asymmetric: ``api_surface``,
 ``effects``, ``imports``, ``complexity``, and ``test_surface`` are limited
@@ -21,7 +22,11 @@ so cutting it to a file subset would create a misleading ``CodeState``.
 
 from __future__ import annotations
 
+import math
+import queue
+import threading
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
@@ -89,12 +94,21 @@ class ExtractorError(Exception):
         )
 
 
+@dataclass(frozen=True)
+class CodeStateExtraction:
+    """CodeState plus extraction diagnostics that do not change the schema."""
+
+    state: CodeState
+    timed_out_dimensions: frozenset[str]
+
+
 def extract_python_code_state(
     package_root: Path,
     *,
     dimensions: frozenset[str] | None = None,
     extract_config: ExtractConfig | None = None,
     exclude_reporter: ExcludeReporter | None = None,
+    timeout_seconds: float | None = None,
 ) -> CodeState:
     """Assemble a whole-package Python ``CodeState`` from ``package_root``.
 
@@ -104,6 +118,26 @@ def extract_python_code_state(
     fields such as ``type_relations``, ``control_flow``, ``data_flow``, and
     ``coverage`` are always left at the schema defaults.
     """
+    return extract_python_code_state_result(
+        package_root,
+        dimensions=dimensions,
+        extract_config=extract_config,
+        exclude_reporter=exclude_reporter,
+        timeout_seconds=timeout_seconds,
+    ).state
+
+
+def extract_python_code_state_result(
+    package_root: Path,
+    *,
+    dimensions: frozenset[str] | None = None,
+    extract_config: ExtractConfig | None = None,
+    exclude_reporter: ExcludeReporter | None = None,
+    timeout_seconds: float | None = None,
+) -> CodeStateExtraction:
+    """Assemble a CodeState and report dimensions that timed out."""
+
+    _validate_timeout(timeout_seconds)
     root = _resolve_package_root(package_root)
     paths = _python_paths_from_inputs((root,), package_root=root)
     paths = _filter_excluded(
@@ -116,6 +150,7 @@ def extract_python_code_state(
         package_root=root,
         dimensions=dimensions,
         extract_config=extract_config,
+        timeout_seconds=timeout_seconds,
     )
 
 
@@ -126,6 +161,7 @@ def extract_python_code_state_from_paths(
     dimensions: frozenset[str] | None = None,
     extract_config: ExtractConfig | None = None,
     exclude_reporter: ExcludeReporter | None = None,
+    timeout_seconds: float | None = None,
 ) -> CodeState:
     """Assemble a Python ``CodeState`` with per-file fields limited to ``paths``.
 
@@ -136,6 +172,28 @@ def extract_python_code_state_from_paths(
     ``dimensions`` limits extraction to that subset and leaves omitted
     dimensions at schema defaults.
     """
+    return extract_python_code_state_from_paths_result(
+        paths,
+        package_root=package_root,
+        dimensions=dimensions,
+        extract_config=extract_config,
+        exclude_reporter=exclude_reporter,
+        timeout_seconds=timeout_seconds,
+    ).state
+
+
+def extract_python_code_state_from_paths_result(
+    paths: Iterable[Path],
+    *,
+    package_root: Path,
+    dimensions: frozenset[str] | None = None,
+    extract_config: ExtractConfig | None = None,
+    exclude_reporter: ExcludeReporter | None = None,
+    timeout_seconds: float | None = None,
+) -> CodeStateExtraction:
+    """Assemble a CodeState from selected paths and report timed-out dimensions."""
+
+    _validate_timeout(timeout_seconds)
     root = _resolve_package_root(package_root)
     selected_paths = tuple(paths)
     expanded_paths = _python_paths_from_inputs(selected_paths, package_root=root)
@@ -149,6 +207,7 @@ def extract_python_code_state_from_paths(
         package_root=root,
         dimensions=dimensions,
         extract_config=extract_config,
+        timeout_seconds=timeout_seconds,
     )
 
 
@@ -158,39 +217,84 @@ def _assemble_code_state(
     package_root: Path,
     dimensions: frozenset[str] | None,
     extract_config: ExtractConfig | None,
-) -> CodeState:
-    return CodeState(
-        api_surface=(
-            _extract_api_surface(paths, package_root=package_root)
-            if _should_extract(DIMENSION_API_SURFACE, dimensions)
-            else ()
+    timeout_seconds: float | None,
+) -> CodeStateExtraction:
+    timed_out: set[str] = set()
+
+    def extract_dimension(dimension: str, action: Callable[[], T]) -> T | tuple[object, ...]:
+        if not _should_extract(dimension, dimensions):
+            return ()
+        value, timed_out_dimension = _extract_with_timeout(
+            action,
+            timeout_seconds=timeout_seconds,
+            dimension=dimension,
+        )
+        if timed_out_dimension is not None:
+            timed_out.add(timed_out_dimension)
+            return ()
+        return value
+
+    state = CodeState(
+        api_surface=extract_dimension(
+            DIMENSION_API_SURFACE,
+            lambda: _extract_api_surface(paths, package_root=package_root),
         ),
-        effects=(
-            _extract_effects(paths, package_root=package_root)
-            if _should_extract(DIMENSION_EFFECTS, dimensions)
-            else ()
+        effects=extract_dimension(
+            DIMENSION_EFFECTS,
+            lambda: _extract_effects(paths, package_root=package_root),
         ),
-        imports=(
-            _extract_imports(paths, package_root=package_root)
-            if _should_extract(DIMENSION_IMPORTS, dimensions)
-            else ()
+        imports=extract_dimension(
+            DIMENSION_IMPORTS,
+            lambda: _extract_imports(paths, package_root=package_root),
         ),
-        complexity=(
-            _extract_complexity(paths, package_root=package_root)
-            if _should_extract(DIMENSION_COMPLEXITY, dimensions)
-            else ()
+        complexity=extract_dimension(
+            DIMENSION_COMPLEXITY,
+            lambda: _extract_complexity(paths, package_root=package_root),
         ),
-        test_surface=(
-            _extract_test_surface(paths, package_root=package_root)
-            if _should_extract(DIMENSION_TEST_SURFACE, dimensions)
-            else ()
+        test_surface=extract_dimension(
+            DIMENSION_TEST_SURFACE,
+            lambda: _extract_test_surface(paths, package_root=package_root),
         ),
-        module_graph=(
-            _extract_module_graph(package_root, extract_config=extract_config)
-            if _should_extract(DIMENSION_MODULE_GRAPH, dimensions)
-            else ()
+        module_graph=extract_dimension(
+            DIMENSION_MODULE_GRAPH,
+            lambda: _extract_module_graph(package_root, extract_config=extract_config),
         ),
     )
+    return CodeStateExtraction(state=state, timed_out_dimensions=frozenset(timed_out))
+
+
+def _extract_with_timeout(
+    action: Callable[[], T],
+    *,
+    timeout_seconds: float | None,
+    dimension: str,
+) -> tuple[T, None] | tuple[None, str]:
+    if timeout_seconds is None:
+        return action(), None
+
+    result_queue: queue.Queue[tuple[bool, T | BaseException]] = queue.Queue(maxsize=1)
+
+    def run_action() -> None:
+        try:
+            result_queue.put((True, action()))
+        except BaseException as exc:  # noqa: BLE001 - re-raised on caller thread.
+            result_queue.put((False, exc))
+
+    worker = threading.Thread(target=run_action, daemon=True)
+    worker.start()
+    worker.join(timeout=timeout_seconds)
+    if worker.is_alive():
+        return None, dimension
+
+    ok, payload = result_queue.get_nowait()
+    if ok:
+        return payload, None
+    raise payload
+
+
+def _validate_timeout(timeout_seconds: float | None) -> None:
+    if timeout_seconds is not None and (not math.isfinite(timeout_seconds) or timeout_seconds <= 0):
+        raise ValueError("extractor timeout must be a finite value greater than 0 seconds")
 
 
 def _should_extract(dimension: str, dimensions: frozenset[str] | None) -> bool:

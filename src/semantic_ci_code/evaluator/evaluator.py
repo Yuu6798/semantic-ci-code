@@ -62,6 +62,7 @@ E_OPERATOR_TARGET_MISMATCH: Final = "E_OPERATOR_TARGET_MISMATCH"
 E_OPERATOR_UNSUPPORTED_P1: Final = "E_OPERATOR_UNSUPPORTED_P1"
 E_REPAIR_KIND_UNSUPPORTED_P1: Final = "E_REPAIR_KIND_UNSUPPORTED_P1"
 E_DIMENSION_SKIPPED: Final = "E_DIMENSION_SKIPPED"
+E_DIMENSION_TIMED_OUT: Final = "E_DIMENSION_TIMED_OUT"
 E_HARD_LOCK_SHORT_CIRCUIT: Final = "E_HARD_LOCK_SHORT_CIRCUIT"
 _LOCK_SHORT_CIRCUIT_OPERATORS: Final = frozenset(
     {
@@ -209,6 +210,8 @@ def evaluate_constraints(
     baseline: CodeState,
     candidate: CodeState,
     extracted_dimensions: frozenset[str] | None = None,
+    baseline_timed_out_dimensions: frozenset[str] | None = None,
+    candidate_timed_out_dimensions: frozenset[str] | None = None,
 ) -> Verdict:
     """Evaluate compiled constraints against baseline/candidate states and delta."""
 
@@ -227,6 +230,8 @@ def evaluate_constraints(
             effect_allow_new=compiled.effect_allow_new,
             api_surface_allow_changes=compiled.api_surface_allow_changes,
             extracted_dimensions=extracted_dimensions,
+            baseline_timed_out_dimensions=baseline_timed_out_dimensions,
+            candidate_timed_out_dimensions=candidate_timed_out_dimensions,
         )
         results.append(result)
         if _should_short_circuit(constraint, result):
@@ -306,6 +311,8 @@ def _evaluate_constraint(
     effect_allow_new: tuple[CompiledEffectAllowRule, ...],
     api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...],
     extracted_dimensions: frozenset[str] | None,
+    baseline_timed_out_dimensions: frozenset[str] | None,
+    candidate_timed_out_dimensions: frozenset[str] | None,
 ) -> ConstraintResult:
     if constraint.kind is ConstraintKind.REPAIR:
         return _result(
@@ -341,6 +348,21 @@ def _evaluate_constraint(
             E_DIMENSION_SKIPPED,
             reason="partial_code_state",
             dimension=skipped_dimension,
+        )
+    timed_out_dimension = _timed_out_dimension(
+        constraint,
+        segments,
+        baseline_timed_out_dimensions=baseline_timed_out_dimensions,
+        candidate_timed_out_dimensions=candidate_timed_out_dimensions,
+    )
+    if timed_out_dimension is not None:
+        return _result(
+            constraint,
+            ResultStatus.UNKNOWN,
+            E_DIMENSION_TIMED_OUT,
+            reason="extractor_timeout",
+            dimension=timed_out_dimension,
+            unknown_cause=UnknownCause.EXTRACTION,
         )
 
     try:
@@ -844,6 +866,29 @@ def _skipped_dimension(
         return None
     dimension = _dimension_for_target(segments)
     if dimension is None or dimension in extracted_dimensions:
+        return None
+    return dimension
+
+
+def _timed_out_dimension(
+    constraint: CompiledConstraint,
+    segments: tuple[str, ...],
+    *,
+    baseline_timed_out_dimensions: frozenset[str] | None,
+    candidate_timed_out_dimensions: frozenset[str] | None,
+) -> str | None:
+    dimension = _dimension_for_target(segments)
+    if dimension is None:
+        return None
+    if constraint.kind is ConstraintKind.STATE:
+        timed_out_dimensions = candidate_timed_out_dimensions or frozenset()
+    elif constraint.kind is ConstraintKind.DELTA:
+        timed_out_dimensions = (baseline_timed_out_dimensions or frozenset()) | (
+            candidate_timed_out_dimensions or frozenset()
+        )
+    else:
+        return None
+    if dimension not in timed_out_dimensions:
         return None
     return dimension
 

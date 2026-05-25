@@ -624,7 +624,7 @@ svp-rpe-code/
 
 ## 12. フェーズ計画
 
-> **現在地(2026-05-25 時点)**: **P2.5 + Brief 8 完走 + source-selection Phase 3b 完走** — Brief 1〜5 と Brief 8 全 merged。`semantic-ci` CLI 9 subcommand release 可能状態(`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`)。pre-commit hook integration は `check --candidate-source=staged-index` に集約済み。次は **Brief 7 (SSP v0.1)** または P2 残課題(lock / per-extractor timeout / per-extractor version hash)の brief 化。Brief 進捗の詳細は §25 参照。
+> **現在地(2026-05-25 時点)**: **P2.5 + Brief 8 完走 + source-selection Phase 3b 完走** — Brief 1〜5 と Brief 8 全 merged。`semantic-ci` CLI 9 subcommand release 可能状態(`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`)。pre-commit hook integration は `check --candidate-source=staged-index` に集約済み。P2 残課題のうち lock violation short-circuit と per-extractor timeout は実装済み。次は **Brief 7 (SSP v0.1)** または per-extractor version hash の brief 化。Brief 進捗の詳細は §25 参照。
 >
 > **§21 / §22 による前倒し反映**: Generator Adapter(元 P5)と Repair Compiler は **P2.5** に、TypeScript extractor(元 P3b)は **P2.5 並列** に移動済み。後者は 2026-05-06 Session 2 で **凍結**(下記 P3b 参照)。本節の元計画と §21/§22 で記述が分かれている箇所は §21/§22 が優先。
 
@@ -915,6 +915,14 @@ performance:
 
 - §5.4 の `unknown_policy: fail/repair/warn/ignore` と統合
 - timeout で部分結果のまま verdict を出せる（§6.2 partial extraction tolerance）
+- 2026-05-25 実装: `semantic-ci check --extractor-timeout <seconds>` は
+  `api_surface` / `imports` / `module_graph` / `effects` / `complexity` /
+  `test_surface` の各 dimension に同一 per-dimension timeout を適用する。
+  timeout した dimension は schema default にフォールバックし、
+  `engine.timed_out_dimensions` に記録され、その dimension を読む constraint は
+  `ResultStatus.UNKNOWN` + `unknown_cause: extraction` として `unknown_policy`
+  で routing される。config-file-based per-extractor budgets と total budget は
+  future work。
 
 ### 18.5 並列抽出
 

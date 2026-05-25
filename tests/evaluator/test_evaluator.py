@@ -120,6 +120,79 @@ def evaluate_verdict(
     )
 
 
+def test_timed_out_dimension_routes_constraint_to_extraction_unknown():
+    verdict = evaluate_constraints(
+        compiled_target(
+            delta_value_constraint(
+                id="complexity_timeout",
+                operator=Operator.LESS_THAN,
+                expected=1,
+                severity=Severity.SOFT,
+                unknown_policy=UnknownPolicy.REPAIR,
+            )
+        ),
+        CodeStateDelta(complexity_delta=ComplexityDelta(cyclomatic=3)),
+        baseline=CodeState(),
+        candidate=CodeState(),
+        baseline_timed_out_dimensions=frozenset({"complexity"}),
+    )
+
+    result = verdict.results[0]
+    assert verdict.result is VerdictResult.REPAIR
+    assert result.status is ResultStatus.UNKNOWN
+    assert result.error_code == "E_DIMENSION_TIMED_OUT"
+    assert result.unknown_cause is UnknownCause.EXTRACTION
+    assert dict(result.evidence)["dimension"] == "complexity"
+
+
+def test_state_constraint_ignores_baseline_only_timeout():
+    verdict = evaluate_constraints(
+        compiled_target(
+            constraint(
+                id="candidate_api_present",
+                kind=ConstraintKind.STATE,
+                target="api_surface",
+                operator=Operator.INCLUDES_ANY,
+                expected=({"fqn": "pkg.a"},),
+            )
+        ),
+        CodeStateDelta(),
+        baseline=CodeState(),
+        candidate=CodeState(api_surface=(api("pkg.a"),)),
+        baseline_timed_out_dimensions=frozenset({"api_surface"}),
+    )
+
+    result = verdict.results[0]
+    assert verdict.result is VerdictResult.PASS
+    assert result.status is ResultStatus.SATISFIED
+
+
+def test_state_constraint_uses_candidate_timeout():
+    verdict = evaluate_constraints(
+        compiled_target(
+            constraint(
+                id="candidate_api_timeout",
+                kind=ConstraintKind.STATE,
+                target="api_surface",
+                operator=Operator.INCLUDES_ANY,
+                expected=({"fqn": "pkg.a"},),
+                severity=Severity.SOFT,
+                unknown_policy=UnknownPolicy.REPAIR,
+            )
+        ),
+        CodeStateDelta(),
+        baseline=CodeState(api_surface=(api("pkg.a"),)),
+        candidate=CodeState(api_surface=(api("pkg.a"),)),
+        candidate_timed_out_dimensions=frozenset({"api_surface"}),
+    )
+
+    result = verdict.results[0]
+    assert verdict.result is VerdictResult.REPAIR
+    assert result.status is ResultStatus.UNKNOWN
+    assert result.error_code == "E_DIMENSION_TIMED_OUT"
+    assert result.unknown_cause is UnknownCause.EXTRACTION
+
+
 def state_value_constraint(
     *,
     id: str = "c",

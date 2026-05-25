@@ -310,7 +310,7 @@ semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--baseline-source {commit,working-tree,staged-index}]
                   [--candidate-source {commit,working-tree,staged-index}]
                   [--mode {smoke,full}] [--no-cache] [--cache-dir <dir>]
-                  [--cache-max-bytes <int>]
+                  [--cache-max-bytes <int>] [--extractor-timeout <seconds>]
 ```
 
 Compares git refs using temporary detached worktrees. Defaults are:
@@ -379,6 +379,16 @@ the current command invocation. `hit` and `miss` count individual baseline /
 candidate lookups, `invalid` counts corrupt or version-mismatched entries that
 were recomputed, and `write_failed` counts failed cache writes.
 
+`--extractor-timeout <seconds>` applies a per-dimension wall-clock budget to
+each Python extractor dimension (`api_surface`, `imports`, `module_graph`,
+`effects`, `complexity`, `test_surface`). Omit it for the default fail-fast,
+no-timeout behavior. If a dimension exceeds the budget, `check` falls that
+dimension back to its schema default, disables CodeState cache reads/writes for
+that invocation, records the dimension under `engine.timed_out_dimensions` in
+JSON output, and constraints targeting that dimension evaluate as
+`unknown_cause: extraction` so their `unknown_policy` still controls verdict
+routing.
+
 Examples:
 
 ```bash
@@ -388,6 +398,7 @@ semantic-ci check --candidate-source working-tree --package-root src/semantic_ci
 semantic-ci check --candidate-source staged-index --target target.yaml
 semantic-ci check --baseline-source working-tree --candidate-source staged-index
 semantic-ci check --mode smoke
+semantic-ci check --extractor-timeout 2.5 --format json
 semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600
 semantic-ci check --format sarif --output semantic-ci.sarif

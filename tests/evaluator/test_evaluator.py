@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from semantic_ci_code.cli.output.json_formatter import build_payload
 from semantic_ci_code.compiler import (
     CompiledConstraint,
     CompiledTarget,
@@ -23,6 +24,7 @@ from semantic_ci_code.domain.state_schema import (
     EffectChanges,
     EffectClass,
     EffectEntry,
+    ImportDelta,
     SymbolDelta,
 )
 from semantic_ci_code.evaluator import (
@@ -40,6 +42,7 @@ from semantic_ci_code.framework.constraint_types import (
     UnknownPolicy,
 )
 from semantic_ci_code.pipeline import extract_python_code_state
+from semantic_ci_code.repair import emit_repair_plan
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "evaluator"
 
@@ -692,6 +695,382 @@ def test_hard_and_soft_violations_aggregate_to_fail():
     )
 
     assert verdict.result is VerdictResult.FAIL
+
+
+def test_hard_violation_short_circuits_remaining_constraints():
+    verdict = evaluate_verdict(
+        state_value_constraint(id="soft_before", expected=2, severity=Severity.SOFT),
+        constraint(
+            id="hard_lock",
+            kind=ConstraintKind.DELTA,
+            target="api_surface",
+            operator=Operator.EQUALS_BASELINE,
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="after", expected=1, severity=Severity.SOFT),
+        baseline=CodeState(api_surface=(api("pkg.before"),)),
+        candidate=CodeState(
+            api_surface=(api("pkg.after"),),
+            python_specific={"value": 1},
+        ),
+    )
+    plan = emit_repair_plan(verdict)
+    payload = build_payload(
+        "compare",
+        compiled=compiled_target(),
+        verdict=verdict,
+        repair_plan=plan,
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.VIOLATED,
+        ResultStatus.SKIPPED,
+    ]
+    assert verdict.results[2].error_code == "E_HARD_LOCK_SHORT_CIRCUIT"
+    assert payload["summary"]["skipped"] == 1
+    assert {instruction.constraint_id for instruction in plan.instructions} == {
+        "soft_before",
+        "hard_lock",
+    }
+
+
+def test_hard_pass_does_not_short_circuit_soft_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="hard_lock",
+            kind=ConstraintKind.DELTA,
+            target="api_surface",
+            operator=Operator.EQUALS_BASELINE,
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="soft_one", expected=2, severity=Severity.SOFT),
+        state_value_constraint(id="soft_two", expected=3, severity=Severity.SOFT),
+        baseline=CodeState(api_surface=(api("pkg.same"),)),
+        candidate=CodeState(
+            api_surface=(api("pkg.same"),),
+            python_specific={"value": 1},
+        ),
+    )
+
+    assert verdict.result is VerdictResult.REPAIR
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.SATISFIED,
+        ResultStatus.VIOLATED,
+        ResultStatus.VIOLATED,
+    ]
+    assert verdict.skipped == ()
+
+
+def test_hard_authoring_unknown_short_circuits_remaining_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="bad_authoring",
+            kind=ConstraintKind.DELTA,
+            target="missing",
+            operator=Operator.EQUALS_BASELINE,
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="after", expected=1, severity=Severity.SOFT),
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+    plan = emit_repair_plan(verdict)
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.UNKNOWN,
+        ResultStatus.SKIPPED,
+    ]
+    assert verdict.results[0].unknown_cause is UnknownCause.AUTHORING
+    assert {instruction.constraint_id for instruction in plan.instructions} == {"bad_authoring"}
+
+
+def test_equals_empty_delta_lock_short_circuits_remaining_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="no_new_effects",
+            kind=ConstraintKind.DELTA,
+            target="effect_changes.added",
+            operator=Operator.EQUALS,
+            expected=(),
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="after", expected=1, severity=Severity.SOFT),
+        delta=CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=(EffectEntry(fqn="pkg.write", effect_class=EffectClass.FS),),
+            )
+        ),
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.SKIPPED,
+    ]
+    assert verdict.results[1].error_code == "E_HARD_LOCK_SHORT_CIRCUIT"
+
+
+def test_removed_public_equals_empty_lock_short_circuits_remaining_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="no_removed_public_api",
+            kind=ConstraintKind.DELTA,
+            target="api_surface_delta.removed_public",
+            operator=Operator.EQUALS,
+            expected=(),
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="after", expected=1, severity=Severity.SOFT),
+        delta=CodeStateDelta(
+            api_surface_delta=SymbolDelta(
+                removed=(api("pkg.removed_public"),),
+            )
+        ),
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.SKIPPED,
+    ]
+    assert verdict.results[1].error_code == "E_HARD_LOCK_SHORT_CIRCUIT"
+
+
+@pytest.mark.parametrize(
+    ("target", "delta"),
+    [
+        (
+            "api_surface_delta.added.fqns",
+            CodeStateDelta(api_surface_delta=SymbolDelta(added=(api("pkg.added"),))),
+        ),
+        (
+            "effect_changes.added.fqns",
+            CodeStateDelta(
+                effect_changes=EffectChanges(
+                    added=(EffectEntry(fqn="pkg.write", effect_class=EffectClass.FS),),
+                )
+            ),
+        ),
+        (
+            "imports_delta.added.modules",
+            CodeStateDelta(imports_delta=ImportDelta(added=({"module": "pkg.new"},))),
+        ),
+    ],
+)
+def test_flat_projection_equals_empty_lock_short_circuits_remaining_constraints(
+    target: str,
+    delta: CodeStateDelta,
+):
+    verdict = evaluate_verdict(
+        constraint(
+            id="no_new_flat_projection_item",
+            kind=ConstraintKind.DELTA,
+            target=target,
+            operator=Operator.EQUALS,
+            expected=(),
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="after", expected=1, severity=Severity.SOFT),
+        delta=delta,
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.SKIPPED,
+    ]
+    assert verdict.results[1].error_code == "E_HARD_LOCK_SHORT_CIRCUIT"
+
+
+@pytest.mark.parametrize(
+    ("operator", "target", "expected", "delta"),
+    [
+        (
+            Operator.SUBSET_OF,
+            "api_surface_delta.added",
+            (),
+            CodeStateDelta(api_surface_delta=SymbolDelta(added=(api("pkg.added"),))),
+        ),
+        (
+            Operator.EXCLUDES_ALL,
+            "effect_changes.added",
+            ({"fqn": "pkg.write"},),
+            CodeStateDelta(
+                effect_changes=EffectChanges(
+                    added=(EffectEntry(fqn="pkg.write", effect_class=EffectClass.FS),),
+                )
+            ),
+        ),
+    ],
+)
+def test_deny_style_delta_lock_short_circuits_remaining_constraints(
+    operator: Operator,
+    target: str,
+    expected: object,
+    delta: CodeStateDelta,
+):
+    verdict = evaluate_verdict(
+        constraint(
+            id="deny_style_lock",
+            kind=ConstraintKind.DELTA,
+            target=target,
+            operator=operator,
+            expected=expected,
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="after", expected=1, severity=Severity.SOFT),
+        delta=delta,
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.SKIPPED,
+    ]
+    assert verdict.results[1].error_code == "E_HARD_LOCK_SHORT_CIRCUIT"
+
+
+def test_equals_full_zero_record_lock_short_circuits_remaining_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="no_effect_changes",
+            kind=ConstraintKind.DELTA,
+            target="effect_changes",
+            operator=Operator.EQUALS,
+            expected={"added": (), "removed": ()},
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="after", expected=1, severity=Severity.SOFT),
+        delta=CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=(EffectEntry(fqn="pkg.write", effect_class=EffectClass.FS),),
+            )
+        ),
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.SKIPPED,
+    ]
+    assert verdict.results[1].error_code == "E_HARD_LOCK_SHORT_CIRCUIT"
+
+
+def test_equals_partial_zero_record_lock_does_not_short_circuit_user_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="partial_no_effect_changes",
+            kind=ConstraintKind.DELTA,
+            target="effect_changes",
+            operator=Operator.EQUALS,
+            expected={"added": ()},
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="user_after", expected=2, severity=Severity.SOFT),
+        delta=CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=(EffectEntry(fqn="pkg.write", effect_class=EffectClass.FS),),
+            )
+        ),
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.VIOLATED,
+    ]
+    assert verdict.skipped == ()
+
+
+def test_template_hard_violation_does_not_short_circuit_user_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="template:refactor:api_surface_unchanged",
+            kind=ConstraintKind.DELTA,
+            target="api_surface",
+            operator=Operator.EQUALS_BASELINE,
+            severity=Severity.HARD,
+            source=ConstraintSource.TEMPLATE,
+        ),
+        state_value_constraint(id="user_after", expected=2, severity=Severity.SOFT),
+        baseline=CodeState(api_surface=(api("pkg.before"),)),
+        candidate=CodeState(
+            api_surface=(api("pkg.after"),),
+            python_specific={"value": 1},
+        ),
+    )
+    plan = emit_repair_plan(verdict)
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.VIOLATED,
+    ]
+    assert verdict.skipped == ()
+    assert {instruction.constraint_id for instruction in plan.instructions} == {
+        "template:refactor:api_surface_unchanged",
+        "user_after",
+    }
+
+
+def test_positive_change_requirement_does_not_short_circuit_user_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="must_change",
+            kind=ConstraintKind.DELTA,
+            target="api_surface",
+            operator=Operator.CHANGED,
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="user_after", expected=2, severity=Severity.SOFT),
+        baseline=CodeState(api_surface=(api("pkg.same"),)),
+        candidate=CodeState(
+            api_surface=(api("pkg.same"),),
+            python_specific={"value": 1},
+        ),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.VIOLATED,
+    ]
+    assert verdict.skipped == ()
+
+
+def test_equals_positive_delta_requirement_does_not_short_circuit_user_constraints():
+    verdict = evaluate_verdict(
+        constraint(
+            id="must_add_effect",
+            kind=ConstraintKind.DELTA,
+            target="effect_changes.added",
+            operator=Operator.EQUALS,
+            expected=({"fqn": "pkg.required", "effect_class": "fs"},),
+            severity=Severity.HARD,
+        ),
+        state_value_constraint(id="user_after", expected=2, severity=Severity.SOFT),
+        delta=CodeStateDelta(
+            effect_changes=EffectChanges(
+                added=(EffectEntry(fqn="pkg.actual", effect_class=EffectClass.FS),),
+            )
+        ),
+        candidate=CodeState(python_specific={"value": 1}),
+    )
+
+    assert verdict.result is VerdictResult.FAIL
+    assert [result.status for result in verdict.results] == [
+        ResultStatus.VIOLATED,
+        ResultStatus.VIOLATED,
+    ]
+    assert verdict.skipped == ()
 
 
 def test_soft_violation_only_aggregates_to_repair():

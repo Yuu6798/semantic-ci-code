@@ -44,12 +44,14 @@ def build_payload(
     baseline_rev: str | None = None,
     candidate_source: str | None = None,
     candidate_rev: str | None = None,
+    timed_out_dimensions: frozenset[str] | tuple[str, ...] | list[str] | None = None,
 ) -> dict[str, Any]:
     engine = _engine_payload(
         baseline_source=baseline_source,
         baseline_rev=baseline_rev,
         candidate_source=candidate_source,
         candidate_rev=candidate_rev,
+        timed_out_dimensions=timed_out_dimensions,
     )
     return {
         "schema_version": SCHEMA_VERSION,
@@ -134,12 +136,15 @@ def _engine_payload(
     baseline_rev: str | None = None,
     candidate_source: str | None = None,
     candidate_rev: str | None = None,
+    timed_out_dimensions: frozenset[str] | tuple[str, ...] | list[str] | None = None,
 ) -> dict[str, Any]:
     engine: dict[str, Any] = {}
     if baseline_source is not None or baseline_rev is not None:
         engine["baseline"] = {"source": baseline_source, "rev": baseline_rev}
     if candidate_source is not None or candidate_rev is not None:
         engine["candidate"] = {"source": candidate_source, "rev": candidate_rev}
+    if timed_out_dimensions:
+        engine["timed_out_dimensions"] = sorted(timed_out_dimensions)
     engine["extractor_pyver"] = f"{sys.version_info.major}.{sys.version_info.minor}"
     engine["package_version"] = package_version()
     return engine

@@ -89,6 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check.add_argument("--no-fetch", action="store_true")
     check.add_argument(
+        "--extractor-timeout",
+        type=float,
+        default=None,
+        help="per-dimension extractor timeout in seconds; omitted means no timeout",
+    )
+    check.add_argument(
         "--baseline-source",
         choices=("commit", "working-tree", "staged-index"),
         default="commit",

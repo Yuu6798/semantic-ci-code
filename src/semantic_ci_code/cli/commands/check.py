@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from argparse import Namespace
 from contextlib import AbstractContextManager, ExitStack, nullcontext
 from pathlib import Path
@@ -59,7 +60,11 @@ from semantic_ci_code.compiler import CompileError
 from semantic_ci_code.delta import compute_code_state_delta
 from semantic_ci_code.evaluator import evaluate_constraints
 from semantic_ci_code.framework.extract_config import ExtractConfig, ExtractConfigError
-from semantic_ci_code.pipeline import ExtractorError, extract_python_code_state
+from semantic_ci_code.pipeline import (
+    CodeStateExtraction,
+    ExtractorError,
+    extract_python_code_state_result,
+)
 from semantic_ci_code.repair import emit_repair_plan
 
 _VOLATILE_SOURCES = frozenset(("working-tree", "staged-index"))
@@ -97,6 +102,9 @@ def run_check(args: Namespace) -> int:
         dimensions = dimensions_for_mode(mode)
         dimensions_tuple = dimensions_for_cache(dimensions)
         use_cache = not cache_disabled(no_cache_flag=args.no_cache)
+        extractor_timeout = _extractor_timeout(args.extractor_timeout)
+        if extractor_timeout is not None:
+            use_cache = False
         cache_root = resolve_cache_root(args.cache_dir, repo_root=root, cwd=Path.cwd())
         cache_max_bytes = resolve_cache_max_bytes(args.cache_max_bytes) if use_cache else 0
         cache_stats = CacheStats(disabled=not use_cache)
@@ -150,7 +158,7 @@ def run_check(args: Namespace) -> int:
             )
             if args.verbose:
                 _stderr(f"extracting baseline package_root={baseline_root}")
-            baseline = _extract_code_state(
+            baseline_extraction = _extract_code_state(
                 package_root=package_root,
                 resolved_package_root=baseline_root,
                 tree_root=baseline_dir,
@@ -164,11 +172,12 @@ def run_check(args: Namespace) -> int:
                 use_cache=use_cache and not baseline_volatile,
                 cache_stats=cache_stats,
                 cache_max_bytes=cache_max_bytes,
+                timeout_seconds=extractor_timeout,
                 verbose=args.verbose,
             )
             if args.verbose:
                 _stderr(f"extracting candidate package_root={candidate_root}")
-            candidate = _extract_code_state(
+            candidate_extraction = _extract_code_state(
                 package_root=package_root,
                 resolved_package_root=candidate_root,
                 tree_root=candidate_dir,
@@ -182,8 +191,17 @@ def run_check(args: Namespace) -> int:
                 use_cache=use_cache and not candidate_volatile,
                 cache_stats=cache_stats,
                 cache_max_bytes=cache_max_bytes,
+                timeout_seconds=extractor_timeout,
                 verbose=args.verbose,
             )
+
+        baseline = baseline_extraction.state
+        candidate = candidate_extraction.state
+        timed_out_dimensions = (
+            baseline_extraction.timed_out_dimensions | candidate_extraction.timed_out_dimensions
+        )
+        if args.verbose and timed_out_dimensions:
+            _stderr("extractor timed out dimensions: " + ", ".join(sorted(timed_out_dimensions)))
 
         delta = compute_code_state_delta(baseline, candidate)
         entries = _numstat_entries(
@@ -201,6 +219,8 @@ def run_check(args: Namespace) -> int:
             baseline=baseline,
             candidate=candidate,
             extracted_dimensions=dimensions,
+            baseline_timed_out_dimensions=baseline_extraction.timed_out_dimensions,
+            candidate_timed_out_dimensions=candidate_extraction.timed_out_dimensions,
         )
         repair_plan = emit_repair_plan(verdict)
         payload = build_payload(
@@ -216,6 +236,7 @@ def run_check(args: Namespace) -> int:
             baseline_rev=baseline_rev,
             candidate_source=candidate_source,
             candidate_rev=candidate_rev,
+            timed_out_dimensions=timed_out_dimensions,
         )
         output_status = _write_output(
             _render_payload(payload, args, subcommand="check"), args.output
@@ -269,6 +290,14 @@ def _is_volatile_source(source: str) -> bool:
 def _reject_incompatible_rev(*, side: str, source: str, explicit_rev: bool) -> None:
     if _is_volatile_source(source) and explicit_rev:
         raise ValueError(f"error: --{side}-source={source} is incompatible with --{side}-rev")
+
+
+def _extractor_timeout(raw: float | None) -> float | None:
+    if raw is None:
+        return None
+    if not math.isfinite(raw) or raw <= 0:
+        raise ValueError("--extractor-timeout must be a finite value greater than 0 seconds")
+    return raw
 
 
 def _resolve_baseline_ref(args: Namespace, *, repo_root: Path) -> str:
@@ -353,13 +382,18 @@ def _extract_code_state(
     use_cache: bool,
     cache_stats: CacheStats,
     cache_max_bytes: int,
+    timeout_seconds: float | None,
     verbose: bool,
-):
+) -> CodeStateExtraction:
+    if timeout_seconds is not None:
+        use_cache = False
+
     if not use_cache:
-        return extract_python_code_state(
+        return extract_python_code_state_result(
             resolved_package_root,
             dimensions=dimensions,
             extract_config=extract_config,
+            timeout_seconds=timeout_seconds,
             exclude_reporter=make_exclude_reporter(Namespace(verbose=verbose)),
         )
 
@@ -378,9 +412,9 @@ def _extract_code_state(
     log = _stderr if verbose else None
     cached = read_cached_code_state(cache_root, key, stats=cache_stats, log=log)
     if cached is not None:
-        return cached
+        return CodeStateExtraction(state=cached, timed_out_dimensions=frozenset())
 
-    state = extract_python_code_state(
+    extraction = extract_python_code_state_result(
         resolved_package_root,
         dimensions=dimensions,
         extract_config=extract_config,
@@ -389,7 +423,7 @@ def _extract_code_state(
     write_cached_code_state(
         cache_root,
         key,
-        state=state,
+        state=extraction.state,
         meta=key_meta(
             tree_object_id=tree_id,
             package_root_relpath_posix=package_root_posix,
@@ -402,4 +436,4 @@ def _extract_code_state(
         max_bytes=cache_max_bytes,
         log=log,
     )
-    return state
+    return extraction

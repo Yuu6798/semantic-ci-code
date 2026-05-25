@@ -50,7 +50,7 @@ def test_check_uses_cached_codestate_without_calling_extractor_on_second_run(
         "--cache-dir",
         str(cache_dir),
     )
-    monkeypatch.setattr(check_command, "extract_python_code_state", _boom_extractor)
+    monkeypatch.setattr(check_command, "extract_python_code_state_result", _boom_extractor)
     second = run_semantic_ci(
         repo,
         "check",

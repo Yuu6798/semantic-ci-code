@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import pickle
+import time
 from pathlib import Path
 
 import pytest
 
+import semantic_ci_code.pipeline.python_code_state as code_state_pipeline
 from semantic_ci_code.cli.git_runtime import GitCommandError
 
 from .git_helpers import (
@@ -33,6 +35,19 @@ COMPARE_INVALID_TARGET = COMPARE_FIXTURES / "target_invalid.yaml"
 TARGET_NO_USER_CONSTRAINTS = (
     "intent: no user constraints\nchange:\n  primary_kind: feature\nconstraints: []\n"
 )
+TARGET_COMPLEXITY_TIMEOUT = """\
+intent: tolerate slow complexity extractor
+change:
+  primary_kind: feature
+constraints:
+  - id: complexity_timeout
+    kind: delta
+    target: complexity_delta.cyclomatic
+    operator: less_than
+    expected: 1
+    severity: soft
+    unknown_policy: repair
+"""
 
 
 def compare_args(target: Path = COMPARE_PASS_TARGET) -> list[str]:
@@ -92,6 +107,75 @@ def test_origin_main_ref_is_used_when_present(tmp_path: Path):
 
     assert result.returncode == 0
     assert payload(result)["verdict"] == "pass"
+
+
+def test_check_extractor_timeout_surfaces_extraction_unknown(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    repo = init_repo(tmp_path)
+    write_file(repo / "target.yaml", TARGET_COMPLEXITY_TIMEOUT)
+
+    def slow_complexity(*args, **kwargs):
+        del args, kwargs
+        time.sleep(1.0)
+        return ()
+
+    monkeypatch.setattr(
+        code_state_pipeline,
+        "extract_python_complexity_from_paths",
+        slow_complexity,
+    )
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--no-fetch",
+        "--no-cache",
+        "--extractor-timeout",
+        "0.2",
+        "--format",
+        "json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    data = payload(result)
+    timeout_result = next(
+        item for item in data["results"] if item["constraint_id"] == "complexity_timeout"
+    )
+    assert data["verdict"] == "repair"
+    assert data["engine"]["timed_out_dimensions"] == ["complexity"]
+    assert timeout_result["status"] == "unknown"
+    assert timeout_result["unknown_cause"] == "extraction"
+    assert timeout_result["error_code"] == "E_DIMENSION_TIMED_OUT"
+    timeout_instruction = next(
+        item
+        for item in data["repair_plan"]["instructions"]
+        if item["constraint_id"] == "complexity_timeout"
+    )
+    assert timeout_instruction["repair_code"] == "R_EXTRACTION_TIMEOUT"
+
+
+@pytest.mark.parametrize("timeout", ["nan", "inf", "-inf", "0"])
+def test_check_rejects_non_finite_or_non_positive_extractor_timeout(
+    tmp_path: Path,
+    timeout: str,
+):
+    repo = init_repo(tmp_path)
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--no-fetch",
+        "--mode",
+        "smoke",
+        f"--extractor-timeout={timeout}",
+        "--format",
+        "json",
+    )
+
+    assert result.returncode == 2
+    assert "--extractor-timeout must be a finite value greater than 0 seconds" in result.stderr
 
 
 def test_main_fallback_is_used_when_origin_main_is_missing(tmp_path: Path):

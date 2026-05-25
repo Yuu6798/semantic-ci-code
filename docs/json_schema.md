@@ -85,7 +85,7 @@ bump beyond the current CLI schema version.
 | `files_touched` | Git diff file count. Zero for `observe` and `compare`. |
 | `loc_delta` | Git diff line count. Zero for `observe` and `compare`. |
 | `cache` | Cache stats for this invocation: `hit`, `miss`, `invalid`, `write_failed`, and `disabled`. |
-| `engine` | Python minor version, package version, and optional source provenance. `check` includes `engine.baseline` and `engine.candidate` sub-objects with `{source, rev}`; `source` is `commit`, `working-tree`, or `staged-index`, and `rev` is a resolved commit SHA for commit-backed sources or `null` for volatile sources. Other verdict-producing subcommands may omit these sub-objects. |
+| `engine` | Python minor version, package version, optional source provenance, and optional extraction diagnostics. `check` includes `engine.baseline` and `engine.candidate` sub-objects with `{source, rev}`; `source` is `commit`, `working-tree`, or `staged-index`, and `rev` is a resolved commit SHA for commit-backed sources or `null` for volatile sources. When `check --extractor-timeout` causes one or more dimensions to fall back to schema defaults, `engine.timed_out_dimensions` is a sorted list of dimension names. Other verdict-producing subcommands may omit these sub-objects. |
 
 Extractor exclude config changes cache identity but not the JSON envelope shape.
 `check` includes the effective exclude key in its internal CodeState cache key;
@@ -411,6 +411,11 @@ bump the envelope version.
   `--candidate-source` with `staged-index` without bumping the schema version:
   adding an enum value to this optional provenance field is covered by the
   compatibility policy above.
+- `check --extractor-timeout <seconds>` can add
+  `engine.timed_out_dimensions: [<dimension>, ...]` without bumping the schema
+  version because it is an optional diagnostic field. Constraints that target a
+  timed-out dimension report `status: "unknown"` and
+  `unknown_cause: "extraction"`.
 - The CLI layer still materializes two directories for the engine; the engine
   does not receive source-category enums.
 

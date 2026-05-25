@@ -5,15 +5,18 @@ import os
 import pickle
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
 
+import semantic_ci_code.pipeline.python_code_state as code_state_pipeline
 from semantic_ci_code.domain.state_schema import CodeState, ModuleGraphEntry
 from semantic_ci_code.pipeline import (
     ExtractorError,
     extract_python_code_state,
     extract_python_code_state_from_paths,
+    extract_python_code_state_result,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -73,6 +76,44 @@ def test_single_module_fixture_populates_all_six_extracted_fields():
         (entry.test_file, entry.test_function, entry.asserts) for entry in state.test_surface
     } == {("mod.py", "test_public_api", 1)}
     assert state.module_graph
+
+
+def test_extractor_timeout_falls_back_to_default_and_records_dimension(monkeypatch):
+    def slow_complexity(*args, **kwargs):
+        del args, kwargs
+        time.sleep(0.05)
+        return ()
+
+    monkeypatch.setattr(
+        code_state_pipeline,
+        "extract_python_complexity_from_paths",
+        slow_complexity,
+    )
+
+    extraction = extract_python_code_state_result(
+        SINGLE_MODULE,
+        dimensions=frozenset({"complexity"}),
+        timeout_seconds=0.01,
+    )
+
+    assert extraction.timed_out_dimensions == frozenset({"complexity"})
+    assert extraction.state.complexity == ()
+    assert extraction.state.api_surface == ()
+    assert extraction.state.imports == ()
+
+
+def test_extractor_timeout_default_preserves_existing_behavior():
+    state = extract_python_code_state(SINGLE_MODULE)
+    extraction = extract_python_code_state_result(SINGLE_MODULE)
+
+    assert extraction.timed_out_dimensions == frozenset()
+    assert _state_json(extraction.state) == _state_json(state)
+
+
+@pytest.mark.parametrize("timeout", [float("nan"), float("inf"), float("-inf"), 0.0])
+def test_extractor_timeout_rejects_non_finite_or_non_positive_values(timeout: float):
+    with pytest.raises(ValueError, match="finite value greater than 0"):
+        extract_python_code_state_result(SINGLE_MODULE, timeout_seconds=timeout)
 
 
 def test_whole_package_and_all_paths_variant_are_equivalent():

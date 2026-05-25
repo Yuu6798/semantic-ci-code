@@ -314,6 +314,7 @@ def _message(result: ConstraintResult, repair_code: str) -> str:
         "R_PATH_UNRESOLVED",
         "R_TYPE_MISMATCH",
         "R_OPERATOR_TARGET_MISMATCH",
+        "R_EXTRACTION_TIMEOUT",
     }:
         cause_suffix = f", cause={result.unknown_cause.value}" if result.unknown_cause else ""
         return (

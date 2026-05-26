@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://semantic-ci/ssp_envelope_v1.json",
+  "title": "Semantic Security Protocol v0.1 envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "engine", "deltas_by_sensor", "aggregate_verdict"],
+  "properties": {
+    "schema_version": {"const": "ssp-1"},
+    "engine": {"$ref": "#/$defs/SSPEngine"},
+    "deltas_by_sensor": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/SSPDelta"}
+    },
+    "aggregate_verdict": {"$ref": "#/$defs/SSPResult"},
+    "metadata": {"$ref": "#/$defs/SSPMetadata"}
+  },
+  "$defs": {
+    "SSPResult": {"enum": ["pass", "fail", "unknown"]},
+    "Severity": {"enum": ["critical", "high", "medium", "low", "info"]},
+    "SourceSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_line", "start_col", "end_line", "end_col"],
+      "properties": {
+        "start_line": {"type": "integer", "minimum": 1},
+        "start_col": {"type": "integer", "minimum": 0},
+        "end_line": {"type": "integer", "minimum": 1},
+        "end_col": {"type": "integer", "minimum": 0}
+      }
+    },
+    "SASTFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "rule_id",
+        "module_path",
+        "qualified_name",
+        "normalized_text",
+        "severity"
+      ],
+      "properties": {
+        "category": {"const": "sast"},
+        "rule_id": {"type": "string", "minLength": 1},
+        "module_path": {"type": "string", "minLength": 1},
+        "qualified_name": {"type": "string", "minLength": 1},
+        "normalized_text": {"type": "string"},
+        "ordinal": {"type": ["integer", "null"], "minimum": 0, "default": null},
+        "fingerprint": {
+          "type": ["string", "null"],
+          "minLength": 16,
+          "maxLength": 16,
+          "default": null
+        },
+        "severity": {"$ref": "#/$defs/Severity"},
+        "message": {"type": "string", "default": ""},
+        "source_span": {
+          "anyOf": [{"$ref": "#/$defs/SourceSpan"}, {"type": "null"}],
+          "default": null
+        },
+        "normalization": {"enum": ["ast", "raw"], "default": "ast"}
+      }
+    },
+    "SCAFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "package_name",
+        "installed_version",
+        "advisory_id",
+        "severity"
+      ],
+      "properties": {
+        "category": {"const": "sca"},
+        "package_name": {"type": "string", "minLength": 1},
+        "installed_version": {"type": "string", "minLength": 1},
+        "advisory_id": {"type": "string", "minLength": 1},
+        "fingerprint": {
+          "type": ["string", "null"],
+          "minLength": 16,
+          "maxLength": 16,
+          "default": null
+        },
+        "severity": {"$ref": "#/$defs/Severity"},
+        "message": {"type": "string", "default": ""}
+      }
+    },
+    "Finding": {
+      "oneOf": [{"$ref": "#/$defs/SASTFinding"}, {"$ref": "#/$defs/SCAFinding"}],
+      "discriminator": {
+        "propertyName": "category",
+        "mapping": {
+          "sast": "#/$defs/SASTFinding",
+          "sca": "#/$defs/SCAFinding"
+        }
+      }
+    },
+    "SSPDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sensor_id", "status", "added", "removed", "unchanged_count"],
+      "properties": {
+        "sensor_id": {"type": "string", "minLength": 1},
+        "status": {"$ref": "#/$defs/SSPResult"},
+        "added": {"type": "array", "items": {"$ref": "#/$defs/Finding"}, "default": []},
+        "removed": {"type": "array", "items": {"$ref": "#/$defs/Finding"}, "default": []},
+        "unchanged_count": {"type": "integer", "minimum": 0},
+        "error_message": {"type": ["string", "null"], "default": null}
+      }
+    },
+    "ScanEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["git-rev", "git-tree", "virtual", "prebuilt"]},
+        "ref": {"type": ["string", "null"], "default": null}
+      }
+    },
+    "SensorSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "default": ""},
+        "ruleset_hash": {"type": ["string", "null"], "default": null},
+        "advisory_db_hash": {"type": ["string", "null"], "default": null}
+      }
+    },
+    "SSPMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": {"type": "string", "default": ""},
+        "findings_order_invariant": {
+          "enum": ["source-span", "schema-order"],
+          "default": "source-span"
+        }
+      }
+    },
+    "SSPEngine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ssp_version", "scan_mode", "baseline", "candidate", "sensors"],
+      "properties": {
+        "ssp_version": {"type": "string", "default": "0.1"},
+        "scan_mode": {"enum": ["real", "staged", "virtual", "hybrid"]},
+        "baseline": {"$ref": "#/$defs/ScanEndpoint"},
+        "candidate": {"$ref": "#/$defs/ScanEndpoint"},
+        "sensors": {"type": "array", "items": {"$ref": "#/$defs/SensorSpec"}, "default": []}
+      }
+    }
+  }
+}

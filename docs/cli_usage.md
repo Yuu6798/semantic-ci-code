@@ -530,7 +530,7 @@ semantic-ci target-doctor [--target <yaml>] [--package-root <dir>]
                           [--format {human,json}] [--output <file>]
 ```
 
-Audits a `target.yaml` for six authoring hazards and renders them as
+Audits a `target.yaml` for seven authoring hazards and renders them as
 advisories. Advisor surface — advisory presence does not change the
 verdict and does not change the exit code (`docs/exit_codes.md`).
 
@@ -539,6 +539,7 @@ verdict and does not change the exit code (`docs/exit_codes.md`).
 | `ADVISORY-D1` | `test_surface_delta.*` constraint exists, but no test files (`test_*.py` / `*_test.py` / `tests/`) are visible under `--package-root`. |
 | `ADVISORY-D3` | A user constraint duplicates a template-expanded constraint (same kind/target/operator/expected). |
 | `ADVISORY-D4` | The target is lock-only and the candidate diff (`--baseline-rev` ↔ `--candidate-rev`) touches no Python files; the verdict would be a vacuous PASS. Skipped silently when neither rev is given and git is unavailable. |
+| `ADVISORY-I1` | `intent` is the empty string. Repair adapters and `validate-plan` produce better guidance when intent describes the change purpose; use `init --intent` or edit `target.yaml`. |
 | `ADVISORY-P1` | `primary_kind: feature` has no positive addition constraint. |
 | `ADVISORY-P2` | `primary_kind: bugfix` has no `test_surface_delta.new_cases` expectation. |
 | `ADVISORY-S1` | A user constraint has `severity: info` paired with `unknown_policy in {fail, repair}`. After Brief D1-4 the warning scope narrows to extraction-cause / open_runtime UNKNOWN. |

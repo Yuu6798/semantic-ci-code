@@ -312,6 +312,10 @@ Properties:
 The SSP envelope is independent of the core verdict envelope
 (`schema_version: "6"`). They share no schema definitions.
 
+Every `deltas_by_sensor` key must match the embedded `SSPDelta.sensor_id`.
+The Pydantic model enforces this invariant so consumers cannot accidentally
+misattribute a delta to the wrong sensor key.
+
 ### §6.2 Delta Computation
 
 `compute_delta(baseline: SensorOutput, candidate: SensorOutput) -> SSPDelta`:

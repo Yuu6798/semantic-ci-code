@@ -108,3 +108,25 @@ def test_envelope_json_schema_validates_conforming_payload():
     assert payload["metadata"]["timestamp"] == "2026-01-01T00:00:00Z"
     assert payload["metadata"]["findings_order_invariant"] == "source-span"
     jsonschema.validate(payload, json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
+
+
+def test_envelope_rejects_delta_map_key_sensor_id_mismatch():
+    with pytest.raises(ValidationError, match="deltas_by_sensor keys must match"):
+        SSPEnvelope(
+            engine=SSPEngine(
+                scan_mode="virtual",
+                baseline=ScanEndpoint(kind="virtual", ref="baseline-fixture"),
+                candidate=ScanEndpoint(kind="virtual", ref="candidate-fixture"),
+                sensors=(SensorSpec(id="semgrep", version="1.0"),),
+            ),
+            deltas_by_sensor={
+                "semgrep": SSPDelta(
+                    sensor_id="pip-audit",
+                    status="pass",
+                    added=(),
+                    removed=(),
+                    unchanged_count=0,
+                )
+            },
+            aggregate_verdict="pass",
+        )

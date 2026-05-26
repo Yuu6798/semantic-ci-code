@@ -120,3 +120,18 @@ class SSPEnvelope(_SSPModel):
     deltas_by_sensor: dict[str, SSPDelta]
     aggregate_verdict: SSPResult
     metadata: SSPMetadata = Field(default_factory=SSPMetadata)
+
+    @model_validator(mode="after")
+    def _delta_keys_match_sensor_ids(self) -> SSPEnvelope:
+        mismatches = [
+            (key, delta.sensor_id)
+            for key, delta in self.deltas_by_sensor.items()
+            if key != delta.sensor_id
+        ]
+        if mismatches:
+            details = ", ".join(
+                f"{key!r} maps to delta.sensor_id {sensor_id!r}"
+                for key, sensor_id in sorted(mismatches)
+            )
+            raise ValueError(f"deltas_by_sensor keys must match SSPDelta.sensor_id: {details}")
+        return self

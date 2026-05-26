@@ -20,6 +20,7 @@ from semantic_ci_code.cli.command_support import (
     usage_error,
     write_output,
 )
+from semantic_ci_code.cli.doctor_support import PackageRootError, resolve_package_root
 from semantic_ci_code.cli.git_diff import numstat_range
 from semantic_ci_code.cli.git_runtime import (
     GitError,
@@ -39,15 +40,11 @@ from semantic_ci_code.cli.target_loader import (
 from semantic_ci_code.compiler import CompileError
 
 
-class TargetDoctorUsageError(ValueError):
-    """target-doctor input rejected at the CLI boundary."""
-
-
 def run_target_doctor(args: Namespace) -> int:
     try:
         target_path = discover_target(args.target, cwd=Path.cwd())
         compiled = load_compiled_target(target_path)
-        package_root = _resolve_package_root(args.package_root)
+        package_root = resolve_package_root(args.package_root)
         files_touched = _resolve_files_touched(args, package_root=package_root)
         advisories = detect_advisories(
             compiled,
@@ -62,7 +59,7 @@ def run_target_doctor(args: Namespace) -> int:
         return write_output(output, args.output)
     except TargetUsageError as exc:
         return usage_error(exc)
-    except TargetDoctorUsageError as exc:
+    except PackageRootError as exc:
         return usage_error(exc)
     except CompileError as exc:
         return engine_error(exc, args, prefix="CompileError")
@@ -72,45 +69,6 @@ def run_target_doctor(args: Namespace) -> int:
         return engine_error(exc, args, prefix="git error")
     except Exception as exc:
         return internal_bug(exc, args)
-
-
-def _resolve_package_root(raw: str | None) -> Path:
-    raw_path = Path(raw or ".")
-    if raw_path.is_absolute() or raw_path.drive:
-        raise TargetDoctorUsageError(
-            f"--package-root must be relative for target-doctor: {raw_path}"
-        )
-
-    parts: list[str] = []
-    for part in raw_path.parts:
-        if part in {"", "."}:
-            continue
-        if part == "..":
-            if not parts:
-                raise TargetDoctorUsageError(
-                    f"--package-root must stay within repo for target-doctor: {raw_path}"
-                )
-            parts.pop()
-            continue
-        parts.append(part)
-    normalized = Path(*parts) if parts else Path(".")
-
-    base = Path.cwd()
-    if is_git_available():
-        try:
-            base = repo_root(Path.cwd())
-        except GitError:
-            base = Path.cwd()
-
-    resolved_base = base.resolve()
-    candidate = (resolved_base / normalized).resolve()
-    if not candidate.is_relative_to(resolved_base):
-        raise TargetDoctorUsageError(f"--package-root escapes repo root via symlink: {candidate}")
-    if not candidate.exists():
-        raise TargetDoctorUsageError(f"--package-root does not exist: {candidate}")
-    if not candidate.is_dir():
-        raise TargetDoctorUsageError(f"--package-root is not a directory: {candidate}")
-    return candidate
 
 
 def _resolve_files_touched(

@@ -20,11 +20,16 @@ from semantic_ci_code.authoring.sources import (
     parse_pr_body,
 )
 from semantic_ci_code.authoring.sources.merge import (
+    RECIPE_BUGFIX_REGRESSION_TEST,
+    RECIPE_FEATURE_ADD_API,
+    RECIPE_REFACTOR_PRESERVE_API,
+    RECIPE_TEST_UPDATE_ADD_TEST_CASE,
     MergeError,
     RecipeFlagCompatibilityError,
     merge_sources,
 )
 from semantic_ci_code.cli.command_support import _internal_bug, _stderr, _usage_error
+from semantic_ci_code.cli.doctor_support import PackageRootError, resolve_package_root
 from semantic_ci_code.cli.exit_codes import SUCCESS
 from semantic_ci_code.cli.init_recipes import RECIPES, apply_recipe
 from semantic_ci_code.cli.init_recipes.feature_add_api import FeatureRecipeError
@@ -53,6 +58,24 @@ _EXPLICIT_INPUT_FLAG_ATTRS = (
     "allow_fqn_prefix",
     "declared_at",
 )
+_RECIPE_NOTES: dict[str, str] = {
+    RECIPE_FEATURE_ADD_API: (
+        "note: template locks effect_changes.added = () and "
+        "api_surface_delta.removed_public = (); new effects require "
+        "effects.allow_new in target.yaml"
+    ),
+    RECIPE_BUGFIX_REGRESSION_TEST: (
+        "note: template locks api_surface_public to baseline; API changes require "
+        "a different recipe"
+    ),
+    RECIPE_REFACTOR_PRESERVE_API: (
+        "note: template locks api_surface, type_relations, effect_changes, "
+        "and test_surface to baseline"
+    ),
+    RECIPE_TEST_UPDATE_ADD_TEST_CASE: (
+        "note: template locks api_surface, effect_changes, and imports to baseline"
+    ),
+}
 
 
 def _flag_present(args: Namespace, attr: str) -> bool:
@@ -123,6 +146,18 @@ def _validate_fqn_prefix_values(values: list[str] | None) -> None:
             )
 
 
+def _validate_intent(value: str | None) -> None:
+    if value is not None and ("\n" in value or "\r" in value):
+        raise ValueError(
+            "--intent must be a single line; newline and carriage return characters are not allowed"
+        )
+
+
+def _validate_doctor_flags(args: Namespace) -> None:
+    if args.package_root is not None and not args.doctor:
+        raise ValueError("--package-root is only valid with --doctor")
+
+
 def _run_recipe(args: Namespace) -> dict[str, Any]:
     pr_body_parsed = None
     if args.from_pr_body is not None:
@@ -156,12 +191,72 @@ def _run_recipe(args: Namespace) -> dict[str, Any]:
         commits_kind=commits_kind,
         labels_consulted=labels_consulted,
         commits_consulted=commits_consulted,
+        intent=args.intent or "",
     )
     return apply_recipe(merged)
 
 
+def _bare_scaffold_with_intent(intent: str) -> dict[str, Any]:
+    return {
+        "intent": intent,
+        "change": {
+            "primary_kind": "refactor",
+            "allowed_secondary_kinds": [],
+            "scope": {"files": [], "modules": []},
+        },
+        "authorship": {
+            "authors": [{"identity": ""}],
+            "declared_at": "",
+        },
+        "constraints": [],
+    }
+
+
+def _has_test_surface_constraint(payload: dict[str, Any]) -> bool:
+    for constraint in payload.get("constraints", ()):
+        if constraint.get("target", "").startswith("test_surface_delta"):
+            return True
+    return False
+
+
+def _stderr_block(text: str) -> None:
+    for line in text.rstrip("\n").splitlines():
+        _stderr(line)
+
+
+def _run_inline_doctor(path: Path, args: Namespace) -> None:
+    from semantic_ci_code.authoring import detect_advisories
+    from semantic_ci_code.cli.output.doctor_human import format_doctor_human
+    from semantic_ci_code.compiler.target_compiler import compile_target_svp
+
+    yaml_text = path.read_text(encoding="utf-8")
+    compiled = compile_target_svp(yaml_text)
+    package_root = resolve_package_root(args.package_root)
+    advisories = detect_advisories(
+        compiled,
+        package_root=package_root,
+        files_touched=None,
+    )
+    if args.quiet:
+        return
+    if advisories:
+        _stderr_block(format_doctor_human(advisories))
+    else:
+        _stderr("target-doctor: no advisories")
+
+
+def _print_next_commands(path: Path, *, include_validate_plan: bool) -> None:
+    _stderr("next:")
+    _stderr(f"  semantic-ci compile --target {path} --format human")
+    _stderr(f"  semantic-ci target-doctor --target {path} --package-root .")
+    if include_validate_plan:
+        _stderr(f"  semantic-ci validate-plan --target {path} --adapter codex")
+
+
 def run_init(args: Namespace) -> int:
     try:
+        _validate_doctor_flags(args)
+        _validate_intent(args.intent)
         _validate_recipe_relationship(args)
         _validate_test_case_format(args.test_case)
         _validate_fqn_values(args.add_api, flag="--add-api")
@@ -176,7 +271,15 @@ def run_init(args: Namespace) -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
 
         if args.recipe is None:
-            path.write_text(TARGET_TEMPLATE, encoding="utf-8")
+            payload = None
+            if args.intent:
+                scaffold = _bare_scaffold_with_intent(args.intent)
+                path.write_text(
+                    yaml.safe_dump(scaffold, sort_keys=False, allow_unicode=True),
+                    encoding="utf-8",
+                )
+            else:
+                path.write_text(TARGET_TEMPLATE, encoding="utf-8")
         else:
             payload = _run_recipe(args)
             path.write_text(
@@ -186,9 +289,23 @@ def run_init(args: Namespace) -> int:
 
         if not args.quiet:
             _stderr(f"created {path}")
+            if args.recipe is not None:
+                note = _RECIPE_NOTES.get(args.recipe)
+                if note:
+                    _stderr(note)
+                if payload is not None and _has_test_surface_constraint(payload):
+                    _stderr(
+                        "note: this target expects test files; ensure --package-root "
+                        "covers your test directory"
+                    )
+        if args.doctor:
+            _run_inline_doctor(path, args)
+        if not args.quiet:
+            _print_next_commands(path, include_validate_plan=args.recipe is not None)
         return SUCCESS
     except (
         ValueError,
+        PackageRootError,
         OSError,
         MergeError,
         RecipeFlagCompatibilityError,

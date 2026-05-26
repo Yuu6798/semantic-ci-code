@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
+from semantic_ci_code.cli.init_command import _RECIPE_NOTES
+from semantic_ci_code.cli.init_recipes import RECIPES
 from semantic_ci_code.cli.main import build_parser
 
 from .helpers import payload, run_semantic_ci
@@ -29,6 +33,41 @@ def test_init_writes_default_target_template(tmp_path: Path):
 
     assert result.returncode == 0
     assert target.read_text(encoding="utf-8") == EXPECTED_TEMPLATE
+
+
+def test_init_intent_populates_scaffold_yaml(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init", "--intent", "add user endpoint")
+    target = tmp_path / ".semantic-ci" / "target.yaml"
+
+    assert result.returncode == 0
+    parsed = yaml.safe_load(target.read_text(encoding="utf-8"))
+    assert parsed["intent"] == "add user endpoint"
+
+    compile_result = run_semantic_ci(tmp_path, "compile", str(target), "--format", "json")
+    assert compile_result.returncode == 0
+    assert payload(compile_result)["compiled_target"]["intent"] == "add user endpoint"
+
+
+def test_init_intent_bare_scaffold_without_intent_unchanged(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init")
+    target = tmp_path / ".semantic-ci" / "target.yaml"
+
+    assert result.returncode == 0
+    assert target.read_text(encoding="utf-8") == EXPECTED_TEMPLATE
+
+
+def test_init_intent_rejects_multiline_lf(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init", "--intent", "line1\nline2")
+
+    assert result.returncode == 2
+    assert "--intent must be a single line" in result.stderr
+
+
+def test_init_intent_rejects_multiline_cr(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init", "--intent", "line1\rline2")
+
+    assert result.returncode == 2
+    assert "--intent must be a single line" in result.stderr
 
 
 def test_init_path_overrides_output_location(tmp_path: Path):
@@ -72,6 +111,155 @@ def test_init_scaffold_compiles_positionally(tmp_path: Path):
     assert data["subcommand"] == "compile"
     assert data["compiled_target"]["intent"] == ""
     assert data["compiled_target"]["constraints"]
+
+
+def test_init_guidance_printed_to_stderr(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init")
+
+    assert result.returncode == 0
+    assert "created .semantic-ci" in result.stderr
+    assert "next:" in result.stderr
+    assert "semantic-ci compile --target .semantic-ci" in result.stderr
+    assert "semantic-ci target-doctor --target .semantic-ci" in result.stderr
+    assert "validate-plan" not in result.stderr
+
+
+def test_init_recipe_guidance_includes_validate_plan(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "bugfix:regression-test",
+        "--test-case",
+        "tests/test_x.py::test_y",
+    )
+
+    assert result.returncode == 0
+    assert "semantic-ci validate-plan --target .semantic-ci" in result.stderr
+
+
+def test_init_quiet_suppresses_all_stderr(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "--quiet",
+        "init",
+        "--recipe",
+        "bugfix:regression-test",
+        "--test-case",
+        "tests/test_x.py::test_y",
+        "--doctor",
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+
+
+def test_init_test_surface_note_printed(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "bugfix:regression-test",
+        "--test-case",
+        "tests/test_x.py::test_y",
+    )
+
+    assert result.returncode == 0
+    assert "test files" in result.stderr
+    assert "package-root" in result.stderr
+
+
+def test_init_no_test_surface_note_for_refactor(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init", "--recipe", "refactor:preserve-api-with-allowlist")
+
+    assert result.returncode == 0
+    assert "test files" not in result.stderr
+
+
+def test_init_recipe_note_feature(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "feature:add-api",
+        "--add-api",
+        "pkg.Sym",
+    )
+
+    assert result.returncode == 0
+    assert "effect_changes" in result.stderr
+    assert "effects.allow_new" in result.stderr
+
+
+def test_init_recipe_note_refactor(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init", "--recipe", "refactor:preserve-api-with-allowlist")
+
+    assert result.returncode == 0
+    assert "api_surface" in result.stderr
+    assert "test_surface" in result.stderr
+    assert "baseline" in result.stderr
+
+
+def test_init_recipe_notes_cover_all_recipes():
+    assert set(_RECIPE_NOTES) == set(RECIPES)
+
+
+def test_init_doctor_runs_no_advisories(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "feature:add-api",
+        "--add-api",
+        "pkg.Sym",
+        "--intent",
+        "add sym",
+        "--doctor",
+    )
+
+    assert result.returncode == 0
+    assert "target-doctor: no advisories" in result.stderr
+
+
+def test_init_doctor_passes_package_root(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "feature:add-api",
+        "--add-api",
+        "pkg.Sym",
+        "--doctor",
+        "--package-root",
+        ".",
+    )
+
+    assert result.returncode == 0
+
+
+def test_init_doctor_suppressed_by_quiet(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "--quiet",
+        "init",
+        "--recipe",
+        "feature:add-api",
+        "--add-api",
+        "pkg.Sym",
+        "--intent",
+        "x",
+        "--doctor",
+    )
+
+    assert result.returncode == 0
+    assert "no advisories" not in result.stderr
+
+
+def test_init_package_root_without_doctor_is_usage_error(tmp_path: Path):
+    result = run_semantic_ci(tmp_path, "init", "--package-root", "src")
+
+    assert result.returncode == 2
+    assert "--package-root is only valid with --doctor" in result.stderr
 
 
 def _init_parser_dests() -> set[str]:

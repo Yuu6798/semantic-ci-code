@@ -200,6 +200,12 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--path", default=None, help="target.yaml path to create")
     init.add_argument("--force", action="store_true", help="overwrite an existing file")
     init.add_argument(
+        "--intent",
+        default=None,
+        metavar="TEXT",
+        help="1-line human-readable intent (populates the intent field)",
+    )
+    init.add_argument(
         "--recipe",
         default=None,
         choices=(
@@ -272,6 +278,17 @@ def build_parser() -> argparse.ArgumentParser:
             "path to a text file containing one commit subject line per row; "
             "Conventional Commits prefix feeds the primary_kind hint"
         ),
+    )
+    init.add_argument(
+        "--doctor",
+        action="store_true",
+        default=False,
+        help="run target-doctor inline after generating the target",
+    )
+    init.add_argument(
+        "--package-root",
+        default=None,
+        help="Python package root for --doctor advisory D1 detection",
     )
 
     target_doctor = subcommands.add_parser(

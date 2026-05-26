@@ -258,12 +258,15 @@ semantic-ci observe --package-root . --paths src/semantic_ci_code/cli
 ## `semantic-ci init`
 
 ```text
-semantic-ci init [--path <file>] [--force]
+semantic-ci init [--path <file>] [--force] [--intent <text>]
+                 [--recipe <id>] [--doctor] [--package-root <dir>]
 ```
 
 Scaffolds a commented target file. The default output path is
 `.semantic-ci/target.yaml`; parent directories are created as needed. Existing
-files are not overwritten unless `--force` is provided.
+files are not overwritten unless `--force` is provided. `--intent` writes a
+single-line human-readable intent into the generated target. Without
+`--intent`, the bare scaffold remains byte-for-byte unchanged.
 
 **Surface**: Authoring (§23.3). `init` writes a target.yaml scaffold; it does
 not validate, refine, or interpret intent. The scaffold's defaults do not
@@ -273,9 +276,23 @@ Examples:
 
 ```bash
 semantic-ci init
+semantic-ci init --intent "preserve public API while renaming internals"
 semantic-ci init --path target.yaml
 semantic-ci init --path .semantic-ci/target.yaml --force
+semantic-ci init --recipe feature:add-api --add-api pkg.api.create_user --intent "add user API"
+semantic-ci init --recipe bugfix:regression-test --test-case tests/test_login.py::test_regression --doctor
 ```
+
+After successful generation, `init` prints next-step commands for compile and
+target-doctor. Recipe output also suggests `validate-plan`. Recipe generation
+prints a short note about the template constraints it implies; recipes that add
+`test_surface_delta.*` constraints also remind the user to ensure
+`--package-root` covers the test directory.
+
+`--doctor` runs target-doctor inline after writing the file and prints the human
+advisory output to stderr. `--package-root` is accepted only together with
+`--doctor`; it uses the same repo-relative resolution and symlink-escape guards
+as `semantic-ci target-doctor`.
 
 ## `semantic-ci compare`
 

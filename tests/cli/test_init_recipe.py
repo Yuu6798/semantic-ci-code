@@ -141,6 +141,21 @@ def test_a_test_update_recipe_primary_kind_and_constraint(tmp_path: Path):
     assert new_cases["expected"] == ["tests/test_x.py::test_y"]
 
 
+def test_a_recipe_with_intent_populates_intent_field(tmp_path: Path):
+    rc, data = _run_init(
+        tmp_path,
+        "--recipe",
+        "feature:add-api",
+        "--add-api",
+        "pkg.Sym",
+        "--intent",
+        "add sym",
+    )
+
+    assert rc == 0
+    assert data["intent"] == "add sym"
+
+
 # ---------------------------------------------------------------------------
 # Section B — determinism (byte-identical across runs)
 # ---------------------------------------------------------------------------
@@ -757,6 +772,13 @@ def test_i_recipe_metadata_contains_required_fields(tmp_path: Path):
     assert "user_input" in metadata["source_surfaces"]
     assert metadata["candidate_code_used"] is False
     assert metadata["llm_used"] is False
+
+
+def test_i_recipe_intent_default_empty(tmp_path: Path):
+    rc, data = _run_init(tmp_path, "--recipe", "feature:add-api", "--add-api", "pkg.New")
+
+    assert rc == 0
+    assert data["intent"] == ""
 
 
 def test_i_declared_at_omitted_when_not_specified(tmp_path: Path):

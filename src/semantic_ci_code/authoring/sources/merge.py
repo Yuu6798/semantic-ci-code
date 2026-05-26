@@ -58,6 +58,7 @@ class RecipeFlagCompatibilityError(MergeError):
 class MergedSources:
     recipe_id: str
     primary_kind: ChangeKind
+    intent: str
     api_fqns: tuple[str, ...]
     test_ids: tuple[str, ...]
     allow_fqns: tuple[str, ...]
@@ -122,6 +123,7 @@ def merge_sources(
     commits_kind: ChangeKind | None,
     labels_consulted: bool,
     commits_consulted: bool,
+    intent: str = "",
 ) -> MergedSources:
     if recipe_id not in RECIPE_TO_PRIMARY_KIND:
         valid = ", ".join(sorted(RECIPE_TO_PRIMARY_KIND))
@@ -202,6 +204,7 @@ def merge_sources(
     return MergedSources(
         recipe_id=recipe_id,
         primary_kind=primary_kind,
+        intent=intent,
         api_fqns=api_fqns,
         test_ids=test_ids,
         allow_fqns=_dedup_ordered(explicit_allow_fqns),

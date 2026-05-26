@@ -19,7 +19,7 @@ def empty_recipe_payload(merged: MergedSources) -> dict[str, Any]:
     authorship["generation_metadata"] = generation_metadata
 
     return {
-        "intent": "",
+        "intent": merged.intent,
         "change": {"primary_kind": merged.primary_kind.value},
         "authorship": authorship,
         "constraints": [],

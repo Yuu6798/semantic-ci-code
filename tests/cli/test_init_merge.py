@@ -316,6 +316,18 @@ def test_declared_at_alone_counts_as_user_input_surface():
     assert "user_input" in merged.source_surfaces
 
 
+def test_merge_sources_intent_passthrough():
+    merged = _merge(intent="fix bug")
+
+    assert merged.intent == "fix bug"
+
+
+def test_merge_sources_intent_default_empty():
+    merged = _merge()
+
+    assert merged.intent == ""
+
+
 # ---------------------------------------------------------------------------
 # Unknown recipe / determinism
 # ---------------------------------------------------------------------------

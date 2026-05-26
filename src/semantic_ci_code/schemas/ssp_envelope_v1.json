@@ -12,7 +12,8 @@
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/SSPDelta"}
     },
-    "aggregate_verdict": {"$ref": "#/$defs/SSPResult"}
+    "aggregate_verdict": {"$ref": "#/$defs/SSPResult"},
+    "metadata": {"$ref": "#/$defs/SSPMetadata"}
   },
   "$defs": {
     "SSPResult": {"enum": ["pass", "fail", "unknown"]},
@@ -127,6 +128,17 @@
         "version": {"type": "string", "default": ""},
         "ruleset_hash": {"type": ["string", "null"], "default": null},
         "advisory_db_hash": {"type": ["string", "null"], "default": null}
+      }
+    },
+    "SSPMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": {"type": "string", "default": ""},
+        "findings_order_invariant": {
+          "enum": ["source-span", "schema-order"],
+          "default": "source-span"
+        }
       }
     },
     "SSPEngine": {

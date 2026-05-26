@@ -17,6 +17,7 @@ from semantic_ci_code.ssp.models import (
     SSPDelta,
     SSPEngine,
     SSPEnvelope,
+    SSPMetadata,
 )
 
 SCHEMA_PATH = (
@@ -43,6 +44,10 @@ def test_sensor_output_error_status_rejects_findings():
                 ),
             ),
         )
+
+
+def test_sensor_output_default_status_is_complete():
+    assert SensorOutput(sensor_id="semgrep").status == "complete"
 
 
 def test_discriminated_finding_models_dump_json():
@@ -96,7 +101,10 @@ def test_envelope_json_schema_validates_conforming_payload():
             )
         },
         aggregate_verdict="pass",
+        metadata=SSPMetadata(timestamp="2026-01-01T00:00:00Z"),
     )
     payload = envelope.model_dump(mode="json")
 
+    assert payload["metadata"]["timestamp"] == "2026-01-01T00:00:00Z"
+    assert payload["metadata"]["findings_order_invariant"] == "source-span"
     jsonschema.validate(payload, json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))

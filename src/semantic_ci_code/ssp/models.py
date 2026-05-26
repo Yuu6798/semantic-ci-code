@@ -7,11 +7,12 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Severity = Literal["critical", "high", "medium", "low", "info"]
-SensorStatus = Literal["ok", "error"]
+SensorStatus = Literal["complete", "error"]
 SSPResult = Literal["pass", "fail", "unknown"]
 ScanMode = Literal["real", "staged", "virtual", "hybrid"]
 EndpointKind = Literal["git-rev", "git-tree", "virtual", "prebuilt"]
 Normalization = Literal["ast", "raw"]
+FindingsOrderInvariant = Literal["source-span", "schema-order"]
 
 
 class _SSPModel(BaseModel):
@@ -63,7 +64,7 @@ Finding = Annotated[SASTFinding | SCAFinding, Field(discriminator="category")]
 class SensorOutput(_SSPModel):
     sensor_id: str = Field(min_length=1)
     sensor_version: str = ""
-    status: SensorStatus = "ok"
+    status: SensorStatus = "complete"
     findings: tuple[Finding, ...] = ()
     error_message: str | None = None
 
@@ -108,8 +109,14 @@ class SSPEngine(_SSPModel):
     sensors: tuple[SensorSpec, ...] = ()
 
 
+class SSPMetadata(_SSPModel):
+    timestamp: str = ""
+    findings_order_invariant: FindingsOrderInvariant = "source-span"
+
+
 class SSPEnvelope(_SSPModel):
     schema_version: Literal["ssp-1"] = "ssp-1"
     engine: SSPEngine
     deltas_by_sensor: dict[str, SSPDelta]
     aggregate_verdict: SSPResult
+    metadata: SSPMetadata = Field(default_factory=SSPMetadata)

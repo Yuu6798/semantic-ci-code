@@ -13,6 +13,7 @@ from semantic_ci_code.ssp.models import (
     SSPDelta,
     SSPEngine,
     SSPEnvelope,
+    SSPMetadata,
     SSPVerdict,
 )
 from semantic_ci_code.ssp.python_profile import normalize_text
@@ -25,6 +26,7 @@ __all__ = [
     "SSPDelta",
     "SSPEngine",
     "SSPEnvelope",
+    "SSPMetadata",
     "SSPVerdict",
     "ScanEndpoint",
     "SensorOutput",

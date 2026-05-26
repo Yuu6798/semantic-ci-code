@@ -282,12 +282,12 @@ compile-repair, or validate-plan envelopes. The shape is pinned by
 |---|---|
 | `schema_version` | Always `"advisory-1"`. |
 | `subcommand` | Always `"target-doctor"`. |
-| `advisories[].code` | One of `ADVISORY-D1`, `ADVISORY-D3`, `ADVISORY-D4`, `ADVISORY-P1`, `ADVISORY-P2`, `ADVISORY-S1`. |
+| `advisories[].code` | One of `ADVISORY-D1`, `ADVISORY-D3`, `ADVISORY-D4`, `ADVISORY-I1`, `ADVISORY-P1`, `ADVISORY-P2`, `ADVISORY-S1`. |
 | `advisories[].severity` | Always `"info"` — the Advisor surface never participates in the verdict (`docs/code_semantic_ci_design.md §23.3.1`). |
 | `advisories[].message` | Human-readable explanation of the hazard. |
 | `advisories[].evidence` | Per-advisory diagnostic fields (e.g. `constraint_id`, `target`, `package_root`, `files_touched_count`). |
 
-Advisories are emitted in canonical order (D1 → D3 → D4 → P1 → P2 → S1)
+Advisories are emitted in canonical order (D1 → D3 → D4 → I1 → P1 → P2 → S1)
 with `constraint_id` as the within-code tiebreak so output is byte-identical
 across runs. Advisory presence does not change the exit code — see
 `docs/exit_codes.md`.

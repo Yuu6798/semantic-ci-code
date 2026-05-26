@@ -324,6 +324,11 @@ exempt, and the rest of the surface is still locked.
   every current template installs an `effect_changes` invariant, so adding
   a known effect like `os.system` will route to fail or repair unless you
   whitelist it via `effects.allow_new`.
+- **Whether your declared intent is descriptive enough.** `target-doctor`
+  emits `ADVISORY-I1` when `intent` is exactly `""` because repair adapters
+  and `validate-plan` produce better guidance with a short purpose statement.
+  This is not content validation; whitespace-only text is still considered
+  non-empty.
 - **Reviewing the candidate code itself.** Semantic CI does not lint, type
   check, or run tests. Use those tools alongside it.
 - **Producing or refining the target file.** `init` scaffolds a syntactic

@@ -35,6 +35,7 @@ _ADVISORY_ORDER = (
     "ADVISORY-D1",
     "ADVISORY-D3",
     "ADVISORY-D4",
+    "ADVISORY-I1",
     "ADVISORY-P1",
     "ADVISORY-P2",
     "ADVISORY-S1",
@@ -107,6 +108,7 @@ def detect_advisories(
     advisories.extend(detect_d3(target))
     if files_touched is not None:
         advisories.extend(detect_d4(target, files_touched=files_touched))
+    advisories.extend(detect_i1(target))
     advisories.extend(detect_p1(target))
     advisories.extend(detect_p2(target))
     advisories.extend(detect_s1(target))
@@ -214,6 +216,23 @@ def detect_d4(
                 "files_touched_count": len(files_touched),
                 "sample_files": [str(p) for p in files_touched[:5]],
             },
+        ),
+    )
+
+
+def detect_i1(target: CompiledTarget) -> tuple[Advisory, ...]:
+    """Empty intent degrades repair adapter and validate-plan guidance."""
+    if target.intent:
+        return ()
+    return (
+        Advisory(
+            code="ADVISORY-I1",
+            message=(
+                "intent is empty; repair adapters and validate-plan produce higher quality "
+                "output when intent describes the change purpose. Set intent in target.yaml "
+                "or pass --intent to init."
+            ),
+            evidence={"intent": ""},
         ),
     )
 

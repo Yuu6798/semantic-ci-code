@@ -50,7 +50,7 @@ def assign_sast_ordinals(findings: Iterable[SASTFinding]) -> tuple[SASTFinding, 
 
     unique: dict[tuple[object, ...], tuple[int, SASTFinding]] = {}
     for index, finding in enumerate(findings):
-        unique.setdefault(_sast_dedup_key(finding), (index, finding))
+        unique.setdefault(_sast_dedup_key(finding, index), (index, finding))
 
     grouped: dict[tuple[str, str, str, str], list[tuple[int, SASTFinding]]] = defaultdict(list)
     for index, finding in unique.values():
@@ -149,8 +149,12 @@ def _sast_group_key(finding: SASTFinding) -> tuple[str, str, str, str]:
     )
 
 
-def _sast_dedup_key(finding: SASTFinding) -> tuple[object, ...]:
-    span = finding.source_span.sort_key() if finding.source_span is not None else None
+def _sast_dedup_key(finding: SASTFinding, original_index: int) -> tuple[object, ...]:
+    span = (
+        ("span", *finding.source_span.sort_key())
+        if finding.source_span is not None
+        else ("spanless", original_index)
+    )
     return (*_sast_group_key(finding), span)
 
 

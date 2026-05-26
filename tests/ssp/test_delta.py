@@ -103,6 +103,39 @@ def test_ordinal_assignment_dedups_before_assignment_and_sorts_by_source_span():
     assert assigned[0].fingerprint != assigned[1].fingerprint
 
 
+def test_ordinal_assignment_preserves_spanless_findings_in_same_group():
+    spanless = SASTFinding(
+        rule_id="spanless",
+        module_path="src/app.py",
+        qualified_name="app.handler",
+        normalized_text="danger()",
+        severity="high",
+    )
+
+    assigned = assign_sast_ordinals((spanless, spanless))
+
+    assert [finding.ordinal for finding in assigned] == [0, 1]
+    assert assigned[0].fingerprint != assigned[1].fingerprint
+
+
+def test_compute_delta_reports_multiple_spanless_candidate_findings():
+    spanless = SASTFinding(
+        rule_id="spanless",
+        module_path="src/app.py",
+        qualified_name="app.handler",
+        normalized_text="danger()",
+        severity="high",
+    )
+
+    delta = compute_delta(
+        SensorOutput(sensor_id="semgrep"),
+        SensorOutput(sensor_id="semgrep", findings=(spanless, spanless)),
+    )
+
+    assert len(delta.added) == 2
+    assert [finding.ordinal for finding in delta.added] == [0, 1]
+
+
 def test_ordinal_assignment_single_finding_group_gets_zero():
     assigned = assign_sast_ordinals((_sast("single"),))
 

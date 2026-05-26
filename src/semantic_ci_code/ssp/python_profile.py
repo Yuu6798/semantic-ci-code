@@ -3,18 +3,36 @@
 from __future__ import annotations
 
 import ast
+import io
+import tokenize
+
+_SKIPPED_TOKEN_TYPES = frozenset(
+    {
+        tokenize.ENCODING,
+        tokenize.NL,
+        tokenize.NEWLINE,
+        tokenize.INDENT,
+        tokenize.DEDENT,
+        tokenize.ENDMARKER,
+    }
+)
 
 
 def normalize_text(source: str) -> str:
     """Normalize Python source text for SAST fingerprints.
 
     Valid Python is parsed and emitted through ``ast.unparse`` so comments and
-    formatting noise disappear. Invalid snippets fall back to the raw text. In
-    both cases leading/trailing whitespace is stripped and internal whitespace is
-    collapsed to a single space.
+    formatting noise disappear. Leading/trailing whitespace is stripped. For
+    AST-normalized snippets, whitespace between Python tokens is normalized
+    while literal token text is preserved; invalid snippets fall back to raw
+    whitespace collapsing.
     """
 
-    return _collapse_whitespace(_ast_unparse_or_raw(source))
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return _collapse_raw_whitespace(source)
+    return _collapse_python_whitespace(ast.unparse(tree))
 
 
 def normalization_method(source: str) -> str:
@@ -27,13 +45,17 @@ def normalization_method(source: str) -> str:
     return "ast"
 
 
-def _ast_unparse_or_raw(source: str) -> str:
+def _collapse_python_whitespace(value: str) -> str:
     try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return source
-    return ast.unparse(tree)
+        tokens = (
+            (token.type, token.string)
+            for token in tokenize.generate_tokens(io.StringIO(value).readline)
+            if token.type not in _SKIPPED_TOKEN_TYPES
+        )
+        return tokenize.untokenize(tokens).strip()
+    except tokenize.TokenError:
+        return _collapse_raw_whitespace(value)
 
 
-def _collapse_whitespace(value: str) -> str:
+def _collapse_raw_whitespace(value: str) -> str:
     return " ".join(value.strip().split())

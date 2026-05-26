@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -122,7 +123,7 @@ class SSPEnvelope(_SSPModel):
     metadata: SSPMetadata = Field(default_factory=SSPMetadata)
 
     @model_validator(mode="after")
-    def _delta_keys_match_sensor_ids(self) -> SSPEnvelope:
+    def _validate_delta_consistency(self) -> SSPEnvelope:
         mismatches = [
             (key, delta.sensor_id)
             for key, delta in self.deltas_by_sensor.items()
@@ -134,4 +135,21 @@ class SSPEnvelope(_SSPModel):
                 for key, sensor_id in sorted(mismatches)
             )
             raise ValueError(f"deltas_by_sensor keys must match SSPDelta.sensor_id: {details}")
+        expected = _aggregate_delta_statuses(
+            delta.status for delta in self.deltas_by_sensor.values()
+        )
+        if self.aggregate_verdict != expected:
+            raise ValueError(
+                "aggregate_verdict must match deltas_by_sensor status precedence: "
+                f"expected {expected!r}, got {self.aggregate_verdict!r}"
+            )
         return self
+
+
+def _aggregate_delta_statuses(statuses: Iterable[SSPResult]) -> SSPResult:
+    values = tuple(statuses)
+    if "unknown" in values:
+        return "unknown"
+    if "fail" in values:
+        return "fail"
+    return "pass"

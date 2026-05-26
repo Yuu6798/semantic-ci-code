@@ -11,6 +11,14 @@ def test_normalize_text_is_comment_insensitive():
     assert normalize_text("x = 1  # important\nprint(x)") == normalize_text("x = 1\nprint(x)")
 
 
+def test_normalize_text_preserves_whitespace_inside_string_literals():
+    repeated_space = normalize_text('pattern = "a   b"')
+    single_space = normalize_text('pattern = "a b"')
+
+    assert "a   b" in repeated_space
+    assert repeated_space != single_space
+
+
 def test_normalize_text_raw_fallback_for_invalid_python():
     source = "def broken(:\n    pass"
 

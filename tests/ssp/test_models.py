@@ -130,3 +130,25 @@ def test_envelope_rejects_delta_map_key_sensor_id_mismatch():
             },
             aggregate_verdict="pass",
         )
+
+
+def test_envelope_rejects_aggregate_verdict_mismatch():
+    with pytest.raises(ValidationError, match="aggregate_verdict must match"):
+        SSPEnvelope(
+            engine=SSPEngine(
+                scan_mode="virtual",
+                baseline=ScanEndpoint(kind="virtual", ref="baseline-fixture"),
+                candidate=ScanEndpoint(kind="virtual", ref="candidate-fixture"),
+                sensors=(SensorSpec(id="semgrep", version="1.0"),),
+            ),
+            deltas_by_sensor={
+                "semgrep": SSPDelta(
+                    sensor_id="semgrep",
+                    status="pass",
+                    added=(),
+                    removed=(),
+                    unchanged_count=0,
+                )
+            },
+            aggregate_verdict="fail",
+        )

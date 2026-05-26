@@ -265,7 +265,8 @@ for SAST fingerprints:
 1. Attempt `ast.parse(source)` on the input.
 2. If parsing succeeds: `ast.unparse(tree)` → strip leading/trailing
    whitespace → collapse internal whitespace runs to single space.
-   Record `normalization: "ast"`.
+   Record `normalization: "ast"`. Literal token text is preserved; whitespace
+   normalization applies only between Python tokens.
 3. If parsing fails (`SyntaxError`): use the raw source text → strip →
    collapse whitespace. Record `normalization: "raw"`.
 
@@ -274,6 +275,8 @@ Properties:
 - **Whitespace-insensitive**: `"x=1\n\nprint( x )"` and
   `"x = 1\nprint(x)"` produce the same normalized text.
 - **Comment-insensitive**: comments are stripped by `ast.unparse`.
+- **Literal-safe**: repeated whitespace inside string/regex literals is
+  preserved so semantically distinct literals do not collide.
 - **Deterministic**: same source always produces the same output.
 
 ## §6. Envelope Schema
@@ -375,6 +378,10 @@ Precedence: `unknown > fail > pass`.
 - If any sensor verdict is `"unknown"`: aggregate is `"unknown"`.
 - Else if any sensor verdict is `"fail"`: aggregate is `"fail"`.
 - Otherwise: `"pass"`.
+
+`SSPEnvelope.aggregate_verdict` must equal this aggregation over
+`deltas_by_sensor[*].status`; the Pydantic model rejects inconsistent
+envelopes.
 
 ### §7.3 Severity
 

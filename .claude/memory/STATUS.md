@@ -64,7 +64,7 @@ Cursor / Codex) 経由で repair guidance + pre-generation guidance を
 render 可能。 UNKNOWN は (a) compile-time `CompileError` (大半の
 authoring error)、 (b) runtime `unknown_cause` 4 値、 (c)
 `validate-plan` の `risk_summary.authoring_errors` slot、 (d)
-`target-doctor` の 6 advisory (D1/D3/D4/P1/P2/S1) で end-to-end 診断
+`target-doctor` の 7 advisory (D1/D3/D4/I1/P1/P2/S1) で end-to-end 診断
 可能。 起動時 Tier A attention budget は main 上で **~580 lines**
 (X-5 = PR #96 merge 後は +24 で ~604 lines 想定、 target ≤ 800
 クリア継続、 doc refactor 前 ~2,500 lines から -76% 〜 -77% 帯)、 memory
@@ -85,6 +85,22 @@ Brief 7 / SSP v0.1 (CSCI-36 entry) + Phase X-3 (cross-ref embedding in
 は ecosystem 統合の core work として queue 末尾に常駐。
 
 ## 直近 merged
+
+### 2026-05-26 — target authoring UX 改善 landed (PR #106 + #107)
+
+target.yaml 初期作成の UX 改善を 2 PR で land。設計 v1→v2 改訂
+(user レビューで PR 順序矛盾 / --package-root サイレント無視 /
+package_root 解決の共有化不足 / stderr 二重改行 / \r チェック漏れ
+の 5 点を修正)、両 PR 0 round approve。
+
+- **PR #106** (merged): `feat(init): improve target authoring UX with
+  --intent and inline doctor` — `--intent` フラグ / next-command
+  guidance / recipe notes / test_surface note / `--doctor` inline
+  実行 / `doctor_support.py` 共有化 (target_doctor.py の
+  `_resolve_package_root` を移動)。475+/51-、CI 3/3 green
+- **PR #107** (merged): `feat(authoring): add ADVISORY-I1 for empty
+  target intent` — `detect_i1`: `target.intent == ""` で発火、
+  whitespace-only は非該当。advisory 6→7 件。81+/3-、CI 3/3 green
 
 ### 2026-05-22 — Issue #97 (`--allow-dirty` provenance bug) Phase 1 mitigation landed (PR #98) + Source-selection redesign 正式採用 (PR #99)
 
@@ -419,21 +435,11 @@ architectural pattern 導入前の必読 doc に位置付け。
    `bf8ce8f`)。 §5.7 Anti-Patterns #7 「STATUS.md `次の発行順序` 更新を
    後で先送り」 として明示化、 maintenance practice の重要性を再確認
 
-### 2026-05-21 Session 1 — Brief 8 / CSCI-44 (`semantic-ci target-catalog`) landed
-
-CSCI-44 closes the final Brief 8 implementation piece. `semantic-ci
-target-catalog` renders a machine-readable (`schema_version:
-catalog-1`) and human-readable authoring catalog derived directly from
-runtime registries (`path_schema`, `type_schema`, `match_schema`,
-`TEMPLATE_CONSTRAINTS`, `Operator`). Brief 8 is complete; the normal
-next queue returns to Brief 7 / SSP v0.1 unless a smaller follow-up is
-explicitly chosen.
-
 ---
 
-### 古い merged entry (2026-05-19 以前) — archive 参照
+### 古い merged entry (2026-05-21 S1 以前) — archive 参照
 
-13 entry (2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
+14 entry (2026-05-21 S1 / 2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
 `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
@@ -441,6 +447,7 @@ explicitly chosen.
 (`.claude/memory/YYYY-MM-DD.md`) を参照。 Phase 1 (initial cutoff、
 `docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
 + 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
++ 2026-05-26 wrap-up (5/21 S1 移送)
 で compaction が実施された。
 
 ## 次の発行順序

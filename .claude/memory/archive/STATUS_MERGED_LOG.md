@@ -10,6 +10,16 @@ session wrap-up で 5 entry 超過分が同 archive に随時追記される。
 
 ---
 
+### 2026-05-21 Session 1 — Brief 8 / CSCI-44 (`semantic-ci target-catalog`) landed
+
+CSCI-44 closes the final Brief 8 implementation piece. `semantic-ci
+target-catalog` renders a machine-readable (`schema_version:
+catalog-1`) and human-readable authoring catalog derived directly from
+runtime registries (`path_schema`, `type_schema`, `match_schema`,
+`TEMPLATE_CONSTRAINTS`, `Operator`). Brief 8 is complete; the normal
+next queue returns to Brief 7 / SSP v0.1 unless a smaller follow-up is
+explicitly chosen.
+
 ### 2026-05-19 — Brief 8 canonical-form refactor (PR #85) landed
 
 CSCI-42 PR #84 持ち越しの canonical-form refactor を 1 PR で消化。

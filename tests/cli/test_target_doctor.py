@@ -1315,7 +1315,7 @@ def test_package_root_rejects_absolute_path(tmp_path: Path):
     )
 
     assert result.returncode == 2
-    assert "--package-root must be relative for target-doctor" in result.stderr
+    assert "--package-root must be relative" in result.stderr
 
 
 def test_package_root_rejects_parent_escape(tmp_path: Path):
@@ -1334,7 +1334,7 @@ def test_package_root_rejects_parent_escape(tmp_path: Path):
     )
 
     assert result.returncode == 2
-    assert "--package-root must stay within repo for target-doctor" in result.stderr
+    assert "--package-root must stay within repo" in result.stderr
 
 
 def test_package_root_falls_back_to_cwd_when_git_unavailable(tmp_path: Path, monkeypatch):

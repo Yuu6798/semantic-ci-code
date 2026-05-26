@@ -50,7 +50,19 @@ def test_mixed_severity_added_findings_fail():
 
 
 def test_build_verdict_sorts_sensor_ids_for_determinism():
-    verdict = build_verdict((_delta("zeta", severity="info"), _delta("alpha", severity="high")))
+    verdict = build_verdict(
+        (
+            _delta("zeta", severity="info"),
+            _delta("alpha", status="fail", severity="high"),
+        )
+    )
 
     assert list(verdict.sensor_verdicts) == ["alpha", "zeta"]
+    assert verdict.aggregate_verdict == "fail"
+
+
+def test_build_verdict_uses_delta_status_as_canonical_sensor_verdict():
+    verdict = build_verdict((_delta("semgrep", status="fail", severity="info"),))
+
+    assert verdict.sensor_verdicts == {"semgrep": "fail"}
     assert verdict.aggregate_verdict == "fail"

@@ -28,8 +28,7 @@ def aggregate_verdict(verdicts: Iterable[SSPResult]) -> SSPResult:
 
 def build_verdict(deltas: Iterable[SSPDelta]) -> SSPVerdict:
     sensor_verdicts = {
-        delta.sensor_id: verdict_for_delta(delta)
-        for delta in sorted(deltas, key=lambda item: item.sensor_id)
+        delta.sensor_id: delta.status for delta in sorted(deltas, key=lambda item: item.sensor_id)
     }
     return SSPVerdict(
         sensor_verdicts=sensor_verdicts,

@@ -94,6 +94,7 @@ Active references (current behavior):
 - [target.yaml Authoring Guide](docs/target_yaml_guide.md) — practical authoring guide; centralises hazards D1/D3/D4 (`--package-root` scope, template/user constraint duplication, config-only vacuous PASS)
 - [Target Authoring Surface](docs/target_authoring_surface.md) — Authoring surface design contract (target.yaml generation paths, surface isolation, `candidate_code_used: false`)
 - [AGENTS.md](AGENTS.md) — Claude × Codex task handoff protocol + Experience Externalization Discipline (§5)
+- [SSP v0.1 Protocol Spec](docs/ssp_protocol.md) — normative v0.1 spec: definitions, fingerprint, Python profile, delta computation, verdict, JSON Schema, Sensor Provenance Invariant
 - [SSP v0.1 Forward Design Note](docs/ssp_protocol_design_note.md) — Brief 7 implementer 用 一次資料 (Phase 4 で AGENTS.md inline から分離)
 - [CLAUDE.md](CLAUDE.md) — repository-level agent operating policy
 

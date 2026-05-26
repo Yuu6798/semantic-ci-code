@@ -223,6 +223,12 @@ src/semantic_ci_code/
       codex.py
       markdown.py
   schemas/               # JSON Schema artifacts
+  ssp/                   # Semantic Security Protocol v0.1 (Brief 7)
+    models.py            # Pydantic v2 models (SensorOutput, Finding, SSPDelta, etc.)
+    fingerprint.py       # SAST 5-element + SCA 3-element canonical fingerprint
+    python_profile.py    # AST normalization for SAST normalized_text
+    delta.py             # compute_delta + ordinal assignment
+    verdict.py           # per-sensor + aggregate verdict
   test_surface/          # CSCI-9
 tests/
   cli/                   # CLI integration tests
@@ -232,6 +238,7 @@ tests/
   pipeline/              # CSCI-10
   repair/                # CSCI-14
   repair_compiler/       # Brief 5
+  ssp/                   # SSP models, fingerprint, delta, verdict tests
   fixtures/              # hand-built before/after trees + expected verdicts
 docs/                    # see Design Documents table below
 experiments/             # observation-only reproductions (out of core scope)
@@ -251,6 +258,7 @@ Status legend: **ACTIVE** (current spec/contract, AI agents should read first) /
 | `docs/cli_test_inventory.md` | ACTIVE | CLI test coverage inventory, runtime notes, and conservative reduction candidates |
 | `docs/target_yaml_guide.md` | ACTIVE | `target.yaml` authoring guide. Practical companion to `design.md §4` / `cli_usage.md`. Centralises authoring hazards D1 (`--package-root` scope vs `tests/` visibility), D3 (template / user constraint duplication), D4 (config-only PR の vacuous PASS) — 2026-05-07 Session 4 dogfooding 由来 |
 | `docs/target_authoring_surface.md` | ACTIVE | Authoring surface 設計契約 (Brief 8 / CSCI-41)。target.yaml は hand-written 必須でない / 生成経路 3 通り (recipe + sources / catalog 参照 / hand-written) / LLM 経路は Brief 8b 分離 / 全経路は verdict 前に declared intent として固定 / Authoring・Advisor・Provenance surface は evaluator 不可参照 / `candidate_code_used: false` 固定。§23.3.1 の実装側 catch-up |
+| `docs/ssp_protocol.md` | ACTIVE | SSP v0.1 normative spec: SensorOutput / Finding / SSPDelta / SSPVerdict definitions, 5-element SAST + 3-element SCA fingerprint, Python profile AST normalization, delta computation, verdict precedence (`unknown > fail > pass`), JSON Schema artifact, Sensor Provenance Invariant (§23.1 mirror), determinism requirements, core isolation contract |
 | `docs/brief_7_planning.md` | PLANNING (open) | Brief 7 (Semantic Security Protocol / SSP v0.1) を CSCI-36〜40 想定で planning する文書。Issue #48 の Semgrep 統合提案を audit した結果、core への深い統合は reject、SSP として §20.1 layered distribution の 4 層目(suite と並列)に独立配置。SAST + SCA / Python only / 5 要素 fingerprint(`rule_id × module_path × qualified_name × normalized_text × ordinal`、PR #50 review で 4→5 に拡張)+ 言語プロファイル分離 / 独立 envelope + Sensor Provenance Invariant(§23.1 鏡像)。Brief 6(TypeScript)凍結に伴い順序は **Brief 5 → 7**。CSCI-36 着手時は本文書 §11 checklist + `docs/ssp_protocol_design_note.md` を逐語参照 |
 | `docs/ssp_protocol_design_note.md` | DESIGN NOTE (Brief 7 implementer 用 一次資料) | Brief 7 / SSP v0.1 の設計申し送り 11 項目 + Brief 5 からの学び 3 項目 + 設計 AI への推奨判断。 2026-05-07 に user から提供、 当初 AGENTS.md Forward Design Note inline、 2026-05-21 Phase 4 で本 doc に分離。 CSCI-36 Task Brief 起草・実装時の逐語参照対象。 SSP は semantic-ci core を太らせない sibling protocol、 SAST + SCA、 Python only、 5 要素 fingerprint、 Sensor Provenance Invariant、 unknown/error semantics 等の全申し送りを集約 |
 | `docs/brief_resultstatus_planning.md` | PLANNING (open) | ResultStatus.UNKNOWN を authoring と extraction に分離する brief の planning。**C+B 仮固定**(C=authoring を compile-time に押し戻す / B=`results[].unknown_cause` optional field、A=enum 拡張は不採用)。D2: authoring は unknown_policy 非尊重で強制 fail、extraction は尊重。D3: validate-plan v2 で `risk_summary.authoring_errors` を `would_violate` から分離。Brief D1-1〜D1-4 + D3 の 5 PR 想定。§1b で Brief 8 (Authoring Surface) との境界(semantic hazard vs syntactic/type error / INV-1 framing / ADVISORY-S1 文言更新見込み / 着地順序 open question)を pin。target path 静的型カテゴリ + operator-required-category 行列 + compile catch coverage 推定済 |

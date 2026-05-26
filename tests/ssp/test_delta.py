@@ -65,6 +65,34 @@ def test_compute_delta_empty_candidate_marks_all_baseline_findings_removed():
     assert delta.status == "pass"
 
 
+def test_compute_delta_recomputes_sca_fingerprints_from_canonical_fields():
+    baseline_finding = SCAFinding(
+        package_name="django",
+        installed_version="3.2.0",
+        advisory_id="CVE-1",
+        fingerprint="a" * 16,
+        severity="high",
+    )
+    candidate_finding = SCAFinding(
+        package_name="django",
+        installed_version="3.2.0",
+        advisory_id="CVE-2",
+        fingerprint="a" * 16,
+        severity="high",
+    )
+
+    delta = compute_delta(
+        SensorOutput(sensor_id="pip-audit", findings=(baseline_finding,)),
+        SensorOutput(sensor_id="pip-audit", findings=(candidate_finding,)),
+    )
+
+    assert [finding.advisory_id for finding in delta.added] == ["CVE-2"]
+    assert [finding.advisory_id for finding in delta.removed] == ["CVE-1"]
+    assert delta.added[0].fingerprint != "a" * 16
+    assert delta.removed[0].fingerprint != "a" * 16
+    assert delta.unchanged_count == 0
+
+
 def test_compute_delta_identical_inputs_have_only_unchanged_count():
     finding = _sast("same")
 

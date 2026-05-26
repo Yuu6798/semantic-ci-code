@@ -108,8 +108,6 @@ def _with_fingerprint(finding: Finding) -> Finding:
             }
         )
     if isinstance(finding, SCAFinding):
-        if finding.fingerprint is not None:
-            return finding
         return finding.model_copy(
             update={
                 "fingerprint": sca_fingerprint(

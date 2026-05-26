@@ -31,6 +31,10 @@ def test_verdict_precedence_unknown_over_fail_over_pass():
     assert aggregate_verdict(["pass"]) == "pass"
 
 
+def test_aggregate_verdict_empty_returns_pass():
+    assert aggregate_verdict([]) == "pass"
+
+
 def test_error_sensor_delta_verdict_unknown():
     delta = SSPDelta(sensor_id="semgrep", status="unknown", unchanged_count=0)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from semantic_ci_code.ssp.delta import assign_sast_ordinals, compute_delta
 from semantic_ci_code.ssp.models import SASTFinding, SCAFinding, SensorOutput, SourceSpan
 
@@ -176,3 +178,53 @@ def test_virtual_hand_built_sensor_output_is_accepted():
     candidate = SensorOutput(sensor_id="virtual-semgrep", findings=(_sast("virtual"),))
 
     assert compute_delta(baseline, candidate).status == "fail"
+
+
+def test_compute_delta_rejects_sensor_id_mismatch():
+    with pytest.raises(ValueError, match="sensor_id mismatch"):
+        compute_delta(
+            SensorOutput(sensor_id="semgrep"),
+            SensorOutput(sensor_id="pip-audit"),
+        )
+
+
+def test_compute_delta_both_empty_returns_pass():
+    delta = compute_delta(
+        SensorOutput(sensor_id="semgrep"),
+        SensorOutput(sensor_id="semgrep"),
+    )
+
+    assert delta.status == "pass"
+    assert delta.added == ()
+    assert delta.removed == ()
+    assert delta.unchanged_count == 0
+
+
+def test_compute_delta_mixed_sast_and_sca_findings():
+    baseline = SensorOutput(
+        sensor_id="mixed",
+        findings=(_sast("keep-rule"), _sca("django", "3.2", "CVE-OLD")),
+    )
+    candidate = SensorOutput(
+        sensor_id="mixed",
+        findings=(_sast("keep-rule"), _sca("django", "3.2", "CVE-NEW")),
+    )
+
+    delta = compute_delta(baseline, candidate)
+
+    added_categories = {f.category for f in delta.added}
+    removed_categories = {f.category for f in delta.removed}
+    assert "sca" in added_categories
+    assert "sca" in removed_categories
+    assert delta.unchanged_count == 1
+    assert delta.status == "fail"
+
+
+def test_compute_delta_baseline_error_propagates_error_message():
+    delta = compute_delta(
+        SensorOutput(sensor_id="semgrep", status="error", error_message="ruleset missing"),
+        SensorOutput(sensor_id="semgrep", findings=(_sast("new"),)),
+    )
+
+    assert delta.status == "unknown"
+    assert delta.error_message == "ruleset missing"

@@ -105,19 +105,23 @@ SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta �
 # SAST: sensor_id + FQN + text_hash + ordinal が自然キー
 # sensor_id を含めることで、複数 SAST sensor が同じ rule_id を emit しても衝突しない
 #
-# 重要: canonical_id は delimiter join ではなくコンポーネント tuple の hash で生成する。
-# `:` 区切りの文字列結合はコンポーネントに `:` が含まれる場合に alias collision を
-# 起こす (例: rule_id="a:b",fqn="c" と rule_id="a",fqn="b:c" が同一文字列)。
-# SSP v0.1 docs/ssp_protocol.md §5.1 で同問題の回帰テストが既に存在する。
+# 重要: canonical_id はコンポーネント tuple の injective encoding + hash で生成する。
+# delimiter join (`:` / `\0` 等) はコンポーネントに delimiter が含まれる場合に
+# alias collision を起こす (例: ("a\0b","c") と ("a","b\0c") が同一 byte stream)。
+# SSP v0.1 docs/ssp_protocol.md §5.1 は canonical JSON array encoding で
+# この class の collision を回避しており、本設計もそれを継承する。
 #
-# 実装: adapter が以下の tuple を構築し、sha256 short hash を canonical_id とする。
+# 実装: adapter が以下の tuple を canonical JSON array に serialize し、
+# その byte 列の sha256 short hash を canonical_id とする。
+# JSON array は各要素が quoted string で length-prefixed されるため injective。
 # identity_components (audit log 用) に tuple の全要素を保存する。
-_identity_tuple = ("v1", "sast", sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal))
-canonical_id = "v1:" + hashlib.sha256("\0".join(_identity_tuple).encode()).hexdigest()[:16]
+import json
+_identity_tuple = ["v1", "sast", sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal)]
+canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
 
 # SCA も同様
-_identity_tuple = ("v1", "sca", sensor_id, package_name, installed_version, advisory_id)
-canonical_id = "v1:" + hashlib.sha256("\0".join(_identity_tuple).encode()).hexdigest()[:16]
+_identity_tuple = ["v1", "sca", sensor_id, package_name, installed_version, advisory_id]
+canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
 ```
 
 canonical_id は不透明な hash 文字列であり、人間が読み解く必要はない。

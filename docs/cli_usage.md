@@ -513,6 +513,60 @@ semantic-ci validate-plan --target target.yaml --adapter codex --format json
 semantic-ci validate-plan --target target.yaml --adapter cursor --baseline-rev HEAD~1
 ```
 
+## `semantic-ci ssp`
+
+```text
+semantic-ci ssp scan --sensor {semgrep,pip-audit}
+                     --baseline-dir <dir> --candidate-dir <dir>
+                     [--config <ruleset>] [--package-root <dir>]
+                     [--format {json,human,sarif}] [--output <file>]
+
+semantic-ci ssp from-json --baseline <sensor-output.json>
+                          --candidate <sensor-output.json>
+                          [--format {json,human,sarif}] [--output <file>]
+```
+
+Runs the Semantic Security Protocol (SSP) v0.1 pipeline. SSP is separate from
+the core Semantic CI verdict engine: it consumes security sensor output,
+computes deterministic security deltas, and emits an SSP envelope with
+`schema_version="ssp-1"`.
+
+`ssp scan` executes one live sensor on the baseline and candidate trees:
+
+- `--sensor semgrep` requires `--config <ruleset>`. `--package-root` selects
+  the subdirectory inside each tree scanned by Semgrep and defaults to `.`.
+- `--sensor pip-audit` audits each project directory. If `requirements.txt`
+  exists in a side, it is passed as the requirements input for that side.
+
+`ssp from-json` is fixture / pre-captured mode. It reads two `SensorOutput`
+JSON files, computes the same `SSPDelta` and `SSPVerdict`, and does not run
+any external sensor process.
+
+Formats:
+
+- `--format json` (default): emits the SSP envelope and validates against
+  `src/semantic_ci_code/schemas/ssp_envelope_v1.json`.
+- `--format human`: emits a compact per-sensor summary with added / removed /
+  unchanged counts and finding details.
+- `--format sarif`: emits SARIF 2.1.0. SSP severity maps to SARIF level as:
+  `critical` / `high` -> `error`, `medium` -> `warning`, and `low` / `info`
+  -> `note`.
+
+Exit codes follow the SSP verdict: `pass` exits 0, `fail` exits 1, usage
+errors exit 2, sensor-error / `unknown` envelopes exit 3, and internal bugs
+exit 4.
+
+Examples:
+
+```bash
+semantic-ci ssp scan --sensor semgrep --config semgrep.yml \
+  --baseline-dir baseline --candidate-dir candidate --package-root src
+semantic-ci ssp scan --sensor pip-audit --baseline-dir baseline --candidate-dir candidate
+semantic-ci ssp from-json --baseline baseline.sensor.json --candidate candidate.sensor.json
+semantic-ci ssp from-json --baseline baseline.sensor.json --candidate candidate.sensor.json \
+  --format sarif --output ssp.sarif
+```
+
 ## Authoring subcommands (verdict 不参加)
 
 Subcommands on the **Authoring** or **Advisor** surface

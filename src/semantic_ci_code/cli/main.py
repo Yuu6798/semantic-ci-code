@@ -8,6 +8,7 @@ from semantic_ci_code.cli.commands.compare import run_compare
 from semantic_ci_code.cli.commands.compile import run_compile
 from semantic_ci_code.cli.commands.compile_repair import run_compile_repair
 from semantic_ci_code.cli.commands.observe import run_observe
+from semantic_ci_code.cli.commands.ssp import run_ssp
 from semantic_ci_code.cli.commands.target_catalog import run_target_catalog
 from semantic_ci_code.cli.commands.target_doctor import run_target_doctor
 from semantic_ci_code.cli.commands.validate_plan import run_validate_plan
@@ -350,6 +351,58 @@ def build_parser() -> argparse.ArgumentParser:
         help="write output to this file instead of stdout",
     )
 
+    ssp = subcommands.add_parser(
+        "ssp",
+        help="run Semantic Security Protocol sensors and render SSP envelopes",
+    )
+    ssp_subcommands = ssp.add_subparsers(dest="ssp_subcommand")
+    ssp_subcommands.required = True
+
+    ssp_scan = ssp_subcommands.add_parser("scan", help="run an SSP sensor on two trees")
+    ssp_scan.add_argument(
+        "--sensor",
+        choices=("semgrep", "pip-audit"),
+        required=True,
+        help="SSP sensor adapter to run",
+    )
+    ssp_scan.add_argument("--config", default=None, help="Semgrep ruleset path")
+    ssp_scan.add_argument("--baseline-dir", required=True, help="baseline project directory")
+    ssp_scan.add_argument("--candidate-dir", required=True, help="candidate project directory")
+    ssp_scan.add_argument(
+        "--package-root",
+        default=".",
+        help="package root inside each tree for Semgrep scans",
+    )
+    ssp_scan.add_argument(
+        "--format",
+        choices=("json", "human", "sarif"),
+        default="json",
+        help="SSP output format",
+    )
+    ssp_scan.add_argument(
+        "--output",
+        default=None,
+        help="write output to this file instead of stdout",
+    )
+
+    ssp_from_json = ssp_subcommands.add_parser(
+        "from-json",
+        help="compute an SSP envelope from two SensorOutput JSON files",
+    )
+    ssp_from_json.add_argument("--baseline", required=True, help="baseline SensorOutput JSON")
+    ssp_from_json.add_argument("--candidate", required=True, help="candidate SensorOutput JSON")
+    ssp_from_json.add_argument(
+        "--format",
+        choices=("json", "human", "sarif"),
+        default="json",
+        help="SSP output format",
+    )
+    ssp_from_json.add_argument(
+        "--output",
+        default=None,
+        help="write output to this file instead of stdout",
+    )
+
     return parser
 
 
@@ -380,6 +433,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_target_doctor(args)
     if args.subcommand == "target-catalog":
         return run_target_catalog(args)
+    if args.subcommand == "ssp":
+        return run_ssp(args)
 
     parser.print_help(sys.stderr)
     return USAGE_ERROR

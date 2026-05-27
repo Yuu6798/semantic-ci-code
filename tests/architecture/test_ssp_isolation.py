@@ -13,6 +13,9 @@ SSP_MODULES = (
     "semantic_ci_code.ssp.python_profile",
     "semantic_ci_code.ssp.delta",
     "semantic_ci_code.ssp.verdict",
+    "semantic_ci_code.ssp.adapters",
+    "semantic_ci_code.ssp.adapters.qualified_name",
+    "semantic_ci_code.ssp.adapters.semgrep",
 )
 
 SSP_FORBIDDEN_IMPORTS = (

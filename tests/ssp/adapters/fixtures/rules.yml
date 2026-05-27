@@ -1,0 +1,6 @@
+rules:
+  - id: python.security.hardcoded-password
+    pattern: password = "hunter2"
+    message: Hardcoded password found
+    languages: [python]
+    severity: WARNING

@@ -74,29 +74,39 @@ evaluation:
 
 ### 1.2 D2: SAST finding の自然キー
 
-**決定: SAST finding は adapter 層で FQN 空間に翻訳する。ただし FQN 単独では
-同一関数内の複数 finding を区別できないため、ordinal を discriminator に加える。**
+**決定: SAST finding は adapter 層で FQN 空間に翻訳する。FQN 単独では
+同一関数内の複数 finding を区別できないため、normalized_text の hash を
+discriminator に加える。**
 
 SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta 計算の
 「自然キーによる完全一致」ポリシーと緊張する。Gemini 提案の FQN 翻訳により:
 
 - adapter が semgrep の (file, line) を AST 解析で FQN に逆引き
-- SAST finding の自然キー = `(rule_id, fqn, ordinal)` の複合キー
-- ordinal は同一 (rule_id, fqn) 内での出現順序 (0-indexed)。SSP v0.1 の
-  `docs/ssp_protocol.md §5.1` で既に定義済みの概念を継承
+- SAST finding の自然キー = `(rule_id, fqn, normalized_text_hash)` の複合キー
+- normalized_text_hash は matched source の正規化テキストの short hash。
+  SSP v0.1 の `docs/ssp_protocol.md §5.1` の normalized_text + ordinal 概念を
+  継承するが、ordinal (出現順序) 単独ではなく normalized_text を identity に
+  含める。これにより同一 ordinal でも中身が変わった場合に別 finding として
+  検出できる (同じ関数内で `eval(config)` → `exec(config)` に変わったケース等)
 - core は複合キーベースの集合演算 (既存の effects / api_surface と同構造)
 - fingerprint の設計判断が core に入らない
 
 なぜ `(rule_id, fqn)` だけでは不十分か: 同一関数内に同じルールの finding が
-複数存在しうる (例: `eval()` が同一関数で 2 回呼ばれる)。ordinal なしでは
-canonical_id が衝突し、added / removed の検出漏れが発生する。
+複数存在しうる (例: `eval()` が同一関数で 2 回呼ばれる)。また `(rule_id, fqn,
+ordinal)` だけでは、同じ ordinal 位置でマッチするコード片が変わった場合
+(sink/source 式の差し替え) に unchanged 誤判定が生じ、suppression が異なる
+finding に carry over するリスクがある。normalized_text_hash を含めることで
+これを防ぐ。
 
 ```python
-# SAST: FQN + ordinal が自然キー
-canonical_id = f"v1:sast:{rule_id}:{fqn}:{ordinal}"
+# SAST: FQN + normalized_text_hash が自然キー
+canonical_id = f"v1:sast:{rule_id}:{fqn}:{normalized_text_hash}"
 
-# SCA: package + advisory が自然キー (元から一意)
-canonical_id = f"v1:sca:{package_name}:{advisory_id}"
+# SCA: package + version + advisory が自然キー
+# installed_version を含めることで、同一 advisory でもバージョン変更を検出する。
+# 例: urllib3 1.26.5 → 2.0.0 で同じ CVE が残っている場合、version が変わるため
+# added + removed として扱われ、バージョン upgrade の effect が visible になる。
+canonical_id = f"v1:sca:{package_name}:{installed_version}:{advisory_id}"
 ```
 
 ### 1.3 D3: canonical_id のバージョン埋め込み
@@ -104,9 +114,9 @@ canonical_id = f"v1:sca:{package_name}:{advisory_id}"
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:sast:sql-injection:app.db.get_user:0"
-               ^^^                                    ^
-               identity algorithm version              ordinal (同一 rule+fqn 内の出現順)
+canonical_id = "v1:sast:sql-injection:app.db.get_user:a3f8"
+               ^^^                                    ^^^^
+               identity algorithm version              normalized_text short hash
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
@@ -188,14 +198,16 @@ Layer 1 が本 Phase の新設部分。
 
 ```python
 class SecurityFinding(FrozenModel):
-    canonical_id: str        # "v1:sast:rule_id:fqn:ordinal" or "v1:sca:pkg:advisory"
+    canonical_id: str        # "v1:sast:rule_id:fqn:text_hash" or "v1:sca:pkg:ver:advisory"
     category: str            # "sast" | "sca"
     severity: str            # "critical" | "high" | "medium" | "low" | "info"
     sensor_id: str           # "semgrep" | "pip-audit" | ...
-    rule_id: str | None      # SAST 用
-    advisory_id: str | None  # SCA 用
-    fqn: str | None          # SAST: adapter が FQN 翻訳。SCA: None
-    package_name: str | None # SCA 用
+    rule_id: str | None           # SAST 用
+    advisory_id: str | None       # SCA 用
+    fqn: str | None               # SAST: adapter が FQN 翻訳。SCA: None
+    normalized_text_hash: str | None  # SAST: matched source の正規化 hash
+    package_name: str | None      # SCA 用
+    installed_version: str | None # SCA: 脆弱性が検出されたバージョン
     message: str
     provenance: FindingProvenance
 

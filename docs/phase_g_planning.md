@@ -19,9 +19,13 @@ SSP v0.1 (PR #109〜#112) は diff-based security gate として動作する:
 
 1. **射程の退化**: core が持つ intent 宣言 + 構造比較の力を使えない。
    SSP の intent は「finding を増やすな」固定で、target.yaml の自由度がない
-2. **ロジック脆弱性の不検知**: 認可バイパス等はパターンマッチでは検知不能だが、
-   core の effects constraint (`equals_baseline`) なら検知可能。SSP はその力に
-   接続していない
+2. **ロジック脆弱性の不検知**: 認可バイパス等はパターンマッチでは検知不能。
+   core の CodeState 次元 (api_surface / imports / module_graph 等) への
+   constraint で部分的に検知可能だが、SSP はその力に接続していない。
+   ただし effects では純粋な auth guard 関数 (require_admin() 等) は
+   effect signature DB に登録されていない限り検出できないため、
+   auth guard 保護には call graph / data_flow / api_surface ベースの
+   constraint 設計が必要 (Phase G-5 で検討)
 3. **概念的孤立**: 独自 delta エンジンが core の delta と接続しておらず、
    code verdict と security verdict が統合されない
 

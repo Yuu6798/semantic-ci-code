@@ -1,0 +1,32 @@
+[
+  {
+    "name": "django",
+    "version": "3.2.0",
+    "vulns": [
+      {
+        "id": "PYSEC-2021-9",
+        "fix_versions": ["3.2.25"],
+        "description": "SQL injection in Django QuerySet.",
+        "cvss_score": 9.8
+      },
+      {
+        "id": "CVE-2023-36053",
+        "fix_versions": ["3.2.23"],
+        "description": "Potential denial of service in Django.",
+        "cvss_score": 5.3
+      }
+    ]
+  },
+  {
+    "name": "requests",
+    "version": "2.19.0",
+    "vulns": [
+      {
+        "id": "PYSEC-2018-28",
+        "fix_versions": ["2.20.0"],
+        "description": "Requests session redirect leak.",
+        "cvss_score": 7.5
+      }
+    ]
+  }
+]

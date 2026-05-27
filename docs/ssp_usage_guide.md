@@ -176,7 +176,7 @@ SCA findings use `advisory_id` as the SARIF `ruleId`.
 
 | Exit | Meaning | CI action |
 |---|---|---|
-| 0 | Pass — no new findings | Continue |
+| 0 | Pass — no new findings, or only `info`-severity additions | Continue |
 | 1 | Fail — new findings with severity >= low | Block merge or warn |
 | 2 | Usage error — bad flags, missing files | Fix invocation |
 | 3 | Sensor error — scanner failed, verdict unknown | Investigate |

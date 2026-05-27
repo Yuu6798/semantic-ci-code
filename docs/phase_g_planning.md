@@ -173,9 +173,9 @@ Layer 2 の target.yaml 例 (既存の constraint list 形式):
 # target.yaml — Layer 2 は既存の constraints list 形式で記述可能
 constraints:
   # 認可ロジックの呼び出し元が変わっていないことを検証
-  # (state constraint: baseline の effects と candidate の effects を比較)
+  # (delta constraint + state-domain target: baseline vs candidate を比較)
   - id: auth-guard-preserved
-    kind: state
+    kind: delta
     target: effects
     operator: equals_baseline
     severity: hard

@@ -147,6 +147,14 @@ canonical_id = "v1:3a7f8b2e1c9d04a5"
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
 しかしないので、暗黙の finding 入れ替えを防ぐ。
 
+**Suppression migration**: identity algorithm 変更時は全 canonical_id が変わり、
+既存の `security.suppressions` エントリが silent fail する (マッチしなくなる)。
+対策:
+- evaluator は identity_algorithm_version の不一致を検出し warning を emit する
+- Phase G-4 の CLI に `semantic-ci migrate-suppressions --from v1 --to v2`
+  コマンドを scope に含め、旧 canonical_id → 新 canonical_id の一括更新手段を提供
+- 過渡期に v1/v2 両方の canonical_id をマッチさせるべきかは G-3 brief で判断
+
 ### 1.4 D4: scanner drift の検出
 
 **決定: SensorState に provenance を持たせ、delta 計算で drift を検出する。**
@@ -162,21 +170,33 @@ class SensorProvenance(FrozenModel):
     adapter_version: str
     identity_algorithm_version: str
 
-class SensorDelta(FrozenModel):
+class PerSensorDelta(FrozenModel):
+    sensor_id: str
+    status: str                    # "pass" | "fail" | "unknown"
     added: tuple[SecurityFinding, ...]
     removed: tuple[SecurityFinding, ...]
     unchanged_count: int
-    provenance_changed_sensors: tuple[str, ...]
-    # provenance が変わった sensor_id のリスト。空なら全 sensor 一致。
-    # drift 検出は per-sensor: sensor A の provenance が変わっても、
-    # sensor B 由来の finding は通常の added/removed 判定を受ける。
-    # sensor A の provenance が変わった場合、sensor A の verdict 全体を
-    # unknown にする (added だけでなく removed も信頼できないため)。
+    provenance_changed: bool
+    # この sensor の provenance が baseline と異なるかどうか。
+    # True の場合、status は "unknown" に強制される。
+    error_message: str | None      # status == "unknown" 時の原因説明
+
+class SecurityDelta(FrozenModel):
+    deltas_by_sensor: dict[str, PerSensorDelta]
+    # key = sensor_id。SSP v0.1 の deltas_by_sensor 構造を継承。
+    # per-sensor verdict が自然に計算できる。
+    aggregate_status: str          # "pass" | "fail" | "unknown"
+    # unknown > fail > pass の precedence で deltas_by_sensor から集約
 ```
 
+delta は SSP v0.1 同様 **per-sensor** で保持する。SSP v0.1 の
+`deltas_by_sensor: dict[str, SSPDelta]` 構造を継承し、per-sensor verdict を
+自然に計算可能にする。aggregate は suite evaluator 層で合成する。
+
 scanner / ruleset / adapter が変わっている場合、**当該 sensor の verdict 全体**
-を unknown にする。added finding だけでなく removed finding もコード変更起因と
-断定できない (finding が消えたのがコード修正なのか ruleset 変更なのか区別不能)。
+を unknown にする (`provenance_changed: true` → `status: "unknown"`)。
+added finding だけでなく removed finding もコード変更起因と断定できない
+(finding が消えたのがコード修正なのか ruleset 変更なのか区別不能)。
 provenance が一致している sensor の finding のみ pass / fail 判定を受ける。
 
 ### 1.5 D5: verdict 体系
@@ -231,12 +251,18 @@ Layer 1 の security constraint は**別の namespace / 別ファイル**で宣�
 は変更しない。security constraint の宣言形式は Phase G-3 で設計する。
 候補は以下の 2 案:
 
-- 案 A: target.yaml に `security:` top-level key を新設 (parser 拡張が必要)
-- 案 B: `security.yaml` として別ファイルに分離 (target.yaml は不変)
+- 案 A: target.yaml に `security:` top-level key を新設
+  - `TargetSVP` は `ConfigDict(extra="forbid")` のため、未知キーは
+    Pydantic ValidationError で reject される。案 A を選ぶ場合は
+    `framework/target_svp.py` に `security: SecurityPolicy | None = None`
+    フィールドを追加する変更が**必須**。`extra="forbid"` 自体は既知キーの
+    追加で違反しないが、framework 層の変更であり §5 Scope Guard
+    「core evaluator は変更しない」との関係を G-3 brief で明示すること
+- 案 B: `security.yaml` として別ファイルに分離 (target.yaml / TargetSVP 不変)
+  - `extra="forbid"` 制約を回避できるが、2 ファイル管理の運用コストが増加
 
-いずれも既存の `constraints` list schema とは独立で、`target_svp.py` の
-`extra="forbid"` に違反しない形で設計する。具体的な DSL 設計は G-3 brief の
-AC として扱う。
+いずれも既存の `constraints` list schema とは独立。具体的な DSL 設計は
+G-3 brief の AC として扱う。
 
 Layer 2 は新設計不要 (既存の target.yaml で書ける)。
 Layer 1 が本 Phase の新設部分。
@@ -246,34 +272,46 @@ Layer 1 が本 Phase の新設部分。
 ### 2.1 SensorState model
 
 ```python
-class SecurityFinding(FrozenModel):
-    canonical_id: str        # opaque "v1:<sha256[:16]>"; see §1.2 for hash construction, identity_components for tuple
-    category: str            # "sast" | "sca"
+# SSP v0.1 同様、SAST / SCA を discriminated union で分離する。
+# 全フィールドを Optional で flatten すると category と必須フィールドの
+# 整合性が型レベルで保証できなくなる (SSP v0.1 からの型安全性退行)。
+
+class _SecurityFindingBase(FrozenModel):
+    canonical_id: str        # opaque "v1:<sha256[:16]>"; see §1.2
     severity: str            # "critical" | "high" | "medium" | "low" | "info"
     sensor_id: str           # "semgrep" | "pip-audit" | ...
-    rule_id: str | None           # SAST 用
-    advisory_id: str | None       # SCA 用
-    fqn: str | None               # SAST: adapter が FQN 翻訳。SCA: None
-    normalized_text_hash: str | None  # SAST: matched source の正規化 hash
-    package_name: str | None      # SCA 用
-    installed_version: str | None # SCA: 脆弱性が検出されたバージョン
     message: str
-    # SAST source location (SARIF 出力 / CI annotation 用)
-    module_path: str | None       # SAST: "src/app/db.py" 等のファイルパス
-    source_span: SourceSpan | None  # SAST: 行・列の範囲 (SSP v0.1 SourceSpan 継承)
-    provenance: FindingProvenance
-
-class FindingProvenance(FrozenModel):
-    sensor_name: str
-    sensor_version: str
-    ruleset_hash: str | None
-    adapter_version: str
-    identity_algorithm_version: str
     identity_components: dict  # canonical_id の生成根拠 (audit log 用)
+
+class SASTSecurityFinding(_SecurityFindingBase):
+    category: Literal["sast"] = "sast"
+    rule_id: str                      # min_length=1
+    fqn: str                          # adapter が FQN 翻訳。min_length=1
+    normalized_text_hash: str         # matched source の正規化 hash
+    module_path: str                  # "src/app/db.py" 等のファイルパス
+    source_span: SourceSpan | None    # 行・列の範囲 (SSP v0.1 SourceSpan 継承)
+
+class SCASecurityFinding(_SecurityFindingBase):
+    category: Literal["sca"] = "sca"
+    package_name: str                 # min_length=1
+    installed_version: str            # min_length=1
+    advisory_id: str                  # min_length=1
+
+SecurityFinding = Annotated[
+    SASTSecurityFinding | SCASecurityFinding,
+    Field(discriminator="category"),
+]
 
 class SensorState(FrozenModel):
     findings: tuple[SecurityFinding, ...]
     provenance_by_sensor: dict[str, SensorProvenance]
+    # provenance の source of truth は provenance_by_sensor (state-level) に一元化。
+    # finding-level の provenance 重複フィールド (sensor_name, sensor_version,
+    # ruleset_hash, adapter_version, identity_algorithm_version) は V3 review で
+    # 削除し、finding は sensor_id 参照のみ保持する (_SecurityFindingBase.sensor_id)。
+    # identity_components (canonical_id 生成根拠) は finding-level に残す (audit 用)。
+    # drift 検出は provenance_by_sensor のみを参照し、finding-level との
+    # 整合性検証は不要にする。
     # key = sensor_id ("semgrep", "pip-audit", ...)
     # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。
     # drift 検出は per-sensor で行う: sensor A の ruleset が変わっても
@@ -295,6 +333,15 @@ file:line → FQN の逆引きを実装している (`ssp/adapters/qualified_nam
 ```yaml
 security:
   # finding delta への constraint (糖衣構文)
+  # SSP v0.1 の default: info severity の追加は verdict に影響しない
+  # (_FAIL_SEVERITIES = {critical, high, medium, low}、info 除外)。
+  # Phase G もこの default を継承する。明示的な severity filter で上書き可能:
+  #
+  # | 設定 | info | low | medium | high | critical |
+  # |------|------|-----|--------|------|----------|
+  # | default (設定なし) | 許容 | fail | fail | fail | fail |
+  # | 例 1 (not_in) | 許容 | 許容 | 許容 | fail | fail |
+  # | 例 2 (max_count: 0) | fail | fail | fail | fail | fail |
   findings:
     added:
       # 例 1: high / critical の追加を禁止 (medium 以下は許容)
@@ -302,6 +349,7 @@ security:
         not_in: [high, critical]
 
       # 例 2: severity 不問で added 0 件 (厳格モード、例 1 と排他)
+      # info を含む全 severity の追加を禁止 (SSP v0.1 default と異なる)
       # max_count: 0
 
   # 特定ルールの存在禁止
@@ -310,10 +358,15 @@ security:
       - sql-injection
       - eval-use
 
-  # scanner 環境一致要求
+  # scanner 環境一致要求 (drift 検出との合成ルール)
+  # drift 検出は provenance_by_sensor の全フィールドを比較する。
+  # require_same_*: false のフィールドは比較対象から除外する。
+  # 例: require_same_sensor_version: false の場合、sensor_version の差は
+  # drift として扱わず unknown に寄せない。ruleset_hash の差のみ drift 判定。
   scanner:
-    require_same_ruleset: true
-    require_same_sensor_version: false  # minor version 差は許容
+    require_same_ruleset: true          # false なら ruleset_hash 差は drift 除外
+    require_same_sensor_version: false  # minor version 差は許容 (drift 除外)
+    require_same_advisory_db: true      # SCA: advisory DB hash 差の drift 判定
 
   # false positive 抑制 (理由 + 期限必須)
   suppressions:

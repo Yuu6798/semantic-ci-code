@@ -75,6 +75,14 @@ filters or flags (for example an unknown `--target-path`) exit 2 with a
 did-you-mean hint when available. Expected output / filesystem failures exit 3.
 Internal bugs exit 4.
 
+`ssp` (Brief 7 / CSCI-40) computes a Semantic Security Protocol envelope, not
+the core Semantic CI verdict envelope. `ssp scan` executes one security sensor
+on baseline and candidate directories; `ssp from-json` consumes pre-captured
+`SensorOutput` JSON files without sensor execution. SSP `aggregate_verdict:
+pass` exits 0, `fail` exits 1, and `unknown` exits 3 because it represents a
+sensor error / incomplete security signal. Bad flags, missing files, invalid
+fixture JSON, or missing Semgrep `--config` exit 2. Internal bugs exit 4.
+
 ## Error Streams
 
 Stdout is reserved for JSON or human report output. Expected diagnostic messages
@@ -94,6 +102,8 @@ go to stderr.
 | `check --baseline-source working-tree --baseline-rev <ref>` | 2 | `error: --baseline-source=working-tree is incompatible with --baseline-rev` |
 | `check --baseline-source staged-index --baseline-rev <ref>` | 2 | `error: --baseline-source=staged-index is incompatible with --baseline-rev` |
 | `check --baseline-source <volatile> --candidate-source <same volatile>` | 0/1 | Warning: verdict will report no drift by construction. |
+| `ssp scan --sensor semgrep` without `--config` | 2 | `--config is required when --sensor=semgrep` |
+| `ssp from-json` with a sensor error fixture | 3 | SSP envelope is still written with `aggregate_verdict: unknown`. |
 | Internal bug | 4 | `internal error: <one-line>; rerun with --verbose for traceback` |
 
 With `--verbose`, expected engine errors also print a traceback after the

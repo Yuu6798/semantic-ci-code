@@ -1,0 +1,44 @@
+{
+  "sensor_id": "semgrep",
+  "sensor_version": "1.80.0",
+  "status": "complete",
+  "findings": [
+    {
+      "category": "sast",
+      "rule_id": "python.security.old",
+      "module_path": "src/app.py",
+      "qualified_name": "src.app.handler",
+      "normalized_text": "old_call()",
+      "ordinal": null,
+      "fingerprint": null,
+      "severity": "medium",
+      "message": "Existing finding",
+      "source_span": {
+        "start_line": 2,
+        "start_col": 5,
+        "end_line": 2,
+        "end_col": 15
+      },
+      "normalization": "ast"
+    },
+    {
+      "category": "sast",
+      "rule_id": "python.security.eval",
+      "module_path": "src/app.py",
+      "qualified_name": "src.app.handler",
+      "normalized_text": "eval(user_input)",
+      "ordinal": null,
+      "fingerprint": null,
+      "severity": "high",
+      "message": "New eval use",
+      "source_span": {
+        "start_line": 5,
+        "start_col": 5,
+        "end_line": 5,
+        "end_col": 21
+      },
+      "normalization": "ast"
+    }
+  ],
+  "error_message": null
+}

@@ -74,19 +74,26 @@ evaluation:
 
 ### 1.2 D2: SAST finding の自然キー
 
-**決定: SAST finding は adapter 層で FQN 空間に翻訳する。**
+**決定: SAST finding は adapter 層で FQN 空間に翻訳する。ただし FQN 単独では
+同一関数内の複数 finding を区別できないため、ordinal を discriminator に加える。**
 
 SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta 計算の
 「自然キーによる完全一致」ポリシーと緊張する。Gemini 提案の FQN 翻訳により:
 
 - adapter が semgrep の (file, line) を AST 解析で FQN に逆引き
-- SAST finding の自然キー = `(rule_id, fqn)` の複合キー
-- core は FQN ベースの集合演算 (既存の effects / api_surface と同構造)
+- SAST finding の自然キー = `(rule_id, fqn, ordinal)` の複合キー
+- ordinal は同一 (rule_id, fqn) 内での出現順序 (0-indexed)。SSP v0.1 の
+  `docs/ssp_protocol.md §5.1` で既に定義済みの概念を継承
+- core は複合キーベースの集合演算 (既存の effects / api_surface と同構造)
 - fingerprint の設計判断が core に入らない
 
+なぜ `(rule_id, fqn)` だけでは不十分か: 同一関数内に同じルールの finding が
+複数存在しうる (例: `eval()` が同一関数で 2 回呼ばれる)。ordinal なしでは
+canonical_id が衝突し、added / removed の検出漏れが発生する。
+
 ```python
-# SAST: FQN が自然キー
-canonical_id = f"v1:sast:{rule_id}:{fqn}"
+# SAST: FQN + ordinal が自然キー
+canonical_id = f"v1:sast:{rule_id}:{fqn}:{ordinal}"
 
 # SCA: package + advisory が自然キー (元から一意)
 canonical_id = f"v1:sca:{package_name}:{advisory_id}"
@@ -97,9 +104,9 @@ canonical_id = f"v1:sca:{package_name}:{advisory_id}"
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:sast:sql-injection:app.db.get_user"
-               ^^^
-               identity algorithm version
+canonical_id = "v1:sast:sql-injection:app.db.get_user:0"
+               ^^^                                    ^
+               identity algorithm version              ordinal (同一 rule+fqn 内の出現順)
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
@@ -181,7 +188,7 @@ Layer 1 が本 Phase の新設部分。
 
 ```python
 class SecurityFinding(FrozenModel):
-    canonical_id: str        # "v1:sast:rule_id:fqn" or "v1:sca:pkg:advisory"
+    canonical_id: str        # "v1:sast:rule_id:fqn:ordinal" or "v1:sca:pkg:advisory"
     category: str            # "sast" | "sca"
     severity: str            # "critical" | "high" | "medium" | "low" | "info"
     sensor_id: str           # "semgrep" | "pip-audit" | ...

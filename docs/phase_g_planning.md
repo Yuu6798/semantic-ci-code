@@ -199,15 +199,12 @@ Layer 2 の target.yaml 例 (既存の constraint list 形式):
 ```yaml
 # target.yaml — Layer 2 は既存の constraints list 形式で記述可能
 constraints:
-  # 認可ロジックの呼び出し元が変わっていないことを検証
-  # (delta constraint + state-domain target: baseline vs candidate を比較)
-  - id: auth-guard-preserved
-    kind: delta
-    target: effects
-    operator: equals_baseline
-    severity: hard
-
   # 危険な import の追加を禁止
+  # (effects で auth guard を検知する案は不適: extract_python_effects は
+  #  effect signature DB 登録済みの副作用のみ抽出し、require_admin() 等の
+  #  純粋な auth guard 関数は effects に現れない。auth guard 保護は
+  #  call graph / data_flow / api_surface の制約で扱うべきであり、
+  #  Phase G-5 の security template 設計で正式に検討する)
   - id: deny-dangerous-imports
     kind: delta
     target: imports_delta.added
@@ -284,9 +281,12 @@ security:
   # finding delta への constraint (糖衣構文)
   findings:
     added:
+      # 例 1: high / critical の追加を禁止 (medium 以下は許容)
       severity:
         not_in: [high, critical]
-      max_count: 0              # severity 不問で added 0 件 (厳格モード)
+
+      # 例 2: severity 不問で added 0 件 (厳格モード、例 1 と排他)
+      # max_count: 0
 
   # 特定ルールの存在禁止
   rules:

@@ -36,7 +36,8 @@ semantic-ci ssp scan \
 - `--config` is the Semgrep ruleset file (required for `--sensor semgrep`).
 - `--package-root` selects the subdirectory scanned inside each tree
   (defaults to `.`).
-- Exit 0 = no new findings (pass), exit 1 = new findings (fail).
+- Exit 0 = pass (no new findings, or only `info`-severity additions).
+  Exit 1 = fail (new findings with severity `low` or above).
 
 ### 2. SCA delta with pip-audit
 
@@ -49,8 +50,10 @@ semantic-ci ssp scan \
   --candidate-dir /tmp/candidate
 ```
 
-If `requirements.txt` exists in a directory, it is automatically passed
-to pip-audit. Otherwise pip-audit audits the active Python environment.
+If `requirements.txt` exists in a directory, it is passed to pip-audit
+via `--requirement`. Otherwise pip-audit audits the project directory
+directly (using `--locked` when supported, or the directory path as
+fallback).
 
 ### 3. Fixture mode (no scanner required)
 

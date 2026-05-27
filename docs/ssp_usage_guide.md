@@ -181,16 +181,30 @@ SCA findings use `advisory_id` as the SARIF `ruleId`.
 
 ### Fixture-based CI (no scanner installation)
 
-If your CI does not have Semgrep or pip-audit, capture sensor output
-once and commit the JSON files:
+If your CI does not have Semgrep or pip-audit, capture `SensorOutput`
+JSON locally (where sensors are installed) and commit the files:
 
 ```bash
-# One-time: capture sensor output locally
-semgrep --json --config .semgrep.yml src/ > baseline_sensor.json
-# After changes:
-semgrep --json --config .semgrep.yml src/ > candidate_sensor.json
+# One-time: run ssp scan locally and save the JSON envelope
+semantic-ci ssp scan --sensor semgrep --config .semgrep.yml \
+  --baseline-dir baseline --candidate-dir candidate \
+  --format json > envelope.json
 
-# In CI:
+# Or capture per-side SensorOutput via the adapter Python API:
+python -c "
+import json
+from semantic_ci_code.ssp.adapters.semgrep import SemgrepAdapter
+from pathlib import Path
+result = SemgrepAdapter().scan(Path('src'), ruleset=Path('.semgrep.yml'), repo_root=Path('.'))
+print(json.dumps(result.output.model_dump(mode='json'), indent=2))
+" > baseline_sensor.json
+```
+
+The `from-json` subcommand expects **`SensorOutput` JSON** (with
+`sensor_id`, `status`, `findings`), not raw Semgrep/pip-audit output.
+
+```bash
+# In CI (no scanner needed):
 semantic-ci ssp from-json \
   --baseline baseline_sensor.json \
   --candidate candidate_sensor.json

@@ -181,16 +181,12 @@ SCA findings use `advisory_id` as the SARIF `ruleId`.
 
 ### Fixture-based CI (no scanner installation)
 
-If your CI does not have Semgrep or pip-audit, capture `SensorOutput`
-JSON locally (where sensors are installed) and commit the files:
+If your CI does not have Semgrep or pip-audit, capture per-side
+`SensorOutput` JSON locally (where sensors are installed) and commit
+the files:
 
 ```bash
-# One-time: run ssp scan locally and save the JSON envelope
-semantic-ci ssp scan --sensor semgrep --config .semgrep.yml \
-  --baseline-dir baseline --candidate-dir candidate \
-  --format json > envelope.json
-
-# Or capture per-side SensorOutput via the adapter Python API:
+# Capture baseline SensorOutput via the adapter Python API:
 python -c "
 import json
 from semantic_ci_code.ssp.adapters.semgrep import SemgrepAdapter
@@ -198,10 +194,20 @@ from pathlib import Path
 result = SemgrepAdapter().scan(Path('src'), ruleset=Path('.semgrep.yml'), repo_root=Path('.'))
 print(json.dumps(result.output.model_dump(mode='json'), indent=2))
 " > baseline_sensor.json
+
+# After changes, capture candidate SensorOutput the same way:
+python -c "
+import json
+from semantic_ci_code.ssp.adapters.semgrep import SemgrepAdapter
+from pathlib import Path
+result = SemgrepAdapter().scan(Path('src'), ruleset=Path('.semgrep.yml'), repo_root=Path('.'))
+print(json.dumps(result.output.model_dump(mode='json'), indent=2))
+" > candidate_sensor.json
 ```
 
 The `from-json` subcommand expects **`SensorOutput` JSON** (with
-`sensor_id`, `status`, `findings`), not raw Semgrep/pip-audit output.
+`sensor_id`, `status`, `findings`), not raw Semgrep/pip-audit output
+or SSP envelope JSON.
 
 ```bash
 # In CI (no scanner needed):
@@ -261,10 +267,11 @@ Minimal SCA example:
 }
 ```
 
-Fields `ordinal`, `fingerprint`, `normalization`, and `source_span` are
-optional — the delta engine computes ordinals and fingerprints
-automatically. Set `severity` to one of: `critical`, `high`, `medium`,
-`low`, `info`.
+`fingerprint` is optional for both SAST and SCA — the delta engine
+computes fingerprints automatically. For SAST findings, `ordinal`,
+`normalization`, and `source_span` are also optional (SAST-only fields;
+do not add these to SCA findings as the model rejects unknown fields).
+Set `severity` to one of: `critical`, `high`, `medium`, `low`, `info`.
 
 ## How SSP Computes the Delta
 

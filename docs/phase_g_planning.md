@@ -75,37 +75,33 @@ evaluation:
 ### 1.2 D2: SAST finding の自然キー
 
 **決定: SAST finding は adapter 層で FQN 空間に翻訳する。FQN 単独では
-同一関数内の複数 finding を区別できないため、normalized_text の hash を
-discriminator に加える。**
+同一関数内の複数 finding を区別できないため、normalized_text_hash と
+ordinal の両方を discriminator に加える。**
 
 SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta 計算の
 「自然キーによる完全一致」ポリシーと緊張する。Gemini 提案の FQN 翻訳により:
 
 - adapter が semgrep の (file, line) を AST 解析で FQN に逆引き
-- SAST finding の自然キー = `(rule_id, fqn, normalized_text_hash)` の複合キー
+- SAST finding の自然キー = `(rule_id, fqn, normalized_text_hash, ordinal)`
+  の 4 要素複合キー
 - normalized_text_hash は matched source の正規化テキストの short hash。
-  SSP v0.1 の `docs/ssp_protocol.md §5.1` の normalized_text + ordinal 概念を
-  継承するが、ordinal (出現順序) 単独ではなく normalized_text を identity に
-  含める。これにより同一 ordinal でも中身が変わった場合に別 finding として
-  検出できる (同じ関数内で `eval(config)` → `exec(config)` に変わったケース等)
+  ordinal は同一 `(rule_id, fqn, normalized_text_hash)` グループ内での
+  出現順序 (0-indexed)。SSP v0.1 `docs/ssp_protocol.md §5.1` の ordinal
+  割り当てルールを継承
+- なぜ両方必要か:
+  - normalized_text_hash だけだと、同一関数内で同一テキストの finding が
+    複数ある場合 (例: `eval(config)` が 2 回) に衝突する → ordinal で区別
+  - ordinal だけだと、同一位置でコード片が変わった場合
+    (例: `eval(config)` → `exec(config)`) に unchanged 誤判定する
+    → normalized_text_hash で区別
 - core は複合キーベースの集合演算 (既存の effects / api_surface と同構造)
 - fingerprint の設計判断が core に入らない
 
-なぜ `(rule_id, fqn)` だけでは不十分か: 同一関数内に同じルールの finding が
-複数存在しうる (例: `eval()` が同一関数で 2 回呼ばれる)。また `(rule_id, fqn,
-ordinal)` だけでは、同じ ordinal 位置でマッチするコード片が変わった場合
-(sink/source 式の差し替え) に unchanged 誤判定が生じ、suppression が異なる
-finding に carry over するリスクがある。normalized_text_hash を含めることで
-これを防ぐ。
-
 ```python
-# SAST: FQN + normalized_text_hash が自然キー
-canonical_id = f"v1:sast:{rule_id}:{fqn}:{normalized_text_hash}"
+# SAST: FQN + text_hash + ordinal が自然キー
+canonical_id = f"v1:sast:{rule_id}:{fqn}:{normalized_text_hash}:{ordinal}"
 
 # SCA: package + version + advisory が自然キー
-# installed_version を含めることで、同一 advisory でもバージョン変更を検出する。
-# 例: urllib3 1.26.5 → 2.0.0 で同じ CVE が残っている場合、version が変わるため
-# added + removed として扱われ、バージョン upgrade の effect が visible になる。
 canonical_id = f"v1:sca:{package_name}:{installed_version}:{advisory_id}"
 ```
 
@@ -114,9 +110,10 @@ canonical_id = f"v1:sca:{package_name}:{installed_version}:{advisory_id}"
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:sast:sql-injection:app.db.get_user:a3f8"
-               ^^^                                    ^^^^
-               identity algorithm version              normalized_text short hash
+canonical_id = "v1:sast:sql-injection:app.db.get_user:a3f8:0"
+               ^^^                                    ^^^^  ^
+               identity algorithm version              |    ordinal
+                                                       normalized_text short hash
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
@@ -170,24 +167,40 @@ Layer 1 — 外部 scanner 由来 (SensorState):
 Layer 2 — core constraints 由来 (既存 CodeState):
   effects / api_surface / imports への constraint として記述
 
-```yaml
-# target.yaml
-constraints:
-  # Layer 2: ロジック脆弱性を既存 constraint で検知
-  code:
-    effects:
-      do_transfer:
-        callers: equals_baseline
+Layer 2 の target.yaml 例 (既存の constraint list 形式):
 
-  # Layer 1: scanner finding を security constraint で制御
-  security:
-    findings:
-      added:
-        severity:
-          not_in: [high, critical]
-    scanner:
-      require_same_ruleset: true
+```yaml
+# target.yaml — Layer 2 は既存の constraints list 形式で記述可能
+constraints:
+  # 認可ロジックの呼び出し元が変わっていないことを検証
+  - id: auth-guard-preserved
+    kind: delta
+    target: effect_changes
+    operator: equals_baseline
+    severity: hard
+
+  # 危険な import の追加を禁止
+  - id: deny-dangerous-imports
+    kind: delta
+    target: imports_delta.added
+    operator: excludes_all
+    expected:
+      - module: pickle
+      - module: subprocess
+    severity: hard
 ```
+
+Layer 1 の security constraint は**別の namespace / 別ファイル**で宣言する。
+既存の `constraints` list (`framework/target_svp.py` の `tuple[Constraint, ...]`)
+は変更しない。security constraint の宣言形式は Phase G-3 で設計する。
+候補は以下の 2 案:
+
+- 案 A: target.yaml に `security:` top-level key を新設 (parser 拡張が必要)
+- 案 B: `security.yaml` として別ファイルに分離 (target.yaml は不変)
+
+いずれも既存の `constraints` list schema とは独立で、`target_svp.py` の
+`extra="forbid"` に違反しない形で設計する。具体的な DSL 設計は G-3 brief の
+AC として扱う。
 
 Layer 2 は新設計不要 (既存の target.yaml で書ける)。
 Layer 1 が本 Phase の新設部分。
@@ -198,7 +211,7 @@ Layer 1 が本 Phase の新設部分。
 
 ```python
 class SecurityFinding(FrozenModel):
-    canonical_id: str        # "v1:sast:rule_id:fqn:text_hash" or "v1:sca:pkg:ver:advisory"
+    canonical_id: str        # "v1:sast:rule_id:fqn:text_hash:ordinal" or "v1:sca:pkg:ver:advisory"
     category: str            # "sast" | "sca"
     severity: str            # "critical" | "high" | "medium" | "low" | "info"
     sensor_id: str           # "semgrep" | "pip-audit" | ...

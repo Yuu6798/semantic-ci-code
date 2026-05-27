@@ -136,11 +136,12 @@ audit log / CI 出力で表示する。`v1:` prefix は identity algorithm versi
 ```
 canonical_id = "v1:3a7f8b2e1c9d04a5"
                ^^^  ^^^^^^^^^^^^^^^^
-               |    sha256 short hash of ("\0".join(identity_tuple))
+               |    sha256 short hash of json.dumps(identity_tuple)
                identity algorithm version
 
 # identity_tuple (FindingProvenance.identity_components に保存):
-# ("v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0")
+# ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
+# encoding: json.dumps(list, separators=(",",":"), sort_keys=False)
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致

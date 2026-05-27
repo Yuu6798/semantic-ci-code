@@ -257,6 +257,9 @@ class SecurityFinding(FrozenModel):
     package_name: str | None      # SCA 用
     installed_version: str | None # SCA: 脆弱性が検出されたバージョン
     message: str
+    # SAST source location (SARIF 出力 / CI annotation 用)
+    module_path: str | None       # SAST: "src/app/db.py" 等のファイルパス
+    source_span: SourceSpan | None  # SAST: 行・列の範囲 (SSP v0.1 SourceSpan 継承)
     provenance: FindingProvenance
 
 class FindingProvenance(FrozenModel):

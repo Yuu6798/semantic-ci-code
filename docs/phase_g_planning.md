@@ -139,12 +139,14 @@ class SensorDelta(FrozenModel):
     # provenance が変わった sensor_id のリスト。空なら全 sensor 一致。
     # drift 検出は per-sensor: sensor A の provenance が変わっても、
     # sensor B 由来の finding は通常の added/removed 判定を受ける。
-    # sensor A 由来の added finding のみ unknown に寄せる。
+    # sensor A の provenance が変わった場合、sensor A の verdict 全体を
+    # unknown にする (added だけでなく removed も信頼できないため)。
 ```
 
-scanner / ruleset / adapter が変わっている場合、**当該 sensor 由来の**
-added finding をコード変更
-起因と断定するのは危険。verdict は unknown に寄せる。
+scanner / ruleset / adapter が変わっている場合、**当該 sensor の verdict 全体**
+を unknown にする。added finding だけでなく removed finding もコード変更起因と
+断定できない (finding が消えたのがコード修正なのか ruleset 変更なのか区別不能)。
+provenance が一致している sensor の finding のみ pass / fail 判定を受ける。
 
 ### 1.5 D5: verdict 体系
 

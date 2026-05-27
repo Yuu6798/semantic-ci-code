@@ -98,11 +98,12 @@ SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta �
 - fingerprint の設計判断が core に入らない
 
 ```python
-# SAST: FQN + text_hash + ordinal が自然キー
-canonical_id = f"v1:sast:{rule_id}:{fqn}:{normalized_text_hash}:{ordinal}"
+# SAST: sensor_id + FQN + text_hash + ordinal が自然キー
+# sensor_id を含めることで、複数 SAST sensor が同じ rule_id を emit しても衝突しない
+canonical_id = f"v1:sast:{sensor_id}:{rule_id}:{fqn}:{normalized_text_hash}:{ordinal}"
 
-# SCA: package + version + advisory が自然キー
-canonical_id = f"v1:sca:{package_name}:{installed_version}:{advisory_id}"
+# SCA: sensor_id + package + version + advisory が自然キー
+canonical_id = f"v1:sca:{sensor_id}:{package_name}:{installed_version}:{advisory_id}"
 ```
 
 ### 1.3 D3: canonical_id のバージョン埋め込み
@@ -110,10 +111,10 @@ canonical_id = f"v1:sca:{package_name}:{installed_version}:{advisory_id}"
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:sast:sql-injection:app.db.get_user:a3f8:0"
-               ^^^                                    ^^^^  ^
-               identity algorithm version              |    ordinal
-                                                       normalized_text short hash
+canonical_id = "v1:sast:semgrep:sql-injection:app.db.get_user:a3f8:0"
+               ^^^     ^^^^^^^                                ^^^^  ^
+               |       sensor_id                              |     ordinal
+               identity algorithm version                     text hash
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
@@ -220,7 +221,7 @@ Layer 1 が本 Phase の新設部分。
 
 ```python
 class SecurityFinding(FrozenModel):
-    canonical_id: str        # "v1:sast:rule_id:fqn:text_hash:ordinal" or "v1:sca:pkg:ver:advisory"
+    canonical_id: str        # "v1:sast:sensor:rule:fqn:text_hash:ord" or "v1:sca:sensor:pkg:ver:adv"
     category: str            # "sast" | "sca"
     severity: str            # "critical" | "high" | "medium" | "low" | "info"
     sensor_id: str           # "semgrep" | "pip-audit" | ...
@@ -282,8 +283,8 @@ security:
 
   # false positive 抑制 (理由 + 期限必須)
   suppressions:
-    - canonical_id: "v1:sast:xss:app.legacy.render:b7e2:0"
-      # full form: v1:sast:{rule_id}:{fqn}:{text_hash}:{ordinal}
+    - canonical_id: "v1:sast:semgrep:xss:app.legacy.render:b7e2:0"
+      # full form: v1:sast:{sensor_id}:{rule_id}:{fqn}:{text_hash}:{ordinal}
       reason: "Validated upstream by WAF"
       expires: "2026-09-01"
       owner: "security-team"

@@ -360,14 +360,28 @@ security:
 
 ### Phase G-5: Semantic security templates (CSCI-49)
 - `src/semantic_ci_code/templates/security/` 新設
-  - `auth_guard_preserved.yaml`
-  - `validation_preserved.yaml`
-  - `dangerous_imports_denied.yaml`
-  - `privileged_api_gated.yaml`
-- 既存 core constraint (effects / imports / api_surface) の組み合わせで記述
-- 新 operator 不要 (既存 operator で表現可能)
-- **AC**: `semantic-ci init --recipe security:auth-guard` で
-  認可ロジック保護の target.yaml が生成される
+- テンプレートは 2 カテゴリに分かれる:
+
+**カテゴリ A — 既存 extractor で表現可能 (engine 変更なし)**:
+  - `dangerous_imports_denied.yaml`: imports_delta.added + excludes_all
+  - `validation_preserved.yaml`: api_surface + equals_baseline
+    (public API の signature 変更を検知)
+
+**カテゴリ B — extractor 拡張が必要 (G-5 brief で extractor scope を定義)**:
+  - `auth_guard_preserved.yaml`: 現行 effects extractor は effect signature
+    DB 登録済みの呼び出しのみ抽出するため、`require_admin()` 等の純粋な
+    auth guard 関数は検出不能。G-5 brief で api_surface の auth decorator
+    検出 (e.g. `@login_required` の有無追跡) または data_flow 実装
+    (call graph 上の guard → handler 経路追跡) のいずれかを選択する
+  - `privileged_api_gated.yaml`: 同上。privileged endpoint の guard 有無を
+    追跡するには auth decorator または call graph が必要
+
+- カテゴリ A は新 operator 不要 (既存 operator で表現可能)
+- カテゴリ B は extractor 拡張の scope を G-5 brief AC として定義する
+- **AC (カテゴリ A)**: `semantic-ci init --recipe security:deny-dangerous-imports`
+  で target.yaml が生成される
+- **AC (カテゴリ B)**: G-5 brief が extractor 拡張の scope + AC を定義し、
+  template は extractor 完了後に有効化される
 
 ## 4. 移行戦略
 
@@ -382,7 +396,8 @@ security:
 
 - CodeState schema 変更なし → 既存テスト全互換
 - 新設モジュールは全て optional (sensor/ suite/) → 既存 CLI 動作不変
-- Phase G-5 のテンプレートは target.yaml の content であり engine 変更なし
+- Phase G-5 カテゴリ A テンプレートは target.yaml の content であり engine 変更なし
+- Phase G-5 カテゴリ B テンプレートは extractor 拡張を伴う (G-5 brief で scope 定義)
 
 ## 5. Scope Guard
 

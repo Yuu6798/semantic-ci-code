@@ -127,7 +127,8 @@ algorithm が変わったら canonical_id 全体が変わる。core は文字列
 class SensorProvenance(FrozenModel):
     sensor_name: str
     sensor_version: str
-    ruleset_hash: str | None
+    ruleset_hash: str | None       # SAST: semgrep ruleset file の hash
+    advisory_db_hash: str | None   # SCA: advisory database snapshot の hash
     adapter_version: str
     identity_algorithm_version: str
 

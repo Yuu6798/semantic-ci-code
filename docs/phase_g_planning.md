@@ -173,9 +173,10 @@ Layer 2 の target.yaml 例 (既存の constraint list 形式):
 # target.yaml — Layer 2 は既存の constraints list 形式で記述可能
 constraints:
   # 認可ロジックの呼び出し元が変わっていないことを検証
+  # (state constraint: baseline の effects と candidate の effects を比較)
   - id: auth-guard-preserved
-    kind: delta
-    target: effect_changes
+    kind: state
+    target: effects
     operator: equals_baseline
     severity: hard
 
@@ -267,7 +268,8 @@ security:
 
   # false positive 抑制 (理由 + 期限必須)
   suppressions:
-    - canonical_id: "v1:sast:xss:app.legacy.render"
+    - canonical_id: "v1:sast:xss:app.legacy.render:b7e2:0"
+      # full form: v1:sast:{rule_id}:{fqn}:{text_hash}:{ordinal}
       reason: "Validated upstream by WAF"
       expires: "2026-09-01"
       owner: "security-team"

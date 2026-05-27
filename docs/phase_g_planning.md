@@ -236,7 +236,7 @@ Layer 1 が本 Phase の新設部分。
 
 ```python
 class SecurityFinding(FrozenModel):
-    canonical_id: str        # "v1:sast:sensor:rule:fqn:text_hash:ord" or "v1:sca:sensor:pkg:ver:adv"
+    canonical_id: str        # opaque "v1:<sha256[:16]>"; see §1.2 for hash construction, identity_components for tuple
     category: str            # "sast" | "sca"
     severity: str            # "critical" | "high" | "medium" | "low" | "info"
     sensor_id: str           # "semgrep" | "pip-audit" | ...

@@ -14,6 +14,7 @@ SSP_MODULES = (
     "semantic_ci_code.ssp.delta",
     "semantic_ci_code.ssp.verdict",
     "semantic_ci_code.ssp.adapters",
+    "semantic_ci_code.ssp.adapters.pip_audit",
     "semantic_ci_code.ssp.adapters.qualified_name",
     "semantic_ci_code.ssp.adapters.semgrep",
 )

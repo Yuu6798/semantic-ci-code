@@ -135,10 +135,15 @@ class SensorDelta(FrozenModel):
     added: tuple[SecurityFinding, ...]
     removed: tuple[SecurityFinding, ...]
     unchanged_count: int
-    provenance_changed: bool  # True なら verdict を unknown に寄せる
+    provenance_changed_sensors: tuple[str, ...]
+    # provenance が変わった sensor_id のリスト。空なら全 sensor 一致。
+    # drift 検出は per-sensor: sensor A の provenance が変わっても、
+    # sensor B 由来の finding は通常の added/removed 判定を受ける。
+    # sensor A 由来の added finding のみ unknown に寄せる。
 ```
 
-scanner / ruleset / adapter が変わっている場合、added finding をコード変更
+scanner / ruleset / adapter が変わっている場合、**当該 sensor 由来の**
+added finding をコード変更
 起因と断定するのは危険。verdict は unknown に寄せる。
 
 ### 1.5 D5: verdict 体系
@@ -235,7 +240,13 @@ class FindingProvenance(FrozenModel):
 
 class SensorState(FrozenModel):
     findings: tuple[SecurityFinding, ...]
-    provenance: SensorProvenance
+    provenance_by_sensor: dict[str, SensorProvenance]
+    # key = sensor_id ("semgrep", "pip-audit", ...)
+    # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。
+    # drift 検出は per-sensor で行う: sensor A の ruleset が変わっても
+    # sensor B の finding は unknown に寄せない。
+    # zero-finding sensor も provenance は記録する (scanner が正常に
+    # 完了したが finding がなかったことと、scanner を実行しなかったことを区別)。
 ```
 
 ### 2.2 SAST FQN 翻訳 (adapter 層)

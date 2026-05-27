@@ -7,6 +7,7 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 
 | Date | PR / commit | Outcome | Detail |
 |---|---|---|---|
+| 2026-05-27 | #109-#112 | Brief 7 / SSP v0.1 完走 (CSCI-36〜40)。spec doc 復元 + models/delta/fingerprint + SemgrepAdapter + PipAuditAdapter + CLI/SARIF/human format。Issue #108 closed | `2026-05-27.md` |
 | 2026-05-26 | #106 + #107 | target authoring UX 改善: PR #106 (init --intent / next commands / recipe notes / init --doctor / doctor_support 共有化) + PR #107 (ADVISORY-I1 空 intent 検出)。設計 v1→v2 改訂 (PR 順序反転 / usage error / 共有化 / stderr 安全化 / \r 追加)、両 PR 0 round approve | `2026-05-26.md` |
 | 2026-05-25 | #100-#105 | F queue 完走 (source-selection Phase 2/3a/3b) + D queue 完走 (lock short-circuit / per-extractor timeout / per-extractor version hash)、 6 PR を 1 session で設計→レビュー→マージ、 全 PR 0 round (PR #100 のみ follow-up commit 1 件) | `2026-05-25.md` |
 | 2026-05-22 | #98 + #99 | Issue #97 (langchain blind sampling 由来 `--allow-dirty` provenance bug) を PR #98 = Phase 1 mitigation で 0 round closure (derived predicate + 4 architecture invariant + 2 integration test)。 続けて design hole を `docs/source_selection_planning.md` (406 lines、 3 phase × 7 lock-in、 aggressive style) に encode、 PR #99 で正式採用 | `2026-05-22.md` |

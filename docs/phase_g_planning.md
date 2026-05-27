@@ -146,6 +146,8 @@ algorithm が変わったら canonical_id 全体が変わる。core は文字列
 class SensorProvenance(FrozenModel):
     sensor_name: str
     sensor_version: str
+    status: str                    # "complete" | "error" | "timeout" | "skipped"
+    error_message: str | None      # status != "complete" の場合の詳細
     ruleset_hash: str | None       # SAST: semgrep ruleset file の hash
     advisory_db_hash: str | None   # SCA: advisory database snapshot の hash
     adapter_version: str
@@ -264,8 +266,10 @@ class SensorState(FrozenModel):
     # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。
     # drift 検出は per-sensor で行う: sensor A の ruleset が変わっても
     # sensor B の finding は unknown に寄せない。
-    # zero-finding sensor も provenance は記録する (scanner が正常に
-    # 完了したが finding がなかったことと、scanner を実行しなかったことを区別)。
+    # zero-finding sensor も provenance は記録する (status="complete" で
+    # finding 0 件 = clean scan、status="error" = scanner 失敗、
+    # provenance_by_sensor に key がない = sensor 未実行、の 3 状態を区別)。
+    # status != "complete" の sensor は verdict を unknown に寄せる。
 ```
 
 ### 2.2 SAST FQN 翻訳 (adapter 層)

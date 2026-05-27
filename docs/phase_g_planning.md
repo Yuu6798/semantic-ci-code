@@ -125,7 +125,7 @@ canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, separators=(",
 ```
 
 canonical_id は不透明な hash 文字列であり、人間が読み解く必要はない。
-人間向けの説明は `FindingProvenance.identity_components` に全要素を保存して
+人間向けの説明は `_SecurityFindingBase.identity_components` に全要素を保存して
 audit log / CI 出力で表示する。`v1:` prefix は identity algorithm version を
 示し、algorithm 変更時に全 hash が変わることを保証する。
 
@@ -139,7 +139,7 @@ canonical_id = "v1:3a7f8b2e1c9d04a5"
                |    sha256 short hash of json.dumps(identity_tuple)
                identity algorithm version
 
-# identity_tuple (FindingProvenance.identity_components に保存):
+# identity_tuple (_SecurityFindingBase.identity_components に保存):
 # ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
 # encoding: json.dumps(list, separators=(",",":"), sort_keys=False)
 ```
@@ -310,8 +310,13 @@ class SensorState(FrozenModel):
     # ruleset_hash, adapter_version, identity_algorithm_version) は V3 review で
     # 削除し、finding は sensor_id 参照のみ保持する (_SecurityFindingBase.sensor_id)。
     # identity_components (canonical_id 生成根拠) は finding-level に残す (audit 用)。
-    # drift 検出は provenance_by_sensor のみを参照し、finding-level との
-    # 整合性検証は不要にする。
+    # drift 検出は provenance_by_sensor のみを参照する。
+    #
+    # model_validator (参照整合性):
+    #   全 finding.sensor_id ∈ provenance_by_sensor.keys() を enforce する。
+    #   hand-built JSON や buggy adapter が provenance なしの sensor_id を
+    #   持つ finding を emit した場合、drift/error 判定が不能になるため、
+    #   構築時に ValidationError で reject する。
     # key = sensor_id ("semgrep", "pip-audit", ...)
     # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。
     # drift 検出は per-sensor で行う: sensor A の ruleset が変わっても
@@ -371,7 +376,7 @@ security:
   # false positive 抑制 (理由 + 期限必須)
   suppressions:
     - canonical_id: "v1:e4b2a7c9f1d30856"
-      # opaque hash; identity_components in provenance for audit
+      # opaque hash; identity_components on finding for audit
       reason: "Validated upstream by WAF"
       expires: "2026-09-01"
       owner: "security-team"

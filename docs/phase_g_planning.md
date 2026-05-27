@@ -186,7 +186,12 @@ class SecurityDelta(FrozenModel):
     # key = sensor_id。SSP v0.1 の deltas_by_sensor 構造を継承。
     # per-sensor verdict が自然に計算できる。
     aggregate_status: str          # "pass" | "fail" | "unknown"
-    # unknown > fail > pass の precedence で deltas_by_sensor から集約
+    # model_validator (整合性検証、SSP v0.1 SSPEnvelope._validate_delta_consistency 継承):
+    #   1. deltas_by_sensor の各 key == value.sensor_id を検証
+    #   2. aggregate_status == aggregate(d.status for d in deltas_by_sensor.values())
+    #      を検証 (precedence: unknown > fail > pass)
+    #   hand-built JSON や buggy adapter が不整合な aggregate_status を設定した場合、
+    #   構築時に ValidationError で reject する。
 ```
 
 delta は SSP v0.1 同様 **per-sensor** で保持する。SSP v0.1 の

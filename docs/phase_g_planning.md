@@ -100,21 +100,39 @@ SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta �
 ```python
 # SAST: sensor_id + FQN + text_hash + ordinal が自然キー
 # sensor_id を含めることで、複数 SAST sensor が同じ rule_id を emit しても衝突しない
-canonical_id = f"v1:sast:{sensor_id}:{rule_id}:{fqn}:{normalized_text_hash}:{ordinal}"
+#
+# 重要: canonical_id は delimiter join ではなくコンポーネント tuple の hash で生成する。
+# `:` 区切りの文字列結合はコンポーネントに `:` が含まれる場合に alias collision を
+# 起こす (例: rule_id="a:b",fqn="c" と rule_id="a",fqn="b:c" が同一文字列)。
+# SSP v0.1 docs/ssp_protocol.md §5.1 で同問題の回帰テストが既に存在する。
+#
+# 実装: adapter が以下の tuple を構築し、sha256 short hash を canonical_id とする。
+# identity_components (audit log 用) に tuple の全要素を保存する。
+_identity_tuple = ("v1", "sast", sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal))
+canonical_id = "v1:" + hashlib.sha256("\0".join(_identity_tuple).encode()).hexdigest()[:16]
 
-# SCA: sensor_id + package + version + advisory が自然キー
-canonical_id = f"v1:sca:{sensor_id}:{package_name}:{installed_version}:{advisory_id}"
+# SCA も同様
+_identity_tuple = ("v1", "sca", sensor_id, package_name, installed_version, advisory_id)
+canonical_id = "v1:" + hashlib.sha256("\0".join(_identity_tuple).encode()).hexdigest()[:16]
 ```
+
+canonical_id は不透明な hash 文字列であり、人間が読み解く必要はない。
+人間向けの説明は `FindingProvenance.identity_components` に全要素を保存して
+audit log / CI 出力で表示する。`v1:` prefix は identity algorithm version を
+示し、algorithm 変更時に全 hash が変わることを保証する。
 
 ### 1.3 D3: canonical_id のバージョン埋め込み
 
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:sast:semgrep:sql-injection:app.db.get_user:a3f8:0"
-               ^^^     ^^^^^^^                                ^^^^  ^
-               |       sensor_id                              |     ordinal
-               identity algorithm version                     text hash
+canonical_id = "v1:3a7f8b2e1c9d04a5"
+               ^^^  ^^^^^^^^^^^^^^^^
+               |    sha256 short hash of ("\0".join(identity_tuple))
+               identity algorithm version
+
+# identity_tuple (FindingProvenance.identity_components に保存):
+# ("v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0")
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
@@ -283,8 +301,8 @@ security:
 
   # false positive 抑制 (理由 + 期限必須)
   suppressions:
-    - canonical_id: "v1:sast:semgrep:xss:app.legacy.render:b7e2:0"
-      # full form: v1:sast:{sensor_id}:{rule_id}:{fqn}:{text_hash}:{ordinal}
+    - canonical_id: "v1:e4b2a7c9f1d30856"
+      # opaque hash; identity_components in provenance for audit
       reason: "Validated upstream by WAF"
       expires: "2026-09-01"
       owner: "security-team"

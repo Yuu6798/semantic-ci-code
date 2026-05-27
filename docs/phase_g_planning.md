@@ -177,9 +177,14 @@ class PerSensorDelta(FrozenModel):
     removed: tuple[SecurityFinding, ...]
     unchanged_count: int
     provenance_changed: bool
-    # この sensor の provenance が baseline と異なるかどうか。
-    # True の場合、status は "unknown" に強制される。
     error_message: str | None      # status == "unknown" 時の原因説明
+    # model_validator:
+    #   1. provenance_changed == True → status must be "unknown"
+    #      (drift 時は pass/fail を許容しない。prose の「verdict 全体を
+    #       unknown にする」を型レベルで enforce)
+    #   2. added/removed の全 finding.sensor_id == self.sensor_id
+    #      (異なる sensor の finding が混入すると、drift 判定・per-sensor
+    #       policy が誤った provenance を参照する)
 
 class SecurityDelta(FrozenModel):
     deltas_by_sensor: dict[str, PerSensorDelta]

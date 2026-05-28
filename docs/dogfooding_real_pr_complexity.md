@@ -214,18 +214,60 @@ constructed at session time. They are **not** committed because:
 To reproduce a case:
 
 ```bash
-git clone --depth 50 --filter=blob:none https://github.com/<owner>/<repo>.git
+git clone --depth 100 --filter=blob:none https://github.com/<owner>/<repo>.git
 cd <repo>
+# for PR-numbered cases (1-5):
 git fetch origin pull/<PR>/head:pr<PR>
-# write target.yaml as above
+# for commit-only cases (6-8): no extra fetch needed if the SHA is on main
+# write target.yaml as above (FINDING-F1 example; cases 2-8 use the same
+# skeleton with only intent and scope.files differing)
 semantic-ci check \
   --baseline-rev <base-sha> --candidate-rev <head-sha> \
   --target target.yaml --package-root <pkg> --format json
 ```
 
-Base / head SHAs per case are in the Summary Matrix above (PR # column
-resolves to GitHub PR page; commit hashes are full SHAs for cases 6 / 7
-/ 8 which target individual commits, not PRs).
+### Per-case reproduction inputs
+
+| # | Repo | Source ref | Base SHA | Head SHA | `--package-root` |
+|---:|---|---|---|---|---|
+| 1 | `langchain-ai/langgraph` | PR #3700 (closed) | `e8631c052a2731ac676965c08eff8c3127bb462c` | `0aedea90d631c77f9d30de271c4a7c5e71629ad4` | `libs/langgraph/langgraph` |
+| 2 | `BerriAI/litellm` | PR #15234 (merged) | `ddb90c9ad7a7c65e2dd1037ceb8e391a86e6cc66` | `c36e7ab575d9414009fe2c47c8f641ca752a406b` | `litellm` |
+| 3 | `ansible-collections/amazon.aws` | PR #1193 (merged) | `52068c04aa48b20ccf5956f9f575a957144045b7` | `5e5c9933d32aea018f39f2ba2bf560f0b4d1e174` | `plugins/modules` |
+| 4 | `pdm-project/pdm` | PR #543 (merged) | `085d2b7b6cb6450fc7daec7e69ab147daf2cd855` | `99c5c429871b389df811241b1e722b2b2800cb8f` | `pdm` |
+| 5 | `BerriAI/litellm` | PR #11987 (merged, feature) | `8c5fb6f539b3fee5ea5eac3892fe7908902db4dc` | `cc065f1d4c47acc28469c1d62dd164c650f43b19` | `litellm` |
+| 6 | `BerriAI/litellm` | commit on main | `a34bb6f6d375c97f1db286f2644393c4d163c329` | `352a0eedb554fb817a0d0651faead9bf02c3fdfc` | `litellm` |
+| 7 | `BerriAI/litellm` | commit on main | `0f5b31fd78592c7c8144efe1b372c53e51d27d11` | `2d515e72ffa43ef6799118a839b320c262b65592` | `litellm` |
+| 8 | `pdm-project/pdm` | commit on main | `ae309ea56ae2ff4853a48be3a305c8e2de08215d` | `0fd62dc7fb7e244a00392c4a6f6801617b63e05e` | `pdm` |
+
+### Per-case `target.yaml` deltas from the FINDING-F1 skeleton
+
+Cases 2–4, 6–8 reuse the same two-constraint skeleton as case 1
+(`complexity_delta.cyclomatic ≤ 0` hard, `complexity_delta.cognitive ≤ 0`
+soft) with `change.primary_kind: refactor`, only the `intent` string and
+`change.scope.files` differing per case. Case 5 differs structurally
+(feature with budgets):
+
+```yaml
+# Case 5 (litellm PR #11987) — feature budget
+intent: add List Active Callbacks API endpoint, expect modest complexity increase budget
+change:
+  primary_kind: feature
+constraints:
+  - id: cyclomatic_budget
+    kind: delta
+    target: complexity_delta.cyclomatic
+    operator: less_than_or_equal
+    expected: 5
+    severity: hard
+    unknown_policy: fail
+  - id: cognitive_budget
+    kind: delta
+    target: complexity_delta.cognitive
+    operator: less_than_or_equal
+    expected: 10
+    severity: hard
+    unknown_policy: fail
+```
 
 ## Tracking
 

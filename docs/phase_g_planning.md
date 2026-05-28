@@ -149,10 +149,23 @@ algorithm が変わったら canonical_id 全体が変わる。core は文字列
 
 **Suppression migration**: identity algorithm 変更時は全 canonical_id が変わり、
 既存の `security.suppressions` エントリが silent fail する (マッチしなくなる)。
+`canonical_id` は opaque SHA-256 hash であり、suppression 単独からは v2 の
+canonical_id を導出できない。migration には identity tuple の原データが必要。
+
 対策:
+- **suppression schema 拡張**: suppression エントリは `canonical_id` に加えて
+  `identity_components` (元の identity tuple) を**併記必須**にする。これにより
+  v1→v2 移行時に identity_components を v2 algorithm で再ハッシュして新 canonical_id
+  を導出可能になる (suppression ファイル単独で migration が成立する)
 - evaluator は identity_algorithm_version の不一致を検出し warning を emit する
 - Phase G-4 の CLI に `semantic-ci migrate-suppressions --from v1 --to v2`
-  コマンドを scope に含め、旧 canonical_id → 新 canonical_id の一括更新手段を提供
+  コマンドを scope に含める。入力は suppression ファイルのみ
+  (identity_components が併記されているため外部 scan state は不要)
+- identity_components 併記を強制しない場合の fallback: migration CLI は
+  baseline scan の SensorState を追加入力として要求し、v1 canonical_id で
+  findings を lookup → v2 algorithm で再計算する。この経路は scan state の
+  鮮度に依存し、stale suppression は drop される (silent fail と同等のため
+  非推奨)
 - 過渡期に v1/v2 両方の canonical_id をマッチさせるべきかは G-3 brief で判断
 
 ### 1.4 D4: scanner drift の検出
@@ -384,9 +397,12 @@ security:
     require_same_advisory_db: true      # SCA: advisory DB hash 差の drift 判定
 
   # false positive 抑制 (理由 + 期限必須)
+  # identity_components は §1.3 suppression migration のため併記必須
+  # (canonical_id は opaque hash で、algorithm 変更時に再導出できないため)
   suppressions:
     - canonical_id: "v1:e4b2a7c9f1d30856"
-      # opaque hash; identity_components on finding for audit
+      identity_components:
+        ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
       reason: "Validated upstream by WAF"
       expires: "2026-09-01"
       owner: "security-team"

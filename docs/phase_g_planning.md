@@ -174,18 +174,26 @@ canonical_id を導出できない。migration には identity tuple の原デ�
 
 ```python
 class SensorProvenance(FrozenModel):
-    sensor_name: str
+    sensor_id: str                              # was: sensor_name. 他モデル
+                                                # (SecurityFinding / PerSensorDelta /
+                                                # provenance_by_sensor key) と命名統一
     sensor_version: str
-    status: str                    # "complete" | "error" | "timeout" | "skipped"
+    status: Literal["complete", "error", "timeout", "skipped"]
     error_message: str | None      # status != "complete" の場合の詳細
     ruleset_hash: str | None       # SAST: semgrep ruleset file の hash
     advisory_db_hash: str | None   # SCA: advisory database snapshot の hash
     adapter_version: str
     identity_algorithm_version: str
+    # model_validator (条件 invariant、SSP v0.1 SensorOutput._error_outputs_have_no_findings 鏡像):
+    #   status == "complete" → error_message is None
+    #   status != "complete" → error_message is not None
+    #   buggy adapter が status="complete" に error_message を残したり、
+    #   status="error" で error_message を欠落させると下流の診断が壊れるため
+    #   構築時に reject する。
 
 class PerSensorDelta(FrozenModel):
     sensor_id: str
-    status: str                    # "pass" | "fail" | "unknown"
+    status: Literal["pass", "fail", "unknown"]
     added: tuple[SecurityFinding, ...]
     removed: tuple[SecurityFinding, ...]
     unchanged_count: int
@@ -198,12 +206,15 @@ class PerSensorDelta(FrozenModel):
     #   2. added/removed の全 finding.sensor_id == self.sensor_id
     #      (異なる sensor の finding が混入すると、drift 判定・per-sensor
     #       policy が誤った provenance を参照する)
+    #   3. status == "unknown" → error_message is not None
+    #      status in {"pass", "fail"} → error_message is None
+    #      (unknown の原因は必ず記述させ、pass/fail に紛らわしい原因文を残さない)
 
 class SecurityDelta(FrozenModel):
     deltas_by_sensor: dict[str, PerSensorDelta]
     # key = sensor_id。SSP v0.1 の deltas_by_sensor 構造を継承。
     # per-sensor verdict が自然に計算できる。
-    aggregate_status: str          # "pass" | "fail" | "unknown"
+    aggregate_status: Literal["pass", "fail", "unknown"]
     # model_validator (整合性検証、SSP v0.1 SSPEnvelope._validate_delta_consistency 継承):
     #   1. deltas_by_sensor の各 key == value.sensor_id を検証
     #   2. aggregate_status == aggregate(d.status for d in deltas_by_sensor.values())
@@ -300,8 +311,10 @@ Layer 1 が本 Phase の新設部分。
 # 整合性が型レベルで保証できなくなる (SSP v0.1 からの型安全性退行)。
 
 class _SecurityFindingBase(FrozenModel):
-    canonical_id: str        # opaque "v1:<sha256[:16]>"; see §1.2
-    severity: str            # "critical" | "high" | "medium" | "low" | "info"
+    canonical_id: Annotated[str, Field(pattern=r"^v\d+:[0-9a-f]{16}$")]
+                             # 形式固定: "v<version>:<sha256[:16] hex>"
+                             # ガベージ文字列を schema レベルで拒否
+    severity: Literal["critical", "high", "medium", "low", "info"]
     sensor_id: str           # "semgrep" | "pip-audit" | ...
     message: str
     identity_components: tuple[str, ...]
@@ -333,40 +346,65 @@ SecurityFinding = Annotated[
 ]
 
 # model_validator (SASTSecurityFinding / SCASecurityFinding 共通):
-#   identity_components の shape を category と整合させる。canonical_id 再計算
-#   (suppression migration) で確定的に同じ hash を得るための事前条件。
+#   identity_components の **shape + 要素値の両方** を field と整合させる。
+#   canonical_id 再計算 (suppression migration) で確定的に同じ hash を得るための
+#   事前条件。shape だけ合っていても要素値が field と無関係だと、canonical_id は
+#   hash として整合するが、トップレベル field と意味的に乖離する (silent bug)。
 #
-#   SAST: identity_components == (
-#       identity_algorithm_version,  # "v1"
-#       "sast",
-#       sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal)
-#   )  # len == 7
+#   SASTSecurityFinding の要求:
+#     identity_components == (
+#         identity_algorithm_version,  # canonical_id の "vN" prefix と一致
+#         "sast",                       # category と一致
+#         sensor_id,                    # 同名 field と一致
+#         rule_id,                      # 同名 field と一致
+#         fqn,                          # 同名 field と一致
+#         normalized_text_hash,         # 同名 field と一致
+#         str(ordinal),                 # ordinal は別 field か identity 内のみ存在
+#     )  # len == 7
 #
-#   SCA: identity_components == (
-#       identity_algorithm_version,  # "v1"
-#       "sca",
-#       sensor_id, package_name, installed_version, advisory_id
-#   )  # len == 6
+#   SCASecurityFinding の要求:
+#     identity_components == (
+#         identity_algorithm_version,  # canonical_id の "vN" prefix と一致
+#         "sca",                        # category と一致
+#         sensor_id,                    # 同名 field と一致
+#         package_name,                 # 同名 field と一致
+#         installed_version,            # 同名 field と一致
+#         advisory_id,                  # 同名 field と一致
+#     )  # len == 6
 #
-#   さらに canonical_id が "{version}:{sha256(json.dumps(identity_components))[:16]}"
-#   と一致することも検証する (hand-built JSON での canonical_id / identity_components
-#   不整合を構築時に reject する)。
+#   さらに canonical_id == identity_components[0] + ":" +
+#       sha256(json.dumps(list(identity_components), separators=(",",":"),
+#              sort_keys=False).encode()).hexdigest()[:16]
+#   と一致することも検証する。version prefix tampering ("v2:" + v1 の hash) も
+#   identity_components[0] との比較で検出する。
 
 class SensorState(FrozenModel):
     findings: tuple[SecurityFinding, ...]
     provenance_by_sensor: dict[str, SensorProvenance]
     # provenance の source of truth は provenance_by_sensor (state-level) に一元化。
-    # finding-level の provenance 重複フィールド (sensor_name, sensor_version,
+    # finding-level の provenance 重複フィールド (sensor_id, sensor_version,
     # ruleset_hash, adapter_version, identity_algorithm_version) は V3 review で
     # 削除し、finding は sensor_id 参照のみ保持する (_SecurityFindingBase.sensor_id)。
     # identity_components (canonical_id 生成根拠) は finding-level に残す (audit 用)。
     # drift 検出は provenance_by_sensor のみを参照する。
     #
-    # model_validator (参照整合性):
-    #   全 finding.sensor_id ∈ provenance_by_sensor.keys() を enforce する。
-    #   hand-built JSON や buggy adapter が provenance なしの sensor_id を
-    #   持つ finding を emit した場合、drift/error 判定が不能になるため、
-    #   構築時に ValidationError で reject する。
+    # model_validator:
+    #   1. (参照整合性 - 既存): 全 finding.sensor_id ∈ provenance_by_sensor.keys()
+    #      を enforce。provenance なしの sensor_id を持つ finding は reject。
+    #   2. (key 整合性): provenance_by_sensor[k].sensor_id == k を全 key で enforce。
+    #      key と内部 sensor_id がズレた hand-built JSON を reject
+    #      (SSP v0.1 SSPEnvelope._validate_delta_consistency の鏡像)。
+    #   3. (identity algorithm version 整合性): 全 finding について
+    #      finding.identity_components[0] ==
+    #      provenance_by_sensor[finding.sensor_id].identity_algorithm_version
+    #      を enforce。provenance が v1 を宣言しているのに finding canonical_id が
+    #      "v2:..." の場合、suppression migration / drift 警告がトラスト先を
+    #      間違えるため、構築時に reject する。
+    #   4. (決定論的ソート): findings は canonical_id 昇順で sort されていなければ
+    #      ならない (§5 Scope Guard「決定論性」)。SSP v0.1 _dedup_fingerprinted の
+    #      鏡像。同一論理状態が同一シリアライズを生むことを enforce する。
+    #      ソート違反は ValidationError (`@field_validator` で sorted check)。
+    #
     # key = sensor_id ("semgrep", "pip-audit", ...)
     # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。
     # drift 検出は per-sensor で行う: sensor A の ruleset が変わっても
@@ -376,6 +414,34 @@ class SensorState(FrozenModel):
     # provenance_by_sensor に key がない = sensor 未実行、の 3 状態を区別)。
     # status != "complete" の sensor は verdict を unknown に寄せる。
 ```
+
+### 2.1.1 Suppression model
+
+`security.suppressions` の各エントリは下記 Pydantic モデルで型固定する。
+YAML 例 (§2.3) はこのモデルへ deserialize される。
+
+```python
+import datetime
+
+class Suppression(FrozenModel):
+    canonical_id: Annotated[str, Field(pattern=r"^v\d+:[0-9a-f]{16}$")]
+    identity_components: tuple[str, ...]   # §2.1 と同じ ordered tuple
+    reason: Annotated[str, Field(min_length=1)]
+    expires: datetime.date                  # ISO 8601 YYYY-MM-DD として parse
+    owner: Annotated[str, Field(min_length=1)]
+
+    # model_validator (SecurityFinding 用と同じ identity 整合性ロジックを再利用):
+    #   1. identity_components の shape が SAST(7) / SCA(6) のいずれかに合致
+    #      (識別は identity_components[1] == "sast" | "sca" で行う)
+    #   2. canonical_id == identity_components[0] + ":" +
+    #          sha256(json.dumps(list(identity_components), separators=(",",":"),
+    #                 sort_keys=False).encode()).hexdigest()[:16]
+    #   3. expires は YAML 上の string ("2026-09-01") を date として parse 失敗
+    #      した場合 ValidationError (Pydantic 標準動作で十分)
+```
+
+`security` セクション側は `suppressions: tuple[Suppression, ...]` を持ち、
+`extra="forbid"` で未知キーを拒否する。
 
 ### 2.2 SAST FQN 翻訳 (adapter 層)
 

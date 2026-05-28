@@ -209,6 +209,18 @@ class PerSensorDelta(FrozenModel):
     #   3. status == "unknown" → error_message is not None
     #      status in {"pass", "fail"} → error_message is None
     #      (unknown の原因は必ず記述させ、pass/fail に紛らわしい原因文を残さない)
+    #   4. (default policy floor、SSP v0.1 verdict.py の _FAIL_SEVERITIES 鏡像):
+    #      status == "pass" → 全 added finding の severity == "info"
+    #      added に "critical" / "high" / "medium" / "low" が 1 つでもあれば
+    #      status は "fail" または "unknown" でなければならない。
+    #      逆方向 (status == "fail" → added が空でない) も検証する: fail を
+    #      表すには少なくとも 1 つの fail-severity finding が added に必要。
+    #      これは default policy (`_FAIL_SEVERITIES = {critical, high, medium, low}`)
+    #      の verdict floor であり、user policy (severity.not_in / max_count 等)
+    #      による緩和は suite evaluator 層で aggregate_status の上に適用される。
+    #      PerSensorDelta.status は user policy を適用する前の **最厳格判定** を
+    #      表現する。これにより hand-built JSON が `added: [high-severity finding]`
+    #      かつ `status: "pass"` を宣言する不整合を schema 層で reject できる。
 
 class SecurityDelta(FrozenModel):
     deltas_by_sensor: dict[str, PerSensorDelta]
@@ -221,6 +233,12 @@ class SecurityDelta(FrozenModel):
     #      を検証 (precedence: unknown > fail > pass)
     #   hand-built JSON や buggy adapter が不整合な aggregate_status を設定した場合、
     #   構築時に ValidationError で reject する。
+    #
+    # 注: aggregate_status は default policy floor (PerSensorDelta.status の
+    # 集約) を表す。user policy (severity.not_in / max_count 等) による
+    # pass/fail 上書きは suite evaluator が aggregate_status を入力として
+    # 追加適用する (例: aggregate_status="fail" でも user policy が高 severity
+    # 以外を許容するなら、suite 最終 verdict は "pass" になりうる)。
 ```
 
 delta は SSP v0.1 同様 **per-sensor** で保持する。SSP v0.1 の
@@ -463,6 +481,16 @@ security:
   # | default (設定なし) | 許容 | fail | fail | fail | fail |
   # | 例 1 (not_in) | 許容 | 許容 | 許容 | fail | fail |
   # | 例 2 (max_count: 0) | fail | fail | fail | fail | fail |
+  #
+  # 層の関係:
+  #   - PerSensorDelta.status / SecurityDelta.aggregate_status は default 行のみを
+  #     enforce する schema 層 floor (§1.4 PerSensorDelta validator 4 参照)
+  #   - 例 1 / 例 2 のような user policy は suite evaluator 層で aggregate_status
+  #     を入力として追加適用する
+  #   - 例 1 は緩和方向 (fail → pass): aggregate_status="fail" でも user policy
+  #     で medium 以下を許容するなら suite 最終 verdict は "pass" になる
+  #   - 例 2 は厳格化方向 (pass → fail): aggregate_status="pass" でも info の
+  #     追加があれば suite 最終 verdict は "fail" になる
   findings:
     added:
       # 例 1: high / critical の追加を禁止 (medium 以下は許容)

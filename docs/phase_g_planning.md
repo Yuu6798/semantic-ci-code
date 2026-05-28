@@ -134,7 +134,7 @@ audit log / CI 出力で表示する。`v1:` prefix は identity algorithm versi
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:3a7f8b2e1c9d04a5"
+canonical_id = "v1:d4e58fcd4f5c4043"
                ^^^  ^^^^^^^^^^^^^^^^
                |    sha256 short hash of json.dumps(identity_tuple)
                identity algorithm version
@@ -525,7 +525,7 @@ security:
   # - SAST = 7 要素 / SCA = 6 要素、全要素 str。schema 検証は SecurityFinding と
   #   同じ model_validator を suppression entry にも適用する
   suppressions:
-    - canonical_id: "v1:e4b2a7c9f1d30856"
+    - canonical_id: "v1:d4e58fcd4f5c4043"
       identity_components:
         ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
       reason: "Validated upstream by WAF"

@@ -304,7 +304,14 @@ class _SecurityFindingBase(FrozenModel):
     severity: str            # "critical" | "high" | "medium" | "low" | "info"
     sensor_id: str           # "semgrep" | "pip-audit" | ...
     message: str
-    identity_components: dict  # canonical_id の生成根拠 (audit log 用)
+    identity_components: tuple[str, ...]
+    # canonical_id の生成根拠。§1.2 / §1.3 で定義した ordered identity tuple を
+    # そのまま保持する (例: ("v1", "sast", "semgrep", "sql-injection",
+    # "app.db.get_user", "a3f8", "0"))。dict ではなく ordered tuple/list 必須:
+    # canonical_id は json.dumps(list) の sha256 short hash なので、順序が
+    # 失われると再ハッシュ不能になり、suppression migration が壊れる。
+    # 全要素 str (ordinal は str(ordinal) で正規化)、要素数は category により
+    # SAST 7 / SCA 6 で固定 (§1.2 の tuple shape 参照)。
 
 class SASTSecurityFinding(_SecurityFindingBase):
     category: Literal["sast"] = "sast"
@@ -324,6 +331,26 @@ SecurityFinding = Annotated[
     SASTSecurityFinding | SCASecurityFinding,
     Field(discriminator="category"),
 ]
+
+# model_validator (SASTSecurityFinding / SCASecurityFinding 共通):
+#   identity_components の shape を category と整合させる。canonical_id 再計算
+#   (suppression migration) で確定的に同じ hash を得るための事前条件。
+#
+#   SAST: identity_components == (
+#       identity_algorithm_version,  # "v1"
+#       "sast",
+#       sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal)
+#   )  # len == 7
+#
+#   SCA: identity_components == (
+#       identity_algorithm_version,  # "v1"
+#       "sca",
+#       sensor_id, package_name, installed_version, advisory_id
+#   )  # len == 6
+#
+#   さらに canonical_id が "{version}:{sha256(json.dumps(identity_components))[:16]}"
+#   と一致することも検証する (hand-built JSON での canonical_id / identity_components
+#   不整合を構築時に reject する)。
 
 class SensorState(FrozenModel):
     findings: tuple[SecurityFinding, ...]
@@ -397,8 +424,12 @@ security:
     require_same_advisory_db: true      # SCA: advisory DB hash 差の drift 判定
 
   # false positive 抑制 (理由 + 期限必須)
-  # identity_components は §1.3 suppression migration のため併記必須
-  # (canonical_id は opaque hash で、algorithm 変更時に再導出できないため)
+  # identity_components は §1.3 suppression migration のため併記必須:
+  # - canonical_id は opaque hash で algorithm 変更時に再導出できない
+  # - ordered list として §1.2 の identity tuple shape を完全に保持する
+  #   (dict / named map は不可。要素順序が失われると JSON array hash が変わる)
+  # - SAST = 7 要素 / SCA = 6 要素、全要素 str。schema 検証は SecurityFinding と
+  #   同じ model_validator を suppression entry にも適用する
   suppressions:
     - canonical_id: "v1:e4b2a7c9f1d30856"
       identity_components:

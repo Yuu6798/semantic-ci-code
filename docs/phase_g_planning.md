@@ -114,14 +114,19 @@ SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta �
 # 実装: adapter が以下の tuple を canonical JSON array に serialize し、
 # その byte 列の sha256 short hash を canonical_id とする。
 # JSON array は各要素が quoted string で length-prefixed されるため injective。
+# **ensure_ascii=False 必須**: SSP v0.1 docs/ssp_protocol.md §5.1 の
+# _digest_array と同じ canonical encoding を使う。Python default
+# (ensure_ascii=True) は非 ASCII (Unicode な FQN 等) を \uXXXX に escape し、
+# SSP v0.1 と異なる byte stream を生む → 同じ identity tuple が adapter と
+# validator で異なる canonical_id を生む silent bug を起こす。
 # identity_components (audit log 用) に tuple の全要素を保存する。
 import json
 _identity_tuple = ["v1", "sast", sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal)]
-canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
+canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
 
 # SCA も同様
 _identity_tuple = ["v1", "sca", sensor_id, package_name, installed_version, advisory_id]
-canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
+canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
 ```
 
 canonical_id は不透明な hash 文字列であり、人間が読み解く必要はない。
@@ -141,7 +146,9 @@ canonical_id = "v1:d4e58fcd4f5c4043"
 
 # identity_tuple (_SecurityFindingBase.identity_components に保存):
 # ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
-# encoding: json.dumps(list, separators=(",",":"), sort_keys=False)
+# encoding: json.dumps(list, ensure_ascii=False, separators=(",",":"), sort_keys=False)
+# (ensure_ascii=False は SSP v0.1 _digest_array §5.1 と同じ canonical encoding、
+#  非 ASCII FQN で adapter / validator の hash が乖離するのを防ぐ)
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
@@ -391,10 +398,14 @@ SecurityFinding = Annotated[
 #     )  # len == 6
 #
 #   さらに canonical_id == identity_components[0] + ":" +
-#       sha256(json.dumps(list(identity_components), separators=(",",":"),
-#              sort_keys=False).encode()).hexdigest()[:16]
+#       sha256(json.dumps(list(identity_components), ensure_ascii=False,
+#              separators=(",",":"), sort_keys=False).encode()).hexdigest()[:16]
 #   と一致することも検証する。version prefix tampering ("v2:" + v1 の hash) も
 #   identity_components[0] との比較で検出する。
+#   **ensure_ascii=False 必須** (SSP v0.1 _digest_array §5.1 と同じ encoding):
+#   非 ASCII FQN (Unicode な Python 識別子等) で adapter / validator の hash が
+#   乖離するのを防ぐ。Python default の ensure_ascii=True は非 ASCII を \uXXXX
+#   に escape するため、SSP v0.1 の byte stream と異なる canonical_id を生む。
 
 class SensorState(FrozenModel):
     findings: tuple[SecurityFinding, ...]
@@ -430,6 +441,13 @@ class SensorState(FrozenModel):
     #      observation を信頼してしまうのを防ぐ)。non-complete sensor は
     #      provenance_by_sensor に entry を残すが findings は空のまま (compute_delta
     #      でこの sensor の delta は自動的に "unknown" になる)。
+    #   6. (canonical_id 一意性、SSP v0.1 _dedup_fingerprinted 鏡像): findings の
+    #      全 canonical_id がユニークでなければならない (重複 reject)。Phase G-1
+    #      の delta 計算は canonical_id ベースの集合演算なので、重複 finding は
+    #      dict/set 実装で 1 つに collapse される一方、SARIF / suppression
+    #      出力は両方を残してしまい counts / verdict が不整合になる。
+    #      adapter が collision を起こした場合は ordinal 割当ルール (§1.2) で
+    #      区別すべきであり、同じ canonical_id を持つ複数 finding を allow しない。
     #
     # key = sensor_id ("semgrep", "pip-audit", ...)
     # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。
@@ -460,8 +478,10 @@ class Suppression(FrozenModel):
     #   1. identity_components の shape が SAST(7) / SCA(6) のいずれかに合致
     #      (識別は identity_components[1] == "sast" | "sca" で行う)
     #   2. canonical_id == identity_components[0] + ":" +
-    #          sha256(json.dumps(list(identity_components), separators=(",",":"),
-    #                 sort_keys=False).encode()).hexdigest()[:16]
+    #          sha256(json.dumps(list(identity_components), ensure_ascii=False,
+    #                 separators=(",",":"), sort_keys=False).encode()).hexdigest()[:16]
+    #      (ensure_ascii=False は SSP v0.1 _digest_array §5.1 と同じ canonical
+    #       encoding、§1.2 参照)
     #   3. expires は YAML 上の string ("2026-09-01") を date として parse 失敗
     #      した場合 ValidationError (Pydantic 標準動作で十分)
 ```

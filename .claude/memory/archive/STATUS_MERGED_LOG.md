@@ -10,6 +10,101 @@ session wrap-up で 5 entry 超過分が同 archive に随時追記される。
 
 ---
 
+### 2026-05-21 Session 5 — UGH ecosystem framing 確立 + umbrella repo (`Yuu6798/ugh-ecosystem`) 新設 + semantic-ci-code に Ecosystem Context 追記 (Phase X-1 / X-5 landed)
+
+Session 1〜4 で ABCD-A/B + 緊急 doc refactor を 1 日で全完走した直後の継続
+session。 user 主導の壁打ち session として始まり、 半年壁打ちが
+**「semantic-ci-code 単独 product 開発」 ではなく「UGH ecosystem (4 domain)
+の cross-domain 並列研究 program」 だった** ことが言語化された。 user
+による 4 link 連続提供 (`ugh-prompt-engine` / `svp-video-pipeline` /
+`ugh-audit-core` + ecosystem 統合議論) で、 ecosystem 全貌が web fetch
+経由で surface — 「Semantic CI Ecosystem」 ではなく **「UGH (Unconscious
+Gravity Hypothesis) ecosystem」** が正しい brand、 4 active domain + 1
+archived init (`ugh3-metrics-lib`) + theory foundation、 audit layer は全
+domain で deterministic / generation layer のみ image+video で
+LLM-assisted という **Strata 区別**、 text domain は HA48/HA63 (n=63)
+で既に validated、 等の事実が連続 surface した。
+
+- **`Yuu6798/ugh-ecosystem` 新設** (umbrella repo、 別 Claude Code
+  session 経由で initial PR #1 を 1 round fix で merge):
+  - day-1 minimum = README + LICENSE + .gitignore
+  - README は 4 domain status table + 5-step design pattern + Strata
+    説明 + Theory section (note.com URL は frozen、 explicit citation
+    せず) + Status section + License + "research program / OSS tool
+    両用" 明示
+  - PR #1 review fix: code domain status を「8 CLI subcommands」 と
+    誤記していたものを「ABCD-A/B complete; 10 CLI subcommands」 に修正、
+    repo 名 prefix duplicate (`Yuu6798/Yuu6798-ugh-ecosystem-repo`) を
+    `Yuu6798/ugh-ecosystem` に rename
+  - brief 設計 → 別 session 実装 → 1 round review → merge を 1 日以内
+    closure、 後続 X-3 に再利用可能な reference workflow が成立
+- **PR #96** (本 repo、 `claude/semantic-ci-discussion-Y3rob` branch、
+  Claude 直接実装、 session 終了時 open):
+  - `CLAUDE.md` 冒頭に `## Ecosystem Context` (+24 lines) 挿入
+  - 本 repo を ecosystem の code domain として位置付け、 5-step pattern
+    と 4 概念対応 (`target.yaml` / `CodeState` / constraint evaluator /
+    `RepairPlan`) を明示、 既存 Scope guard を ecosystem-wide audit-
+    deterministic invariant の specialisation として再 framing、 他 3
+    domain repo へ soft link
+  - Tier A attention budget: 580 → 604 lines、 依然 800 target 内
+  - 規模が極小 (+24 lines) なので AGENTS.md §5.2 体制別 envelope の
+    「Claude alone = 半日以下なら 0 round 可」 範囲内、 と framing で
+    AGENTS.md split を一時的に直接実装に振った
+- **Phase X 設計**: 旧 framing「semantic-ci-code 単独 external 配布」
+  を廃止、 新 framing「UGH ecosystem formalization」 を採用。 X-1
+  (umbrella repo) + X-5 (CLAUDE.md ecosystem context) が本 session で
+  landed、 X-2 (HA-style validation cross-domain 移植) は中長期 phase
+  として queue 末尾常駐、 X-3 (他 3 ecosystem repo に cross-ref
+  embedding) は別 Claude Code session 委譲予定、 X-1 続き (umbrella
+  docs/ 拡張 = vocabulary.md / strata.md / roadmap.md / theory.md 等)
+  も中長期で別 session
+
+**設計判断のハイライト**:
+
+1. **Brand 確定 = UGH ecosystem**: 「Semantic CI Ecosystem」 は session
+   序盤の framing 慣性、 user 自身も「セマンティック CI エコシステム」
+   と呼んでいたが、 ugh-audit-core README に「UGHer ecosystem」 表記が
+   既存、 UGH 理論 (note.com) が基盤、 ecosystem name = UGH ecosystem
+   / 内部の design pattern 名 = semantic CI / semantic audit、 と整理
+2. **Strata 区別が ecosystem 規律として明示化**: 「LLM を core に
+   入れない」 半年規律の真の payoff は単独 repo の品質 rule ではなく、
+   **LLM 生成 (Strata B) を別 strata に押し出して deterministic
+   auditor identity を保つ ecosystem 規律の code domain 実装** だった、
+   と本 session で初めて articulate
+3. **umbrella creation workflow の reference 化**: brief 設計 → 別
+   Claude Code session 実装 → PR review → 1 round fix → merge を 1
+   日以内 closure、 ecosystem cross-repo 作業を AGENTS.md split 体制下で
+   回す workflow として後続 X-3 で再利用可能
+4. **「公開歴史の開始」 + 「umbrella repo の役割」 を比喩 + OSS 事例
+   で user に説明**: tag の social commitment、 PyPI 再 upload 不可、
+   docs-only repo の 4 役割、 図書館 catalog / 親会社 site / シリーズ
+   概要パンフ比喩、 Kubernetes / OpenTelemetry / Rust の事例。 user の
+   素朴疑問が深堀り trigger として機能した
+5. **「N=0 ecosystem-wide」 framing の誤り発覚**: text domain
+   (ugh-audit-core) は HA48/HA63 で validated、 ecosystem 全体としては
+   partial validation phase。 「N=0 → N=1」 ではなく「text domain で確立
+   した HA-style validation を 他 3 domain に展開」 が正しい problem
+   定義、 Phase X-2 の core work として queue 化
+6. **AskUserQuestion 不使用で 1-2 paragraph opinionated 提示 → user
+   即決サイクル**: trade-off N 択 table + 私の position + 1 turn で
+   user 判断、 の loop が再現性高く機能。 「Claude 直接実装か」 等の
+   体制判断も即決された
+
+**修正・訂正**:
+
+1. **「Semantic CI Ecosystem」 呼称を私が複数 turn 維持していた誤り** —
+   user 自身も session 序盤の framing 慣性に乗っていた、 と pinpoint
+2. **「ecosystem 全体が N=0」 framing の誤り** — text domain は既に
+   validated、 と user 提供 link で発覚
+3. **「modality 拡張は Brief 6 規模の数ヶ月 work」 評価の誤り** — 実は
+   既に 3 modality (music PoC + image+video experimental) で実装済み
+4. **PR #1 review で agent が code domain status を「8 subcommands」 と
+   誤記** — agent が `STATUS.md` を読まずに repo top README 判断、
+   後続 X-3 brief で「`STATUS.md` (or equivalent) mandatory read source」
+   を明示する discipline 必要、 と pin
+
+---
+
 ### 2026-05-21 Session 3 — 緊急 doc refactor 8 phase 1 日完走 + framework 自己 refactor dogfood
 
 Session 2 末尾の user 「doc 膨張で agent noise が増える懸念」 提起から

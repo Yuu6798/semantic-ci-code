@@ -24,11 +24,68 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。2026-05-28 に **Phase G (SSP core integration) planning** が PR #114 + #115 で landed (`docs/phase_g_planning.md`、5 PR 構成 CSCI-45〜49、Codex 18 round + deep cross-ref 7 件で洗練済)。Phase G は SSP v0.1 (現状 core の横に並列) を core の縦接続に再構築する設計: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict、SAST finding を FQN 空間に翻訳、canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。Next queue: **Phase G 実装 (CSCI-45 から)** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
+Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。2026-05-28 (S1) に **Phase G (SSP core integration) planning** が PR #114 + #115 で landed (`docs/phase_g_planning.md`、5 PR 構成 CSCI-45〜49、Codex 18 round + deep cross-ref 7 件で洗練済)。同日 S2 で並走していた **公開リポジトリ実 PR 8 件 dogfooding pass** の結果が PR #116 + #117 で land、`docs/dogfooding_real_pr_complexity.md` + 単一 tracker `docs/dogfooding_findings_tracker.md` (累計 21 ケース pin、D6/D7 追加) として artifact 化された。Phase G は SSP v0.1 (現状 core の横に並列) を core の縦接続に再構築する設計: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict、SAST finding を FQN 空間に翻訳、canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。Next queue: **Phase G 実装 (CSCI-45 から)** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
 
 ## 直近 merged
 
-### 2026-05-28 — Phase G (SSP core integration) planning landed (PR #114 + #115)
+### 2026-05-28 Session 2 — Real-PR complexity dogfood report + tracker case-count landed (PR #116 + #117)
+
+同日 Session 1 (Phase G planning) と並走していた **公開 Python リポジトリ
+実 PR 8 件 (refactor 7 + feature 1) の complexity 制約 dogfooding pass** の
+結果を 2 PR cascade で artifact 化。 累計 21 ケース (Session 4 self-dogfood 3
++ TC10 仮想 10 + real-PR 8) を tracker 単体で即答可能化、 D6 / D7 を D# 名簿
+に追加。
+
+- **PR #116** (merged `0ac4e95`、2 commit):
+  `docs(dogfooding): add real-PR complexity report + consolidated findings tracker`
+  - `docs/dogfooding_real_pr_complexity.md` 新設 (8 case の per-PR matrix +
+    methodology + verdict 集計、 6/8 reviewer-relevant 一致、 1 vacuous PASS
+    = D6 (nested-function blind spot、 D4 sibling)、 1 authoring mismatch =
+    D7 (extract-method × cyclomatic 微増))
+  - `docs/dogfooding_findings_tracker.md` 新設 (D1〜D7 を全 dogfooding pass
+    横断で集約する単一 tracker、 既存 dogfooding report 内の D# entry は
+    cross-link のみ保持に refactor)
+  - 2nd commit (`f13c9cc`) で per-case base/head SHA pin + case 5 の
+    target.yaml inline (re-run reproducibility 確保)
+  - `CLAUDE.md` Design Documents table に 2 row 追加
+- **PR #117** (merged `575d398`、 1 commit):
+  `docs(dogfooding): pin per-pass case counts + cumulative total in tracker`
+  - user 問い「ドッグフーディングの件数って累積でカウントできるように
+    なってるか」 への応答、 Source pass index 表に Methodology + Cases
+    column 追加
+  - per-pass 件数 pin: Session 4 self-dogfood = 3 / TC10 = 10 / Real-PR
+    complexity = 8 / **累計 = 21**
+  - CASE STUDY (pre_generation_validation_case.md /
+    multi_agent_audit_case.md) は dogfooding pass と別カテゴリとして
+    累計から除外する rule を文章で pin、 将来の追加で同 confusion を防ぐ
+
+**設計判断のハイライト**:
+
+1. **「累計件数を tracker 単体で即答可能にする」design criterion**:
+   N=21 は 3 つの report に分散していたので、 source pass index 表に
+   Cases column + 累計 row を追加するだけで、 tracker が「単一 source of
+   truth」 として機能。 後続 dogfooding pass 追加時も Pass / Date /
+   Methodology / Cases / Doc / Findings の 6 列で同 invariant 維持可能
+2. **`AskUserQuestion` で 3 択 trade-off 提示**: PR #116 merge 後に
+   「件数 column 追加」 を独立 PR で出すか / wrap-up とバンドルか /
+   main 直 push (rule 違反) か の 3 択を提示、 user は推奨 (follow-up
+   PR) を即選択。 stale 件数記載が翌日に伸びることなく、 質問と回答の
+   context cohesion が高い間に encode 完了
+3. **PR auto-subscribe → merge までイベント駆動**: PR #117 で
+   `subscribe_pr_activity` を call、 CI in_progress を確認した時点で
+   turn を閉じ、 webhook 通知で merge を受け取り直ちにローカル main を
+   sync。 poll なしで PR closure を待つ運用
+
+**修正・訂正**:
+
+1. **Session 4 件数**: 初期に「Session 4 dogfood = 1 件」 と counting
+   しがちだが、 実態は init→compile_repair 同等シナリオ 1 + PR #59
+   self-dogfood 1 + PR #60 self-dogfood 1 = **3 件**。 tracker 起草時の
+   `.claude/memory/2026-05-07.md` 再読で正確な書き起こしに訂正
+2. **Pass naming**: `Session 4 dogfood` → `Session 4 self-dogfood` に
+   refactor (自分自身の PR を入力に取る methodology を正確に表す)
+
+### 2026-05-28 Session 1 — Phase G (SSP core integration) planning landed (PR #114 + #115)
 
 SSP v0.1 完走直後の 2026-05-28 session で、SSP の実地テスト 21 ケース
 (実リポジトリ 9 + 仮想入力 5 + マルチエージェント想定 7) を実行する過程で
@@ -215,104 +272,11 @@ branch を 2 PR で連続 reuse。
    問題なし。 今後 PR title に issue # を含めるかは convention 議論
    として保留
 
-### 2026-05-21 Session 5 — UGH ecosystem framing 確立 + umbrella repo (`Yuu6798/ugh-ecosystem`) 新設 + semantic-ci-code に Ecosystem Context 追記 (Phase X-1 / X-5 landed)
-
-Session 1〜4 で ABCD-A/B + 緊急 doc refactor を 1 日で全完走した直後の継続
-session。 user 主導の壁打ち session として始まり、 半年壁打ちが
-**「semantic-ci-code 単独 product 開発」 ではなく「UGH ecosystem (4 domain)
-の cross-domain 並列研究 program」 だった** ことが言語化された。 user
-による 4 link 連続提供 (`ugh-prompt-engine` / `svp-video-pipeline` /
-`ugh-audit-core` + ecosystem 統合議論) で、 ecosystem 全貌が web fetch
-経由で surface — 「Semantic CI Ecosystem」 ではなく **「UGH (Unconscious
-Gravity Hypothesis) ecosystem」** が正しい brand、 4 active domain + 1
-archived init (`ugh3-metrics-lib`) + theory foundation、 audit layer は全
-domain で deterministic / generation layer のみ image+video で
-LLM-assisted という **Strata 区別**、 text domain は HA48/HA63 (n=63)
-で既に validated、 等の事実が連続 surface した。
-
-- **`Yuu6798/ugh-ecosystem` 新設** (umbrella repo、 別 Claude Code
-  session 経由で initial PR #1 を 1 round fix で merge):
-  - day-1 minimum = README + LICENSE + .gitignore
-  - README は 4 domain status table + 5-step design pattern + Strata
-    説明 + Theory section (note.com URL は frozen、 explicit citation
-    せず) + Status section + License + "research program / OSS tool
-    両用" 明示
-  - PR #1 review fix: code domain status を「8 CLI subcommands」 と
-    誤記していたものを「ABCD-A/B complete; 10 CLI subcommands」 に修正、
-    repo 名 prefix duplicate (`Yuu6798/Yuu6798-ugh-ecosystem-repo`) を
-    `Yuu6798/ugh-ecosystem` に rename
-  - brief 設計 → 別 session 実装 → 1 round review → merge を 1 日以内
-    closure、 後続 X-3 に再利用可能な reference workflow が成立
-- **PR #96** (本 repo、 `claude/semantic-ci-discussion-Y3rob` branch、
-  Claude 直接実装、 session 終了時 open):
-  - `CLAUDE.md` 冒頭に `## Ecosystem Context` (+24 lines) 挿入
-  - 本 repo を ecosystem の code domain として位置付け、 5-step pattern
-    と 4 概念対応 (`target.yaml` / `CodeState` / constraint evaluator /
-    `RepairPlan`) を明示、 既存 Scope guard を ecosystem-wide audit-
-    deterministic invariant の specialisation として再 framing、 他 3
-    domain repo へ soft link
-  - Tier A attention budget: 580 → 604 lines、 依然 800 target 内
-  - 規模が極小 (+24 lines) なので AGENTS.md §5.2 体制別 envelope の
-    「Claude alone = 半日以下なら 0 round 可」 範囲内、 と framing で
-    AGENTS.md split を一時的に直接実装に振った
-- **Phase X 設計**: 旧 framing「semantic-ci-code 単独 external 配布」
-  を廃止、 新 framing「UGH ecosystem formalization」 を採用。 X-1
-  (umbrella repo) + X-5 (CLAUDE.md ecosystem context) が本 session で
-  landed、 X-2 (HA-style validation cross-domain 移植) は中長期 phase
-  として queue 末尾常駐、 X-3 (他 3 ecosystem repo に cross-ref
-  embedding) は別 Claude Code session 委譲予定、 X-1 続き (umbrella
-  docs/ 拡張 = vocabulary.md / strata.md / roadmap.md / theory.md 等)
-  も中長期で別 session
-
-**設計判断のハイライト**:
-
-1. **Brand 確定 = UGH ecosystem**: 「Semantic CI Ecosystem」 は session
-   序盤の framing 慣性、 user 自身も「セマンティック CI エコシステム」
-   と呼んでいたが、 ugh-audit-core README に「UGHer ecosystem」 表記が
-   既存、 UGH 理論 (note.com) が基盤、 ecosystem name = UGH ecosystem
-   / 内部の design pattern 名 = semantic CI / semantic audit、 と整理
-2. **Strata 区別が ecosystem 規律として明示化**: 「LLM を core に
-   入れない」 半年規律の真の payoff は単独 repo の品質 rule ではなく、
-   **LLM 生成 (Strata B) を別 strata に押し出して deterministic
-   auditor identity を保つ ecosystem 規律の code domain 実装** だった、
-   と本 session で初めて articulate
-3. **umbrella creation workflow の reference 化**: brief 設計 → 別
-   Claude Code session 実装 → PR review → 1 round fix → merge を 1
-   日以内 closure、 ecosystem cross-repo 作業を AGENTS.md split 体制下で
-   回す workflow として後続 X-3 で再利用可能
-4. **「公開歴史の開始」 + 「umbrella repo の役割」 を比喩 + OSS 事例
-   で user に説明**: tag の social commitment、 PyPI 再 upload 不可、
-   docs-only repo の 4 役割、 図書館 catalog / 親会社 site / シリーズ
-   概要パンフ比喩、 Kubernetes / OpenTelemetry / Rust の事例。 user の
-   素朴疑問が深堀り trigger として機能した
-5. **「N=0 ecosystem-wide」 framing の誤り発覚**: text domain
-   (ugh-audit-core) は HA48/HA63 で validated、 ecosystem 全体としては
-   partial validation phase。 「N=0 → N=1」 ではなく「text domain で確立
-   した HA-style validation を 他 3 domain に展開」 が正しい problem
-   定義、 Phase X-2 の core work として queue 化
-6. **AskUserQuestion 不使用で 1-2 paragraph opinionated 提示 → user
-   即決サイクル**: trade-off N 択 table + 私の position + 1 turn で
-   user 判断、 の loop が再現性高く機能。 「Claude 直接実装か」 等の
-   体制判断も即決された
-
-**修正・訂正**:
-
-1. **「Semantic CI Ecosystem」 呼称を私が複数 turn 維持していた誤り** —
-   user 自身も session 序盤の framing 慣性に乗っていた、 と pinpoint
-2. **「ecosystem 全体が N=0」 framing の誤り** — text domain は既に
-   validated、 と user 提供 link で発覚
-3. **「modality 拡張は Brief 6 規模の数ヶ月 work」 評価の誤り** — 実は
-   既に 3 modality (music PoC + image+video experimental) で実装済み
-4. **PR #1 review で agent が code domain status を「8 subcommands」 と
-   誤記** — agent が `STATUS.md` を読まずに repo top README 判断、
-   後続 X-3 brief で「`STATUS.md` (or equivalent) mandatory read source」
-   を明示する discipline 必要、 と pin
-
 ---
 
-### 古い merged entry (2026-05-21 S3 以前) — archive 参照
+### 古い merged entry (2026-05-21 S5 以前) — archive 参照
 
-16 entry (2026-05-21 S3 + S2 + S1 / 2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
+17 entry (2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
 `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
@@ -320,8 +284,8 @@ LLM-assisted という **Strata 区別**、 text domain は HA48/HA63 (n=63)
 (`.claude/memory/YYYY-MM-DD.md`) を参照。 Phase 1 (initial cutoff、
 `docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
 + 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
-+ 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 wrap-up (5/21 S2+S3 移送)
-で compaction が実施された。
++ 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 S1 wrap-up (5/21 S2+S3 移送)
++ 2026-05-28 S2 wrap-up (5/21 S5 移送) で compaction が実施された。
 
 ## 次の発行順序
 

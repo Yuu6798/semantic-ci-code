@@ -41,8 +41,17 @@ Status taxonomy:
 
 ## Source pass index
 
-| Pass | Date | Doc | Findings → D# |
-|---|---|---|---|
-| Session 4 dogfood | 2026-05-07 | `.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4" | D1, D2, D3, D4 |
-| TC10 virtual report | 2026-05-07 Session 5 | `docs/dogfooding_TC10_report.md` | FINDING-1 → D5, FINDING-2 (resolved in PR #61), FINDING-3 (resolved in PR #61) |
-| Real-PR complexity | 2026-05-28 | `docs/dogfooding_real_pr_complexity.md` | F1 → D6, F2 → D7, F3 / F4 / F5 → observations only |
+| Pass | Date | Methodology | Cases | Doc | Findings → D# |
+|---|---|---|---:|---|---|
+| Session 4 self-dogfood | 2026-05-07 | self-dogfood on own PRs (#59, #60) + `init → compile_repair` 実走 | 3 | `.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4" | D1, D2, D3, D4 |
+| TC10 virtual report | 2026-05-07 Session 5 | hand-built virtual `baseline/` and `candidate/` package trees | 10 | `docs/dogfooding_TC10_report.md` | FINDING-1 → D5, FINDING-2 (resolved in PR #61), FINDING-3 (resolved in PR #61) |
+| Real-PR complexity | 2026-05-28 | external public PRs + per-PR `target.yaml` under complexity constraints | 8 | `docs/dogfooding_real_pr_complexity.md` | F1 → D6, F2 → D7, F3 / F4 / F5 → observations only |
+| **累計** | | | **21** | | D1〜D7 |
+
+CASE STUDY 系の empirical 観察 (`docs/pre_generation_validation_case.md` 3
+ケース、 `docs/multi_agent_audit_case.md` 3 並列 agent 比較) は dogfooding
+pass とは別の core-scope-外応用観測として `CLAUDE.md` の Design Documents
+table で CASE STUDY 区分に分類されており、 本累計には含めない。
+新規 pass を追加する際は、 dogfooding (= semantic-ci 自身の self-test
+or その verdict quality 測定) と case study (= 応用観測) の区別を維持し、
+本表には dogfooding pass のみ追記すること。

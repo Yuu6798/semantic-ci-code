@@ -422,6 +422,14 @@ class SensorState(FrozenModel):
     #      ならない (§5 Scope Guard「決定論性」)。SSP v0.1 _dedup_fingerprinted の
     #      鏡像。同一論理状態が同一シリアライズを生むことを enforce する。
     #      ソート違反は ValidationError (`@field_validator` で sorted check)。
+    #   5. (non-complete sensor の findings 拒否、SSP v0.1
+    #      SensorOutput._error_outputs_have_no_findings 鏡像): 全 finding について
+    #      provenance_by_sensor[finding.sensor_id].status == "complete" でなければ
+    #      ならない。status が "error" / "timeout" / "skipped" の sensor は信頼でき
+    #      ないため findings を所有できない (delta / suppression / SARIF が stale
+    #      observation を信頼してしまうのを防ぐ)。non-complete sensor は
+    #      provenance_by_sensor に entry を残すが findings は空のまま (compute_delta
+    #      でこの sensor の delta は自動的に "unknown" になる)。
     #
     # key = sensor_id ("semgrep", "pip-audit", ...)
     # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。

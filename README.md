@@ -114,7 +114,9 @@ Reference / archived (completed briefs, retained for context — see [`docs/arch
 
 Out-of-core observation (case studies and dogfooding):
 
-- [Dogfooding TC10 Report](docs/dogfooding_TC10_report.md) — 10 virtual-package cases through the CLI; tracks D5 / FINDING-1 (set operator partial-dict semantics, **unresolved**)
+- [Dogfooding TC10 Report](docs/dogfooding_TC10_report.md) — 10 virtual-package cases through the CLI; FINDING-1 / D5 (set operator partial-dict semantics) resolved in PR #65
+- [Dogfooding Real-PR Complexity Report](docs/dogfooding_real_pr_complexity.md) — 8 real-PR cases under complexity constraints; surfaces D6 (nested-function vacuous PASS) and D7 (extract-method × cyclomatic authoring mismatch), both open
+- [Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md) — consolidated D-class status (D1〜D7) across all dogfooding passes
 - [Pre-Generation Validation Case](docs/pre_generation_validation_case.md) — observation that stub-only candidates are accepted by the engine input contract; reproduction in `experiments/pre_generation_validation/`
 - [Multi-Agent Audit Case](docs/multi_agent_audit_case.md) — orchestrator-blindspot observation when running parallel agents
 

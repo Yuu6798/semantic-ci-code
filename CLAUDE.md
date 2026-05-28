@@ -68,6 +68,11 @@ This input-side provenance neutrality is required by
   exercising `compare` / `validate-plan` / `compile-repair` end-to-end with
   hand-built `baseline/` and `candidate/` trees; verdict + exit code match
   the documented contract for every case.
+- `docs/dogfooding_real_pr_complexity.md` — 8 real-PR cases exercising
+  `check` against external Python repositories under complexity
+  constraints; verdict matches reviewer-relevant signal in 6/8, with 1
+  vacuous PASS (D6) and 1 authoring mismatch (D7) registered in the
+  consolidated tracker.
 
 If new feature work weakens this neutrality (e.g. requiring a real git ref
 to compute a verdict), it MUST be flagged as a §23.1 violation in the brief.
@@ -125,8 +130,11 @@ surface that in the response rather than acting without it.
 
 - `docs/brief_*_planning.md` (full read of the relevant planning doc)
 - 直近 3 dated session logs (`.claude/memory/YYYY-MM-DD.md`) in full
-- Related case study (`docs/multi_agent_audit_case.md` /
-  `docs/dogfooding_TC10_report.md` / etc.)
+- Related case study or dogfooding report
+  (`docs/multi_agent_audit_case.md` / `docs/dogfooding_TC10_report.md` /
+  `docs/dogfooding_real_pr_complexity.md` / etc.). For D-class hazard
+  status start at `docs/dogfooding_findings_tracker.md` and follow links
+  back to the originating report.
 - `docs/code_semantic_ci_design.md` §23 (engine contract / boundary)
   before changing engine, evaluator, repair compiler, or adapter
   behavior
@@ -269,7 +277,9 @@ Status legend: **ACTIVE** (current spec/contract, AI agents should read first) /
 | `docs/archive/brief_4b_planning.md` | REFERENCE (Brief 4b 完走 2026-05-05) | Brief 4b (CI integration outputs) を CSCI-28 に集約した planning 文書。SARIF 2.1.0 / GitHub Actions annotation / `.pre-commit-hooks.yaml` manifest を 1 PR で完結。Brief 4 Open Questions Q9/Q10/Q11 を救済 |
 | `docs/archive/brief_4_planning.md` | REFERENCE (Brief 4 完走 2026-05-04) | Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR merged で `semantic-ci` CLI 5 subcommand が release 可能。残 Open Questions は Brief 4b / 4c / 4d / 5 で消化済み |
 | `docs/archive/brief_3_planning.md` | ARCHIVED (Brief 3 完走) | Brief 3 (pipeline 統合) を CSCI-10〜14 に分割した planning 文書。当時の判断履歴として保存(operator 5 個案などの一部記述は CSCI-12 brief で上書き済み) |
-| `docs/dogfooding_TC10_report.md` | DOGFOOD REPORT (2026-05-07 Session 5) | 仮想 Python パッケージ 10 ケースで `compare` / `validate-plan` / `compile-repair` を end-to-end 検証。FINDING-1(set operator partial-dict mismatch、**未解決** = D5、`.claude/memory/STATUS.md` 次の発行順序 §F)、FINDING-2(`equals_baseline` の structured added/removed 欠落、PR #61 で fix 済)、FINDING-3(`compile-repair` schema_version 不一致 warning 追加、PR #61 で fix 済) |
+| `docs/dogfooding_TC10_report.md` | DOGFOOD REPORT (2026-05-07 Session 5) | 仮想 Python パッケージ 10 ケースで `compare` / `validate-plan` / `compile-repair` を end-to-end 検証。FINDING-1(set operator partial-dict mismatch → D5、PR #65 で fix 済)、FINDING-2(`equals_baseline` の structured added/removed 欠落、PR #61 で fix 済)、FINDING-3(`compile-repair` schema_version 不一致 warning 追加、PR #61 で fix 済)。D-class 状態は `docs/dogfooding_findings_tracker.md` に集約 |
+| `docs/dogfooding_real_pr_complexity.md` | DOGFOOD REPORT (2026-05-28) | 公開 Python リポジトリの実 PR 8 件(refactor 7 + feature 1)に complexity 制約を宣言した `target.yaml` で `semantic-ci check` を回した dogfooding pass。6/8 で tool 判断が reviewer 関心信号と一致、1/8 で vacuous PASS = FINDING-F1 → **D6**(nested-function blind spot、D4 の sibling)、1/8 で authoring mismatch = FINDING-F2 → **D7**(extract-method × cyclomatic の数学的微増)。D-class 状態は `docs/dogfooding_findings_tracker.md` に集約 |
+| `docs/dogfooding_findings_tracker.md` | DOGFOOD REPORT (集約 tracker) | 全 dogfooding pass を跨いだ D-class findings の単一管理表。D1〜D7 を `解決 / 未解決 / 重複・関連(sibling-class)` で分類、 originating pass・mechanism・mitigation を 1 表に集約。 既存 dogfooding report 内に分散していた D# tracker をここに集約し、 各 report は cross-link のみ保持する形にリファクタ済(2026-05-28) |
 | `docs/multi_agent_audit_case.md` | CASE STUDY | 並列エージェント運用におけるオーケストレーター盲点の観測事例。core scope 外の応用観測としてセマンティック CI の射程拡張を示す |
 | `docs/pre_generation_validation_case.md` | CASE STUDY | stub のみの candidate を engine に渡し §23.1 入力 contract が実装で動作することを 3 ケースで確認した観測事例。再現は `experiments/pre_generation_validation/` で完結。core scope 外の応用観測 |
 

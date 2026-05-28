@@ -342,8 +342,15 @@ exempt, and the rest of the surface is still locked.
   Constraint Severity, Set Operator Match Semantics
 - `docs/exit_codes.md` — verdict-to-exit-code mapping
 - `docs/dogfooding_TC10_report.md` — concrete cases (TC1–TC10) of constraints
-  exercised end-to-end; D5 / FINDING-1 (set operator partial-dict semantics)
-  was resolved Validator-side in PR #65 (Match Schema partial-record match)
+  exercised end-to-end against hand-built virtual packages; D5 / FINDING-1
+  (set operator partial-dict semantics) was resolved Validator-side in
+  PR #65 (Match Schema partial-record match)
+- `docs/dogfooding_real_pr_complexity.md` — 8 real-PR cases under
+  complexity constraints; surfaces D6 (nested-function vacuous PASS,
+  sibling of Hazard 3 / D4) and D7 (extract-method × cyclomatic
+  authoring mismatch), both 未解決 at the time of writing
+- `docs/dogfooding_findings_tracker.md` — D-class findings consolidated
+  registry across all dogfooding passes
   and is **not** covered by `target-doctor` (`docs/brief_8_planning.md §6.3.1`
   notes D5 has no residual advisory pattern)
 - `docs/target_authoring_surface.md` — Authoring surface design contract;

@@ -1289,7 +1289,9 @@ CASE STUDY (core scope 外の応用観測):
 
 DOGFOOD REPORT:
 
-- [`dogfooding_TC10_report.md`](./dogfooding_TC10_report.md) — TC10 ドッグフーディング、D5 / FINDING-1 (set operator partial-dict semantics) を **未解決** で tracking
+- [`dogfooding_TC10_report.md`](./dogfooding_TC10_report.md) — TC10 ドッグフーディング (仮想 Python パッケージ 10 ケース)。 D5 / FINDING-1 (set operator partial-dict semantics) は PR #65 で resolved
+- [`dogfooding_real_pr_complexity.md`](./dogfooding_real_pr_complexity.md) — 実 PR 8 件に complexity 制約を当てた dogfooding pass (2026-05-28)。 D6 (nested-function vacuous PASS) と D7 (extract-method × cyclomatic authoring mismatch) を未解決で tracking
+- [`dogfooding_findings_tracker.md`](./dogfooding_findings_tracker.md) — 全 dogfooding pass を跨いだ D-class findings の集約 registry (解決 / 未解決 / 重複・関連 を分類)
 
 今後 `docs/<topic>.md` を追加した場合は、本節と [`CLAUDE.md`](../CLAUDE.md) Design Documents 表 + README の Documentation 節に追記する。
 

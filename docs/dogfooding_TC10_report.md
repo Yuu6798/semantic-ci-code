@@ -245,37 +245,22 @@ the CLI surface.
 
 FINDING-2 was originally listed here but resolved in this PR (see above).
 
-### Tracking: D5 (FINDING-1) — Resolved (PR #65, CSCI-35c, 2026-05-08)
+### Tracking
 
-FINDING-1 was the only finding from this dogfooding pass that remained open
-after PR #61. It was integrated into the dogfood-driven fix plan as **D5**,
-joining D1〜D4 from the 2026-05-07 Session 4 dogfooding
-(`.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4"), and resolved on
-2026-05-08 via PR #65 (CSCI-35c).
+D-class status (D1〜D5 from this pass + the Session 4 pass, plus any
+later D# from subsequent dogfooding) is consolidated in
+**`docs/dogfooding_findings_tracker.md`**. Do not re-tabulate D-class
+status inside this report.
 
-| D# | Source | Subject | Brief slot |
-|---|---|---|---|
-| D1 | Session 4 dogfood | `--package-root` scope hazard | A' (`target_yaml_guide.md`) — open |
-| D2 | Session 4 dogfood | extractor crash on `syntax_error/bad.py` | **Resolved in PR #67 (CSCI-35e, 2026-05-08)** — `[tool.semantic_ci_code.extract] exclude` loaded from nearest `pyproject.toml` and applied before AST parse |
-| D3 | Session 4 dogfood | template / user constraint duplication | A' (`target_yaml_guide.md`) — open |
-| D4 | Session 4 dogfood | config-only PR vacuous PASS | A' (`target_yaml_guide.md`) — open |
-| **D5** | **Session 5 dogfood (PR #61, FINDING-1)** | **set operator partial-match semantics — false positive on `includes_*` / `subset_of` / `superset_of`, false negative (CI bypass) on `excludes_all`** | **Resolved in PR #65 (CSCI-35c, 2026-05-08)** |
+Quick recap for this pass:
 
-Resolution chose option (c) — both partial-key matcher semantics on set
-operators **and** flat-projection targets. The chosen mechanism is the
-**Match Schema** registry in `framework/match_schema.py` keyed per dict
-collection target (`api_surface*`, `effects*`, `imports*`) with a
-`required_key` (e.g. `fqn` / `module`), a closed `optional_keys` allow-list
-(`kind`, `visibility`, `effect_class`, `from`), and `forbidden_keys` that
-reject extractor-coupling fields (`signature`, `confidence`, `evidence`,
-`symbols`) at compile time. The five set operators now use partial-record
-matching via a shared `match_item(expected, observed)` predicate, and
-`excludes_all` violations report `evidence.matched` `{expected_item,
-observed_record}` pairs to make the closed CI bypass auditable. Bare-string
-`expected` items desugar to `{required_key: <string>}` and three flat
-projection aliases (`api_surface_delta.added.fqns`,
-`effect_changes.added.fqns`, `imports_delta.added.modules`) are registered
-for plain string-set authoring. The verdict / compile JSON envelope was
-bumped from `schema_version="4"` to `"5"` to reflect the gate-strengthening
-behavior change (existing partial-dict authoring that previously silently
-satisfied `excludes_all` will now correctly fail).
+- **FINDING-1 → D5** (set operator partial-match semantics) — **解決**
+  in PR #65 (CSCI-35c, 2026-05-08). Match Schema registry in
+  `framework/match_schema.py`, partial-record matching across set
+  operators, flat-projection aliases (`api_surface_delta.added.fqns`,
+  `effect_changes.added.fqns`, `imports_delta.added.modules`),
+  `evidence.matched` for `excludes_all`, schema_version bump v4→v5.
+- **FINDING-2** (`equals_baseline` missing structured added/removed) —
+  **解決** in this report's originating PR (#61).
+- **FINDING-3** (`compile-repair` schema_version mismatch silently
+  accepted) — **解決** in PR #61.

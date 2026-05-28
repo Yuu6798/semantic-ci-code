@@ -114,18 +114,23 @@ SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta �
 # 実装: adapter が以下の tuple を canonical JSON array に serialize し、
 # その byte 列の sha256 short hash を canonical_id とする。
 # JSON array は各要素が quoted string で length-prefixed されるため injective。
+# **ensure_ascii=False 必須**: SSP v0.1 docs/ssp_protocol.md §5.1 の
+# _digest_array と同じ canonical encoding を使う。Python default
+# (ensure_ascii=True) は非 ASCII (Unicode な FQN 等) を \uXXXX に escape し、
+# SSP v0.1 と異なる byte stream を生む → 同じ identity tuple が adapter と
+# validator で異なる canonical_id を生む silent bug を起こす。
 # identity_components (audit log 用) に tuple の全要素を保存する。
 import json
 _identity_tuple = ["v1", "sast", sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal)]
-canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
+canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
 
 # SCA も同様
 _identity_tuple = ["v1", "sca", sensor_id, package_name, installed_version, advisory_id]
-canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
+canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
 ```
 
 canonical_id は不透明な hash 文字列であり、人間が読み解く必要はない。
-人間向けの説明は `FindingProvenance.identity_components` に全要素を保存して
+人間向けの説明は `_SecurityFindingBase.identity_components` に全要素を保存して
 audit log / CI 出力で表示する。`v1:` prefix は identity algorithm version を
 示し、algorithm 変更時に全 hash が変わることを保証する。
 
@@ -134,18 +139,41 @@ audit log / CI 出力で表示する。`v1:` prefix は identity algorithm versi
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:3a7f8b2e1c9d04a5"
+canonical_id = "v1:d4e58fcd4f5c4043"
                ^^^  ^^^^^^^^^^^^^^^^
                |    sha256 short hash of json.dumps(identity_tuple)
                identity algorithm version
 
-# identity_tuple (FindingProvenance.identity_components に保存):
+# identity_tuple (_SecurityFindingBase.identity_components に保存):
 # ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
-# encoding: json.dumps(list, separators=(",",":"), sort_keys=False)
+# encoding: json.dumps(list, ensure_ascii=False, separators=(",",":"), sort_keys=False)
+# (ensure_ascii=False は SSP v0.1 _digest_array §5.1 と同じ canonical encoding、
+#  非 ASCII FQN で adapter / validator の hash が乖離するのを防ぐ)
 ```
 
 algorithm が変わったら canonical_id 全体が変わる。core は文字列の完全一致
 しかしないので、暗黙の finding 入れ替えを防ぐ。
+
+**Suppression migration**: identity algorithm 変更時は全 canonical_id が変わり、
+既存の `security.suppressions` エントリが silent fail する (マッチしなくなる)。
+`canonical_id` は opaque SHA-256 hash であり、suppression 単独からは v2 の
+canonical_id を導出できない。migration には identity tuple の原データが必要。
+
+対策:
+- **suppression schema 拡張**: suppression エントリは `canonical_id` に加えて
+  `identity_components` (元の identity tuple) を**併記必須**にする。これにより
+  v1→v2 移行時に identity_components を v2 algorithm で再ハッシュして新 canonical_id
+  を導出可能になる (suppression ファイル単独で migration が成立する)
+- evaluator は identity_algorithm_version の不一致を検出し warning を emit する
+- Phase G-4 の CLI に `semantic-ci migrate-suppressions --from v1 --to v2`
+  コマンドを scope に含める。入力は suppression ファイルのみ
+  (identity_components が併記されているため外部 scan state は不要)
+- identity_components 併記を強制しない場合の fallback: migration CLI は
+  baseline scan の SensorState を追加入力として要求し、v1 canonical_id で
+  findings を lookup → v2 algorithm で再計算する。この経路は scan state の
+  鮮度に依存し、stale suppression は drop される (silent fail と同等のため
+  非推奨)
+- 過渡期に v1/v2 両方の canonical_id をマッチさせるべきかは G-3 brief で判断
 
 ### 1.4 D4: scanner drift の検出
 
@@ -153,30 +181,81 @@ algorithm が変わったら canonical_id 全体が変わる。core は文字列
 
 ```python
 class SensorProvenance(FrozenModel):
-    sensor_name: str
+    sensor_id: str                              # was: sensor_name. 他モデル
+                                                # (SecurityFinding / PerSensorDelta /
+                                                # provenance_by_sensor key) と命名統一
     sensor_version: str
-    status: str                    # "complete" | "error" | "timeout" | "skipped"
+    status: Literal["complete", "error", "timeout", "skipped"]
     error_message: str | None      # status != "complete" の場合の詳細
     ruleset_hash: str | None       # SAST: semgrep ruleset file の hash
     advisory_db_hash: str | None   # SCA: advisory database snapshot の hash
     adapter_version: str
     identity_algorithm_version: str
+    # model_validator (条件 invariant、SSP v0.1 SensorOutput._error_outputs_have_no_findings 鏡像):
+    #   status == "complete" → error_message is None
+    #   status != "complete" → error_message is not None
+    #   buggy adapter が status="complete" に error_message を残したり、
+    #   status="error" で error_message を欠落させると下流の診断が壊れるため
+    #   構築時に reject する。
 
-class SensorDelta(FrozenModel):
+class PerSensorDelta(FrozenModel):
+    sensor_id: str
+    status: Literal["pass", "fail", "unknown"]
     added: tuple[SecurityFinding, ...]
     removed: tuple[SecurityFinding, ...]
     unchanged_count: int
-    provenance_changed_sensors: tuple[str, ...]
-    # provenance が変わった sensor_id のリスト。空なら全 sensor 一致。
-    # drift 検出は per-sensor: sensor A の provenance が変わっても、
-    # sensor B 由来の finding は通常の added/removed 判定を受ける。
-    # sensor A の provenance が変わった場合、sensor A の verdict 全体を
-    # unknown にする (added だけでなく removed も信頼できないため)。
+    provenance_changed: bool
+    error_message: str | None      # status == "unknown" 時の原因説明
+    # model_validator:
+    #   1. provenance_changed == True → status must be "unknown"
+    #      (drift 時は pass/fail を許容しない。prose の「verdict 全体を
+    #       unknown にする」を型レベルで enforce)
+    #   2. added/removed の全 finding.sensor_id == self.sensor_id
+    #      (異なる sensor の finding が混入すると、drift 判定・per-sensor
+    #       policy が誤った provenance を参照する)
+    #   3. status == "unknown" → error_message is not None
+    #      status in {"pass", "fail"} → error_message is None
+    #      (unknown の原因は必ず記述させ、pass/fail に紛らわしい原因文を残さない)
+    #   4. (default policy floor、SSP v0.1 verdict.py の _FAIL_SEVERITIES 鏡像):
+    #      status == "pass" → 全 added finding の severity == "info"
+    #      added に "critical" / "high" / "medium" / "low" が 1 つでもあれば
+    #      status は "fail" または "unknown" でなければならない。
+    #      逆方向 (status == "fail" → added が空でない) も検証する: fail を
+    #      表すには少なくとも 1 つの fail-severity finding が added に必要。
+    #      これは default policy (`_FAIL_SEVERITIES = {critical, high, medium, low}`)
+    #      の verdict floor であり、user policy (severity.not_in / max_count 等)
+    #      による緩和は suite evaluator 層で aggregate_status の上に適用される。
+    #      PerSensorDelta.status は user policy を適用する前の **最厳格判定** を
+    #      表現する。これにより hand-built JSON が `added: [high-severity finding]`
+    #      かつ `status: "pass"` を宣言する不整合を schema 層で reject できる。
+
+class SecurityDelta(FrozenModel):
+    deltas_by_sensor: dict[str, PerSensorDelta]
+    # key = sensor_id。SSP v0.1 の deltas_by_sensor 構造を継承。
+    # per-sensor verdict が自然に計算できる。
+    aggregate_status: Literal["pass", "fail", "unknown"]
+    # model_validator (整合性検証、SSP v0.1 SSPEnvelope._validate_delta_consistency 継承):
+    #   1. deltas_by_sensor の各 key == value.sensor_id を検証
+    #   2. aggregate_status == aggregate(d.status for d in deltas_by_sensor.values())
+    #      を検証 (precedence: unknown > fail > pass)
+    #   hand-built JSON や buggy adapter が不整合な aggregate_status を設定した場合、
+    #   構築時に ValidationError で reject する。
+    #
+    # 注: aggregate_status は default policy floor (PerSensorDelta.status の
+    # 集約) を表す。user policy (severity.not_in / max_count 等) による
+    # pass/fail 上書きは suite evaluator が aggregate_status を入力として
+    # 追加適用する (例: aggregate_status="fail" でも user policy が高 severity
+    # 以外を許容するなら、suite 最終 verdict は "pass" になりうる)。
 ```
 
+delta は SSP v0.1 同様 **per-sensor** で保持する。SSP v0.1 の
+`deltas_by_sensor: dict[str, SSPDelta]` 構造を継承し、per-sensor verdict を
+自然に計算可能にする。aggregate は suite evaluator 層で合成する。
+
 scanner / ruleset / adapter が変わっている場合、**当該 sensor の verdict 全体**
-を unknown にする。added finding だけでなく removed finding もコード変更起因と
-断定できない (finding が消えたのがコード修正なのか ruleset 変更なのか区別不能)。
+を unknown にする (`provenance_changed: true` → `status: "unknown"`)。
+added finding だけでなく removed finding もコード変更起因と断定できない
+(finding が消えたのがコード修正なのか ruleset 変更なのか区別不能)。
 provenance が一致している sensor の finding のみ pass / fail 判定を受ける。
 
 ### 1.5 D5: verdict 体系
@@ -231,12 +310,18 @@ Layer 1 の security constraint は**別の namespace / 別ファイル**で宣�
 は変更しない。security constraint の宣言形式は Phase G-3 で設計する。
 候補は以下の 2 案:
 
-- 案 A: target.yaml に `security:` top-level key を新設 (parser 拡張が必要)
-- 案 B: `security.yaml` として別ファイルに分離 (target.yaml は不変)
+- 案 A: target.yaml に `security:` top-level key を新設
+  - `TargetSVP` は `ConfigDict(extra="forbid")` のため、未知キーは
+    Pydantic ValidationError で reject される。案 A を選ぶ場合は
+    `framework/target_svp.py` に `security: SecurityPolicy | None = None`
+    フィールドを追加する変更が**必須**。`extra="forbid"` 自体は既知キーの
+    追加で違反しないが、framework 層の変更であり §5 Scope Guard
+    「core evaluator は変更しない」との関係を G-3 brief で明示すること
+- 案 B: `security.yaml` として別ファイルに分離 (target.yaml / TargetSVP 不変)
+  - `extra="forbid"` 制約を回避できるが、2 ファイル管理の運用コストが増加
 
-いずれも既存の `constraints` list schema とは独立で、`target_svp.py` の
-`extra="forbid"` に違反しない形で設計する。具体的な DSL 設計は G-3 brief の
-AC として扱う。
+いずれも既存の `constraints` list schema とは独立。具体的な DSL 設計は
+G-3 brief の AC として扱う。
 
 Layer 2 は新設計不要 (既存の target.yaml で書ける)。
 Layer 1 が本 Phase の新設部分。
@@ -246,34 +331,124 @@ Layer 1 が本 Phase の新設部分。
 ### 2.1 SensorState model
 
 ```python
-class SecurityFinding(FrozenModel):
-    canonical_id: str        # opaque "v1:<sha256[:16]>"; see §1.2 for hash construction, identity_components for tuple
-    category: str            # "sast" | "sca"
-    severity: str            # "critical" | "high" | "medium" | "low" | "info"
-    sensor_id: str           # "semgrep" | "pip-audit" | ...
-    rule_id: str | None           # SAST 用
-    advisory_id: str | None       # SCA 用
-    fqn: str | None               # SAST: adapter が FQN 翻訳。SCA: None
-    normalized_text_hash: str | None  # SAST: matched source の正規化 hash
-    package_name: str | None      # SCA 用
-    installed_version: str | None # SCA: 脆弱性が検出されたバージョン
-    message: str
-    # SAST source location (SARIF 出力 / CI annotation 用)
-    module_path: str | None       # SAST: "src/app/db.py" 等のファイルパス
-    source_span: SourceSpan | None  # SAST: 行・列の範囲 (SSP v0.1 SourceSpan 継承)
-    provenance: FindingProvenance
+# SSP v0.1 同様、SAST / SCA を discriminated union で分離する。
+# 全フィールドを Optional で flatten すると category と必須フィールドの
+# 整合性が型レベルで保証できなくなる (SSP v0.1 からの型安全性退行)。
 
-class FindingProvenance(FrozenModel):
-    sensor_name: str
-    sensor_version: str
-    ruleset_hash: str | None
-    adapter_version: str
-    identity_algorithm_version: str
-    identity_components: dict  # canonical_id の生成根拠 (audit log 用)
+class _SecurityFindingBase(FrozenModel):
+    canonical_id: Annotated[str, Field(pattern=r"^v\d+:[0-9a-f]{16}$")]
+                             # 形式固定: "v<version>:<sha256[:16] hex>"
+                             # ガベージ文字列を schema レベルで拒否
+    severity: Literal["critical", "high", "medium", "low", "info"]
+    sensor_id: str           # "semgrep" | "pip-audit" | ...
+    message: str
+    identity_components: tuple[str, ...]
+    # canonical_id の生成根拠。§1.2 / §1.3 で定義した ordered identity tuple を
+    # そのまま保持する (例: ("v1", "sast", "semgrep", "sql-injection",
+    # "app.db.get_user", "a3f8", "0"))。dict ではなく ordered tuple/list 必須:
+    # canonical_id は json.dumps(list) の sha256 short hash なので、順序が
+    # 失われると再ハッシュ不能になり、suppression migration が壊れる。
+    # 全要素 str (ordinal は str(ordinal) で正規化)、要素数は category により
+    # SAST 7 / SCA 6 で固定 (§1.2 の tuple shape 参照)。
+
+class SASTSecurityFinding(_SecurityFindingBase):
+    category: Literal["sast"] = "sast"
+    rule_id: str                      # min_length=1
+    fqn: str                          # adapter が FQN 翻訳。min_length=1
+    normalized_text_hash: str         # matched source の正規化 hash
+    module_path: str                  # "src/app/db.py" 等のファイルパス
+    source_span: SourceSpan | None    # 行・列の範囲 (SSP v0.1 SourceSpan 継承)
+
+class SCASecurityFinding(_SecurityFindingBase):
+    category: Literal["sca"] = "sca"
+    package_name: str                 # min_length=1
+    installed_version: str            # min_length=1
+    advisory_id: str                  # min_length=1
+
+SecurityFinding = Annotated[
+    SASTSecurityFinding | SCASecurityFinding,
+    Field(discriminator="category"),
+]
+
+# model_validator (SASTSecurityFinding / SCASecurityFinding 共通):
+#   identity_components の **shape + 要素値の両方** を field と整合させる。
+#   canonical_id 再計算 (suppression migration) で確定的に同じ hash を得るための
+#   事前条件。shape だけ合っていても要素値が field と無関係だと、canonical_id は
+#   hash として整合するが、トップレベル field と意味的に乖離する (silent bug)。
+#
+#   SASTSecurityFinding の要求:
+#     identity_components == (
+#         identity_algorithm_version,  # canonical_id の "vN" prefix と一致
+#         "sast",                       # category と一致
+#         sensor_id,                    # 同名 field と一致
+#         rule_id,                      # 同名 field と一致
+#         fqn,                          # 同名 field と一致
+#         normalized_text_hash,         # 同名 field と一致
+#         str(ordinal),                 # ordinal は別 field か identity 内のみ存在
+#     )  # len == 7
+#
+#   SCASecurityFinding の要求:
+#     identity_components == (
+#         identity_algorithm_version,  # canonical_id の "vN" prefix と一致
+#         "sca",                        # category と一致
+#         sensor_id,                    # 同名 field と一致
+#         package_name,                 # 同名 field と一致
+#         installed_version,            # 同名 field と一致
+#         advisory_id,                  # 同名 field と一致
+#     )  # len == 6
+#
+#   さらに canonical_id == identity_components[0] + ":" +
+#       sha256(json.dumps(list(identity_components), ensure_ascii=False,
+#              separators=(",",":"), sort_keys=False).encode()).hexdigest()[:16]
+#   と一致することも検証する。version prefix tampering ("v2:" + v1 の hash) も
+#   identity_components[0] との比較で検出する。
+#   **ensure_ascii=False 必須** (SSP v0.1 _digest_array §5.1 と同じ encoding):
+#   非 ASCII FQN (Unicode な Python 識別子等) で adapter / validator の hash が
+#   乖離するのを防ぐ。Python default の ensure_ascii=True は非 ASCII を \uXXXX
+#   に escape するため、SSP v0.1 の byte stream と異なる canonical_id を生む。
 
 class SensorState(FrozenModel):
     findings: tuple[SecurityFinding, ...]
     provenance_by_sensor: dict[str, SensorProvenance]
+    # provenance の source of truth は provenance_by_sensor (state-level) に一元化。
+    # finding-level の provenance 重複フィールド (sensor_id, sensor_version,
+    # ruleset_hash, adapter_version, identity_algorithm_version) は V3 review で
+    # 削除し、finding は sensor_id 参照のみ保持する (_SecurityFindingBase.sensor_id)。
+    # identity_components (canonical_id 生成根拠) は finding-level に残す (audit 用)。
+    # drift 検出は provenance_by_sensor のみを参照する。
+    #
+    # model_validator:
+    #   1. (参照整合性 - 既存): 全 finding.sensor_id ∈ provenance_by_sensor.keys()
+    #      を enforce。provenance なしの sensor_id を持つ finding は reject。
+    #   2. (key 整合性): provenance_by_sensor[k].sensor_id == k を全 key で enforce。
+    #      key と内部 sensor_id がズレた hand-built JSON を reject
+    #      (SSP v0.1 SSPEnvelope._validate_delta_consistency の鏡像)。
+    #   3. (identity algorithm version 整合性): 全 finding について
+    #      finding.identity_components[0] ==
+    #      provenance_by_sensor[finding.sensor_id].identity_algorithm_version
+    #      を enforce。provenance が v1 を宣言しているのに finding canonical_id が
+    #      "v2:..." の場合、suppression migration / drift 警告がトラスト先を
+    #      間違えるため、構築時に reject する。
+    #   4. (決定論的ソート): findings は canonical_id 昇順で sort されていなければ
+    #      ならない (§5 Scope Guard「決定論性」)。SSP v0.1 _dedup_fingerprinted の
+    #      鏡像。同一論理状態が同一シリアライズを生むことを enforce する。
+    #      ソート違反は ValidationError (`@field_validator` で sorted check)。
+    #   5. (non-complete sensor の findings 拒否、SSP v0.1
+    #      SensorOutput._error_outputs_have_no_findings 鏡像): 全 finding について
+    #      provenance_by_sensor[finding.sensor_id].status == "complete" でなければ
+    #      ならない。status が "error" / "timeout" / "skipped" の sensor は信頼でき
+    #      ないため findings を所有できない (delta / suppression / SARIF が stale
+    #      observation を信頼してしまうのを防ぐ)。non-complete sensor は
+    #      provenance_by_sensor に entry を残すが findings は空のまま (compute_delta
+    #      でこの sensor の delta は自動的に "unknown" になる)。
+    #   6. (canonical_id 一意性、SSP v0.1 _dedup_fingerprinted 鏡像): findings の
+    #      全 canonical_id がユニークでなければならない (重複 reject)。Phase G-1
+    #      の delta 計算は canonical_id ベースの集合演算なので、重複 finding は
+    #      dict/set 実装で 1 つに collapse される一方、SARIF / suppression
+    #      出力は両方を残してしまい counts / verdict が不整合になる。
+    #      adapter が collision を起こした場合は ordinal 割当ルール (§1.2) で
+    #      区別すべきであり、同じ canonical_id を持つ複数 finding を allow しない。
+    #
     # key = sensor_id ("semgrep", "pip-audit", ...)
     # 複数 sensor を同時に使う場合、各 sensor の provenance を独立に記録する。
     # drift 検出は per-sensor で行う: sensor A の ruleset が変わっても
@@ -283,6 +458,36 @@ class SensorState(FrozenModel):
     # provenance_by_sensor に key がない = sensor 未実行、の 3 状態を区別)。
     # status != "complete" の sensor は verdict を unknown に寄せる。
 ```
+
+### 2.1.1 Suppression model
+
+`security.suppressions` の各エントリは下記 Pydantic モデルで型固定する。
+YAML 例 (§2.3) はこのモデルへ deserialize される。
+
+```python
+import datetime
+
+class Suppression(FrozenModel):
+    canonical_id: Annotated[str, Field(pattern=r"^v\d+:[0-9a-f]{16}$")]
+    identity_components: tuple[str, ...]   # §2.1 と同じ ordered tuple
+    reason: Annotated[str, Field(min_length=1)]
+    expires: datetime.date                  # ISO 8601 YYYY-MM-DD として parse
+    owner: Annotated[str, Field(min_length=1)]
+
+    # model_validator (SecurityFinding 用と同じ identity 整合性ロジックを再利用):
+    #   1. identity_components の shape が SAST(7) / SCA(6) のいずれかに合致
+    #      (識別は identity_components[1] == "sast" | "sca" で行う)
+    #   2. canonical_id == identity_components[0] + ":" +
+    #          sha256(json.dumps(list(identity_components), ensure_ascii=False,
+    #                 separators=(",",":"), sort_keys=False).encode()).hexdigest()[:16]
+    #      (ensure_ascii=False は SSP v0.1 _digest_array §5.1 と同じ canonical
+    #       encoding、§1.2 参照)
+    #   3. expires は YAML 上の string ("2026-09-01") を date として parse 失敗
+    #      した場合 ValidationError (Pydantic 標準動作で十分)
+```
+
+`security` セクション側は `suppressions: tuple[Suppression, ...]` を持ち、
+`extra="forbid"` で未知キーを拒否する。
 
 ### 2.2 SAST FQN 翻訳 (adapter 層)
 
@@ -295,6 +500,25 @@ file:line → FQN の逆引きを実装している (`ssp/adapters/qualified_nam
 ```yaml
 security:
   # finding delta への constraint (糖衣構文)
+  # SSP v0.1 の default: info severity の追加は verdict に影響しない
+  # (_FAIL_SEVERITIES = {critical, high, medium, low}、info 除外)。
+  # Phase G もこの default を継承する。明示的な severity filter で上書き可能:
+  #
+  # | 設定 | info | low | medium | high | critical |
+  # |------|------|-----|--------|------|----------|
+  # | default (設定なし) | 許容 | fail | fail | fail | fail |
+  # | 例 1 (not_in) | 許容 | 許容 | 許容 | fail | fail |
+  # | 例 2 (max_count: 0) | fail | fail | fail | fail | fail |
+  #
+  # 層の関係:
+  #   - PerSensorDelta.status / SecurityDelta.aggregate_status は default 行のみを
+  #     enforce する schema 層 floor (§1.4 PerSensorDelta validator 4 参照)
+  #   - 例 1 / 例 2 のような user policy は suite evaluator 層で aggregate_status
+  #     を入力として追加適用する
+  #   - 例 1 は緩和方向 (fail → pass): aggregate_status="fail" でも user policy
+  #     で medium 以下を許容するなら suite 最終 verdict は "pass" になる
+  #   - 例 2 は厳格化方向 (pass → fail): aggregate_status="pass" でも info の
+  #     追加があれば suite 最終 verdict は "fail" になる
   findings:
     added:
       # 例 1: high / critical の追加を禁止 (medium 以下は許容)
@@ -302,6 +526,7 @@ security:
         not_in: [high, critical]
 
       # 例 2: severity 不問で added 0 件 (厳格モード、例 1 と排他)
+      # info を含む全 severity の追加を禁止 (SSP v0.1 default と異なる)
       # max_count: 0
 
   # 特定ルールの存在禁止
@@ -310,15 +535,27 @@ security:
       - sql-injection
       - eval-use
 
-  # scanner 環境一致要求
+  # scanner 環境一致要求 (drift 検出との合成ルール)
+  # drift 検出は provenance_by_sensor の全フィールドを比較する。
+  # require_same_*: false のフィールドは比較対象から除外する。
+  # 例: require_same_sensor_version: false の場合、sensor_version の差は
+  # drift として扱わず unknown に寄せない。ruleset_hash の差のみ drift 判定。
   scanner:
-    require_same_ruleset: true
-    require_same_sensor_version: false  # minor version 差は許容
+    require_same_ruleset: true          # false なら ruleset_hash 差は drift 除外
+    require_same_sensor_version: false  # minor version 差は許容 (drift 除外)
+    require_same_advisory_db: true      # SCA: advisory DB hash 差の drift 判定
 
   # false positive 抑制 (理由 + 期限必須)
+  # identity_components は §1.3 suppression migration のため併記必須:
+  # - canonical_id は opaque hash で algorithm 変更時に再導出できない
+  # - ordered list として §1.2 の identity tuple shape を完全に保持する
+  #   (dict / named map は不可。要素順序が失われると JSON array hash が変わる)
+  # - SAST = 7 要素 / SCA = 6 要素、全要素 str。schema 検証は SecurityFinding と
+  #   同じ model_validator を suppression entry にも適用する
   suppressions:
-    - canonical_id: "v1:e4b2a7c9f1d30856"
-      # opaque hash; identity_components in provenance for audit
+    - canonical_id: "v1:d4e58fcd4f5c4043"
+      identity_components:
+        ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
       reason: "Validated upstream by WAF"
       expires: "2026-09-01"
       owner: "security-team"

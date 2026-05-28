@@ -24,9 +24,78 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜5 + Brief 8 (Authoring surface) + Brief 7 (SSP v0.1) 全完走 + ResultStatus split + source-selection redesign + doc refactor 全完走。**Brief 7 / SSP v0.1 が 2026-05-27 に feature-complete** (CSCI-36〜40、PR #109〜#112、Issue #108 closed)。`semantic-ci` CLI は 10 core subcommand + `ssp` group (scan / from-json) を持つ。SSP は `docs/ssp_protocol.md` spec に基づき、Semgrep (SAST) + pip-audit (SCA) の 2 sensor adapter + JSON/human/SARIF 3 format で end-to-end 使用可能。Next queue: Phase X (ecosystem formalization) の残 sub-phase (E-1 cross-ref / E-2 umbrella docs / E-3 HA-style validation)。
+Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。2026-05-28 に **Phase G (SSP core integration) planning** が PR #114 + #115 で landed (`docs/phase_g_planning.md`、5 PR 構成 CSCI-45〜49、Codex 18 round + deep cross-ref 7 件で洗練済)。Phase G は SSP v0.1 (現状 core の横に並列) を core の縦接続に再構築する設計: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict、SAST finding を FQN 空間に翻訳、canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。Next queue: **Phase G 実装 (CSCI-45 から)** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
 
 ## 直近 merged
+
+### 2026-05-28 — Phase G (SSP core integration) planning landed (PR #114 + #115)
+
+SSP v0.1 完走直後の 2026-05-28 session で、SSP の実地テスト 21 ケース
+(実リポジトリ 9 + 仮想入力 5 + マルチエージェント想定 7) を実行する過程で
+**「SSP が core の横に並列配置され、core が持つ intent 宣言 + 構造比較の力を
+使えていない」** という構造的問題が surface。3 つの独立 AI 分析 (GPT / Gemini /
+Grok) を統合した `docs/phase_g_planning.md` を起草、Codex review 18 round で
+洗練後 PR #114 merge、続いて PR #115 で deep cross-reference review 7 件を消化。
+
+- **PR #114** (merged `d1f9f9e`): `docs(planning): add Phase G — SSP core integration`
+  - `docs/phase_g_planning.md` 新設 (5 PR 構成、CSCI-45〜49 想定)
+  - 設計の核: SensorState を CodeState と並列の別 state に分離 (GPT 案)、SAST
+    finding を adapter で FQN 空間に翻訳して自然キー化 (Gemini 案)、canonical_id
+    を JSON array hash で injective encoding + identity algorithm version 埋め込み
+    (Grok 案)、per-sensor provenance + status + advisory_db_hash で drift 検出、
+    suite evaluator で code_delta + security_delta を統合 verdict (unknown > fail
+    > repair > pass の aggregation)
+  - 18 round / 22 P2 で消化した設計欠陥: canonical_id の delimiter collision
+    (`:` → `\0` → JSON array)、 schema 整合性 (constraint kind/target/operator
+    の互換性 / effect extractor の limitation / suppression form 同期)、
+    multi-sensor support (sensor_id namespace / provenance_by_sensor map /
+    per-sensor unknown)、 source location 保持 (SARIF 出力対応)、 G-5 template
+    の実現可能性 (extractor 拡張要否で 2 カテゴリ分割)
+- **PR #115** (merged `b13f205`): Phase G planning deep cross-reference fixes
+  - 8 follow-up commits: identity_components の ordered tuple 型化、
+    PerSensorDelta の model_validator (drift と ownership)、 aggregate_status
+    consistency validator、 suppression migration の入力要件明示、
+    default-policy floor on PerSensorDelta.status、 example canonical_id hash の
+    identity tuple との一致確認、 non-complete sensor 拒否、 sensor_name →
+    sensor_id 命名統一、 `ensure_ascii=False` の追加 (SSP v0.1 §5.1 と同じ
+    canonical encoding、非 ASCII FQN での adapter / validator hash 乖離防止)
+  - PR #115 で `docs/ssp_usage_guide.md` も同 PR で land (SSP v0.1 実用ガイド)
+
+**設計判断のハイライト**:
+
+1. **「実地テスト → 設計問題発覚 → planning 起草」の連続フロー**: 「SSP どこまで
+   使えるかテスト」から始まり、テスト結果 (VTC4 のモジュール移動、S5 の
+   backdoor 検知) を user 対話で言語化する過程で設計問題が surface、その場で
+   planning doc を起こす。テスト結果が planning の具体例として残った
+2. **3 AI 並列分析の統合**: GPT (概念分離) + Gemini (自然キー戦略) + Grok
+   (横断品質) の組み合わせが互いの盲点を補完。user の「現提案をベースに 2 点
+   追加」即決判断で統合方針が確定
+3. **planning 段階で Codex review chase を回す**: 実装フェーズではなく planning
+   doc 1 ファイルで 18 round + deep cross-ref 7 件。実装 PR (G-1〜G-5) で同じ
+   trap を回避できる。AGENTS.md §5.4「round 数を leading quality indicator として
+   運用」の応用、29 round 累計 P2 を test に encode した PR #82/#84 の延長
+4. **user 主導の「妥協しない」方針宣言**: round 14 時点で user が「この設計
+   フェーズは妥協すると文書と実装でズレが起きる可能性がある。無くなるまで
+   やりたい」と明示、以降の round 15〜18 + PR #115 の deep chase の動機付け
+5. **「概念境界の純度」を維持する設計**: SecurityFinding を CodeState に直接
+   追加する初期案を GPT 分析で否定 (CodeState = AST 由来の構造状態、
+   SecurityFinding = 観測状態の概念分離)、SensorState を別 state にする案に変更
+6. **canonical_id encoding の段階的洗練**: delimiter join (`:`) → NUL join
+   (`\0`) → canonical JSON array (`json.dumps(ensure_ascii=False)`) の 3 段階で
+   alias collision class を構造的に排除。最終案は SSP v0.1 `_digest_array` §5.1
+   と同じ encoding
+
+**修正・訂正**:
+
+1. **「CodeState に SecurityFinding を直接追加」初期案** — GPT 分析で「コード状態
+   vs 観測状態」の概念分離を指摘され、SensorState を別 state にする案に変更
+2. **canonical_id の delimiter encoding** — Round 10 (`:` collision) → Round 15
+   (`\0` collision) → Round 19 (`ensure_ascii=False` 不足) の 3 段階で洗練
+3. **§0.1 で「effects constraint でロジック脆弱性検知可能」と書いた誤り** —
+   Round 14 で「effects は DB 登録済み副作用のみ抽出、純粋 auth guard は見えない」
+   と訂正、§1.6 / G-5 と整合性を取った
+4. **Phase 番号** — 当初 user が「F」と言及したが既存 Phase F (source-selection)
+   と衝突、planning doc / commit message で **G** に統一
 
 ### 2026-05-27 — Brief 7 / SSP v0.1 完走 (PR #109〜#112、Issue #108 closed)
 
@@ -239,158 +308,11 @@ LLM-assisted という **Strata 区別**、 text domain は HA48/HA63 (n=63)
    後続 X-3 brief で「`STATUS.md` (or equivalent) mandatory read source」
    を明示する discipline 必要、 と pin
 
-### 2026-05-21 Session 3 — 緊急 doc refactor 8 phase 1 日完走 + framework 自己 refactor dogfood
-
-Session 2 末尾の user 「doc 膨張で agent noise が増える懸念」 提起から
-即時 reality check + 定量化 (起動時 attention budget ~2,500 lines、
-target 800 を大幅超過) → `docs/doc_refactor_planning.md` 起草 (PR #88) →
-**同日中に 8 phase 全完走**。 Codex 利用可 + Claude 単独並列の最大効率
-運用で **9 PR landed + 4 direct push** (memory exception)。 framework
-自身が自分自身を refactor する self-referential dogfood が成立。
-
-- **PR #87** R17: target-doctor `--package-root` repo-root parity (PR #87、
-  PR review monitoring + merge)
-- **PR #88** `docs/doc_refactor_planning.md` 新設 (緊急 plan、 8 phase
-  spec + 9 bloat source + sequencing + risk mitigation +
-  self-referential note)
-- **PR #89** Phase 0: CLAUDE.md `Required Reading` を Tier A/B/C/D 4
-  階層に再構成 + 800 line budget pin
-- **PR #90** Phase 3: AGENTS.md §5 を 8 sub-section → 6 sub-section に
-  collapse (209 → 88 lines)、 Practice + Anti-Pattern + Enforcement を
-  3 列 table に統合、 Phase 6 marker 設置
-- **PR #91** Phase 4: AGENTS.md Forward Design Note (220 lines) を
-  `docs/ssp_protocol_design_note.md` (新 doc 253 lines) に分離、 AGENTS.md
-  に pointer 1 段落のみ残置 (425 → 218 lines、 -60%)
-- **PR #92** Phase 7: CLAUDE.md `終了時ルール (自動トリガー)` を 3-step
-  → 7-step + Anti-pattern list + Archive policy TTL table に拡張。
-  Codex bot review 2 round 連続 P2 消化 (R1 = step 4/5 順序 race の sweep
-  before compaction 修正 commit `75244c7`、 R2 = multi-line inline code
-  span が CommonMark spec で space に正規化される rendering bug 3 箇所を
-  単一行化 commit `f78d111`)
-- **PR #93** Phase 6: `tests/discipline/` 新設 + 3 test
-  (`test_status_md_phase_single_paragraph.py` /
-  `test_status_md_next_queue_no_completed.py` /
-  `test_index_md_entry_compactness.py`) を Codex implementation。 doc rule
-  単独依存を構造的に脱却、 CI で memory hygiene drift を auto-enforce
-- **PR #94** Phase 5: `.claude/memory/archive/INDEX.md` 新設 + TTL contract
-  pin。 実 file 移送は 2026-06-01 以降の TTL-driven ritual に発火 (今日
-  時点最古 dated log = 5/2 = 19 日経過、 30 日 TTL 未達)
-- direct push (memory exception):
-  - `bf8ce8f` ADVISORY-S1 stale entry 削除 (実は 5/15 commit `854a528` で
-    既に landing 済の発見)
-  - `3be25d4` Session 2 wrap-up + CLAUDE.md / AGENTS.md §5 (Experience
-    Externalization Discipline) 永続化
-  - `4783728` Phase 2: `_index.md` 53,953 → 5,251 bytes (**-90%**)、 essay
-    化 cell を 1-line index 本来仕様に復元、 27 entry の時系列正規化
-  - `0db925f` Phase 1: STATUS.md 831 → 505 lines、 `## 直近 merged` 古い
-    10 entry を archive 移送 + `次の発行順序` §A/§B 完走 entry 削除
-
-**累計効果**: 起動時 Tier A attention budget が **~2,500 lines → ~580
-lines (-77%)** に圧縮、 target ≤ 800 を大幅クリア。 情報損失ゼロ (全
-archive 移送 + dated session log は原文保存)。
-
-**設計判断のハイライト**:
-
-1. **bloat 懸念に対する即時 reality check + 定量化** — 「気をつけます」
-   ではなく現状の line count を提示、 problem の規模を共有してから
-   planning doc を起こす流れが速かった
-2. **8 phase の sequencing を ROI 順に設計** — Phase 0 → 2 → 1 を
-   連続実行で 1,340 lines 削減を最初に achieve、 target 達成見込みを
-   user 確信させてから後続 phase へ
-3. **Codex / Claude 体制別運用最適化** — Phase 6 (`tests/discipline/`
-   実装) を Codex 利用可日に最大効率で発注、 残 phase は Claude 単独で
-   並列実行。 Phase 4 を Phase 3 branch から chain することで merge
-   conflict を構造的回避
-4. **Codex review P2 を framework self-test として framing** — PR #92
-   R1 / R2 は新 wrap-up protocol の logical / physical correctness を
-   bot が catch、 規律自体の自己検証の成功例
-5. **self-referential dogfood の意図的設置** — planning doc に「完了後は
-   本 doc を archive/ 移送 (self-referential dogfood example)」 を明記
-6. **discipline test 3 件 が CI auto-enforce 化** — doc rule 単独依存を
-   構造的に脱却、 次 session 以降の memory hygiene drift が CI fail で
-   即検出される状態に到達
-
-**修正・訂正**:
-
-1. **PR #92 R1** (step order race): 順序を sweep → compaction に swap
-2. **PR #92 R2** (multi-line inline code span): 3 箇所を単一行化
-3. **Phase 5 acceptance** の 30 日 TTL 事前条件不成立 → infrastructure
-   設置のみ landed として planning doc 追記
-
-### 2026-05-21 Session 2 — R17 (target-doctor `--package-root` parity) landed (PR #87) + 経験値外部化 framework 永続化
-
-Session 1 (CSCI-44) 完了直後の継続 session。 当初プランの Brief 7 (CSCI-36)
-entry に対して user の判断で先に **A 軸 follow-up = ADVISORY-S1 narrow**
-を確認 → 既に 2026-05-15 commit `854a528` で landing 済と判明、 STATUS.md
-の stale entry 削除のみ (commit `bf8ce8f` direct main) で 5 分 closure。
-続いて **R17 deferred** (target-doctor `--package-root` resolve を
-`check` と同じ repo-root 相対に揃える consistency 改善) の brief 起草 →
-Codex paste → PR #87 → 0 round merge を達成。
-
-- **PR #87** (`fix(target-doctor): resolve --package-root against repo
-  root (parity with check)`、 merge `469385e`):
-  - `target_doctor.py:_resolve_package_root` を repo-root aware 版に置換
-    (+31/-1): absolute reject / `..` escape reject / `repo_root(Path.cwd())`
-    with cwd fallback / `is_relative_to` symlink defense の 4 layer
-  - `tests/cli/test_target_doctor.py` (+218/-1): 6 tests 追加 (subdir
-    parity / `.` parity / D4 filter parity / abs reject / parent escape /
-    git unavailable fallback) + bonus symlink reject (Windows skip)
-  - STATUS.md (+7/-8): R17 deferred 3 sites を完走表記に書換 (Codex 側で
-    自発的更新、 brief Scope IN に明示した効果)
-  - CI 3/3 green (3.11 / 3.12 / 3.13)、 local 1269 passed (1261 baseline
-    + 8 new、 0 regression)、 ruff check / format 両 pass
-
-**経験値外部化 framework 永続化**: PR #82 (16 round) / #84 (13 round) /
-#85 (0 round) / #86 (0 round) / #87 (0 round) の empirical envelope を
-data 表として整理、 「29 round 累計 P2 を `test_canonical.py` 48 cases +
-`tests/architecture/` 16 tests に encode した結果として後続 0 round 達成」
-の因果を言語化。 **CLAUDE.md** に Experience Externalization (経験値の
-外部化) section 軽 (~25 lines、 principle 1 paragraph + 4 item bullet +
-AGENTS.md pointer)、 **AGENTS.md** § 5. Experience Externalization
-Discipline substantial (~180 lines、 8 sub-section: 5.1 Principle / 5.2
-Empirical Envelope / 5.3 Three-Tier Externalization (codified / repo-
-specific / session-tacit) / 5.4 Round Count as Leading Quality Indicator /
-5.5 体制別 envelope / 5.6 Maintenance Practice 7 rule / 5.7
-Anti-Patterns 7 件 / 5.8 Cross-Reference) を追記、 新 brief 起草前 / 新
-architectural pattern 導入前の必読 doc に位置付け。
-
-**設計判断のハイライト**:
-
-1. **「経験値の外部化」 を AI 開発 discipline 規律として明示化** —
-   Claude long-term memory 不在制約が **強制的 externalization discipline**
-   として逆説的に働く framing を §5.1 で言語化、 「ベテランの暗黙知」 が
-   AI 開発では機能しないという principle を policy doc 化
-2. **Review round 数を leading quality indicator として運用** — §5.4 で
-   0 / 1-3 / 5-10 / 10+ の round 数解釈表を pin、 「同じ trap は二度発生
-   させない」 ための encoding work を 5+ round 時に必須化
-3. **体制別 envelope を §5.5 で明示** — split (Codex=impl) で 1 日規模
-   0 round / Claude alone で半日以下 0 round / Claude exception で 1 日
-   規模は 13+ round chase、 の経験的 envelope を data 付きで pin。
-   「Codex が intrinsically 速い」 framing を回避、 「規律 infrastructure
-   揃った状態の split 運用」 が正しい framing
-4. **Maintenance Practice 7 rule (§5.6) + Anti-Patterns 7 件 (§5.7)** —
-   memory log skip 禁止 / §15 checklist 強制 / prefix match 自動 cover
-   保持 / round trail を必ず docs/test に encode / dogfood fail+pass 両方
-   / Claude exception scope ≤ 半日 / STATUS.md 次の発行順序 即時更新 等、
-   実証済 operational rule を逐語化
-5. **本 session 自体が経験値外部化 discipline の自己言及的実演** —
-   反省会で気付いた pattern を即座に CLAUDE.md / AGENTS.md に encode
-   する loop が、 言語化した規律の自己適用例として記録に値する。 §5
-   全 sub-section が本 session 中に書かれた事実は、 discipline の
-   reusability を即時実証している
-
-**修正・訂正**:
-
-1. **A 軸 follow-up「残」 表記が stale** (実体は 2026-05-15 完了済) —
-   brief 起草前の事前確認で発覚、 5 分で stale 削除 closure (commit
-   `bf8ce8f`)。 §5.7 Anti-Patterns #7 「STATUS.md `次の発行順序` 更新を
-   後で先送り」 として明示化、 maintenance practice の重要性を再確認
-
 ---
 
-### 古い merged entry (2026-05-21 S1 以前) — archive 参照
+### 古い merged entry (2026-05-21 S3 以前) — archive 参照
 
-14 entry (2026-05-21 S1 / 2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
+16 entry (2026-05-21 S3 + S2 + S1 / 2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
 `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
@@ -398,19 +320,58 @@ architectural pattern 導入前の必読 doc に位置付け。
 (`.claude/memory/YYYY-MM-DD.md`) を参照。 Phase 1 (initial cutoff、
 `docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
 + 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
-+ 2026-05-26 wrap-up (5/21 S1 移送)
++ 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 wrap-up (5/21 S2+S3 移送)
 で compaction が実施された。
 
 ## 次の発行順序
 
 ABCD-A/B + Brief 7 (SSP v0.1) + D + F 全完走。active queue は
-**E (Phase X 残)** の 1 軸のみ。Brief 7 は 2026-05-27 に CSCI-36〜40
-全マージ + Issue #108 closed で完走 (PR #109〜#112)。
+**G (SSP core integration、 planning は PR #114 + #115 で取り込み済、 実装 CSCI-45〜49 未着手)**
+と **E (Phase X 残)** の 2 軸。Phase G は本 repo 内で完結する実装フェーズ、
+Phase X は ecosystem cross-repo 作業。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
 `.claude/memory/archive/STATUS_MERGED_LOG.md` (古い entry) + dated session
 log (`.claude/memory/YYYY-MM-DD.md`)。
+
+
+### G. Phase G(SSP core integration、 planning は PR #114 + #115 で取り込み済、 実装 5 CSCI 未着手)
+
+`docs/phase_g_planning.md` を planning source として、SSP v0.1 を core の
+横ではなく上 (縦接続) に再構築する 5 PR 構成 (CSCI-45〜49)。SensorState を
+CodeState と並列の別 state に分離し、suite evaluator で code_delta +
+security_delta を統合 verdict、SAST finding を FQN 空間に翻訳して自然キー化、
+canonical_id を canonical JSON array hash で injective encoding。
+
+- **G-1. CSCI-45. SensorState model + canonical_id**:
+  `src/semantic_ci_code/sensor/` 新設 (models.py / delta.py)。SecurityFinding
+  / SensorState / SensorProvenance / SensorDelta の Pydantic 定義、
+  canonical_id ベースの集合差分。既存コード変更なし。AC: hand-built JSON で
+  SensorState 構築・比較可能 (§23.1 鏡像)
+- **G-2. CSCI-46. FQN 翻訳 adapter**:
+  `src/semantic_ci_code/sensor/adapters/` 新設。SSP v0.1 の
+  SemgrepAdapter / PipAuditAdapter を SensorState に正規化、
+  fqn_resolver.py で file:line → FQN 逆引き、canonical_id 生成 (v1 prefix +
+  ensure_ascii=False)、provenance 生成
+- **G-3. CSCI-47. Suite evaluator + security constraint**:
+  `src/semantic_ci_code/suite/` 新設。code_delta + security_delta →
+  suite_verdict、target.yaml `security:` namespace 解釈、scanner drift
+  検出 (provenance_changed → unknown)。AC: target.yaml に security
+  constraint を書いて verdict が出る
+- **G-4. CSCI-48. CLI 統合 + SSP v0.1 migration path**:
+  `semantic-ci check --sensor` 追加。SSP v0.1 の `ssp scan` /
+  `ssp from-json` は互換維持 (deprecated 予告)。suite verdict の
+  JSON / human / SARIF 出力
+- **G-5. CSCI-49. Semantic security templates** (2 カテゴリ):
+  - カテゴリ A (extractor 拡張なし): `dangerous_imports_denied.yaml` +
+    `validation_preserved.yaml`、既存 imports / api_surface で表現
+  - カテゴリ B (extractor 拡張必要): `auth_guard_preserved.yaml` +
+    `privileged_api_gated.yaml`、G-5 brief で extractor scope を AC として
+    定義 (auth decorator 検出 or data_flow 実装)
+
+planning doc §6 Open Questions (Q1〜Q5) は G-1 brief 起草時に最低限
+G-1 範囲では確定する。
 
 
 ### E. Phase X(UGH ecosystem formalization、 2026-05-21 Session 5 起草、 残 3 sub-phase)
@@ -449,15 +410,24 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 
 - **A/B/C/D/F 全完走**: Brief 1〜8 + ResultStatus split + source-selection
   redesign + Brief 7 (SSP v0.1) 全 merged
-- **E (Phase X) のみ active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
+- **G (Phase G) active**: 本 repo 内で完結する実装フェーズ、CSCI-45 から
+  順次 brief 起草 + Codex 実装 split で進行
+- **E (Phase X) active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
   は ecosystem cross-repo work で別 Claude Code session 委譲、E-3 (X-2
   validation 移植) は中長期 phase
+- **G と E の優先順位**: G は本 repo 単独完結なので Codex split で平行
+  進行可能、E は別 session 委譲で本 session と非同期。本 repo 内の作業
+  優先度では G が先
 
 ### 直近最短経路
 
-- **E-1. Phase X-3. Cross-ref embedding in 残 3 ecosystem repo** の brief
-  設計 + 別 session 委譲 (PR #96 の `## Ecosystem Context` を template 再利用)
-- **E-2. Phase X-1 続き. Umbrella `docs/` 拡張** (vocabulary / strata / roadmap)
+- **G-1. CSCI-45 brief 起草**: SensorState model + canonical_id +
+  delta engine (新設のみ、既存コード変更なし)。planning doc §6
+  Open Questions のうち G-1 範囲を brief 起草時に確定
+- **G-2. CSCI-46 brief 起草** (G-1 merge 後): FQN 翻訳 adapter +
+  SSP v0.1 adapter 移植
+- **E-1. Phase X-3. Cross-ref embedding** (並行可、別 session 委譲)
+- **E-2. Phase X-1 続き. Umbrella `docs/` 拡張** (並行可、別 session 委譲)
 - **E-3. Phase X-2. HA-style validation cross-domain 移植** (中長期)
 
 ## Frozen / Deferred

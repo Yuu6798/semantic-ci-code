@@ -22,7 +22,7 @@ The procedure has a hard ordering and a hard gate that散文では構造的に
 - **step 4 (`次の発行順序` sweep) must run before step 5 (`直近 merged`
   compaction)** — a single pass that moves completed entries into 直近
   merged *then* re-evaluates the 5-cap (PR #92 review).
-- **step 8 (`pytest tests/discipline/`) must run before any direct push** —
+- **step 8 (`python -m pytest tests/discipline/`) must run before any direct push** —
   the `.claude/memory/` main-push exception is post-hoc-only, so a discipline
   violation turns main red directly instead of being blocked by PR CI.
 
@@ -80,8 +80,13 @@ warranted, propose it to the user.
 Run:
 
 ```bash
-pytest tests/discipline/ -q --no-cov
+python -m pytest tests/discipline/ -q --no-cov
 ```
+
+Use `python -m pytest`, not bare `pytest`: a bare `pytest` on `$PATH` can
+resolve to an interpreter without the `pytest-cov` plugin, making `--no-cov`
+an unrecognized argument and the gate error out spuriously. `python -m`
+pins the invocation to the active environment's pytest.
 
 All tests in `tests/discipline/` MUST pass before pushing. A failure means
 drift remains from steps 4–6 — fix the offending file and re-run; do NOT

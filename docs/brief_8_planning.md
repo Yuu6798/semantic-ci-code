@@ -811,14 +811,14 @@ CSCI acceptance の cross-test に対応。
 
 - [ ] **実 schema を grep して検証**: 提案する path / operator / match_schema
       key / template constraint が実装に存在することを以下のファイルで確認:
-  - `domain/state_schema.py`(Delta field)
-  - `evaluator/operators.py`(operator 名と semantic)
-  - `evaluator/evaluator.py`(template relaxation 経路)
-  - `compiler/templates.py`(`TEMPLATE_CONSTRAINTS` dict)
-  - `compiler/target_compiler.py`(allow_changes 等の policy hatch)
-  - `compiler/path_schema.py`(path validation)
-  - `framework/match_schema.py`(registry: required/optional/forbidden keys)
-  - `framework/target_svp.py`(field optionality / target-level keys)
+  - `src/semantic_ci_code/domain/state_schema.py`(Delta field)
+  - `src/semantic_ci_code/evaluator/operators.py`(operator 名と semantic)
+  - `src/semantic_ci_code/evaluator/evaluator.py`(template relaxation 経路)
+  - `src/semantic_ci_code/compiler/templates.py`(`TEMPLATE_CONSTRAINTS` dict)
+  - `src/semantic_ci_code/compiler/target_compiler.py`(allow_changes 等の policy hatch)
+  - `src/semantic_ci_code/compiler/path_schema.py`(path validation)
+  - `src/semantic_ci_code/framework/match_schema.py`(registry: required/optional/forbidden keys)
+  - `src/semantic_ci_code/framework/target_svp.py`(field optionality / target-level keys)
 - [ ] **template 説明は `TEMPLATE_CONSTRAINTS` dict を逐語参照**(brief 起草時
       に思い込みで書かない)
 - [ ] **collection constraint の値形式**は実 delta producer の出力と一致

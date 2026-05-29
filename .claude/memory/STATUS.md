@@ -28,6 +28,31 @@ Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selecti
 
 ## 直近 merged
 
+### 2026-05-29 Session 2 — SessionStart hook + fixture 署名修正 (PR #120)
+
+2 Skill (new-brief / wrap-up) の動作確認から派生した tooling 系 PR。active
+queue (Phase G / Phase X) には未着手で、 Web セッションの実行基盤を整備。
+
+- **PR #120** (merged `a570a85`、 commits `717d10f`→`5acf441`):
+  - `.claude/hooks/session-start.sh` + `.claude/settings.json` 新設:
+    remote-only / startup・resume 限定 / 同期で `pip install -e ".[dev]"`。
+    SessionStart stdout が model context に注入されるため pip 出力は log 捕捉
+    し失敗時のみ stderr、 成功時 1 行。`$CLAUDE_PROJECT_DIR` は引用 (空白パス
+    word-split 防止)。狙いは `/wrap-up` step 8 (`pytest tests/discipline/
+    -q --no-cov`、 cov plugin 必須) の起動時成立。
+  - fixture 署名修正: `tests/cli/git_helpers.py` (`run`) +
+    `tests/architecture/test_check_provenance.py` (`_git`) に `GIT_CONFIG_*`
+    env で `commit.gpgsign`/`tag.gpgsign` false 注入。host の署名強制
+    (`/tmp/code-sign`、 fixture commit を "missing source" で拒否) を継承して
+    フルスイートが 466 件 fail/error していた問題を host config 不変で解消
+    (既存 `test_target_doctor._git` の precedent に idiom 統一)。フルスイート
+    1436 passed / coverage 90%。
+  - self-dogfood: PR diff に `semantic-ci check` (refactor:API保持) → PASS /
+    exit 0。変更全件が package-root 外 (tests/ + .claude/) のため D4 (vacuous
+    PASS) に該当することを正直報告 (誤検知ではなく射程外)。
+  - Codex bot review P2 × 3 (pip 出力の context 注入 / matcher 全 source 一致 /
+    `$CLAUDE_PROJECT_DIR` 未引用) を 2 push で消化。
+
 ### 2026-05-29 — doc-refactor Phase 6 完走 + doc hygiene sweep (PR #118)
 
 `doc_refactor_planning.md` Phase 6 の残 "future hardening" 3 候補を closeout し、
@@ -186,26 +211,10 @@ CSCI-40 (CLI + SARIF + human format) = PR #112。全 PR CI green、P1 なし
 (PR #109 のみ P1 2件を修正後マージ)。`semantic-ci ssp scan` / `ssp from-json`
 で SSP v0.1 が end-to-end 使用可能。Issue #108 completed でクローズ。
 
-### 2026-05-26 — target authoring UX 改善 landed (PR #106 + #107)
+### 古い merged entry (2026-05-26 以前) — archive 参照
 
-target.yaml 初期作成の UX 改善を 2 PR で land。設計 v1→v2 改訂
-(user レビューで PR 順序矛盾 / --package-root サイレント無視 /
-package_root 解決の共有化不足 / stderr 二重改行 / \r チェック漏れ
-の 5 点を修正)、両 PR 0 round approve。
-
-- **PR #106** (merged): `feat(init): improve target authoring UX with
-  --intent and inline doctor` — `--intent` フラグ / next-command
-  guidance / recipe notes / test_surface note / `--doctor` inline
-  実行 / `doctor_support.py` 共有化 (target_doctor.py の
-  `_resolve_package_root` を移動)。475+/51-、CI 3/3 green
-- **PR #107** (merged): `feat(authoring): add ADVISORY-I1 for empty
-  target intent` — `detect_i1`: `target.intent == ""` で発火、
-  whitespace-only は非該当。advisory 6→7 件。81+/3-、CI 3/3 green
-
-### 古い merged entry (2026-05-22 以前) — archive 参照
-
-18 entry (2026-05-22 / 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
-2026-05-15 Session 4 + Session 3 + Session 2 /
+19 entry (2026-05-26 / 2026-05-22 / 2026-05-21 S5 + S3 + S2 + S1 /
+2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
 `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
@@ -214,8 +223,8 @@ package_root 解決の共有化不足 / stderr 二重改行 / \r チェック漏
 `docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
 + 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
 + 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 S1 wrap-up (5/21 S2+S3 移送)
-+ 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送) で
-compaction が実施された。
++ 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送)
++ 2026-05-29 S2 wrap-up (5/26 移送) で compaction が実施された。
 
 ## 次の発行順序
 

@@ -857,3 +857,19 @@ encode して正式採用まで 2 PR cascade で land
   (no alias / no deprecation / hard delete)、 §7 で rejected options 4 件を
   rationale 付き永続化
 
+
+### 2026-05-26 — target authoring UX 改善 landed (PR #106 + #107)
+
+target.yaml 初期作成の UX 改善を 2 PR で land。設計 v1→v2 改訂
+(user レビューで PR 順序矛盾 / --package-root サイレント無視 /
+package_root 解決の共有化不足 / stderr 二重改行 / \r チェック漏れ
+の 5 点を修正)、両 PR 0 round approve。
+
+- **PR #106** (merged): `feat(init): improve target authoring UX with
+  --intent and inline doctor` — `--intent` フラグ / next-command
+  guidance / recipe notes / test_surface note / `--doctor` inline
+  実行 / `doctor_support.py` 共有化 (target_doctor.py の
+  `_resolve_package_root` を移動)。475+/51-、CI 3/3 green
+- **PR #107** (merged): `feat(authoring): add ADVISORY-I1 for empty
+  target intent` — `detect_i1`: `target.intent == ""` で発火、
+  whitespace-only は非該当。advisory 6→7 件。81+/3-、CI 3/3 green

@@ -7,7 +7,8 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 
 | Date | PR / commit | Outcome | Detail |
 |---|---|---|---|
-| 2026-05-29 | #118 | doc-refactor Phase 6 完走 (schema-grep + dual-case を `tests/discipline/` 化、 round-count retire) + doc hygiene sweep (phase_g 表 drift / STATUS 418→349 / AGENTS §5.5 同期)。Codex P2 で dual-case を verdict 列パースに改修 + 回帰 test。壁打ちで B=coverage advisory 設計を externalize (検証不能な真値→検証可能な保守代理 のメタ原理) | `2026-05-29.md` |
+| 2026-05-29 (S2) | #120 | 2 Skill (new-brief/wrap-up) 動作確認 (構造・参照・gate 全検証、 dangling ゼロ) → SessionStart hook (dev-extras 自動導入、 startup/resume 限定、 出力抑制) + fixture 署名 OFF (host config 不変、 GIT_CONFIG env で commit.gpgsign false) で Web/local フルテスト緑化。self-dogfood PASS (D4 vacuous と正直報告)、 Codex P2×3 を 2 push で消化、 PR #120 merge | `2026-05-29.md` |
+| 2026-05-29 (S1) | #118 | doc-refactor Phase 6 完走 (schema-grep + dual-case を `tests/discipline/` 化、 round-count retire) + doc hygiene sweep (phase_g 表 drift / STATUS 418→349 / AGENTS §5.5 同期)。Codex P2 で dual-case を verdict 列パースに改修 + 回帰 test。壁打ちで B=coverage advisory 設計を externalize (検証不能な真値→検証可能な保守代理 のメタ原理) | `2026-05-29.md` |
 | 2026-05-28 (S2) | #116 + #117 | Real-PR complexity dogfood report + 単一 tracker landed (D6/D7 追加)、 続けて件数列追加で 累計 21 件 (S4=3 + TC10=10 + real-PR=8) を tracker 単体で即答可能化 | `2026-05-28.md` |
 | 2026-05-28 (S1) | #114 + #115 | Phase G (SSP core integration) planning landed。SSP 実地テスト 21 ケース (実 9 + 仮想 5 + multi-agent 7) → 設計問題発覚 → 3 AI 統合 planning 起草 → Codex 18 round / 22 P2 chase。PR #114 merge 後 #115 で deep cross-ref 7 件追加修正 | `2026-05-28.md` |
 | 2026-05-27 | #109-#112 | Brief 7 / SSP v0.1 完走 (CSCI-36〜40)。spec doc 復元 + models/delta/fingerprint + SemgrepAdapter + PipAuditAdapter + CLI/SARIF/human format。Issue #108 closed | `2026-05-27.md` |

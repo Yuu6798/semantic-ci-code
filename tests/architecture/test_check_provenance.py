@@ -191,6 +191,13 @@ def _git(repo: Path, *args: str) -> str:
             "GIT_COMMITTER_EMAIL": "semantic-ci@example.invalid",
             "GIT_AUTHOR_DATE": "2024-01-01T00:00:00+00:00",
             "GIT_COMMITTER_DATE": "2024-01-01T00:00:00+00:00",
+            # See git_helpers.run: disable signing so fixture commits do not
+            # inherit a host's enforced commit.gpgsign.
+            "GIT_CONFIG_COUNT": "2",
+            "GIT_CONFIG_KEY_0": "commit.gpgsign",
+            "GIT_CONFIG_VALUE_0": "false",
+            "GIT_CONFIG_KEY_1": "tag.gpgsign",
+            "GIT_CONFIG_VALUE_1": "false",
         }
     )
     result = subprocess.run(

@@ -102,6 +102,16 @@ def run(
             "GIT_COMMITTER_EMAIL": "semantic-ci@example.invalid",
             "GIT_AUTHOR_DATE": "2024-01-01T00:00:00+00:00",
             "GIT_COMMITTER_DATE": "2024-01-01T00:00:00+00:00",
+            # Disable commit/tag signing for fixture repos so the suite does
+            # not inherit a host's enforced ``commit.gpgsign`` (e.g. the
+            # signing setup in Claude Code on the web rejects fixture commits
+            # with "missing source"). Mirrors the local ``_git`` helper in
+            # test_target_doctor.py.
+            "GIT_CONFIG_COUNT": "2",
+            "GIT_CONFIG_KEY_0": "commit.gpgsign",
+            "GIT_CONFIG_VALUE_0": "false",
+            "GIT_CONFIG_KEY_1": "tag.gpgsign",
+            "GIT_CONFIG_VALUE_1": "false",
         }
     )
     if env:

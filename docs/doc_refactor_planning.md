@@ -210,7 +210,7 @@ candidate は test 形式と相性が悪いため retire (理由は下表)。
 | `STATUS.md ## Phase` duplicate paragraph | implemented: `tests/discipline/test_status_md_phase_single_paragraph.py` | `## Phase` section の paragraph count が 1 でなければ fail |
 | `_index.md` essay cell 化 | implemented: `tests/discipline/test_index_md_entry_compactness.py` | table cell が 500 chars を超えれば fail |
 | schema-grep check | implemented: `tests/discipline/test_json_schema_version_sync.py` | 各 CLI envelope の `schema_version` 定数 (producer) と `docs/json_schema.md` の Currently/Always anchor が不一致なら fail |
-| dual-case dogfood | implemented: `tests/discipline/test_dogfood_dual_case.py` | `docs/dogfooding_*.md` が PASS / FAIL 両方向を実演していなければ fail |
+| dual-case dogfood | implemented: `tests/discipline/test_dogfood_dual_case.py` | registered case/verdict-matrix report の `Verdict` 列 (散文ではなく列をパース) が PASS / FAIL 両方向を含まなければ fail。 PR #118 Codex review で散文スキャンの誤通過を指摘され列パースに改修 |
 | round-count-to-encoding check | **retired** (test 化せず) | review round 数は hand-written prose にしか存在せず、 test はその文字列の近傍 proxy にしかなり得ない。 肝心の「encode 忘れ」 case こそ検出できず、 framework 自己膨張パラドックスを再誘発する。 intent は `CLAUDE.md` 終了時ルールの wrap-up checklist 項目 (5+ round 論点の encode check) として常駐 |
 
 **Acceptance**: 完走 (5 implemented + 1 retired)。 schema-grep / dual-case

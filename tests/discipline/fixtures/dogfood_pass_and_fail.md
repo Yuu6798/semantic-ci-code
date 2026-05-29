@@ -1,10 +1,10 @@
 # Balanced dogfood fixture
 
-This fixture demonstrates both verdict directions, so the dogfooding pass can
+The Verdict column demonstrates both directions, so the dogfooding pass can
 evidence detection power in both directions.
 
-| Case | Verdict |
-|---|---|
-| C1 | PASS |
-| C2 | FAIL |
-| C3 | PASS |
+| # | Case | Verdict | Note |
+|---:|---|---|---|
+| 1 | C1 | PASS | clean |
+| 2 | C2 | FAIL | regression caught |
+| 3 | C3 | PASS | clean |

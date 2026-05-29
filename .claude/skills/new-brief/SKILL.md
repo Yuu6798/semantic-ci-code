@@ -25,6 +25,10 @@ Before drafting, read:
   its reusable core; consult the source for domain-specific items).
 - The relevant `docs/<topic>_planning.md` for the phase/brief at hand, and
   `.claude/memory/STATUS.md` § Phase + § 次の発行順序 for current priority.
+- `.claude/memory/_index.md` + the 直近 3 dated `YYYY-MM-DD.md` session logs.
+  `AGENTS.md §5.5` makes this mandatory before brief drafting: skipping the
+  memory log re-introduces the "memory log skip → 過去 session trap 再発生"
+  anti-pattern, and this skill is the executor for every new brief.
 
 If a required doc is stale or missing, surface that in the draft rather than
 inventing context (documented recurring failure mode).

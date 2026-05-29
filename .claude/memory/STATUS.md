@@ -28,6 +28,29 @@ Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selecti
 
 ## 直近 merged
 
+### 2026-05-29 — doc-refactor Phase 6 完走 + doc hygiene sweep (PR #118)
+
+`doc_refactor_planning.md` Phase 6 の残 "future hardening" 3 候補を closeout し、
+起動時 audit で surface した doc drift を同 PR に積んだ。
+
+- **PR #118** (merged、 commits `aa56332`→`f8f004c`):
+  - Phase 6: schema-grep を `tests/discipline/test_json_schema_version_sync.py`
+    (CLI envelope `schema_version` 定数 ↔ `docs/json_schema.md` anchor 同期)、
+    dual-case dogfood を `test_dogfood_dual_case.py` (registered case/verdict-matrix
+    report の `Verdict` 列が PASS/FAIL 両方向を含むか) に test 化。round-count は
+    retire (prose proxy が脆い → `CLAUDE.md` wrap-up checklist へ格下げ)。
+  - hygiene: `CLAUDE.md` 表に `phase_g_planning.md` 行追加、 README Planning 補完
+    + stale schema_version 修正、 STATUS 2026-05-22 entry 圧縮 (418→349 行)、
+    `AGENTS.md §5.5` enforcement cell を実 test パスへ同期。
+  - Codex bot review P2 (dual-case の prose-scan 誤通過) に対応し **verdict 列
+    パース**へ改修 + `test_dual_case_ignores_prose_tokens` 回帰追加。CI 一度 fail
+    (ruff format 見落とし) → 修正で 3.11/3.12/3.13 green。
+- 壁打ち成果 (実装は Codex 不在で見送り): **B = coverage advisory** の設計思想・
+  実務順序・較正方針を `.claude/memory/2026-05-29.md` 専用 section に externalize。
+  メタ原理「検証不能な真値 → 検証可能な保守的代理」。
+- 残: doc_refactor 自己 archive は Phase 3 cosmetic (§5 trim、 §5.3 merge は再考
+  推奨 = 非実行) のため見送り。
+
 ### 2026-05-28 Session 2 — Real-PR complexity dogfood report + tracker case-count landed (PR #116 + #117)
 
 同日 Session 1 (Phase G planning) と並走していた **公開 Python リポジトリ
@@ -179,35 +202,10 @@ package_root 解決の共有化不足 / stderr 二重改行 / \r チェック漏
   target intent` — `detect_i1`: `target.intent == ""` で発火、
   whitespace-only は非該当。advisory 6→7 件。81+/3-、CI 3/3 green
 
-### 2026-05-22 — Issue #97 (`--allow-dirty` provenance bug) Phase 1 mitigation landed (PR #98) + Source-selection redesign 正式採用 (PR #99)
+### 古い merged entry (2026-05-22 以前) — archive 参照
 
-`langchain-ai/langchain` への blind random sampling で発覚した
-`semantic-ci check --candidate-rev <SHA> --allow-dirty` の provenance bug
-を 1 day で closure し、 同 session 内で design hole を planning doc に
-encode して正式採用まで 2 PR cascade で land
-(`claude/repository-issue-review-BVt9Y` を 2 PR 連続 reuse)。
-
-- **PR #98** (merged `bf4af3b`、 0 round): `check.py` に
-  `candidate_uses_working_tree` derived predicate 導入、 explicit
-  `--candidate-rev` + `--allow-dirty` 同時指定で warning + ref materialize。
-  `tests/architecture/test_check_provenance.py` 新設 (§23.1 CLI-layer
-  mirror、 4 invariant)。 CI 3/3 green、 1284 passed。 PR body で Phase 2
-  deferral を明示宣言し後続 #99 の前提を pin
-- **PR #99** (docs only): `docs/source_selection_planning.md` 新設
-  (406 lines)。 `--candidate-source` / `--baseline-source` redesign を
-  Phase 2 / 3a / 3b の 3 PR 構成で pin、 aggressive / clean-cut style
-  (no alias / no deprecation / hard delete)、 §7 で rejected options 4 件を
-  rationale 付き永続化
-
-設計判断・修正の詳細 (7 sub-question の 4-style trade-off 圧縮、 rejected
-options 永続化 pattern、 §23.1 reinforcement、 当初 4→3 phase 統合と JSON
-provenance 前倒し等) は `.claude/memory/2026-05-22.md` 参照。
-
----
-
-### 古い merged entry (2026-05-21 S5 以前) — archive 参照
-
-17 entry (2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
+18 entry (2026-05-22 / 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
+2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
 `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
@@ -216,7 +214,8 @@ provenance 前倒し等) は `.claude/memory/2026-05-22.md` 参照。
 `docs/doc_refactor_planning.md`) + 2026-05-21 S3 wrap-up (5/15 S3 移送)
 + 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
 + 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 S1 wrap-up (5/21 S2+S3 移送)
-+ 2026-05-28 S2 wrap-up (5/21 S5 移送) で compaction が実施された。
++ 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送) で
+compaction が実施された。
 
 ## 次の発行順序
 

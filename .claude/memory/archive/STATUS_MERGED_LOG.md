@@ -832,3 +832,28 @@ docs only の CSCI-41 (Session 2) を実装に展開し、 6 advisory (D1/D3/D4/
    ごとに inviolate predicate 1 行」 + 「false negative の境界 fixture を AC で
    要求」 する pattern を継承
 
+---
+
+### 2026-05-22 — Issue #97 (`--allow-dirty` provenance bug) Phase 1 mitigation landed (PR #98) + Source-selection redesign 正式採用 (PR #99)
+
+(2026-05-29 wrap-up で 直近 merged cap 5 維持のため移送。 full detail は
+`.claude/memory/2026-05-22.md`)
+
+`langchain-ai/langchain` への blind random sampling で発覚した
+`semantic-ci check --candidate-rev <SHA> --allow-dirty` の provenance bug
+を 1 day で closure し、 同 session 内で design hole を planning doc に
+encode して正式採用まで 2 PR cascade で land
+(`claude/repository-issue-review-BVt9Y` を 2 PR 連続 reuse)。
+
+- **PR #98** (merged `bf4af3b`、 0 round): `check.py` に
+  `candidate_uses_working_tree` derived predicate 導入、 explicit
+  `--candidate-rev` + `--allow-dirty` 同時指定で warning + ref materialize。
+  `tests/architecture/test_check_provenance.py` 新設 (§23.1 CLI-layer
+  mirror、 4 invariant)。 CI 3/3 green、 1284 passed。 PR body で Phase 2
+  deferral を明示宣言し後続 #99 の前提を pin
+- **PR #99** (docs only): `docs/source_selection_planning.md` 新設
+  (406 lines)。 `--candidate-source` / `--baseline-source` redesign を
+  Phase 2 / 3a / 3b の 3 PR 構成で pin、 aggressive / clean-cut style
+  (no alias / no deprecation / hard delete)、 §7 で rejected options 4 件を
+  rationale 付き永続化
+

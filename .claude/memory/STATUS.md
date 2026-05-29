@@ -182,95 +182,26 @@ package_root 解決の共有化不足 / stderr 二重改行 / \r チェック漏
 ### 2026-05-22 — Issue #97 (`--allow-dirty` provenance bug) Phase 1 mitigation landed (PR #98) + Source-selection redesign 正式採用 (PR #99)
 
 `langchain-ai/langchain` への blind random sampling で発覚した
-`semantic-ci check --candidate-rev <SHA> --allow-dirty` の provenance
-bug を 1 day で closure し、 同 session 内で design hole を planning doc
-に encode して正式採用までを 2 PR cascade で land。 `claude/repository-issue-review-BVt9Y`
-branch を 2 PR で連続 reuse。
+`semantic-ci check --candidate-rev <SHA> --allow-dirty` の provenance bug
+を 1 day で closure し、 同 session 内で design hole を planning doc に
+encode して正式採用まで 2 PR cascade で land
+(`claude/repository-issue-review-BVt9Y` を 2 PR 連続 reuse)。
 
-- **PR #98** (merged `bf4af3b`、 0 round):
-  `fix(check): preserve explicit --candidate-rev under --allow-dirty (#97)`
-  - `check.py` に `candidate_uses_working_tree = allow_dirty AND
-    candidate_rev is None` derived predicate、 explicit `--candidate-rev`
-    + `--allow-dirty` 同時指定で warning + ref materialize に変更
-  - 2 副次 call site (cache write 抑制 / numstat range) を derived
-    predicate 経由に rewire
-  - `tests/architecture/test_check_provenance.py` 新設 = §23.1 CLI-layer
-    mirror、 inv-1 (A==B → empty observed) / inv-2 (working-tree-only
-    symbols が evidence に漏れない) を `allow_dirty ∈ {False, True}` で
-    parametrize、 計 4 invariant
-  - `tests/cli/test_check.py` に 2 new integration test (warning fires /
-    bare `--allow-dirty` unchanged)
-  - `docs/cli_usage.md` で `--allow-dirty` × `--candidate-rev` の interaction
-    semantics を pin
-  - CI 3/3 green (3.11 / 3.12 / 3.13)、 1284 passed (baseline 1281 + new 3)、
-    ruff clean
-  - PR body で "A deeper fix is deferred to a Phase 2 Task Brief" と明示
-    宣言、 後続 PR #99 の前提を pin
-- **PR #99** (open at session wrap-up、 docs only):
-  `docs(planning): adopt source-selection redesign (Phase 2 / 3a / 3b)`
-  - `docs/source_selection_planning.md` 新設 (406 lines、 12 section)
-  - 7 sub-question を `§3` lock-in 表で encode、 全 sub-decision
-    aggressive / clean-cut style から derive (no alias / no deprecation /
-    hard delete)
-  - 3 PR 構成: Phase 2 (`--candidate-source {commit, working-tree}` +
-    `--allow-dirty` 削除 + JSON envelope provenance) / Phase 3a (対称
-    `--baseline-source` + `staged-index` 追加 + 4 conflict rule pin +
-    degenerate warning + source × source matrix docs) / Phase 3b
-    (`pre-commit` subcommand 削除 + `.pre-commit-hooks.yaml` rewrite)
-  - `§7 Decisions rejected / not adopted` で 4 rejected options を rationale
-    付き永続化 (Phase 2.5 / `--allow-dirty` alias / `--candidate-source=auto`
-    / engine-level source enum)
-  - `§8 Phase ordering` で strict order を pin (Phase 3a は Phase 2 が
-    main にあるまで開始不可、 Phase 3b は Phase 3a が main にあるまで
-    開始不可、 published hook break 回避)
-  - `§9 Required Reading` で Phase 2 brief drafter の必読 7 件を列挙
-  - `§11` Phase 3b PR cross-phase acceptance criteria (grep clean /
-    migration note / schema_version 維持 / `§23.1` doc 明示) を pin
-  - `CLAUDE.md` Design Documents table に planning doc 行追加
+- **PR #98** (merged `bf4af3b`、 0 round): `check.py` に
+  `candidate_uses_working_tree` derived predicate 導入、 explicit
+  `--candidate-rev` + `--allow-dirty` 同時指定で warning + ref materialize。
+  `tests/architecture/test_check_provenance.py` 新設 (§23.1 CLI-layer
+  mirror、 4 invariant)。 CI 3/3 green、 1284 passed。 PR body で Phase 2
+  deferral を明示宣言し後続 #99 の前提を pin
+- **PR #99** (docs only): `docs/source_selection_planning.md` 新設
+  (406 lines)。 `--candidate-source` / `--baseline-source` redesign を
+  Phase 2 / 3a / 3b の 3 PR 構成で pin、 aggressive / clean-cut style
+  (no alias / no deprecation / hard delete)、 §7 で rejected options 4 件を
+  rationale 付き永続化
 
-**設計判断のハイライト**:
-
-1. **「Phase 1 mitigation を land + 同 session 内で Phase 2+ redesign
-   を planning doc に encode」 ritual**: PR #98 body の "deferred"
-   宣言を session 内で消化、 context cohesion が高い間に rejected
-   options の rationale を precise に pin。 別 session で planning
-   doc を起こすより rejected options が遺漏しにくい
-2. **7 sub-question を 4-style trade-off comparison で 1 turn 確定**:
-   conservative / additive / symmetry-first / aggressive の 4 style
-   提示 → 各 style における 7 sub-decision の derived position を
-   表で展開 → user 1 turn 判断で X = aggressive 確定。 AGENTS.md
-   §5.7 「AskUserQuestion N 択 trade-off 提示」 pattern を style 軸
-   に応用、 個別問い 7 個を 1 メタ問いに圧縮
-3. **`§7 Rejected options` を planning doc に **永続化する new pattern**:
-   通常の planning doc は採用案 + 採用理由を書くが、 「却下案 + 却下
-   理由」 を 4 件明示 pin することで future agent が同 trap を踏まない。
-   §5.3 Three-Tier Externalization codified tier に「rejected options」
-   を加える pattern
-4. **`§23.1 input neutrality` を CLI redesign で reinforce**: engine
-   signature `engine.check_pair(baseline_path, candidate_path, intent)`
-   不変、 sourcing は CLI-layer 単独責務、 planning doc §4.4 で
-   `code_semantic_ci_design.md §23.1` text に「engine は path-snapshot
-   しか見ない」 を明示追記する task を Phase 2 brief に組み込み。
-   半年規律の延長線上に 3 phase redesign を pin
-5. **「aggressive / clean-cut」 style が repo culture と整合**: scope
-   guard / §23.1 / 経験値外部化 / Tier A budget compaction、 いずれも
-   「shim を増やさず削除すべきものは削除する」 規律。 PR #98 が recent
-   enough で external caller pin が無いことを hard delete 採用の論拠
-   として明示
-
-**修正・訂正**:
-
-1. **当初 4 phase 案 (Phase 2 / 2.5 / 3a / 3b) を Phase 3 に統合**:
-   `--baseline-source` 単独追加 phase は同一 user-facing API axis を
-   2 PR に分割するコストが merit を上回ると分析、 Phase 3a に統合
-2. **JSON provenance を Phase 3a に defer する案を 当初提示**:
-   X = aggressive 採用により「Phase 2 で envelope の 2 値 enum を
-   land しないと Phase 1 mitigation の warning が残るだけになる」 と
-   再考、 Phase 2 に前倒し
-3. **PR title `(#97)` suffix**: GitHub squash merge 時の自動補完で
-   issue # が PR title に紛れた、 worth noting だが behavior 上の
-   問題なし。 今後 PR title に issue # を含めるかは convention 議論
-   として保留
+設計判断・修正の詳細 (7 sub-question の 4-style trade-off 圧縮、 rejected
+options 永続化 pattern、 §23.1 reinforcement、 当初 4→3 phase 統合と JSON
+provenance 前倒し等) は `.claude/memory/2026-05-22.md` 参照。
 
 ---
 

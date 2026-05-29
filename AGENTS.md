@@ -116,7 +116,8 @@ Codex should stop and report a blocked Completion Summary when:
 Required reading **before drafting any new Task Brief** or **introducing
 a new architectural pattern**. Codifies the operating principle from
 2026-04 〜 2026-05 累計 28 sessions / 39 merged PRs. Compacted by
-`docs/doc_refactor_planning.md` Phase 3 (was 209 lines, now ≤ 80).
+`docs/doc_refactor_planning.md` Phase 3 (was 209 lines, now ~88; ≤ 80 target
+の残 cosmetic と §5.3 merge は Phase 3 の唯一の未了項目)。
 
 ### 5.1 Principle
 
@@ -173,20 +174,19 @@ maintenance practice を遵守しないと PR #84 の状態に戻る。
 ### 5.5 Practice + Anti-Pattern + Enforcement (combined)
 
 各 rule は **肯定形 (Practice)** / **反例 (Anti-Pattern)** / **enforce 経路**
-の 3 軸で読む。 enforce 経路が 「(Phase 6)」 のものは
-`docs/doc_refactor_planning.md` Phase 6 で `tests/discipline/` に test 化
-予定。
+の 3 軸で読む。 enforce 経路の `tests/discipline/` test は
+`docs/doc_refactor_planning.md` Phase 6 (完走) で出揃った。
 
 | Practice | Anti-Pattern | Enforcement |
 |---|---|---|
 | brief 起草前に memory log + 直近 3 dated entries 読む | memory log skip → 過去 session trap 再発生 | `CLAUDE.md` § Required Reading (Tier A) |
-| §15.1 Schema grounding (producer 出力 shape grep 後 validator) | 思い込みで validator 書く → `Class::method` 受理忘れ系 trap | `docs/brief_8_planning.md §15.1` + (future hardening: schema-grep check) |
+| §15.1 Schema grounding (producer 出力 shape grep 後 validator) | 思い込みで validator 書く → `Class::method` 受理忘れ系 trap | `docs/brief_8_planning.md §15.1` + `tests/discipline/test_json_schema_version_sync.py` |
 | §15 checklist 全項目 (規模に関係なく) | 「短い brief だから」 で §15 skip | `docs/brief_8_planning.md §15` (8 sub-checklist) |
 | 新 module 追加時に architecture test の prefix match cover を確認 | prefix match → 個別 enumeration に regress / prefix を緩める | `tests/architecture/test_surface_isolation.py` |
-| dogfood で fail case + pass case 両方を実演 | pass case 1 件のみで「動いた」 → no-op gate 検出不能 | (future hardening: dual-case dogfood check) |
+| dogfood で fail case + pass case 両方を実演 | pass case 1 件のみで「動いた」 → no-op gate 検出不能 | `tests/discipline/test_dogfood_dual_case.py` |
 | AskUserQuestion で trade-off 軸 3-4 択提示 | 単純な yes/no 問い → user 判断遅延 | (pattern catalog、 PR #84 R10 / #85 / 5/21 で再現性確認) |
 | Codex 不在時の Claude exception scope ≤ 半日 | 1 日規模を Claude 単独押し込み → 13+ round chase | (体制 envelope §5.2、 PR #84 vs #85 の境界) |
-| review 5+ round → PR merge 後に「曖昧だった spec」 を docs/test に encode | round 内修正のみで完了 → trail が memory log だけに残り再参照されない | (future hardening: round-count-to-encoding check) |
+| review 5+ round → PR merge 後に「曖昧だった spec」 を docs/test に encode | round 内修正のみで完了 → trail が memory log だけに残り再参照されない | `CLAUDE.md` 終了時ルール step 7 wrap-up checklist (round-count は test 化せず retire: prose proxy が脆く「encode 忘れ」 case を検出不能) |
 | PR merge 直後に STATUS.md `次の発行順序` を sweep (完走 entry 削除) | 「後で」 と先送り → stale entry 蓄積 (5/21 で ADVISORY-S1 + R17 で 2 連続発生) | `tests/discipline/test_status_md_next_queue_no_completed.py` |
 | STATUS.md `## Phase` は 1 paragraph 厳守 | 新 paragraph 追加 + 旧 paragraph 残置 (5/21 で Codex も再発) | `tests/discipline/test_status_md_phase_single_paragraph.py` |
 | `_index.md` 各 entry の cell ≤ 500 chars | essay cell に膨張 (Phase 2 で 53KB → 5KB 復元の前例) | `tests/discipline/test_index_md_entry_compactness.py` |
@@ -198,7 +198,7 @@ maintenance practice を遵守しないと PR #84 の状態に戻る。
 - `docs/brief_8_planning.md §15` (brief drafting checklist、 20 round 蒸留)
 - `docs/multi_agent_audit_case.md` (parallel agent 規律不在時の failure mode)
 - `docs/doc_refactor_planning.md` (本 framework 自己 refactor の dogfood
-  example、 Phase 6 で本 §5.5 Anti-Pattern を `tests/discipline/` に変換)
+  example、 Phase 6 完走で本 §5.5 Anti-Pattern を `tests/discipline/` に変換済)
 
 ## Forward Design Note: Brief 7 / SSP v0.1 (CSCI-36 着手時必読)
 

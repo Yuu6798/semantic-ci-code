@@ -197,25 +197,24 @@ archive 移送、 `_index.md` で 1 行参照可能。
   専用 索引、 layout / 移送 protocol / TTL contract / Phase 6 cross-ref +
   archive 由来 4 phase log を pin)
 
-### Phase 6: **Test-enforced rule への変換** (部分完走: 3/4 + 2 新 rule)
+### Phase 6: **Test-enforced rule への変換** (完走: 5 implemented + 1 retired)
 
-`tests/discipline/` で doc rule の自動 check を実装。 初回 slice では
-STATUS.md / `_index.md` hygiene の 3 test と、 Phase paragraph / index
-compactness の 2 新 rule を landed。 残 candidate は future hardening として
-保持。
+`tests/discipline/` で doc rule の自動 check を実装。 初回 slice (2026-05)
+で STATUS.md / `_index.md` hygiene の 3 test、 続く Phase 6 v2 (2026-05-29)
+で schema-grep + dual-case dogfood の 2 test を landed。 round-count
+candidate は test 形式と相性が悪いため retire (理由は下表)。
 
 | Rule | Status / test | 検出方法 |
 |---|---|---|
 | `STATUS.md 次の発行順序` 更新先送り | implemented: `tests/discipline/test_status_md_next_queue_no_completed.py` | queue heading / primary bullet に `完走` / `landed` marker が残っていれば fail |
 | `STATUS.md ## Phase` duplicate paragraph | implemented: `tests/discipline/test_status_md_phase_single_paragraph.py` | `## Phase` section の paragraph count が 1 でなければ fail |
 | `_index.md` essay cell 化 | implemented: `tests/discipline/test_index_md_entry_compactness.py` | table cell が 500 chars を超えれば fail |
-| schema-grep check | future hardening | producer 出力 shape grep 後に validator / catalog mirror を固定 |
-| dogfood single-case | future hardening | dogfood fixture が fail case + pass case の両方を含むかの constraint |
-| round-count-to-encoding check | future hardening | review 5+ round の曖昧 spec が docs/test に encode されたかを検査 |
+| schema-grep check | implemented: `tests/discipline/test_json_schema_version_sync.py` | 各 CLI envelope の `schema_version` 定数 (producer) と `docs/json_schema.md` の Currently/Always anchor が不一致なら fail |
+| dual-case dogfood | implemented: `tests/discipline/test_dogfood_dual_case.py` | registered case/verdict-matrix report の `Verdict` 列 (散文ではなく列をパース) が PASS / FAIL 両方向を含まなければ fail。 PR #118 Codex review で散文スキャンの誤通過を指摘され列パースに改修 |
+| round-count-to-encoding check | **retired** (test 化せず) | review round 数は hand-written prose にしか存在せず、 test はその文字列の近傍 proxy にしかなり得ない。 肝心の「encode 忘れ」 case こそ検出できず、 framework 自己膨張パラドックスを再誘発する。 intent は `CLAUDE.md` 終了時ルールの wrap-up checklist 項目 (5+ round 論点の encode check) として常駐 |
 
-**Acceptance**: 部分完走 (3 implemented + 2 new rule)。 残 3 candidate
-(schema-grep / dual-case dogfood / round-count) は Phase 6 v2 の future
-hardening として保持。
+**Acceptance**: 完走 (5 implemented + 1 retired)。 schema-grep / dual-case
+dogfood を test 化、 round-count は CLAUDE.md wrap-up checklist に格下げ。
 
 ### Phase 7: **Memory wrap-up protocol の更新** (CLAUDE.md edit、 半日)
 

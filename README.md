@@ -88,7 +88,7 @@ Active references (current behavior):
 
 - [CLI Usage](docs/cli_usage.md) — all 8 subcommands, flags, target discovery, output formats, severity routing
 - [Exit Codes](docs/exit_codes.md) — CI-facing exit code contract
-- [JSON Output Schema](docs/json_schema.md) — verdict / compile envelopes (`schema_version="4"`) + compile-repair / validate-plan envelopes (independent `schema_version="1"`)
+- [JSON Output Schema](docs/json_schema.md) — verdict / compile envelopes (`schema_version="6"`) + compile-repair (`"1"`) / validate-plan (`"2"`) envelopes (independent versions)
 - [Code Semantic CI Design](docs/code_semantic_ci_design.md) — Code Edition v0.1 design spec (3-state RPE, constraint type system, phase plan)
 - [CLI Test Inventory](docs/cli_test_inventory.md) — CLI test coverage map and reduction candidates
 - [target.yaml Authoring Guide](docs/target_yaml_guide.md) — practical authoring guide; centralises hazards D1/D3/D4 (`--package-root` scope, template/user constraint duplication, config-only vacuous PASS)
@@ -101,8 +101,11 @@ Active references (current behavior):
 
 Planning (open):
 
+- [Phase G — SSP core integration](docs/phase_g_planning.md) — vertical-connect SSP v0.1 into core: SensorState parallel to CodeState, suite evaluator unifying code + security delta, FQN-translated findings, CSCI-45〜49 (active queue main axis)
+- [Brief 8 — Target Authoring Surface](docs/brief_8_planning.md) — target.yaml generation paths (recipe / catalog / hand-written), surface isolation from evaluator, `candidate_code_used: false`; encoded into `tests/authoring/` + `tests/architecture/`
 - [Brief 7 — Semantic Security Protocol v0.1](docs/brief_7_planning.md) — SAST + SCA, Python only, independent envelope, Sensor Provenance Invariant
 - [ResultStatus authoring/extraction split](docs/brief_resultstatus_planning.md) — C+B (compile-time pushback + `unknown_cause` sibling field), 5 PR split, validate-plan v2 — boundary with Brief 8 (Authoring Surface) pinned in §1b
+- [Candidate / baseline source selection](docs/source_selection_planning.md) — `--candidate-source` / `--baseline-source` redesign, `--allow-dirty` removal, `pre-commit` subcommand migration; CLI-layer sourcing, engine §23.1 neutrality unchanged
 - [Doc Refactoring Plan (urgent, 2026-05-21)](docs/doc_refactor_planning.md) — startup attention budget 2,500 → 800 lines compaction, Tier A/B/C/D 階層化, archive infrastructure, test-enforced rule conversion, 8 phase / 4-6 day scope
 
 Reference / archived (completed briefs, retained for context — see [`docs/archive/README.md`](docs/archive/README.md)):

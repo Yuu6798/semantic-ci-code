@@ -273,6 +273,7 @@ Status legend: **ACTIVE** (current spec/contract, AI agents should read first) /
 | `docs/brief_resultstatus_planning.md` | PLANNING (open) | ResultStatus.UNKNOWN を authoring と extraction に分離する brief の planning。**C+B 仮固定**(C=authoring を compile-time に押し戻す / B=`results[].unknown_cause` optional field、A=enum 拡張は不採用)。D2: authoring は unknown_policy 非尊重で強制 fail、extraction は尊重。D3: validate-plan v2 で `risk_summary.authoring_errors` を `would_violate` から分離。Brief D1-1〜D1-4 + D3 の 5 PR 想定。§1b で Brief 8 (Authoring Surface) との境界(semantic hazard vs syntactic/type error / INV-1 framing / ADVISORY-S1 文言更新見込み / 着地順序 open question)を pin。target path 静的型カテゴリ + operator-required-category 行列 + compile catch coverage 推定済 |
 | `docs/doc_refactor_planning.md` | PLANNING (open) | **緊急 doc refactor planning (2026-05-21 起草)**。 起動時 attention budget が ~2,500 lines に膨張、 経験値外部化 framework 自身が膨張する逆説にハマっている懸念を受けて起草。 Tier A/B/C/D 階層化 + `_index.md` 本来仕様復元 + STATUS.md compaction + AGENTS.md §5 collapse + archive infrastructure + test-enforced rule 変換の 8 phase、 8 PR / 4-6 日規模。 最短経路 (Phase 0+2+1) を 1 session 連続で attention budget を 2,500 → 800 lines に圧縮可能。 完了後は本 doc 自身を `archive/` 移送 (self-referential dogfood example) |
 | `docs/source_selection_planning.md` | PLANNING (open) | **Candidate / baseline source selection planning (2026-05-22 起草、 正式採用)**。 PR #98 (`--allow-dirty` Phase 1 mitigation) が surface した CLI 設計 hole を 3 phase で閉じる。 Phase 2 = `--candidate-source {commit,working-tree}` + `--allow-dirty` 削除 + JSON envelope provenance。 Phase 3a = `--baseline-source` 対称化 + `staged-index` source 追加。 Phase 3b = `pre-commit` subcommand 削除 + `.pre-commit-hooks.yaml` を `check --candidate-source=staged-index` に migration。 style = aggressive / clean-cut (no alias, no deprecation period)。 engine `§23.1` input neutrality は不変、 sourcing は CLI 層単独責務 |
+| `docs/phase_g_planning.md` | PLANNING (open) | **Phase G (SSP core integration / security observation layer) planning (2026-05-28 起草)**。 SSP v0.1 (Brief 7) を core の「横」並列ではなく「上」に**縦接続**し、 target.yaml の constraint 体系でセキュリティ判定を宣言可能にする 5 PR (CSCI-45〜49)。 SensorState を CodeState と並列の別 state に分離、 suite evaluator で code_delta + security_delta を統合 verdict、 SAST finding を FQN 空間に翻訳して canonical_id で自然キー化 (canonical JSON array hash の injective encoding)。 planning は PR #114 + #115 で取り込み済、 実装 5 CSCI 未着手。 STATUS.md 次の発行順序の active queue 主軸 |
 | `docs/archive/brief_5_planning.md` | REFERENCE (Brief 5 完走 2026-05-07) | Brief 5 (Repair Compiler + Vibe Coding Adapters、P2.5 entry) を CSCI-31〜35 の 5 PR に分割した planning 文書。CSCI-31〜35 全 PR merged で `compile-repair` / `validate-plan` 2 subcommand + Claude Code / Cursor / Codex 3 adapter が release 可能。Brief 3 残課題 #4(Repair Compiler)+ §21.3 adapter list + `pre_generation_validation_case.md` 残された問い #4 を救済済み。Brief 7 起草時の参照として保存 |
 | `docs/archive/brief_4b_planning.md` | REFERENCE (Brief 4b 完走 2026-05-05) | Brief 4b (CI integration outputs) を CSCI-28 に集約した planning 文書。SARIF 2.1.0 / GitHub Actions annotation / `.pre-commit-hooks.yaml` manifest を 1 PR で完結。Brief 4 Open Questions Q9/Q10/Q11 を救済 |
 | `docs/archive/brief_4_planning.md` | REFERENCE (Brief 4 完走 2026-05-04) | Brief 4 (CLI / operational entrypoint) を CSCI-15〜19 に分割した planning 文書。CSCI-15〜19 全 PR merged で `semantic-ci` CLI 5 subcommand が release 可能。残 Open Questions は Brief 4b / 4c / 4d / 5 で消化済み |
@@ -380,10 +381,16 @@ later sessions can resume without losing context.
    両方が再発させた drift category、
    `tests/discipline/test_status_md_phase_single_paragraph.py` (Phase 6)
    で自動検出される rule)
-7. `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
+7. **5+ round 論点の encode check**: 当 session で review / 壁打ちが 5
+   round 以上に達した曖昧 spec があれば、 その解決を docs / tests に
+   encode 済か確認し、 未 encode なら externalize する (Experience
+   Externalization の核。 `docs/doc_refactor_planning.md` Phase 6 で test
+   化を検討したが、 round 数は hand-written prose proxy で脆く「encode
+   忘れ」 case こそ検出できないため checklist 項目として常駐させる判断)。
+   併せて `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
 8. **memory 直 push 前に `pytest tests/discipline/ -q --no-cov` を実行
-   し 3 test 全 pass を確認**。 fail がある場合は step 4-6 のいずれかで
-   drift が残っているので push せず該当 file を修正。 memory exception
+   し `tests/discipline/` 全 test pass を確認**。 fail がある場合は step
+   4-6 のいずれかで drift が残っているので push せず該当 file を修正。 memory exception
    (`.claude/memory/` 直 main push 許可) は **PR ceremony を省く**
    ためのものだが、 PR 経由と異なり **post-hoc 検出のみ** なので
    discipline test 違反があると main branch が直接 red になる。

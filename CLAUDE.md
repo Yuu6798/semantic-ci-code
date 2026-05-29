@@ -380,10 +380,16 @@ later sessions can resume without losing context.
    両方が再発させた drift category、
    `tests/discipline/test_status_md_phase_single_paragraph.py` (Phase 6)
    で自動検出される rule)
-7. `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
+7. **5+ round 論点の encode check**: 当 session で review / 壁打ちが 5
+   round 以上に達した曖昧 spec があれば、 その解決を docs / tests に
+   encode 済か確認し、 未 encode なら externalize する (Experience
+   Externalization の核。 `docs/doc_refactor_planning.md` Phase 6 で test
+   化を検討したが、 round 数は hand-written prose proxy で脆く「encode
+   忘れ」 case こそ検出できないため checklist 項目として常駐させる判断)。
+   併せて `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
 8. **memory 直 push 前に `pytest tests/discipline/ -q --no-cov` を実行
-   し 3 test 全 pass を確認**。 fail がある場合は step 4-6 のいずれかで
-   drift が残っているので push せず該当 file を修正。 memory exception
+   し `tests/discipline/` 全 test pass を確認**。 fail がある場合は step
+   4-6 のいずれかで drift が残っているので push せず該当 file を修正。 memory exception
    (`.claude/memory/` 直 main push 許可) は **PR ceremony を省く**
    ためのものだが、 PR 経由と異なり **post-hoc 検出のみ** なので
    discipline test 違反があると main branch が直接 red になる。

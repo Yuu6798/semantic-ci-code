@@ -388,7 +388,7 @@ later sessions can resume without losing context.
    化を検討したが、 round 数は hand-written prose proxy で脆く「encode
    忘れ」 case こそ検出できないため checklist 項目として常駐させる判断)。
    併せて `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
-8. **memory 直 push 前に `pytest tests/discipline/ -q --no-cov` を実行
+8. **memory 直 push 前に `python -m pytest tests/discipline/ -q --no-cov` を実行
    し `tests/discipline/` 全 test pass を確認**。 fail がある場合は step
    4-6 のいずれかで drift が残っているので push せず該当 file を修正。 memory exception
    (`.claude/memory/` 直 main push 許可) は **PR ceremony を省く**

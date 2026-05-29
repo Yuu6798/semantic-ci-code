@@ -31,8 +31,7 @@ ENVELOPES = (
         "source": "src/semantic_ci_code/cli/commands/compile_repair.py",
         "constant": "_COMPILE_REPAIR_SCHEMA_VERSION",
         "doc_anchor": (
-            '| `schema_version` | Compile-repair envelope version. '
-            'Currently `"{version}"`. |'
+            '| `schema_version` | Compile-repair envelope version. Currently `"{version}"`. |'
         ),
     },
     {
@@ -40,8 +39,7 @@ ENVELOPES = (
         "source": "src/semantic_ci_code/cli/commands/validate_plan.py",
         "constant": "_VALIDATE_PLAN_SCHEMA_VERSION",
         "doc_anchor": (
-            '| `schema_version` | Validate-plan envelope version. '
-            'Currently `"{version}"`. |'
+            '| `schema_version` | Validate-plan envelope version. Currently `"{version}"`. |'
         ),
     },
     {

@@ -52,6 +52,10 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
     PASS) に該当することを正直報告 (誤検知ではなく射程外)。
   - Codex bot review P2 × 3 (pip 出力の context 注入 / matcher 全 source 一致 /
     `$CLAUDE_PROJECT_DIR` 未引用) を 2 push で消化。
+- **PR #121** (merged `3e33ef3`、 Codex 👍 0-round): follow-up。wrap-up gate を
+  `pytest` → `python -m pytest` に統一 (`CLAUDE.md` step 8 + `wrap-up` SKILL.md
+  3 箇所 + rationale 1 行)。bare `pytest` が PATH 上の cov-plugin 無し interpreter
+  を引くと `--no-cov` 未認識でゲートが誤 fail する穴を恒久 close。
 
 ### 2026-05-29 — doc-refactor Phase 6 完走 + doc hygiene sweep (PR #118)
 

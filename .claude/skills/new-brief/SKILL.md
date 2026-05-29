@@ -34,16 +34,17 @@ inventing context (documented recurring failure mode).
 ### 1a. Schema grounding — §15.1  ⚠️ highest-yield
 Every path / operator / match_schema key / template constraint / delta field
 you name in the brief MUST be verified to exist in the implementation by grep,
-not from memory. Canonical files to grep:
+not from memory. Canonical files to grep (paths are repo-root relative; the
+package lives under `src/`):
 
-- `domain/state_schema.py` (delta fields)
-- `evaluator/operators.py` (operator names + semantics)
-- `evaluator/evaluator.py` (template relaxation path)
-- `compiler/templates.py` (`TEMPLATE_CONSTRAINTS` dict — quote it verbatim)
-- `compiler/target_compiler.py` (`allow_changes` etc. policy hatches)
-- `compiler/path_schema.py` (path validation)
-- `framework/match_schema.py` (required / optional / forbidden keys)
-- `framework/target_svp.py` (field optionality / target-level keys)
+- `src/semantic_ci_code/domain/state_schema.py` (delta fields)
+- `src/semantic_ci_code/evaluator/operators.py` (operator names + semantics)
+- `src/semantic_ci_code/evaluator/evaluator.py` (template relaxation path)
+- `src/semantic_ci_code/compiler/templates.py` (`TEMPLATE_CONSTRAINTS` dict — quote it verbatim)
+- `src/semantic_ci_code/compiler/target_compiler.py` (`allow_changes` etc. policy hatches)
+- `src/semantic_ci_code/compiler/path_schema.py` (path validation)
+- `src/semantic_ci_code/framework/match_schema.py` (required / optional / forbidden keys)
+- `src/semantic_ci_code/framework/target_svp.py` (field optionality / target-level keys)
 
 Collection-constraint value forms must match the real delta producer's output
 (e.g. `new_cases` uses `path::name`, not Python FQN — a permanent

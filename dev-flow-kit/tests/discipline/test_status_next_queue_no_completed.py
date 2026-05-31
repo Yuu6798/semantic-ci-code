@@ -14,15 +14,37 @@ def _completed_queue_markers(text: str) -> list[str]:
     section = _next_queue_section(text)
     violations: list[str] = []
     scan_bullets = True
+    # Lines of the bullet currently being accumulated. A queue bullet may wrap
+    # its completion note onto indented continuation lines, so the marker check
+    # runs against the whole bullet block, not just its first line.
+    bullet: list[str] = []
+
+    def flush() -> None:
+        if scan_bullets and bullet and _has_completion_marker(" ".join(bullet)):
+            violations.append(bullet[0])
+        bullet.clear()
+
     for line in section.splitlines():
         stripped = line.strip()
         if stripped.startswith("### "):
+            flush()  # close the prior bullet under the still-current scan state
             scan_bullets = not stripped.startswith(NARRATIVE_SUBSECTIONS)
             if _has_completion_marker(stripped):
                 violations.append(stripped)
             continue
-        if scan_bullets and stripped.startswith("- **") and _has_completion_marker(stripped):
-            violations.append(stripped)
+        if stripped.startswith("- **"):
+            flush()
+            bullet.append(stripped)
+            continue
+        if not stripped:
+            flush()
+            continue
+        if bullet and line[:1].isspace():
+            # Indented continuation of the current bullet (wrapped note).
+            bullet.append(stripped)
+            continue
+        flush()
+    flush()
     return violations
 
 
@@ -71,3 +93,20 @@ def test_next_queue_parser_rejects_missing_section_fixture() -> None:
     text = (FIXTURES / "status_missing_next_queue.md").read_text(encoding="utf-8")
     with pytest.raises(AssertionError, match="must contain"):
         _assert_no_completed_queue_items(text, source="fixture")
+
+
+def test_next_queue_parser_detects_wrapped_continuation_completion() -> None:
+    # A completion note that wraps onto an indented continuation line must
+    # still be caught (the first bullet line carries no marker on its own).
+    text = (FIXTURES / "status_completed_wrapped_in_queue.md").read_text(encoding="utf-8")
+    assert _completed_queue_markers(text) == ["- **Implement feature Z** —"]
+    with pytest.raises(AssertionError, match="completed queue markers"):
+        _assert_no_completed_queue_items(text, source="fixture")
+
+
+def test_next_queue_parser_does_not_flag_active_imperative_titles() -> None:
+    # Active, not-yet-done imperative titles (e.g. "Complete ...", "Finish ...")
+    # must not be mistaken for completed items by the default markers.
+    text = (FIXTURES / "status_active_imperative_queue.md").read_text(encoding="utf-8")
+    assert _completed_queue_markers(text) == []
+    _assert_no_completed_queue_items(text, source="fixture")

@@ -27,26 +27,34 @@ def _completed_queue_markers(text: str) -> list[str]:
 
     for line in section.splitlines():
         stripped = line.strip()
-        if stripped.startswith("### "):
+        if not stripped:
+            flush()
+            continue
+        indented = line[:1].isspace()
+        if not indented and stripped.startswith("### "):
             flush()  # close the prior bullet under the still-current scan state
             scan_bullets = not stripped.startswith(NARRATIVE_SUBSECTIONS)
             if _has_completion_marker(stripped):
                 violations.append(stripped)
             continue
-        if stripped.startswith("- **"):
+        if not indented and _is_queue_bullet(stripped):
+            # Any top-level Markdown list item starts a new queue bullet — the
+            # tracker does not require a bold title, so do not assume "- **".
             flush()
             bullet.append(stripped)
             continue
-        if not stripped:
-            flush()
-            continue
-        if bullet and line[:1].isspace():
-            # Indented continuation of the current bullet (wrapped note).
+        if bullet and indented:
+            # Indented continuation of the current bullet (wrapped note or a
+            # nested sub-bullet); both belong to the parent queue item.
             bullet.append(stripped)
             continue
         flush()
     flush()
     return violations
+
+
+def _is_queue_bullet(stripped: str) -> bool:
+    return stripped[:1] in {"-", "*", "+"} and stripped[1:2].isspace()
 
 
 def _has_completion_marker(text: str) -> bool:
@@ -114,6 +122,15 @@ def test_next_queue_parser_detects_wrapped_continuation_completion() -> None:
     # still be caught (the first bullet line carries no marker on its own).
     text = (FIXTURES / "status_completed_wrapped_in_queue.md").read_text(encoding="utf-8")
     assert _completed_queue_markers(text) == ["- **Implement feature Z** —"]
+    with pytest.raises(AssertionError, match="completed queue markers"):
+        _assert_no_completed_queue_items(text, source="fixture")
+
+
+def test_next_queue_parser_detects_unbolded_completed_bullet() -> None:
+    # The tracker does not require bold titles, so a completed item written as
+    # a plain "- ..." bullet must still be caught.
+    text = (FIXTURES / "status_completed_unbolded_in_queue.md").read_text(encoding="utf-8")
+    assert _completed_queue_markers(text) == ["- Implement feature Y (merged in PR #42)"]
     with pytest.raises(AssertionError, match="completed queue markers"):
         _assert_no_completed_queue_items(text, source="fixture")
 

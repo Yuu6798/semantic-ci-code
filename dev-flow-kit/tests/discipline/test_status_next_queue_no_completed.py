@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -48,9 +49,22 @@ def _completed_queue_markers(text: str) -> list[str]:
     return violations
 
 
-def _has_completion_marker(line: str) -> bool:
-    lower = line.lower()
-    return any(marker in line or marker.lower() in lower for marker in COMPLETION_MARKERS)
+def _has_completion_marker(text: str) -> bool:
+    lowered = text.lower()
+    for marker in COMPLETION_MARKERS:
+        token = marker.lower()
+        if token.isascii() and token.isalnum():
+            # Whole-word match for plain ASCII markers: the token must not be
+            # flanked by word characters or hyphens. This catches an outcome
+            # like "(merged in PR #42)" while leaving active titles such as
+            # "Handle unmerged branches" or "pre-merged validation" alone.
+            if re.search(rf"(?<![\w-]){re.escape(token)}(?![\w-])", lowered):
+                return True
+        elif token in lowered:
+            # Non-ASCII markers (e.g. CJK like "完走") have no usable ASCII word
+            # boundary, so fall back to substring matching for them.
+            return True
+    return False
 
 
 def _next_queue_section(text: str) -> str:

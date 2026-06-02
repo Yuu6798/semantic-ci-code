@@ -13,6 +13,10 @@ SENSOR_FORBIDDEN_IMPORTS = (
     "semantic_ci_code.compiler",
     "semantic_ci_code.repair_compiler",
 )
+SENSOR_CORE_MODULES = (
+    "semantic_ci_code.sensor.models",
+    "semantic_ci_code.sensor.delta",
+)
 
 
 def _module_to_path(module_name: str) -> Path | None:
@@ -91,6 +95,10 @@ def _is_forbidden_match(module: str) -> str | None:
     return None
 
 
+def _is_prefix_match(module: str, prefix: str) -> bool:
+    return module == prefix or module.startswith(prefix + ".")
+
+
 def test_sensor_package_does_not_import_core_engine_or_cli_layers():
     failures: dict[str, list[str]] = {}
     for module in _discover_package_modules(SENSOR_PACKAGE):
@@ -100,3 +108,14 @@ def test_sensor_package_does_not_import_core_engine_or_cli_layers():
             failures[module] = leaks
 
     assert not failures, f"Sensor package isolation violation: {failures}"
+
+
+def test_sensor_core_models_and_delta_do_not_import_ssp_protocol():
+    failures: dict[str, list[str]] = {}
+    for module in SENSOR_CORE_MODULES:
+        closure = _transitive_closure(module)
+        leaks = sorted(item for item in closure if _is_prefix_match(item, "semantic_ci_code.ssp"))
+        if leaks:
+            failures[module] = leaks
+
+    assert not failures, f"Sensor core module imported SSP protocol: {failures}"

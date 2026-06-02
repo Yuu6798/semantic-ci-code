@@ -873,3 +873,13 @@ package_root 解決の共有化不足 / stderr 二重改行 / \r チェック漏
 - **PR #107** (merged): `feat(authoring): add ADVISORY-I1 for empty
   target intent` — `detect_i1`: `target.intent == ""` で発火、
   whitespace-only は非該当。advisory 6→7 件。81+/3-、CI 3/3 green
+
+### 2026-05-27 — Brief 7 / SSP v0.1 完走 (PR #109〜#112、Issue #108 closed)
+
+Brief 7 (Semantic Security Protocol v0.1) の全 5 CSCI を 1 session で完走。
+CSCI-36 (spec doc gap fill) + CSCI-37 (models/delta/fingerprint) を PR #109 に
+同梱、CSCI-38 (SemgrepAdapter) = PR #110、CSCI-39 (PipAuditAdapter) = PR #111、
+CSCI-40 (CLI + SARIF + human format) = PR #112。全 PR CI green、P1 なし
+(PR #109 のみ P1 2件を修正後マージ)。`semantic-ci ssp scan` / `ssp from-json`
+で SSP v0.1 が end-to-end 使用可能。Issue #108 completed でクローズ。
+(2026-06-02 wrap-up で STATUS.md 直近 merged 5-cap 超過により移送)

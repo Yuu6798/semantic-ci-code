@@ -24,9 +24,38 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。2026-05-28 (S1) に **Phase G (SSP core integration) planning** が PR #114 + #115 で landed (`docs/phase_g_planning.md`、5 PR 構成 CSCI-45〜49、Codex 18 round + deep cross-ref 7 件で洗練済)。同日 S2 で並走していた **公開リポジトリ実 PR 8 件 dogfooding pass** の結果が PR #116 + #117 で land、`docs/dogfooding_real_pr_complexity.md` + 単一 tracker `docs/dogfooding_findings_tracker.md` (累計 21 ケース pin、D6/D7 追加) として artifact 化された。Phase G は SSP v0.1 (現状 core の横に並列) を core の縦接続に再構築する設計: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict、SAST finding を FQN 空間に翻訳、canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。Next queue: **Phase G 実装 (CSCI-45 から)** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
+Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。2026-05-28 (S1) に **Phase G (SSP core integration) planning** が PR #114 + #115 で landed (`docs/phase_g_planning.md`、5 PR 構成 CSCI-45〜49、Codex 18 round + deep cross-ref 7 件で洗練済)。同日 S2 で並走していた **公開リポジトリ実 PR 8 件 dogfooding pass** の結果が PR #116 + #117 で land、`docs/dogfooding_real_pr_complexity.md` + 単一 tracker `docs/dogfooding_findings_tracker.md` (累計 21 ケース pin、D6/D7 追加) として artifact 化された。Phase G は SSP v0.1 (現状 core の横に並列) を core の縦接続に再構築する設計: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict、SAST finding を FQN 空間に翻訳、canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。2026-06-02 に **G-1 (CSCI-45) + G-2 (CSCI-46) merged** (PR #124 / #125): SensorState model + canonical_id + delta + SSP→SensorState 翻訳 adapter、SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定。Next queue: **Phase G の続き (G-3/CSCI-47 から)** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
 
 ## 直近 merged
+
+### 2026-06-02 — Phase G 着手: G-1/CSCI-45 + G-2/CSCI-46 完走 (PR #124 + #125 + #126)
+
+Phase G (SSP core integration) 実装の最初の 2 PR を 1 session で完走。design
+(Claude brief) → Codex 実装 → Claude review で P2 発見 → Codex 1 round 修正 →
+merge の標準サイクル。
+
+- **PR #124** (merged, CSCI-45 / G-1): `src/semantic_ci_code/sensor/{models,delta}.py`
+  新設。SecurityFinding (SAST/SCA discriminated union) / SensorState /
+  SensorProvenance / PerSensorDelta / SecurityDelta + canonical_id ベース集合差分。
+  review で 3 P2 (ordinal 脱落 / suppression-in-state / suppression shape) → repair
+  commit で **SAST identity を SSP 5 要素 fingerprint 整合の 8 要素に確定** (ordinal
+  含む) / suppression を G-3 に defer (SensorState を観測状態に純化) / discriminator
+  `category` + `deltas_by_sensor` 命名整合。bonus fix 2 件 (module_path POSIX 正規化 /
+  isolation test auto-discovery)。
+- **PR #125** (merged, CSCI-46 / G-2): `sensor/adapters/{semgrep,pip_audit}_adapter.py`
+  新設。SSP scan output → SensorState 翻訳の薄い層 (SSP adapter 再利用、full 吸収は
+  G-4)。`assign_sast_ordinals` 再利用で同位置重複 finding に distinct ordinal/canonical_id。
+  review で SCA dedup P2 (SAST は assign_sast_ordinals で安全だが SCA 素通し →
+  uniqueness validator crash) → Codex が `_dedup_by_canonical_id` (SSP
+  `_dedup_fingerprinted` 鏡像) + 回帰 test で修正。isolation: adapters は ssp 可、
+  models/delta は ssp-free を別 test で固定。
+- **PR #126** (merged, doc): `docs/phase_g_planning.md` を CSCI-45 確定形に逆流同期
+  (§1.2/§1.3/§2.1/§2.1.1/§2.3/§2.2、example canonical_id は実計算値、Suppression を
+  G-3 scope と明記)。
+
+設計判断: ordinal は v1 のうちに identity slot を確定 (G-2 での v1→v2 強制 bump 回避)。
+suppression = 宣言ポリシーなので観測状態 (SensorState) から分離し G-3 へ。両 review とも
+1 round 解決、設計フォークは AskUserQuestion 推奨付き N 択 / robustness 修正は直接 repair text。
 
 ### 2026-05-29 Session 2 — SessionStart hook + fixture 署名修正 (PR #120)
 
@@ -206,18 +235,9 @@ Grok) を統合した `docs/phase_g_planning.md` を起草、Codex review 18 rou
 4. **Phase 番号** — 当初 user が「F」と言及したが既存 Phase F (source-selection)
    と衝突、planning doc / commit message で **G** に統一
 
-### 2026-05-27 — Brief 7 / SSP v0.1 完走 (PR #109〜#112、Issue #108 closed)
+### 古い merged entry (2026-05-27 以前) — archive 参照
 
-Brief 7 (Semantic Security Protocol v0.1) の全 5 CSCI を 1 session で完走。
-CSCI-36 (spec doc gap fill) + CSCI-37 (models/delta/fingerprint) を PR #109 に
-同梱、CSCI-38 (SemgrepAdapter) = PR #110、CSCI-39 (PipAuditAdapter) = PR #111、
-CSCI-40 (CLI + SARIF + human format) = PR #112。全 PR CI green、P1 なし
-(PR #109 のみ P1 2件を修正後マージ)。`semantic-ci ssp scan` / `ssp from-json`
-で SSP v0.1 が end-to-end 使用可能。Issue #108 completed でクローズ。
-
-### 古い merged entry (2026-05-26 以前) — archive 参照
-
-19 entry (2026-05-26 / 2026-05-22 / 2026-05-21 S5 + S3 + S2 + S1 /
+20 entry (2026-05-27 / 2026-05-26 / 2026-05-22 / 2026-05-21 S5 + S3 + S2 + S1 /
 2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
@@ -228,12 +248,13 @@ CSCI-40 (CLI + SARIF + human format) = PR #112。全 PR CI green、P1 なし
 + 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
 + 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 S1 wrap-up (5/21 S2+S3 移送)
 + 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送)
-+ 2026-05-29 S2 wrap-up (5/26 移送) で compaction が実施された。
++ 2026-05-29 S2 wrap-up (5/26 移送) + 2026-06-02 wrap-up (5/27 移送) で
+compaction が実施された。
 
 ## 次の発行順序
 
 ABCD-A/B + Brief 7 (SSP v0.1) + D + F 全完走。active queue は
-**G (SSP core integration、 planning は PR #114 + #115 で取り込み済、 実装 CSCI-45〜49 未着手)**
+**G (SSP core integration、 planning は PR #114 + #115 で取り込み済、 G-1/G-2 (CSCI-45/46) は 2026-06-02 merged、 G-3〜G-5 残)**
 と **E (Phase X 残)** の 2 軸。Phase G は本 repo 内で完結する実装フェーズ、
 Phase X は ecosystem cross-repo 作業。
 
@@ -243,24 +264,16 @@ Phase X は ecosystem cross-repo 作業。
 log (`.claude/memory/YYYY-MM-DD.md`)。
 
 
-### G. Phase G(SSP core integration、 planning は PR #114 + #115 で取り込み済、 実装 5 CSCI 未着手)
+### G. Phase G(SSP core integration、 planning は PR #114 + #115 で取り込み済、 G-1/G-2 merged、 G-3〜G-5 残)
 
 `docs/phase_g_planning.md` を planning source として、SSP v0.1 を core の
 横ではなく上 (縦接続) に再構築する 5 PR 構成 (CSCI-45〜49)。SensorState を
 CodeState と並列の別 state に分離し、suite evaluator で code_delta +
 security_delta を統合 verdict、SAST finding を FQN 空間に翻訳して自然キー化、
 canonical_id を canonical JSON array hash で injective encoding。
+**G-1 (CSCI-45) + G-2 (CSCI-46) は 2026-06-02 merged** (PR #124 / #125)、
+SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定形に。残は G-3〜G-5。
 
-- **G-1. CSCI-45. SensorState model + canonical_id**:
-  `src/semantic_ci_code/sensor/` 新設 (models.py / delta.py)。SecurityFinding
-  / SensorState / SensorProvenance / SensorDelta の Pydantic 定義、
-  canonical_id ベースの集合差分。既存コード変更なし。AC: hand-built JSON で
-  SensorState 構築・比較可能 (§23.1 鏡像)
-- **G-2. CSCI-46. FQN 翻訳 adapter**:
-  `src/semantic_ci_code/sensor/adapters/` 新設。SSP v0.1 の
-  SemgrepAdapter / PipAuditAdapter を SensorState に正規化、
-  fqn_resolver.py で file:line → FQN 逆引き、canonical_id 生成 (v1 prefix +
-  ensure_ascii=False)、provenance 生成
 - **G-3. CSCI-47. Suite evaluator + security constraint**:
   `src/semantic_ci_code/suite/` 新設。code_delta + security_delta →
   suite_verdict、target.yaml `security:` namespace 解釈、scanner drift
@@ -277,8 +290,11 @@ canonical_id を canonical JSON array hash で injective encoding。
     `privileged_api_gated.yaml`、G-5 brief で extractor scope を AC として
     定義 (auth decorator 検出 or data_flow 実装)
 
-planning doc §6 Open Questions (Q1〜Q5) は G-1 brief 起草時に最低限
-G-1 範囲では確定する。
+planning doc §6 Open Questions のうち Q1 (suite evaluator module placement) /
+Q2 (security DSL を target.yaml 統合 vs 分離) は G-3 brief 起草時に確定する。
+あわせて Suppression を planning §2.1.1 通り (expires/owner + finding identity
+tuple 併記) に G-3 で復活させ、§3 G-2 の fqn_resolver 記述を thin-translation
+確定に合わせて同期する。
 
 
 ### E. Phase X(UGH ecosystem formalization、 2026-05-21 Session 5 起草、 残 3 sub-phase)

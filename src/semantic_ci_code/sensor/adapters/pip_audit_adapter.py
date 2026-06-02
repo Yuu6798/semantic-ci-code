@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -51,15 +52,10 @@ def _sensor_state_from_output(output: SensorOutput, *, sensor_spec: SensorSpec) 
     if provenance.status != "complete":
         findings: tuple[SCASecurityFinding, ...] = ()
     else:
-        findings = tuple(
-            sorted(
-                (
-                    _finding_from_sca(finding, sensor_id=output.sensor_id)
-                    for finding in output.findings
-                    if isinstance(finding, SCAFinding)
-                ),
-                key=lambda finding: finding.canonical_id,
-            )
+        findings = _dedup_by_canonical_id(
+            _finding_from_sca(finding, sensor_id=output.sensor_id)
+            for finding in output.findings
+            if isinstance(finding, SCAFinding)
         )
     return SensorState(
         provenance_by_sensor={output.sensor_id: provenance},
@@ -115,3 +111,12 @@ def _finding_from_sca(finding: SCAFinding, *, sensor_id: str) -> SCASecurityFind
         installed_version=finding.installed_version,
         advisory_id=finding.advisory_id,
     )
+
+
+def _dedup_by_canonical_id(
+    findings: Iterable[SCASecurityFinding],
+) -> tuple[SCASecurityFinding, ...]:
+    by_id: dict[str, SCASecurityFinding] = {}
+    for finding in findings:
+        by_id.setdefault(finding.canonical_id, finding)
+    return tuple(sorted(by_id.values(), key=lambda finding: finding.canonical_id))

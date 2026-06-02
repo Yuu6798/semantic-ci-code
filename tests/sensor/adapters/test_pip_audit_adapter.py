@@ -14,7 +14,7 @@ from semantic_ci_code.sensor.models import (
     canonical_id_for_identity,
 )
 from semantic_ci_code.ssp.adapters.pip_audit import PipAuditScanResult
-from semantic_ci_code.ssp.models import SensorOutput, SensorSpec
+from semantic_ci_code.ssp.models import SCAFinding, SensorOutput, SensorSpec
 
 FIXTURES = Path(__file__).parents[2] / "ssp" / "adapters" / "fixtures"
 FIXTURE = FIXTURES / "pip_audit_output_basic.json"
@@ -89,6 +89,45 @@ def test_pip_audit_error_output_translates_to_error_provenance_and_empty_finding
     assert provenance.error_message == "pip-audit failed"
     assert provenance.advisory_db_hash == "sha256:db"
     assert state.findings == ()
+
+
+def test_pip_audit_scan_deduplicates_duplicate_advisories_by_canonical_id():
+    result = PipAuditScanResult(
+        output=SensorOutput(
+            sensor_id="pip-audit",
+            sensor_version="2.8.0",
+            status="complete",
+            findings=(
+                SCAFinding(
+                    package_name="django",
+                    installed_version="3.2.0",
+                    advisory_id="PYSEC-2021-9",
+                    severity="critical",
+                    message="first report",
+                ),
+                SCAFinding(
+                    package_name="django",
+                    installed_version="3.2.0",
+                    advisory_id="PYSEC-2021-9",
+                    severity="low",
+                    message="duplicate report",
+                ),
+            ),
+        ),
+        sensor_spec=SensorSpec(
+            id="pip-audit",
+            version="2.8.0",
+            advisory_db_hash="sha256:db",
+        ),
+    )
+
+    state = sensor_state_from_pip_audit_scan(result)
+
+    assert len(state.findings) == 1
+    finding = state.findings[0]
+    assert isinstance(finding, SCASecurityFinding)
+    assert finding.message == "first report"
+    assert finding.canonical_id == canonical_id_for_identity(finding.identity_components)
 
 
 def test_pip_audit_translation_is_deterministic_for_same_json():

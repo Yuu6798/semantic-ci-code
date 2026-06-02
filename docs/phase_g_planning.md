@@ -79,30 +79,37 @@ evaluation:
 ### 1.2 D2: SAST finding の自然キー
 
 **決定: SAST finding は adapter 層で FQN 空間に翻訳する。FQN 単独では
-同一関数内の複数 finding を区別できないため、normalized_text_hash と
+同一関数内の複数 finding を区別できないため、normalized_text と
 ordinal の両方を discriminator に加える。**
+
+> **CSCI-45 で確定**: identity 構成は当初案 (`fqn` / `normalized_text_hash` /
+> 7 要素) から、SSP v0.1 の 5 要素 fingerprint に揃えた **8 要素**
+> (`module_path` 追加 / `fqn`→`qualified_name` / `normalized_text_hash`→
+> `normalized_text` full text) に確定した (PR #124)。本節以下はその確定形。
 
 SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta 計算の
 「自然キーによる完全一致」ポリシーと緊張する。Gemini 提案の FQN 翻訳により:
 
 - adapter が semgrep の (file, line) を AST 解析で FQN に逆引き
-- SAST finding の自然キー = `(rule_id, fqn, normalized_text_hash, ordinal)`
-  の 4 要素複合キー
-- normalized_text_hash は matched source の正規化テキストの short hash。
-  ordinal は同一 `(rule_id, fqn, normalized_text_hash)` グループ内での
-  出現順序 (0-indexed)。SSP v0.1 `docs/ssp_protocol.md §5.1` の ordinal
-  割り当てルールを継承
+- SAST finding の自然キー = `(rule_id, module_path, qualified_name,
+  normalized_text, ordinal)` の 5 要素複合キー (SSP v0.1 の 5 要素
+  fingerprint 構成と一致)
+- normalized_text は matched source の正規化テキスト (full text。short hash
+  ではなく SSP v0.1 SASTFinding と同じ生テキストを保持し、canonical_id 側で
+  hash する)。ordinal は同一 `(rule_id, module_path, qualified_name,
+  normalized_text)` グループ内での出現順序 (0-indexed)。SSP v0.1
+  `docs/ssp_protocol.md §5.1` の ordinal 割り当てルールを継承
 - なぜ両方必要か:
-  - normalized_text_hash だけだと、同一関数内で同一テキストの finding が
+  - normalized_text だけだと、同一位置で同一テキストの finding が
     複数ある場合 (例: `eval(config)` が 2 回) に衝突する → ordinal で区別
   - ordinal だけだと、同一位置でコード片が変わった場合
     (例: `eval(config)` → `exec(config)`) に unchanged 誤判定する
-    → normalized_text_hash で区別
+    → normalized_text で区別
 - core は複合キーベースの集合演算 (既存の effects / api_surface と同構造)
 - fingerprint の設計判断が core に入らない
 
 ```python
-# SAST: sensor_id + FQN + text_hash + ordinal が自然キー
+# SAST: sensor_id + module_path + FQN + normalized_text + ordinal が自然キー
 # sensor_id を含めることで、複数 SAST sensor が同じ rule_id を emit しても衝突しない
 #
 # 重要: canonical_id はコンポーネント tuple の injective encoding + hash で生成する。
@@ -121,7 +128,7 @@ SSP v0.1 の fingerprint (5 要素 hash) は近似一致であり、core delta �
 # validator で異なる canonical_id を生む silent bug を起こす。
 # identity_components (audit log 用) に tuple の全要素を保存する。
 import json
-_identity_tuple = ["v1", "sast", sensor_id, rule_id, fqn, normalized_text_hash, str(ordinal)]
+_identity_tuple = ["v1", "sast", sensor_id, rule_id, module_path, qualified_name, normalized_text, str(ordinal)]
 canonical_id = "v1:" + hashlib.sha256(json.dumps(_identity_tuple, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode()).hexdigest()[:16]
 
 # SCA も同様
@@ -139,13 +146,13 @@ audit log / CI 出力で表示する。`v1:` prefix は identity algorithm versi
 **決定: canonical_id に identity algorithm version を prefix する。**
 
 ```
-canonical_id = "v1:d4e58fcd4f5c4043"
+canonical_id = "v1:b876160d09a41425"
                ^^^  ^^^^^^^^^^^^^^^^
                |    sha256 short hash of json.dumps(identity_tuple)
                identity algorithm version
 
-# identity_tuple (_SecurityFindingBase.identity_components に保存):
-# ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
+# identity_tuple (_SecurityFindingBase.identity_components に保存、8 要素):
+# ["v1", "sast", "semgrep", "sql-injection", "src/app/db.py", "app.db.get_user", "get_user(uid)", "0"]
 # encoding: json.dumps(list, ensure_ascii=False, separators=(",",":"), sort_keys=False)
 # (ensure_ascii=False は SSP v0.1 _digest_array §5.1 と同じ canonical encoding、
 #  非 ASCII FQN で adapter / validator の hash が乖離するのを防ぐ)
@@ -345,18 +352,19 @@ class _SecurityFindingBase(FrozenModel):
     identity_components: tuple[str, ...]
     # canonical_id の生成根拠。§1.2 / §1.3 で定義した ordered identity tuple を
     # そのまま保持する (例: ("v1", "sast", "semgrep", "sql-injection",
-    # "app.db.get_user", "a3f8", "0"))。dict ではなく ordered tuple/list 必須:
-    # canonical_id は json.dumps(list) の sha256 short hash なので、順序が
-    # 失われると再ハッシュ不能になり、suppression migration が壊れる。
-    # 全要素 str (ordinal は str(ordinal) で正規化)、要素数は category により
-    # SAST 7 / SCA 6 で固定 (§1.2 の tuple shape 参照)。
+    # "src/app/db.py", "app.db.get_user", "get_user(uid)", "0"))。dict ではなく
+    # ordered tuple/list 必須: canonical_id は json.dumps(list) の sha256 short
+    # hash なので、順序が失われると再ハッシュ不能になり、suppression migration
+    # が壊れる。全要素 str (ordinal は str(ordinal) で正規化)、要素数は category
+    # により SAST 8 / SCA 6 で固定 (§1.2 の tuple shape 参照)。
 
 class SASTSecurityFinding(_SecurityFindingBase):
     category: Literal["sast"] = "sast"
     rule_id: str                      # min_length=1
-    fqn: str                          # adapter が FQN 翻訳。min_length=1
-    normalized_text_hash: str         # matched source の正規化 hash
-    module_path: str                  # "src/app/db.py" 等のファイルパス
+    module_path: str                  # "src/app/db.py" 等のファイルパス (POSIX 正規化)
+    qualified_name: str               # adapter が FQN 翻訳。min_length=1
+    normalized_text: str              # matched source の正規化テキスト (full text)
+    ordinal: int                      # 同一位置重複の出現順序 (ge=0)
     source_span: SourceSpan | None    # 行・列の範囲 (SSP v0.1 SourceSpan 継承)
 
 class SCASecurityFinding(_SecurityFindingBase):
@@ -382,10 +390,11 @@ SecurityFinding = Annotated[
 #         "sast",                       # category と一致
 #         sensor_id,                    # 同名 field と一致
 #         rule_id,                      # 同名 field と一致
-#         fqn,                          # 同名 field と一致
-#         normalized_text_hash,         # 同名 field と一致
-#         str(ordinal),                 # ordinal は別 field か identity 内のみ存在
-#     )  # len == 7
+#         module_path,                  # 同名 field と一致 (POSIX 正規化後)
+#         qualified_name,               # 同名 field と一致
+#         normalized_text,              # 同名 field と一致
+#         str(ordinal),                 # 同名 field (int) を str 化して一致
+#     )  # len == 8
 #
 #   SCASecurityFinding の要求:
 #     identity_components == (
@@ -464,6 +473,12 @@ class SensorState(FrozenModel):
 `security.suppressions` の各エントリは下記 Pydantic モデルで型固定する。
 YAML 例 (§2.3) はこのモデルへ deserialize される。
 
+> **Scope**: Suppression は target.yaml `security:` namespace の一部なので
+> **Phase G-3 (CSCI-47) で実装する**。CSCI-45 / G-1 (observed state の
+> SensorState) には含めない (PR #124 で defer 確定)。G-3 起草時は本節通り
+> `expires` / `owner` 必須 + finding の identity tuple 併記 (§1.3 の
+> suppression-file-alone migration 成立条件) を AC に含めること。
+
 ```python
 import datetime
 
@@ -475,7 +490,7 @@ class Suppression(FrozenModel):
     owner: Annotated[str, Field(min_length=1)]
 
     # model_validator (SecurityFinding 用と同じ identity 整合性ロジックを再利用):
-    #   1. identity_components の shape が SAST(7) / SCA(6) のいずれかに合致
+    #   1. identity_components の shape が SAST(8) / SCA(6) のいずれかに合致
     #      (識別は identity_components[1] == "sast" | "sca" で行う)
     #   2. canonical_id == identity_components[0] + ":" +
     #          sha256(json.dumps(list(identity_components), ensure_ascii=False,
@@ -493,7 +508,8 @@ class Suppression(FrozenModel):
 
 SSP v0.1 の `SemgrepAdapter` は既に `qualified_name_for_line()` で
 file:line → FQN の逆引きを実装している (`ssp/adapters/qualified_name.py`)。
-本 Phase ではこれを `SecurityFinding.fqn` に正式化する。
+本 Phase ではこれを `SASTSecurityFinding.qualified_name` に正式化する
+(CSCI-46 / G-2 が SSP adapter 出力を SensorState に翻訳する際に写像する)。
 
 ### 2.3 target.yaml security namespace
 
@@ -550,12 +566,12 @@ security:
   # - canonical_id は opaque hash で algorithm 変更時に再導出できない
   # - ordered list として §1.2 の identity tuple shape を完全に保持する
   #   (dict / named map は不可。要素順序が失われると JSON array hash が変わる)
-  # - SAST = 7 要素 / SCA = 6 要素、全要素 str。schema 検証は SecurityFinding と
+  # - SAST = 8 要素 / SCA = 6 要素、全要素 str。schema 検証は SecurityFinding と
   #   同じ model_validator を suppression entry にも適用する
   suppressions:
-    - canonical_id: "v1:d4e58fcd4f5c4043"
+    - canonical_id: "v1:b876160d09a41425"
       identity_components:
-        ["v1", "sast", "semgrep", "sql-injection", "app.db.get_user", "a3f8", "0"]
+        ["v1", "sast", "semgrep", "sql-injection", "src/app/db.py", "app.db.get_user", "get_user(uid)", "0"]
       reason: "Validated upstream by WAF"
       expires: "2026-09-01"
       owner: "security-team"

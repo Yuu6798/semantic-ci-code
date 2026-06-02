@@ -5,12 +5,7 @@ import importlib.util
 from pathlib import Path
 
 PROJECT_PREFIX = "semantic_ci_code"
-
-SENSOR_MODULES = (
-    "semantic_ci_code.sensor",
-    "semantic_ci_code.sensor.models",
-    "semantic_ci_code.sensor.delta",
-)
+SENSOR_PACKAGE = "semantic_ci_code.sensor"
 
 SENSOR_FORBIDDEN_IMPORTS = (
     "semantic_ci_code.cli",
@@ -31,6 +26,24 @@ def _module_to_path(module_name: str) -> Path | None:
     if not path.exists():
         return None
     return path
+
+
+def _discover_package_modules(package_name: str) -> tuple[str, ...]:
+    package_path = _module_to_path(package_name)
+    if package_path is None:
+        raise AssertionError(f"package not importable: {package_name}")
+    package_root = package_path.parent
+    modules: set[str] = set()
+    for path in package_root.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        relative = path.relative_to(package_root)
+        if path.name == "__init__.py":
+            suffix_parts = relative.parent.parts
+        else:
+            suffix_parts = relative.with_suffix("").parts
+        modules.add(".".join((package_name, *suffix_parts)))
+    return tuple(sorted(modules))
 
 
 def _direct_imports(path: Path) -> set[str]:
@@ -80,7 +93,7 @@ def _is_forbidden_match(module: str) -> str | None:
 
 def test_sensor_package_does_not_import_core_engine_or_cli_layers():
     failures: dict[str, list[str]] = {}
-    for module in SENSOR_MODULES:
+    for module in _discover_package_modules(SENSOR_PACKAGE):
         closure = _transitive_closure(module)
         leaks = sorted(item for item in closure if _is_forbidden_match(item))
         if leaks:

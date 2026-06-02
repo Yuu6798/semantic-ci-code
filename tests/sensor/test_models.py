@@ -10,7 +10,7 @@ from semantic_ci_code.sensor.models import (
     SecurityDelta,
     SensorProvenance,
     SensorState,
-    Suppression,
+    SourceSpan,
     canonical_id_for_identity,
 )
 
@@ -21,8 +21,6 @@ from .helpers import (
     sca_components,
     sca_finding,
     sensor_state,
-    suppression_components,
-    suppression_for,
 )
 
 
@@ -47,6 +45,33 @@ def test_sensor_provenance_status_error_message_invariant_rejects(payload: dict[
 def test_security_finding_accepts_sast_and_sca_identity_shapes():
     assert sast_finding().identity_components == sast_components()
     assert sca_finding().identity_components == sca_components()
+
+
+def test_sast_finding_accepts_optional_source_span():
+    finding = sast_finding()
+    payload = finding.model_dump(mode="json")
+    payload["source_span"] = {
+        "start_line": 10,
+        "end_line": 11,
+        "start_col": 0,
+        "end_col": 8,
+    }
+
+    parsed = SASTSecurityFinding.model_validate(payload)
+
+    assert parsed.source_span == SourceSpan(
+        start_line=10,
+        end_line=11,
+        start_col=0,
+        end_col=8,
+    )
+
+
+def test_source_span_rejects_invalid_bounds():
+    with pytest.raises(ValidationError):
+        SourceSpan(start_line=0, end_line=1, start_col=0, end_col=0)
+    with pytest.raises(ValidationError):
+        SourceSpan(start_line=1, end_line=1, start_col=-1, end_col=0)
 
 
 def test_security_finding_rejects_field_identity_mismatch():
@@ -74,27 +99,6 @@ def test_security_finding_rejects_version_prefix_tampering():
 
     with pytest.raises(ValidationError):
         SASTSecurityFinding.model_validate(payload)
-
-
-def test_suppression_accepts_identity_shape():
-    finding = sast_finding()
-    suppression = suppression_for(finding.canonical_id)
-    assert suppression.identity_components == suppression_components(finding.canonical_id)
-
-
-def test_suppression_rejects_identity_and_canonical_tampering():
-    finding = sast_finding()
-    suppression = suppression_for(finding.canonical_id)
-    payload = suppression.model_dump(mode="json")
-    payload["finding_canonical_id"] = sca_finding().canonical_id
-
-    with pytest.raises(ValidationError, match="identity_components"):
-        Suppression.model_validate(payload)
-
-    payload = suppression.model_dump(mode="json")
-    payload["canonical_id"] = "v2:" + suppression.canonical_id.split(":", 1)[1]
-    with pytest.raises(ValidationError):
-        Suppression.model_validate(payload)
 
 
 def test_per_sensor_delta_accepts_pass_fail_and_unknown_shapes():
@@ -156,14 +160,16 @@ def test_per_sensor_delta_accepts_pass_fail_and_unknown_shapes():
         },
     ],
 )
-def test_per_sensor_delta_rejects_invalid_policy_floor_and_references(delta: dict[str, object]):
+def test_per_sensor_delta_rejects_invalid_policy_floor_and_references(
+    delta: dict[str, object],
+):
     with pytest.raises(ValidationError):
         PerSensorDelta(**delta)
 
 
 def test_security_delta_accepts_aggregate_precedence():
     delta = SecurityDelta(
-        per_sensor={
+        deltas_by_sensor={
             "semgrep": PerSensorDelta(
                 sensor_id="semgrep",
                 status="unknown",
@@ -187,7 +193,7 @@ def test_security_delta_accepts_aggregate_precedence():
     "payload",
     [
         {
-            "per_sensor": {
+            "deltas_by_sensor": {
                 "wrong": {
                     "sensor_id": "semgrep",
                     "status": "pass",
@@ -197,7 +203,7 @@ def test_security_delta_accepts_aggregate_precedence():
             "aggregate_status": "pass",
         },
         {
-            "per_sensor": {
+            "deltas_by_sensor": {
                 "semgrep": {
                     "sensor_id": "semgrep",
                     "status": "fail",
@@ -214,13 +220,11 @@ def test_security_delta_rejects_key_or_aggregate_mismatch(payload: dict[str, obj
         SecurityDelta.model_validate(payload)
 
 
-def test_sensor_state_accepts_sorted_findings_and_suppression_reference():
+def test_sensor_state_accepts_sorted_findings():
     finding = sast_finding()
-    suppression = suppression_for(finding.canonical_id)
-    state = sensor_state(findings=(finding,), suppressions=(suppression,))
+    state = sensor_state(findings=(finding,))
 
     assert state.findings == (finding,)
-    assert state.suppressions[suppression.canonical_id] == suppression
 
 
 def test_sensor_state_rejects_provenance_key_mismatch():
@@ -278,24 +282,4 @@ def test_sensor_state_rejects_findings_for_non_complete_sensor():
                 "semgrep": provenance(status="error", error_message="tool failed")
             },
             findings=(finding,),
-        )
-
-
-def test_sensor_state_rejects_bad_suppression_key_and_reference():
-    finding = sast_finding()
-    suppression = suppression_for(finding.canonical_id)
-
-    with pytest.raises(ValidationError, match="suppression keys"):
-        SensorState(
-            provenance_by_sensor={"semgrep": provenance()},
-            findings=(finding,),
-            suppressions={"wrong": suppression},
-        )
-
-    orphan = suppression_for(sca_finding().canonical_id)
-    with pytest.raises(ValidationError, match="unknown finding"):
-        SensorState(
-            provenance_by_sensor={"semgrep": provenance()},
-            findings=(finding,),
-            suppressions={orphan.canonical_id: orphan},
         )

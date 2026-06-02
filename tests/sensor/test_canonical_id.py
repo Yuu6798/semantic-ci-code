@@ -4,28 +4,22 @@ import hashlib
 import json
 
 import pytest
-from pydantic import ValidationError
 
 from semantic_ci_code.sensor.models import (
     SASTSecurityFinding,
-    Suppression,
+    SensorState,
     canonical_id_for_identity,
 )
 from semantic_ci_code.ssp.fingerprint import _digest_array as ssp_digest_array
 
-from .helpers import (
-    sast_components,
-    sast_finding,
-    suppression_components,
-    suppression_for,
-)
+from .helpers import sast_components, sast_finding, sensor_state
 
 
 def test_canonical_id_uses_ssp_digest_byte_encoding_for_non_ascii_identity():
     components = sast_components(
         "python.security.eval",
-        qualified_name="pkg.サービス.実行",
-        normalized_text="評価(入力)",
+        qualified_name="pkg.\u30b5\u30fc\u30d3\u30b9.\u5b9f\u884c",
+        normalized_text="\u8a55\u4fa1(\u5165\u529b)",
     )
     expected_digest = hashlib.sha256(
         json.dumps(
@@ -43,11 +37,11 @@ def test_canonical_id_uses_ssp_digest_byte_encoding_for_non_ascii_identity():
 def test_adapter_supplied_canonical_id_matches_validator_recalculation():
     components = sast_components(
         "python.security.eval",
-        qualified_name="pkg.サービス.実行",
-        normalized_text="評価(入力)",
+        qualified_name="pkg.\u30b5\u30fc\u30d3\u30b9.\u5b9f\u884c",
+        normalized_text="\u8a55\u4fa1(\u5165\u529b)",
     )
     payload = {
-        "kind": "sast",
+        "category": "sast",
         "sensor_id": "semgrep",
         "canonical_id": canonical_id_for_identity(components),
         "identity_components": components,
@@ -55,8 +49,9 @@ def test_adapter_supplied_canonical_id_matches_validator_recalculation():
         "message": "finding",
         "rule_id": "python.security.eval",
         "module_path": "src/app.py",
-        "qualified_name": "pkg.サービス.実行",
-        "normalized_text": "評価(入力)",
+        "qualified_name": "pkg.\u30b5\u30fc\u30d3\u30b9.\u5b9f\u884c",
+        "normalized_text": "\u8a55\u4fa1(\u5165\u529b)",
+        "ordinal": 0,
     }
 
     finding = SASTSecurityFinding.model_validate(payload)
@@ -69,24 +64,30 @@ def test_canonical_id_rejects_empty_identity_components():
         canonical_id_for_identity(())
 
 
-def test_suppression_rejects_version_prefix_tampering():
-    finding = sast_finding()
-    suppression = suppression_for(finding.canonical_id)
-    payload = suppression.model_dump(mode="json")
-    payload["canonical_id"] = "v2:" + suppression.canonical_id.split(":", 1)[1]
-
-    with pytest.raises(ValidationError):
-        Suppression.model_validate(payload)
-
-
-def test_suppression_validator_recomputes_canonical_id_from_identity_components():
-    finding = sast_finding()
-    components = suppression_components(finding.canonical_id)
-    suppression = Suppression(
-        canonical_id=canonical_id_for_identity(components),
-        identity_components=components,
-        finding_canonical_id=finding.canonical_id,
-        reason="accepted test fixture",
+def test_sast_identity_components_include_ssp_v0_fingerprint_axes():
+    components = sast_components(
+        "python.security.eval",
+        module_path="src/app.py",
+        qualified_name="src.app.handler",
+        normalized_text="eval(user_input)",
+        ordinal=7,
     )
 
-    assert suppression.canonical_id == canonical_id_for_identity(suppression.identity_components)
+    assert components[3:] == (
+        "python.security.eval",
+        "src/app.py",
+        "src.app.handler",
+        "eval(user_input)",
+        "7",
+    )
+
+
+def test_sast_ordinal_disambiguates_duplicate_findings_in_sensor_state():
+    first = sast_finding("python.security.eval", ordinal=0)
+    second = sast_finding("python.security.eval", ordinal=1)
+
+    assert first.canonical_id != second.canonical_id
+    state = sensor_state(findings=(first, second))
+
+    assert isinstance(state, SensorState)
+    assert len(state.findings) == 2

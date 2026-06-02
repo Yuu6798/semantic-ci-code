@@ -8,7 +8,7 @@ from semantic_ci_code.sensor.models import (
     SecurityFinding,
     SensorProvenance,
     SensorState,
-    Suppression,
+    SourceSpan,
     canonical_id_for_identity,
 )
 
@@ -19,7 +19,7 @@ __all__ = [
     "SecurityFinding",
     "SensorProvenance",
     "SensorState",
-    "Suppression",
+    "SourceSpan",
     "canonical_id_for_identity",
     "compute_security_delta",
 ]

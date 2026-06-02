@@ -14,7 +14,7 @@ def test_compute_security_delta_partitions_added_removed_and_unchanged():
     candidate = sensor_state(findings=(unchanged, added))
 
     delta = compute_security_delta(baseline, candidate)
-    semgrep = delta.per_sensor["semgrep"]
+    semgrep = delta.deltas_by_sensor["semgrep"]
 
     assert semgrep.status == "fail"
     assert semgrep.added == (added,)
@@ -27,7 +27,7 @@ def test_info_only_added_findings_keep_sensor_delta_pass():
     added = sast_finding("info.rule", severity="info")
     delta = compute_security_delta(sensor_state(findings=()), sensor_state(findings=(added,)))
 
-    assert delta.per_sensor["semgrep"].status == "pass"
+    assert delta.deltas_by_sensor["semgrep"].status == "pass"
     assert delta.aggregate_status == "pass"
 
 
@@ -45,7 +45,7 @@ def test_provenance_drift_blocks_sensor_comparison_as_unknown():
     )
 
     delta = compute_security_delta(baseline, candidate)
-    semgrep = delta.per_sensor["semgrep"]
+    semgrep = delta.deltas_by_sensor["semgrep"]
 
     assert semgrep.status == "unknown"
     assert semgrep.provenance_changed is True
@@ -56,7 +56,7 @@ def test_provenance_drift_blocks_sensor_comparison_as_unknown():
 
 
 def test_sensor_version_drift_is_ignored_by_default_policy():
-    """Planning §2.3 default keeps require_same_sensor_version=false in G-1."""
+    """Planning 2.3 default keeps require_same_sensor_version=false in G-1."""
 
     finding = sast_finding("same.rule", severity="info")
     baseline = sensor_state(
@@ -70,9 +70,9 @@ def test_sensor_version_drift_is_ignored_by_default_policy():
 
     delta = compute_security_delta(baseline, candidate)
 
-    assert delta.per_sensor["semgrep"].status == "pass"
-    assert delta.per_sensor["semgrep"].provenance_changed is False
-    assert delta.per_sensor["semgrep"].unchanged_count == 1
+    assert delta.deltas_by_sensor["semgrep"].status == "pass"
+    assert delta.deltas_by_sensor["semgrep"].provenance_changed is False
+    assert delta.deltas_by_sensor["semgrep"].unchanged_count == 1
 
 
 def test_one_sided_sensor_is_unknown_and_marks_provenance_changed():
@@ -86,7 +86,7 @@ def test_one_sided_sensor_is_unknown_and_marks_provenance_changed():
     )
 
     delta = compute_security_delta(baseline, candidate)
-    pip_audit = delta.per_sensor["pip-audit"]
+    pip_audit = delta.deltas_by_sensor["pip-audit"]
 
     assert pip_audit.status == "unknown"
     assert pip_audit.provenance_changed is True
@@ -102,7 +102,7 @@ def test_non_complete_sensor_is_unknown_without_provenance_drift():
     candidate = sensor_state(provenances=(provenance(),), findings=())
 
     delta = compute_security_delta(baseline, candidate)
-    semgrep = delta.per_sensor["semgrep"]
+    semgrep = delta.deltas_by_sensor["semgrep"]
 
     assert semgrep.status == "unknown"
     assert semgrep.provenance_changed is False
@@ -129,8 +129,8 @@ def test_aggregate_precedence_unknown_over_fail_over_pass():
 
     delta = compute_security_delta(baseline, candidate)
 
-    assert delta.per_sensor["semgrep"].status == "fail"
-    assert delta.per_sensor["pip-audit"].status == "unknown"
+    assert delta.deltas_by_sensor["semgrep"].status == "fail"
+    assert delta.deltas_by_sensor["pip-audit"].status == "unknown"
     assert delta.aggregate_status == "unknown"
 
 
@@ -143,6 +143,7 @@ def test_hand_built_json_states_compare_without_extractor_or_adapter_execution()
         "src/app.py",
         "src.app.handler",
         "eval(user_input)",
+        "0",
     )
     candidate_dict = {
         "identity_algorithm_version": "v1",
@@ -158,7 +159,7 @@ def test_hand_built_json_states_compare_without_extractor_or_adapter_execution()
         },
         "findings": [
             {
-                "kind": "sast",
+                "category": "sast",
                 "sensor_id": "semgrep",
                 "canonical_id": "v1:0000000000000000",
                 "identity_components": components,
@@ -168,6 +169,7 @@ def test_hand_built_json_states_compare_without_extractor_or_adapter_execution()
                 "module_path": "src/app.py",
                 "qualified_name": "src.app.handler",
                 "normalized_text": "eval(user_input)",
+                "ordinal": 0,
             }
         ],
     }
@@ -184,5 +186,5 @@ def test_hand_built_json_states_compare_without_extractor_or_adapter_execution()
 
     delta = compute_security_delta(baseline, candidate)
 
-    assert delta.per_sensor["semgrep"].status == "fail"
-    assert delta.per_sensor["semgrep"].added[0].canonical_id == canonical_id
+    assert delta.deltas_by_sensor["semgrep"].status == "fail"
+    assert delta.deltas_by_sensor["semgrep"].added[0].canonical_id == canonical_id

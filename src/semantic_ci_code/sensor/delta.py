@@ -29,7 +29,7 @@ def compute_security_delta(baseline: SensorState, candidate: SensorState) -> Sec
             candidate_findings=_findings_for_sensor(candidate, sensor_id),
         )
     return SecurityDelta(
-        per_sensor=deltas,
+        deltas_by_sensor=deltas,
         aggregate_status=aggregate_status(delta.status for delta in deltas.values()),
     )
 

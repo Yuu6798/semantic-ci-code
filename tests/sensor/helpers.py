@@ -5,7 +5,6 @@ from semantic_ci_code.sensor.models import (
     SCASecurityFinding,
     SensorProvenance,
     SensorState,
-    Suppression,
     canonical_id_for_identity,
 )
 
@@ -17,6 +16,7 @@ def sast_components(
     module_path: str = "src/app.py",
     qualified_name: str = "src.app.handler",
     normalized_text: str = "eval(user_input)",
+    ordinal: int = 0,
 ) -> tuple[str, ...]:
     return (
         "v1",
@@ -26,6 +26,7 @@ def sast_components(
         module_path,
         qualified_name,
         normalized_text,
+        str(ordinal),
     )
 
 
@@ -46,14 +47,6 @@ def sca_components(
     )
 
 
-def suppression_components(
-    finding_canonical_id: str,
-    *,
-    reason: str = "accepted test fixture",
-) -> tuple[str, ...]:
-    return ("v1", "suppression", finding_canonical_id, reason)
-
-
 def sast_finding(
     rule_id: str = "python.security.eval",
     *,
@@ -61,14 +54,17 @@ def sast_finding(
     severity: str = "high",
     normalized_text: str = "eval(user_input)",
     qualified_name: str = "src.app.handler",
+    ordinal: int = 0,
 ) -> SASTSecurityFinding:
     components = sast_components(
         rule_id,
         sensor_id=sensor_id,
         normalized_text=normalized_text,
         qualified_name=qualified_name,
+        ordinal=ordinal,
     )
     return SASTSecurityFinding(
+        category="sast",
         sensor_id=sensor_id,
         canonical_id=canonical_id_for_identity(components),
         identity_components=components,
@@ -77,6 +73,7 @@ def sast_finding(
         module_path="src/app.py",
         qualified_name=qualified_name,
         normalized_text=normalized_text,
+        ordinal=ordinal,
         message="finding",
     )
 
@@ -94,6 +91,7 @@ def sca_finding(
         advisory_id=advisory_id,
     )
     return SCASecurityFinding(
+        category="sca",
         sensor_id=sensor_id,
         canonical_id=canonical_id_for_identity(components),
         identity_components=components,
@@ -102,20 +100,6 @@ def sca_finding(
         installed_version="3.2.0",
         advisory_id=advisory_id,
         message="advisory",
-    )
-
-
-def suppression_for(
-    finding_canonical_id: str,
-    *,
-    reason: str = "accepted test fixture",
-) -> Suppression:
-    components = suppression_components(finding_canonical_id, reason=reason)
-    return Suppression(
-        canonical_id=canonical_id_for_identity(components),
-        identity_components=components,
-        finding_canonical_id=finding_canonical_id,
-        reason=reason,
     )
 
 
@@ -144,7 +128,6 @@ def sensor_state(
     *,
     provenances: tuple[SensorProvenance, ...] | None = None,
     findings: tuple[SASTSecurityFinding | SCASecurityFinding, ...] = (),
-    suppressions: tuple[Suppression, ...] = (),
 ) -> SensorState:
     if provenances is None:
         sensors = sorted({finding.sensor_id for finding in findings} or {"semgrep"})
@@ -152,5 +135,4 @@ def sensor_state(
     return SensorState(
         provenance_by_sensor={item.sensor_id: item for item in provenances},
         findings=tuple(sorted(findings, key=lambda finding: finding.canonical_id)),
-        suppressions={item.canonical_id: item for item in suppressions},
     )

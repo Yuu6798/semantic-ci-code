@@ -18,6 +18,7 @@ SecurityDeltaStatus = Literal["pass", "fail", "unknown"]
 SecurityFindingKind = Literal["sast", "sca"]
 
 _FAIL_SEVERITIES = frozenset({"critical", "high", "medium", "low"})
+# When identity v2 lands, widen both IdentityAlgorithmVersion and canonical_id regexes.
 
 
 def canonical_id_for_identity(identity_components: Iterable[str]) -> str:
@@ -72,12 +73,21 @@ class _SecurityFindingBase(FrozenModel):
         return self
 
 
+class SourceSpan(FrozenModel):
+    start_line: int = Field(ge=1)
+    end_line: int = Field(ge=1)
+    start_col: int = Field(ge=0)
+    end_col: int = Field(ge=0)
+
+
 class SASTSecurityFinding(_SecurityFindingBase):
-    kind: Literal["sast"] = "sast"
+    category: Literal["sast"] = "sast"
     rule_id: str = Field(min_length=1)
     module_path: str = Field(min_length=1)
     qualified_name: str = Field(min_length=1)
     normalized_text: str
+    ordinal: int = Field(ge=0)
+    source_span: SourceSpan | None = None
 
     @model_validator(mode="after")
     def _identity_components_match_sast_fields(self) -> SASTSecurityFinding:
@@ -89,6 +99,7 @@ class SASTSecurityFinding(_SecurityFindingBase):
             self.module_path,
             self.qualified_name,
             self.normalized_text,
+            str(self.ordinal),
         )
         if self.identity_components != expected:
             raise ValueError("SAST identity_components must match finding fields")
@@ -96,7 +107,7 @@ class SASTSecurityFinding(_SecurityFindingBase):
 
 
 class SCASecurityFinding(_SecurityFindingBase):
-    kind: Literal["sca"] = "sca"
+    category: Literal["sca"] = "sca"
     package_name: str = Field(min_length=1)
     installed_version: str = Field(min_length=1)
     advisory_id: str = Field(min_length=1)
@@ -118,29 +129,8 @@ class SCASecurityFinding(_SecurityFindingBase):
 
 SecurityFinding = Annotated[
     SASTSecurityFinding | SCASecurityFinding,
-    Field(discriminator="kind"),
+    Field(discriminator="category"),
 ]
-
-
-class Suppression(FrozenModel):
-    canonical_id: str = Field(pattern=r"^v1:[0-9a-f]{16}$")
-    identity_components: tuple[str, ...]
-    finding_canonical_id: str = Field(pattern=r"^v1:[0-9a-f]{16}$")
-    reason: str = ""
-
-    @model_validator(mode="after")
-    def _canonical_id_matches_identity(self) -> Suppression:
-        expected = (
-            self.identity_components[0] if self.identity_components else "",
-            "suppression",
-            self.finding_canonical_id,
-            self.reason,
-        )
-        if self.identity_components != expected:
-            raise ValueError("Suppression identity_components must match suppression fields")
-        if self.canonical_id != canonical_id_for_identity(self.identity_components):
-            raise ValueError("canonical_id does not match identity_components")
-        return self
 
 
 class PerSensorDelta(FrozenModel):
@@ -174,19 +164,19 @@ class PerSensorDelta(FrozenModel):
 
 
 class SecurityDelta(FrozenModel):
-    per_sensor: dict[str, PerSensorDelta]
+    deltas_by_sensor: dict[str, PerSensorDelta]
     aggregate_status: SecurityDeltaStatus
 
     @model_validator(mode="after")
     def _validate_delta_map(self) -> SecurityDelta:
         mismatches = [
             (key, delta.sensor_id)
-            for key, delta in self.per_sensor.items()
+            for key, delta in self.deltas_by_sensor.items()
             if key != delta.sensor_id
         ]
         if mismatches:
-            raise ValueError(f"per_sensor keys must match sensor_id: {mismatches}")
-        expected = aggregate_status(delta.status for delta in self.per_sensor.values())
+            raise ValueError(f"deltas_by_sensor keys must match sensor_id: {mismatches}")
+        expected = aggregate_status(delta.status for delta in self.deltas_by_sensor.values())
         if self.aggregate_status != expected:
             raise ValueError(
                 f"aggregate_status must be {expected!r}, got {self.aggregate_status!r}"
@@ -198,7 +188,6 @@ class SensorState(FrozenModel):
     identity_algorithm_version: IdentityAlgorithmVersion = "v1"
     provenance_by_sensor: dict[str, SensorProvenance] = Field(default_factory=dict)
     findings: tuple[SecurityFinding, ...] = ()
-    suppressions: dict[str, Suppression] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate_state_invariants(self) -> SensorState:
@@ -212,21 +201,12 @@ class SensorState(FrozenModel):
                 f"provenance_by_sensor keys must match sensor_id: {provenance_mismatches}"
             )
 
-        suppression_mismatches = [
-            (key, suppression.canonical_id)
-            for key, suppression in self.suppressions.items()
-            if key != suppression.canonical_id
-        ]
-        if suppression_mismatches:
-            raise ValueError(f"suppression keys must match canonical_id: {suppression_mismatches}")
-
         all_versions = [
             *(
                 provenance.identity_algorithm_version
                 for provenance in self.provenance_by_sensor.values()
             ),
             *(finding.identity_components[0] for finding in self.findings),
-            *(suppression.identity_components[0] for suppression in self.suppressions.values()),
         ]
         if any(version != self.identity_algorithm_version for version in all_versions):
             raise ValueError("identity_algorithm_version must match all nested identities")
@@ -246,13 +226,6 @@ class SensorState(FrozenModel):
                 raise ValueError(f"finding references unknown sensor_id: {finding.sensor_id}")
             if provenance.status != "complete":
                 raise ValueError("non-complete sensors must not include findings")
-
-        finding_id_set = set(finding_ids)
-        for suppression in self.suppressions.values():
-            if suppression.finding_canonical_id not in finding_id_set:
-                raise ValueError(
-                    f"suppression references unknown finding: {suppression.finding_canonical_id}"
-                )
         return self
 
 

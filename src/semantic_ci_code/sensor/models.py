@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -80,6 +80,10 @@ class SourceSpan(FrozenModel):
     end_col: int = Field(ge=0)
 
 
+def _posix_path(value: str) -> str:
+    return value.replace("\\", "/")
+
+
 class SASTSecurityFinding(_SecurityFindingBase):
     category: Literal["sast"] = "sast"
     rule_id: str = Field(min_length=1)
@@ -88,6 +92,23 @@ class SASTSecurityFinding(_SecurityFindingBase):
     normalized_text: str
     ordinal: int = Field(ge=0)
     source_span: SourceSpan | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_module_path(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        module_path = normalized.get("module_path")
+        if isinstance(module_path, str):
+            normalized["module_path"] = _posix_path(module_path)
+        identity_components = normalized.get("identity_components")
+        if isinstance(identity_components, (list, tuple)) and len(identity_components) == 8:
+            components = list(identity_components)
+            if isinstance(components[4], str):
+                components[4] = _posix_path(components[4])
+            normalized["identity_components"] = tuple(components)
+        return normalized
 
     @model_validator(mode="after")
     def _identity_components_match_sast_fields(self) -> SASTSecurityFinding:

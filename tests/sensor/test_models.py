@@ -101,6 +101,49 @@ def test_security_finding_rejects_version_prefix_tampering():
         SASTSecurityFinding.model_validate(payload)
 
 
+def test_sast_finding_normalizes_windows_module_path_before_identity_validation():
+    raw_components = sast_components(module_path="src\\app.py")
+    normalized_components = sast_components(module_path="src/app.py")
+    payload = {
+        "category": "sast",
+        "sensor_id": "semgrep",
+        "canonical_id": canonical_id_for_identity(normalized_components),
+        "identity_components": raw_components,
+        "severity": "high",
+        "message": "finding",
+        "rule_id": "python.security.eval",
+        "module_path": "src\\app.py",
+        "qualified_name": "src.app.handler",
+        "normalized_text": "eval(user_input)",
+        "ordinal": 0,
+    }
+
+    finding = SASTSecurityFinding.model_validate(payload)
+
+    assert finding.module_path == "src/app.py"
+    assert finding.identity_components == normalized_components
+
+
+def test_sast_finding_rejects_canonical_id_hashed_from_windows_module_path():
+    raw_components = sast_components(module_path="src\\app.py")
+    payload = {
+        "category": "sast",
+        "sensor_id": "semgrep",
+        "canonical_id": canonical_id_for_identity(raw_components),
+        "identity_components": raw_components,
+        "severity": "high",
+        "message": "finding",
+        "rule_id": "python.security.eval",
+        "module_path": "src\\app.py",
+        "qualified_name": "src.app.handler",
+        "normalized_text": "eval(user_input)",
+        "ordinal": 0,
+    }
+
+    with pytest.raises(ValidationError, match="canonical_id"):
+        SASTSecurityFinding.model_validate(payload)
+
+
 def test_per_sensor_delta_accepts_pass_fail_and_unknown_shapes():
     info = sast_finding("info.rule", severity="info")
     failing = sast_finding("fail.rule", severity="high")

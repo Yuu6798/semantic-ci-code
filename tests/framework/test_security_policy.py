@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 import datetime as dt
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -9,6 +11,16 @@ from pydantic import ValidationError
 
 from semantic_ci_code.framework.security_policy import SecurityPolicy
 from semantic_ci_code.framework.target_svp import parse_target_svp_yaml
+
+
+def _canonical_id_for_identity(components: tuple[str, ...]) -> str:
+    payload = json.dumps(
+        list(components),
+        ensure_ascii=False,
+        sort_keys=False,
+        separators=(",", ":"),
+    )
+    return f"{components[0]}:{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16]}"
 
 
 def test_security_policy_defaults_are_empty_policy():
@@ -100,6 +112,37 @@ def test_security_policy_rejects_structural_errors_only():
                         "reason": "",
                         "expires": "not-a-date",
                         "owner": "",
+                    }
+                ]
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "components",
+    [
+        ("v1",),
+        ("v1", "unknown", "sensor", "value", "extra", "parts"),
+        ("v1", "sast", "semgrep", "rule", "src/app.py", "pkg.fn", "eval(x)"),
+        ("v1", "sast", "semgrep", "rule", "src/app.py", "pkg.fn", "eval(x)", "01"),
+        ("v1", "sast", "semgrep", "rule", "src/app.py", "pkg.fn", "eval(x)", "not-int"),
+        ("v1", "sca", "pip-audit", "django", "3.2.0"),
+        ("v1", "sca", "pip-audit", "django", "3.2.0", ""),
+    ],
+)
+def test_security_policy_rejects_malformed_suppression_identity_shape(components):
+    canonical_id = _canonical_id_for_identity(components)
+
+    with pytest.raises(ValidationError, match="identity_components"):
+        SecurityPolicy.model_validate(
+            {
+                "suppressions": [
+                    {
+                        "canonical_id": canonical_id,
+                        "identity_components": components,
+                        "reason": "malformed identity shape",
+                        "expires": "2026-09-01",
+                        "owner": "security-team",
                     }
                 ]
             }

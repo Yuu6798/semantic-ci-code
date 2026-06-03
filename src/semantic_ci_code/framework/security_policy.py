@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Keep this Literal value-identical to sensor.models.SecuritySeverity without
 # importing sensor into framework; framework models perform structure checks only.
@@ -53,6 +53,49 @@ class Suppression(BaseModel):
     reason: Annotated[str, Field(min_length=1)]
     expires: dt.date
     owner: Annotated[str, Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def _identity_components_match_supported_shape(self) -> Suppression:
+        _validate_suppression_identity_components(self.identity_components)
+        return self
+
+
+def _validate_suppression_identity_components(components: tuple[str, ...]) -> None:
+    """Validate suppression identity tuple shape without importing sensor models."""
+
+    if len(components) < 2:
+        raise ValueError("suppression identity_components must include version and category")
+    version, category = components[0], components[1]
+    if version != "v1":
+        raise ValueError("suppression identity_components must use identity version v1")
+    if category == "sast":
+        _validate_sast_identity_components(components)
+        return
+    if category == "sca":
+        _validate_sca_identity_components(components)
+        return
+    raise ValueError("suppression identity_components category must be 'sast' or 'sca'")
+
+
+def _validate_sast_identity_components(components: tuple[str, ...]) -> None:
+    # (v1, sast, sensor_id, rule_id, module_path, qualified_name, normalized_text, ordinal)
+    if len(components) != 8:
+        raise ValueError("SAST suppression identity_components must have 8 elements")
+    if any(not item for item in components[2:6]):
+        raise ValueError("SAST suppression identity_components has empty required fields")
+    ordinal = components[7]
+    if not ordinal.isdecimal() or str(int(ordinal)) != ordinal:
+        raise ValueError(
+            "SAST suppression identity_components ordinal must be a non-negative integer string"
+        )
+
+
+def _validate_sca_identity_components(components: tuple[str, ...]) -> None:
+    # (v1, sca, sensor_id, package_name, installed_version, advisory_id)
+    if len(components) != 6:
+        raise ValueError("SCA suppression identity_components must have 6 elements")
+    if any(not item for item in components[2:]):
+        raise ValueError("SCA suppression identity_components has empty required fields")
 
 
 class SecurityPolicy(BaseModel):

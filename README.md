@@ -86,7 +86,7 @@ semantic-ci check --format json | semantic-ci compile-repair --adapter claude-co
 
 Active references (current behavior):
 
-- [CLI Usage](docs/cli_usage.md) — all 8 subcommands, flags, target discovery, output formats, severity routing
+- [CLI Usage](docs/cli_usage.md) — all 10 subcommands (incl. the `ssp` sensor group), flags, target discovery, output formats, severity routing
 - [Exit Codes](docs/exit_codes.md) — CI-facing exit code contract
 - [JSON Output Schema](docs/json_schema.md) — verdict / compile envelopes (`schema_version="6"`) + compile-repair (`"1"`) / validate-plan (`"2"`) envelopes (independent versions)
 - [Code Semantic CI Design](docs/code_semantic_ci_design.md) — Code Edition v0.1 design spec (3-state RPE, constraint type system, phase plan)

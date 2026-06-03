@@ -17,7 +17,8 @@ from semantic_ci_code.framework.security_policy import (
 )
 from semantic_ci_code.sensor.models import SensorState, canonical_id_for_identity
 from semantic_ci_code.suite.security import _drift_fields_for_scanner, evaluate_security
-from tests.sensor.helpers import provenance, sast_finding, sca_finding, sensor_state
+
+from .helpers import provenance, sast_finding, sca_finding, sensor_state
 
 AS_OF = dt.date(2026, 6, 3)
 

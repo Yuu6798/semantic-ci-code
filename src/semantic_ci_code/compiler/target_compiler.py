@@ -53,6 +53,7 @@ from semantic_ci_code.framework.constraint_types import (
     UnknownPolicy,
 )
 from semantic_ci_code.framework.match_schema import MatchSchemaError, normalize_collection_expected
+from semantic_ci_code.framework.security_policy import SecurityPolicy
 from semantic_ci_code.framework.target_svp import TargetSVP, parse_target_svp_yaml
 
 __all__ = [
@@ -149,6 +150,7 @@ class CompiledTarget:
     api_surface_allow_changes: tuple[CompiledAPISurfaceAllowRule, ...] = ()
     effect_allow_new: tuple[CompiledEffectAllowRule, ...] = ()
     authorship: CompiledAuthorship | None = None
+    security: SecurityPolicy | None = None
 
 
 @dataclass(init=False)
@@ -233,6 +235,7 @@ def compile_target_svp(
         api_surface_allow_changes=_compile_api_surface_allow_changes(target_svp),
         effect_allow_new=_compile_effect_allow_new(target_svp),
         authorship=_compile_authorship(target_svp),
+        security=target_svp.security,
     )
 
 

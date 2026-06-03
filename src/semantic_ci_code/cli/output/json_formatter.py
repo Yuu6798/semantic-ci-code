@@ -45,6 +45,9 @@ def build_payload(
     candidate_source: str | None = None,
     candidate_rev: str | None = None,
     timed_out_dimensions: frozenset[str] | tuple[str, ...] | list[str] | None = None,
+    security_verdict: str | None = None,
+    security_as_of: str | None = None,
+    suite_verdict: str | None = None,
 ) -> dict[str, Any]:
     engine = _engine_payload(
         baseline_source=baseline_source,
@@ -53,36 +56,47 @@ def build_payload(
         candidate_rev=candidate_rev,
         timed_out_dimensions=timed_out_dimensions,
     )
-    return {
+    payload = {
         "schema_version": SCHEMA_VERSION,
         "subcommand": subcommand,
         "mode": mode,
         "verdict": verdict.result.value if verdict is not None else None,
-        "intent": compiled.intent if compiled is not None else None,
-        "primary_kind": compiled.primary_kind.value if compiled is not None else None,
-        "allowed_secondary_kinds": (
-            [kind.value for kind in compiled.allowed_secondary_kinds]
-            if compiled is not None
-            else []
-        ),
-        "target_authorship": (
-            _serialize_authorship(compiled.authorship)
-            if compiled is not None and compiled.authorship is not None
-            else None
-        ),
-        "summary": _summary(verdict, repair_plan) if verdict is not None else None,
-        "results": (
-            [_serialize_constraint_result(result) for result in verdict.results]
-            if verdict is not None
-            else []
-        ),
-        "repair_plan": _serialize_repair_plan(repair_plan) if repair_plan is not None else None,
-        "code_state": state.model_dump(mode="json") if state is not None else None,
-        "files_touched": files_touched,
-        "loc_delta": _serialize_loc_delta(loc_delta or LocDelta()),
-        "cache": _serialize_cache_stats(cache_stats),
-        "engine": engine,
     }
+    if security_verdict is not None:
+        payload["security"] = {"verdict": security_verdict, "as_of": security_as_of}
+    if suite_verdict is not None:
+        payload["suite_verdict"] = suite_verdict
+    payload.update(
+        {
+            "intent": compiled.intent if compiled is not None else None,
+            "primary_kind": compiled.primary_kind.value if compiled is not None else None,
+            "allowed_secondary_kinds": (
+                [kind.value for kind in compiled.allowed_secondary_kinds]
+                if compiled is not None
+                else []
+            ),
+            "target_authorship": (
+                _serialize_authorship(compiled.authorship)
+                if compiled is not None and compiled.authorship is not None
+                else None
+            ),
+            "summary": _summary(verdict, repair_plan) if verdict is not None else None,
+            "results": (
+                [_serialize_constraint_result(result) for result in verdict.results]
+                if verdict is not None
+                else []
+            ),
+            "repair_plan": (
+                _serialize_repair_plan(repair_plan) if repair_plan is not None else None
+            ),
+            "code_state": state.model_dump(mode="json") if state is not None else None,
+            "files_touched": files_touched,
+            "loc_delta": _serialize_loc_delta(loc_delta or LocDelta()),
+            "cache": _serialize_cache_stats(cache_stats),
+            "engine": engine,
+        }
+    )
+    return payload
 
 
 def build_observe_payload(state: CodeState) -> dict[str, Any]:

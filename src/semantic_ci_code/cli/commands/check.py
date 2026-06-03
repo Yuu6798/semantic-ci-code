@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import datetime as dt
 import math
 from argparse import Namespace
 from contextlib import AbstractContextManager, ExitStack, nullcontext
 from pathlib import Path
+
+from pydantic import ValidationError
 
 from semantic_ci_code.cli.code_state_cache import (
     CacheStats,
@@ -30,6 +33,7 @@ from semantic_ci_code.cli.command_support import (
     _write_output,
 )
 from semantic_ci_code.cli.delta_overlay import overlay_delta, summarize_numstat
+from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, FAIL, SUCCESS
 from semantic_ci_code.cli.extract_config_runtime import (
     load_extract_config_for_cli,
     make_exclude_reporter,
@@ -67,6 +71,9 @@ from semantic_ci_code.pipeline import (
     extract_python_code_state_result,
 )
 from semantic_ci_code.repair import emit_repair_plan
+from semantic_ci_code.sensor.models import SensorState
+from semantic_ci_code.suite.evaluator import SuiteResult, combine_verdict
+from semantic_ci_code.suite.security import evaluate_security
 
 _VOLATILE_SOURCES = frozenset(("working-tree", "staged-index"))
 
@@ -88,6 +95,20 @@ def run_check(args: Namespace) -> int:
             side="candidate",
             source=candidate_source,
             explicit_rev=candidate_rev_explicit,
+        )
+        sensor_enabled = _sensor_flags_enabled(args)
+        if sensor_enabled:
+            _reject_unsupported_sensor_output_format(args.format)
+        as_of = _as_of_date(args.as_of) if args.as_of is not None or sensor_enabled else None
+        baseline_sensor = (
+            _load_sensor_state(args.sensor_baseline, flag="--sensor-baseline")
+            if sensor_enabled
+            else None
+        )
+        candidate_sensor = (
+            _load_sensor_state(args.sensor_candidate, flag="--sensor-candidate")
+            if sensor_enabled
+            else None
         )
 
         if not is_git_available():
@@ -226,6 +247,18 @@ def run_check(args: Namespace) -> int:
             baseline_timed_out_dimensions=baseline_extraction.timed_out_dimensions,
             candidate_timed_out_dimensions=candidate_extraction.timed_out_dimensions,
         )
+        security_status = None
+        suite = None
+        if sensor_enabled:
+            if baseline_sensor is None or candidate_sensor is None or as_of is None:
+                raise AssertionError("sensor inputs must be loaded when sensor flags are enabled")
+            security_status = evaluate_security(
+                compiled.security,
+                baseline_sensor,
+                candidate_sensor,
+                as_of=as_of,
+            )
+            suite = combine_verdict(verdict.result, security_status)
         repair_plan = emit_repair_plan(verdict)
         payload = build_payload(
             "check",
@@ -241,12 +274,17 @@ def run_check(args: Namespace) -> int:
             candidate_source=candidate_source,
             candidate_rev=candidate_rev,
             timed_out_dimensions=timed_out_dimensions,
+            security_verdict=security_status,
+            security_as_of=as_of.isoformat() if as_of is not None else None,
+            suite_verdict=suite.final.value if suite is not None else None,
         )
         output_status = _write_output(
             _render_payload(payload, args, subcommand="check"), args.output
         )
         if output_status != 0:
             return output_status
+        if suite is not None:
+            return _exit_code_for_suite(suite.final, strict_repair=args.strict_repair)
         return _exit_code_for(verdict.result, strict_repair=args.strict_repair)
     except TargetUsageError as exc:
         return _usage_error(exc)
@@ -302,6 +340,55 @@ def _extractor_timeout(raw: float | None) -> float | None:
     if not math.isfinite(raw) or raw <= 0:
         raise ValueError("--extractor-timeout must be a finite value greater than 0 seconds")
     return raw
+
+
+def _sensor_flags_enabled(args: Namespace) -> bool:
+    has_baseline = args.sensor_baseline is not None
+    has_candidate = args.sensor_candidate is not None
+    if has_baseline != has_candidate:
+        raise ValueError("--sensor-baseline and --sensor-candidate must be provided together")
+    return has_baseline and has_candidate
+
+
+def _reject_unsupported_sensor_output_format(output_format: str | None) -> None:
+    if output_format in {"sarif", "gh-actions"}:
+        raise ValueError(
+            "sensor-enabled check supports only json or human output; "
+            f"--format {output_format} is deferred to G-4b"
+        )
+
+
+def _as_of_date(raw: str | None) -> dt.date:
+    if raw is None:
+        return dt.date.today()
+    try:
+        return dt.date.fromisoformat(raw)
+    except ValueError as exc:
+        raise ValueError("--as-of must be a valid YYYY-MM-DD date") from exc
+
+
+def _load_sensor_state(raw_path: str, *, flag: str) -> SensorState:
+    path = Path(raw_path)
+    try:
+        return SensorState.model_validate_json(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"{flag} could not be read: {path}") from exc
+    except ValidationError as exc:
+        raise ValueError(
+            f"{flag} must be a valid SensorState JSON file: {exc.errors()[0]['msg']}"
+        ) from exc
+    except ValueError as exc:
+        raise ValueError(f"{flag} must be a valid SensorState JSON file") from exc
+
+
+def _exit_code_for_suite(final: SuiteResult, *, strict_repair: bool) -> int:
+    if final is SuiteResult.UNKNOWN:
+        return ENGINE_ERROR
+    if final is SuiteResult.FAIL:
+        return FAIL
+    if final is SuiteResult.REPAIR and strict_repair:
+        return FAIL
+    return SUCCESS
 
 
 def _resolve_baseline_ref(args: Namespace, *, repo_root: Path) -> str:

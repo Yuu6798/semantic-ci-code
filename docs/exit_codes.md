@@ -27,6 +27,13 @@ normal engine-error path; exit 3 remains reserved by the global policy.
 smoke` uses the same exit-code policy; skipped constraints are reported in
 output but do not contribute to PASS, REPAIR, or FAIL.
 
+When `check` is run with `--sensor-baseline` and `--sensor-candidate`, it
+combines the code verdict and security verdict into `suite_verdict` using
+`unknown > fail > repair > pass`. Sensor-enabled `check` maps suite `pass` to
+exit 0, suite `repair` to exit 0 (or 1 with `--strict-repair`), suite `fail` to
+exit 1, and suite `unknown` to exit 3. Without sensor flags, `check` keeps the
+code-only exit behavior above.
+
 Constraints with `severity: info` violate as advisory only: they appear in
 output as `category: info` instructions but never change the verdict or the
 exit code, even with `--strict-repair`. This is the Advisor channel defined
@@ -102,6 +109,11 @@ go to stderr.
 | `check --baseline-source working-tree --baseline-rev <ref>` | 2 | `error: --baseline-source=working-tree is incompatible with --baseline-rev` |
 | `check --baseline-source staged-index --baseline-rev <ref>` | 2 | `error: --baseline-source=staged-index is incompatible with --baseline-rev` |
 | `check --baseline-source <volatile> --candidate-source <same volatile>` | 0/1 | Warning: verdict will report no drift by construction. |
+| `check --sensor-baseline <file>` without `--sensor-candidate` | 2 | `--sensor-baseline and --sensor-candidate must be provided together` |
+| `check --sensor-baseline <invalid-json> --sensor-candidate <file>` | 2 | `--sensor-baseline must be a valid SensorState JSON file...` |
+| `check --sensor-baseline <file> --sensor-candidate <file> --as-of bad` | 2 | `--as-of must be a valid YYYY-MM-DD date` |
+| `check --sensor-baseline <file> --sensor-candidate <file> --format sarif` | 2 | `sensor-enabled check supports only json or human output...` |
+| `check` with sensor provenance drift / incomplete security signal | 3 | JSON or human output is still written with `security.verdict: unknown` and `suite_verdict: unknown`. |
 | `ssp scan --sensor semgrep` without `--config` | 2 | `--config is required when --sensor=semgrep` |
 | `ssp from-json` with a sensor error fixture | 3 | SSP envelope is still written with `aggregate_verdict: unknown`. |
 | Internal bug | 4 | `internal error: <one-line>; rerun with --verbose for traceback` |

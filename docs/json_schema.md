@@ -25,6 +25,8 @@ bump beyond the current CLI schema version.
   "subcommand": "check",
   "mode": "full",
   "verdict": "pass",
+  "security": {"verdict": "pass", "as_of": "2026-09-01"},
+  "suite_verdict": "pass",
   "intent": "add user profile endpoint",
   "primary_kind": "feature",
   "allowed_secondary_kinds": [],
@@ -74,6 +76,8 @@ bump beyond the current CLI schema version.
 | `subcommand` | One of `observe`, `compare`, `check`. |
 | `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
+| `security` | Optional `check` security verdict object present only when `--sensor-baseline` / `--sensor-candidate` are supplied. Shape: `{verdict: "pass"|"fail"|"unknown", as_of: "YYYY-MM-DD"}`. |
+| `suite_verdict` | Optional final suite verdict present only when `security` is present. Values: `pass`, `repair`, `fail`, or `unknown`; computed from code and security using `unknown > fail > repair > pass`. |
 | `intent` | Target intent, or `null` for `observe`. |
 | `primary_kind` | Target primary change kind, or `null` for `observe`. |
 | `allowed_secondary_kinds` | Target secondary change kinds. Empty for `observe`. |
@@ -416,6 +420,11 @@ bump the envelope version.
   version because it is an optional diagnostic field. Constraints that target a
   timed-out dimension report `status: "unknown"` and
   `unknown_cause: "extraction"`.
+- `check --sensor-baseline <json> --sensor-candidate <json>` can add optional
+  top-level `security` and `suite_verdict` fields without bumping the schema
+  version. Consumers reading v6 can ignore these additive fields and keep using
+  the code-only `verdict`; sensor-enabled callers should route exit behavior
+  from `suite_verdict`.
 - The CLI layer still materializes two directories for the engine; the engine
   does not receive source-category enums.
 

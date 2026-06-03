@@ -96,6 +96,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="per-dimension extractor timeout in seconds; omitted means no timeout",
     )
     check.add_argument(
+        "--sensor-baseline",
+        default=None,
+        help="prebuilt baseline SensorState JSON for suite security verdict integration",
+    )
+    check.add_argument(
+        "--sensor-candidate",
+        default=None,
+        help="prebuilt candidate SensorState JSON for suite security verdict integration",
+    )
+    check.add_argument(
+        "--as-of",
+        default=None,
+        help="YYYY-MM-DD date used for security suppression expiry; defaults to today",
+    )
+    check.add_argument(
         "--baseline-source",
         choices=("commit", "working-tree", "staged-index"),
         default="commit",

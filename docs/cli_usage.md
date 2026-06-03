@@ -328,6 +328,9 @@ semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--candidate-source {commit,working-tree,staged-index}]
                   [--mode {smoke,full}] [--no-cache] [--cache-dir <dir>]
                   [--cache-max-bytes <int>] [--extractor-timeout <seconds>]
+                  [--sensor-baseline <sensor-state.json>]
+                  [--sensor-candidate <sensor-state.json>]
+                  [--as-of YYYY-MM-DD]
 ```
 
 Compares git refs using temporary detached worktrees. Defaults are:
@@ -368,6 +371,38 @@ Common source combinations:
 
 JSON output from `check` records source provenance under
 `engine.baseline` and `engine.candidate`.
+
+`check` can also combine the code verdict with prebuilt security sensor state:
+
+```bash
+semantic-ci check \
+  --sensor-baseline baseline.sensor-state.json \
+  --sensor-candidate candidate.sensor-state.json \
+  --as-of 2026-09-01
+```
+
+Both `--sensor-baseline` and `--sensor-candidate` must be provided together.
+Each file must be a `SensorState` JSON document produced by the Phase G sensor
+state model. `check` does not run Semgrep, pip-audit, or any other live scanner
+from these flags; it only ingests prebuilt JSON and evaluates the target's
+optional `security:` policy. `--as-of` controls suppression expiry. When it is
+omitted, the CLI boundary uses today's date. With sensor state enabled, JSON
+output adds:
+
+```json
+{
+  "security": {"verdict": "pass", "as_of": "2026-09-01"},
+  "suite_verdict": "pass"
+}
+```
+
+The code-only `verdict` field remains the evaluator verdict. `suite_verdict`
+combines code and security with `unknown > fail > repair > pass` and controls
+the process exit code for sensor-enabled `check` runs. Sensor-enabled `check`
+currently supports JSON and human output only; `--format sarif` and
+`--format gh-actions` are rejected until security-aware renderers land in a
+later G-4 slice. Without sensor flags, the payload and exit behavior are
+unchanged.
 
 **Migrated in Phase 3b**: `semantic-ci pre-commit [...]` became
 `semantic-ci check --candidate-source=staged-index [...]`. The evaluation
@@ -416,6 +451,7 @@ semantic-ci check --candidate-source staged-index --target target.yaml
 semantic-ci check --baseline-source working-tree --candidate-source staged-index
 semantic-ci check --mode smoke
 semantic-ci check --extractor-timeout 2.5 --format json
+semantic-ci check --sensor-baseline baseline.security.json --sensor-candidate candidate.security.json
 semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600
 semantic-ci check --format sarif --output semantic-ci.sarif

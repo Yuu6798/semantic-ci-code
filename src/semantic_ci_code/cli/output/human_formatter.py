@@ -21,6 +21,7 @@ _VERDICT_COLOR = {
     "pass": "green",
     "repair": "yellow",
     "fail": "red",
+    "unknown": "cyan",
 }
 
 
@@ -32,6 +33,7 @@ def format_human(payload: dict[str, Any], *, use_color: bool) -> str:
     lines.append(f"Primary kind: {payload.get('primary_kind') or '-'}")
     lines.append("")
     lines.append(_verdict_line(payload, use_color=use_color))
+    lines.extend(_suite_lines(payload, use_color=use_color))
 
     instructions = payload.get("repair_plan", {}).get("instructions", [])
     for category in _CATEGORY_ORDER:
@@ -87,6 +89,27 @@ def _verdict_line(payload: dict[str, Any], *, use_color: bool) -> str:
         f"{summary.get('skipped', 0)} skipped)"
     )
     return colored(text, _VERDICT_COLOR.get(payload["verdict"], "gray"), enabled=use_color)
+
+
+def _suite_lines(payload: dict[str, Any], *, use_color: bool) -> list[str]:
+    security = payload.get("security")
+    suite_verdict = payload.get("suite_verdict")
+    if security is None or suite_verdict is None:
+        return []
+    security_verdict = security["verdict"]
+    lines = [
+        colored(
+            f"Security verdict: {str(security_verdict).upper()}  (as_of={security['as_of']})",
+            _VERDICT_COLOR.get(security_verdict, "gray"),
+            enabled=use_color,
+        ),
+        colored(
+            f"Suite final: {str(suite_verdict).upper()}",
+            _VERDICT_COLOR.get(suite_verdict, "gray"),
+            enabled=use_color,
+        ),
+    ]
+    return lines
 
 
 def _instruction_lines(item: dict[str, Any], *, use_color: bool) -> list[str]:

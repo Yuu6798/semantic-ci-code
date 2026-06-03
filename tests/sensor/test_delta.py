@@ -97,6 +97,40 @@ def test_explicit_drift_fields_can_include_sensor_version():
     assert "sensor_version" in (delta.deltas_by_sensor["semgrep"].error_message or "")
 
 
+def test_provenance_drift_reason_orders_changed_fields_deterministically():
+    baseline = sensor_state(
+        provenances=(
+            provenance(
+                adapter_version="adapter-a",
+                ruleset_hash="sha256:rules-a",
+                sensor_version="tool-a",
+            ),
+        ),
+        findings=(),
+    )
+    candidate = sensor_state(
+        provenances=(
+            provenance(
+                adapter_version="adapter-b",
+                ruleset_hash="sha256:rules-b",
+                sensor_version="tool-b",
+            ),
+        ),
+        findings=(),
+    )
+
+    delta = compute_security_delta(
+        baseline,
+        candidate,
+        drift_fields=frozenset({"sensor_version", "ruleset_hash", "adapter_version"}),
+    )
+
+    assert (
+        delta.deltas_by_sensor["semgrep"].error_message
+        == "sensor provenance changed: adapter_version, ruleset_hash, sensor_version"
+    )
+
+
 def test_explicit_drift_fields_can_relax_ruleset_hash_drift():
     finding = sast_finding("same.rule", severity="info")
     baseline = sensor_state(

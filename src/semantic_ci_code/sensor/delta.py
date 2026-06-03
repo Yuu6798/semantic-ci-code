@@ -114,9 +114,9 @@ def _provenance_drift_reason(
 ) -> str | None:
     if baseline is None or candidate is None:
         return "sensor exists on only one side"
-    changed = [
+    changed = sorted(
         field for field in drift_fields if getattr(baseline, field) != getattr(candidate, field)
-    ]
+    )
     if not changed:
         return None
     return "sensor provenance changed: " + ", ".join(changed)

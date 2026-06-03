@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from semantic_ci_code.domain.state_schema import ChangeKind, EffectClass
 from semantic_ci_code.framework.constraint_types import Constraint
+from semantic_ci_code.framework.security_policy import SecurityPolicy
 
 
 class APISurfaceAllowRule(BaseModel):
@@ -67,6 +68,7 @@ class TargetSVP(BaseModel):
     authorship: Authorship | None = None
     api_surface: APISurfacePolicy | None = None
     effects: EffectsPolicy | None = None
+    security: SecurityPolicy | None = None
     constraints: tuple[Constraint, ...] = Field(default_factory=tuple)
 
 

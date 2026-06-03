@@ -45,6 +45,37 @@
       "title": "APISurfacePolicy",
       "type": "object"
     },
+    "AddedFindingsPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "max_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Count"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SeverityFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "AddedFindingsPolicy",
+      "type": "object"
+    },
     "Author": {
       "additionalProperties": false,
       "properties": {
@@ -274,6 +305,24 @@
       "title": "EffectsPolicy",
       "type": "object"
     },
+    "FindingsPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AddedFindingsPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "FindingsPolicy",
+      "type": "object"
+    },
     "Operator": {
       "enum": [
         "equals",
@@ -362,6 +411,89 @@
       "title": "RepairConstraint",
       "type": "object"
     },
+    "RulesPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "deny_added": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deny Added",
+          "type": "array"
+        }
+      },
+      "title": "RulesPolicy",
+      "type": "object"
+    },
+    "ScannerPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "require_same_advisory_db": {
+          "default": true,
+          "title": "Require Same Advisory Db",
+          "type": "boolean"
+        },
+        "require_same_ruleset": {
+          "default": true,
+          "title": "Require Same Ruleset",
+          "type": "boolean"
+        },
+        "require_same_sensor_version": {
+          "default": false,
+          "title": "Require Same Sensor Version",
+          "type": "boolean"
+        }
+      },
+      "title": "ScannerPolicy",
+      "type": "object"
+    },
+    "SecurityPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "findings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindingsPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rules": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RulesPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scanner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScannerPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "suppressions": {
+          "items": {
+            "$ref": "#/$defs/Suppression"
+          },
+          "title": "Suppressions",
+          "type": "array"
+        }
+      },
+      "title": "SecurityPolicy",
+      "type": "object"
+    },
     "Severity": {
       "enum": [
         "hard",
@@ -370,6 +502,27 @@
       ],
       "title": "Severity",
       "type": "string"
+    },
+    "SeverityFilter": {
+      "additionalProperties": false,
+      "properties": {
+        "not_in": {
+          "items": {
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "type": "string"
+          },
+          "title": "Not In",
+          "type": "array"
+        }
+      },
+      "title": "SeverityFilter",
+      "type": "object"
     },
     "StateConstraint": {
       "additionalProperties": false,
@@ -431,6 +584,47 @@
         "operator"
       ],
       "title": "StateConstraint",
+      "type": "object"
+    },
+    "Suppression": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical_id": {
+          "pattern": "^v1:[0-9a-f]{16}$",
+          "title": "Canonical Id",
+          "type": "string"
+        },
+        "expires": {
+          "format": "date",
+          "title": "Expires",
+          "type": "string"
+        },
+        "identity_components": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Identity Components",
+          "type": "array"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "canonical_id",
+        "identity_components",
+        "reason",
+        "expires",
+        "owner"
+      ],
+      "title": "Suppression",
       "type": "object"
     },
     "UnknownPolicy": {
@@ -510,6 +704,17 @@
     "intent": {
       "title": "Intent",
       "type": "string"
+    },
+    "security": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecurityPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

@@ -166,27 +166,31 @@ candidate 側 miss は "removed" を捏造する) を構造的に断つ。
   candidate_findings = LLM_scan(candidate_code)         # 1 回だけ
   for f in candidate_findings:
       anchor = project_to_canonical(f)                  # D6
-      # baseline 照合は anchor 種別で述語が異なる (下記)。LLM 再実行ではなく
-      # コード構造の決定論的述語
-      already_in_baseline = baseline_predicate(anchor, baseline_code)
+      # already_in_baseline = 「この脆弱性が baseline にも既に存在したか」を
+      # コード構造の決定論的述語で判定 (LLM 再実行はしない)。述語は anchor 種別で
+      # 異なる (下記)。証明不能なら False (= added) に倒す
+      already_in_baseline = vuln_present_in_baseline(anchor, baseline_code)
       if not already_in_baseline:
           mark_added(f)
 ```
 
-**presence anchor と absence anchor で baseline 述語が異なる (PR #132 review P2)**:
+**`vuln_present_in_baseline` は anchor 種別で計算が異なる (PR #132 review P2)**。
+述語の意味は一貫して「**この脆弱性が baseline にも既に存在したか**」であり、
+制御フロー (`not already_in_baseline → added`) に合わせる:
 
 - **presence anchor** (脆弱性 = 存在するコード片。injection / IDOR sink 等):
-  `baseline_predicate` = 「その sink / コード片が baseline に存在するか」。存在すれば
-  baseline 既出 → unchanged。site 存在チェックで正しい
+  `vuln_present_in_baseline` = 「その sink / コード片が baseline に存在するか」。
+  存在すれば baseline 既出 → unchanged。site 存在チェックで正しい
 - **absence anchor** (脆弱性 = 欠落。`(site, expected_property)`、missing authz /
-  validation 等): site が baseline に存在することは「脆弱性が baseline にあった」を
-  **意味しない**。baseline で expected_property が満たされていた (check 在り) のに
-  candidate で削除された場合、site は両方に存在するが脆弱性は candidate で新規。
-  よって `baseline_predicate` は **「baseline で expected_property が満たされて
-  いたか」= 欠落プロパティ自体の決定論的述語**でなければならない (site 存在では不可)
-- **証明不能なら added (D7 recall 優先)**: expected_property の baseline 充足を
-  決定論的に判定できない場合、baseline presence を unproven とみなし、当該 finding は
-  unchanged ではなく **added** に倒す (見逃しより誤検知を選ぶ)
+  validation 等): `vuln_present_in_baseline` = 「baseline でも expected_property が
+  **満たされていなかった** (= 同じ欠落が baseline に既存)」。これは
+  「baseline が property を満たしていたか」の **否定**である点に注意:
+  baseline に check 在り (property 充足) なら欠落は baseline に**無かった** →
+  `already_in_baseline = False` → **added**。site が両方に存在することは
+  「脆弱性が baseline にあった」を意味しない (site 存在では判定不可)
+- **証明不能なら added (D7 recall 優先)**: baseline の expected_property 充足を
+  決定論的に判定できない場合、`vuln_present_in_baseline` を False とみなし、当該
+  finding は unchanged ではなく **added** に倒す (見逃しより誤検知を選ぶ)
 
 semgrep のような決定論センサーでは re-projection は任意 (どちらでも結果同じ)
 だが、**LLM sensor では必須**。adapter Protocol (§2.1) はこの規律を型・契約で

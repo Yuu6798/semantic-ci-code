@@ -102,7 +102,6 @@ Active references (current behavior):
 Planning (open):
 
 - [Phase G — SSP core integration](docs/phase_g_planning.md) — vertical-connect SSP v0.1 into core: SensorState parallel to CodeState, suite evaluator unifying code + security delta, FQN-translated findings, CSCI-45〜49 (active queue main axis)
-- [LLM Security Sensor — Non-Deterministic Scout Layer (Phase H candidate)](docs/llm_sensor_adapter_planning.md) — connect a non-deterministic LLM security oracle (Codex Security et al.) as one sensor adapter atop Phase G. Core thesis: **LLM is a scout, not a judge** (on-demand, advisory surface, never seats the verdict). Determinism preserved via frozen SensorState + one-run-plus-reprojection; §23.1 not weakened; LLM-general adapter protocol; promotion only via target.yaml authoring freeze (silence = consent). Gated on Phase G-5, CSCI-50〜54
 - [Brief 8 — Target Authoring Surface](docs/brief_8_planning.md) — target.yaml generation paths (recipe / catalog / hand-written), surface isolation from evaluator, `candidate_code_used: false`; encoded into `tests/authoring/` + `tests/architecture/`
 - [Brief 7 — Semantic Security Protocol v0.1](docs/brief_7_planning.md) — SAST + SCA, Python only, independent envelope, Sensor Provenance Invariant
 - [ResultStatus authoring/extraction split](docs/brief_resultstatus_planning.md) — C+B (compile-time pushback + `unknown_cause` sibling field), 5 PR split, validate-plan v2 — boundary with Brief 8 (Authoring Surface) pinned in §1b

@@ -174,13 +174,19 @@ candidate 側 miss は "removed" を捏造する) を構造的に断つ。
           mark_added(f)
 ```
 
-**`vuln_present_in_baseline` は anchor 種別で計算が異なる (PR #132 review P2)**。
-述語の意味は一貫して「**この脆弱性が baseline にも既に存在したか**」であり、
-制御フロー (`not already_in_baseline → added`) に合わせる:
+**`vuln_present_in_baseline` の原則 (PR #132 review P2)**。述語の意味は一貫して
+「**この脆弱性が baseline にも既に存在したか**」であり、制御フロー
+(`not already_in_baseline → added`) に合わせる。**重要**: anchor site の存在は
+必要条件にすぎず十分条件ではない。述語は「同じ **脆弱な条件・経路** が baseline
+にも成立していたか」を確立しなければならず、確立できない場合は False (= added、
+D7 recall 優先) に倒す:
 
 - **presence anchor** (脆弱性 = 存在するコード片。injection / IDOR sink 等):
-  `vuln_present_in_baseline` = 「その sink / コード片が baseline に存在するか」。
-  存在すれば baseline 既出 → unchanged。site 存在チェックで正しい
+  sink / コード片が baseline に存在するだけでは**不十分**。baseline では
+  sanitization / authorization / source-flow 制約で**安全だった** sink を candidate
+  がその保護を外した場合、sink は両方に存在するが脆弱性は candidate で新規。よって
+  `vuln_present_in_baseline` は「baseline で**脆弱な条件/経路が成立していたか**」を
+  判定する必要がある (sink の存在では判定不可)。判定不能なら added
 - **absence anchor** (脆弱性 = 欠落。`(site, expected_property)`、missing authz /
   validation 等): `vuln_present_in_baseline` = 「baseline でも expected_property が
   **満たされていなかった** (= 同じ欠落が baseline に既存)」。これは
@@ -188,9 +194,13 @@ candidate 側 miss は "removed" を捏造する) を構造的に断つ。
   baseline に check 在り (property 充足) なら欠落は baseline に**無かった** →
   `already_in_baseline = False` → **added**。site が両方に存在することは
   「脆弱性が baseline にあった」を意味しない (site 存在では判定不可)
-- **証明不能なら added (D7 recall 優先)**: baseline の expected_property 充足を
-  決定論的に判定できない場合、`vuln_present_in_baseline` を False とみなし、当該
-  finding は unchanged ではなく **added** に倒す (見逃しより誤検知を選ぶ)
+- **証明不能なら added (D7 recall 優先)**: 脆弱な条件/経路 (presence) または
+  expected_property の欠落 (absence) の baseline 成立を決定論的に判定できない場合、
+  `vuln_present_in_baseline` を False とみなし、当該 finding は unchanged ではなく
+  **added** に倒す (見逃しより誤検知を選ぶ)。脆弱な条件/経路の baseline 成立を
+  決定論的に証明できるとは限らないため、この fallback が常用経路になりうる。
+  どの条件をどこまで決定論的に判定するかは D6 の anchor レシピ暫定性に従い実装時に
+  較正する
 
 semgrep のような決定論センサーでは re-projection は任意 (どちらでも結果同じ)
 だが、**LLM sensor では必須**。adapter Protocol (§2.1) はこの規律を型・契約で
@@ -401,14 +411,16 @@ deterministic sensor と異なる (再 scan しても一致しないため versi
   `delta_overlay.py` / `code_state_delta.py` が捨てているため、まず rename マップ
   を delta に乗せる必要がある
 - 上記 rename マップに rename re-projection を接続 (D7)
-- **absence anchor の baseline 述語**: `(site, expected_property)` 型 finding は
-  site 存在ではなく expected_property の baseline 充足を判定する述語を実装し、
-  判定不能なら added に倒す (D4)
+- **baseline 述語は anchor site でなく脆弱な条件/経路を判定する**: presence /
+  absence いずれも site 存在では不十分。判定不能なら added に倒す (D4 原則)
 - **AC 1**: 2-run 差分を取らないことを architecture test で enforce、
   rename マップ実装後、rename した baseline で同一脆弱性が "added" に出ない
 - **AC 2 (absence anchor)**: baseline と candidate に同一 site が存在し baseline
   のみ expected_property を満たす (candidate で check 削除) ケースで、finding が
   unchanged ではなく "added" に出ることを test で固定
+- **AC 3 (presence anchor)**: baseline と candidate に同一 sink が存在し baseline
+  のみ保護 (sanitization / authz / source-flow) で安全だった (candidate で保護削除)
+  ケースで、finding が unchanged ではなく "added" に出ることを test で固定
 
 ### H-3: Codex Security reference adapter (CSCI-52)
 - `sensor/adapters/llm/codex_security.py` (first concrete, §1.5)

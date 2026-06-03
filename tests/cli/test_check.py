@@ -12,8 +12,10 @@ import semantic_ci_code.pipeline.python_code_state as code_state_pipeline
 from semantic_ci_code.cli.git_runtime import GitCommandError
 from semantic_ci_code.sensor.models import (
     SASTSecurityFinding,
+    SCASecurityFinding,
     SensorProvenance,
     SensorState,
+    SourceSpan,
     canonical_id_for_identity,
 )
 
@@ -64,6 +66,24 @@ security:
   rules:
     deny_added:
       - python.security.denied
+constraints:
+  - id: added_api_present
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_any
+    expected:
+      - fqn: mod.added
+        kind: function
+        visibility: public
+"""
+TARGET_SECURITY_MAX_COUNT_ZERO = """\
+intent: add a public API with security count policy
+change:
+  primary_kind: feature
+security:
+  findings:
+    added:
+      max_count: 0
 constraints:
   - id: added_api_present
     kind: delta
@@ -160,7 +180,17 @@ def test_check_sensor_security_fail_changes_exit_and_payload(tmp_path: Path):
     assert result.returncode == 1
     data = payload(result)
     assert data["verdict"] == "pass"
-    assert data["security"] == {"verdict": "fail", "as_of": "2026-09-01"}
+    assert data["security"]["verdict"] == "fail"
+    assert data["security"]["as_of"] == "2026-09-01"
+    assert data["security"]["global_count_violated"] is False
+    sensor = data["security"]["sensors"][0]
+    assert sensor["sensor_id"] == "semgrep"
+    assert sensor["status"] == "fail"
+    assert sensor["added"][0]["rule_id"] == "python.security.eval"
+    assert sensor["removed"] == []
+    assert sensor["suppressed"] == []
+    assert sensor["drift_reason"] is None
+    assert sensor["unchanged_count"] == 0
     assert data["suite_verdict"] == "fail"
 
 
@@ -177,8 +207,31 @@ def test_check_sensor_security_pass_preserves_code_exit(tmp_path: Path):
     assert result.returncode == 0
     data = payload(result)
     assert data["verdict"] == "pass"
-    assert data["security"] == {"verdict": "pass", "as_of": "2026-09-01"}
+    assert data["security"]["verdict"] == "pass"
+    assert data["security"]["as_of"] == "2026-09-01"
+    sensor = data["security"]["sensors"][0]
+    assert sensor["status"] == "pass"
+    assert sensor["added"][0]["severity"] == "info"
     assert data["suite_verdict"] == "pass"
+
+
+def test_check_sensor_json_includes_removed_security_detail(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    removed = _sast_finding("python.security.removed", severity="high")
+    sensor_baseline = _write_sensor_state(
+        tmp_path / "sensor-baseline.json",
+        findings=(removed,),
+    )
+    sensor_candidate = _write_sensor_state(tmp_path / "sensor-candidate.json")
+
+    result = _run_check_with_sensors(repo, sensor_baseline, sensor_candidate)
+
+    assert result.returncode == 0
+    sensor = payload(result)["security"]["sensors"][0]
+    assert sensor["status"] == "pass"
+    assert sensor["added"] == []
+    assert sensor["removed"][0]["canonical_id"] == removed.canonical_id
+    assert sensor["suppressed"] == []
 
 
 def test_check_sensor_unknown_returns_engine_error_exit(tmp_path: Path):
@@ -197,7 +250,15 @@ def test_check_sensor_unknown_returns_engine_error_exit(tmp_path: Path):
     assert result.returncode == 3
     data = payload(result)
     assert data["verdict"] == "pass"
-    assert data["security"] == {"verdict": "unknown", "as_of": "2026-09-01"}
+    assert data["security"]["verdict"] == "unknown"
+    assert data["security"]["as_of"] == "2026-09-01"
+    sensor = data["security"]["sensors"][0]
+    assert sensor["status"] == "unknown"
+    assert sensor["added"] == []
+    assert sensor["removed"] == []
+    assert sensor["suppressed"] == []
+    assert sensor["provenance_changed"] is True
+    assert "ruleset_hash" in sensor["drift_reason"]
     assert data["suite_verdict"] == "unknown"
 
 
@@ -298,11 +359,21 @@ def test_check_as_of_controls_security_suppression_expiry(tmp_path: Path):
     )
 
     assert active.returncode == 0
-    assert payload(active)["security"]["verdict"] == "pass"
-    assert payload(active)["suite_verdict"] == "pass"
+    active_payload = payload(active)
+    assert active_payload["security"]["verdict"] == "pass"
+    assert active_payload["security"]["sensors"][0]["added"] == []
+    assert active_payload["security"]["sensors"][0]["suppressed"][0]["canonical_id"] == (
+        finding.canonical_id
+    )
+    assert active_payload["suite_verdict"] == "pass"
     assert expired.returncode == 1
-    assert payload(expired)["security"]["verdict"] == "fail"
-    assert payload(expired)["suite_verdict"] == "fail"
+    expired_payload = payload(expired)
+    assert expired_payload["security"]["verdict"] == "fail"
+    assert expired_payload["security"]["sensors"][0]["added"][0]["canonical_id"] == (
+        finding.canonical_id
+    )
+    assert expired_payload["security"]["sensors"][0]["suppressed"] == []
+    assert expired_payload["suite_verdict"] == "fail"
 
 
 def test_check_human_output_includes_security_and_suite_verdicts(tmp_path: Path):
@@ -321,6 +392,74 @@ def test_check_human_output_includes_security_and_suite_verdicts(tmp_path: Path)
     assert result.returncode == 0
     assert "Security verdict: PASS  (as_of=2026-09-01)" in text
     assert "Suite final: PASS" in text
+    assert "[semgrep] PASS  added=0 removed=0 suppressed=0 unchanged=0" in text
+
+
+def test_check_human_output_lists_added_security_findings(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    finding = _sast_finding(
+        "python.security.eval",
+        severity="high",
+        source_span=SourceSpan(start_line=7, end_line=7, start_col=1, end_col=17),
+    )
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="human",
+    )
+
+    assert result.returncode == 1
+    assert "[semgrep] FAIL  added=1 removed=0 suppressed=0 unchanged=0" in result.stdout
+    assert "+ python.security.eval [high] at src/app.py:7 - finding" in result.stdout
+
+
+def test_check_human_output_includes_suppressed_count_and_drift_reason(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    finding = _sast_finding("python.security.suppressed", severity="high")
+    write_file(repo / "target.yaml", _target_with_suppression(finding, expires=dt.date(2026, 9, 1)))
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    suppressed = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="human",
+    )
+
+    assert suppressed.returncode == 0
+    assert "[semgrep] PASS  added=0 removed=0 suppressed=1 unchanged=0" in suppressed.stdout
+    assert "suppressed: 1" in suppressed.stdout
+
+    drift_baseline = _write_sensor_state(
+        tmp_path / "sensor-drift-baseline.json",
+        provenances=(_provenance(ruleset_hash="sha256:old"),),
+    )
+    drift_candidate = _write_sensor_state(
+        tmp_path / "sensor-drift-candidate.json",
+        provenances=(_provenance(ruleset_hash="sha256:new"),),
+    )
+    drift = _run_check_with_sensors(
+        repo,
+        drift_baseline,
+        drift_candidate,
+        output_format="human",
+    )
+
+    assert drift.returncode == 3
+    assert "[semgrep] UNKNOWN  added=0 removed=0 suppressed=0 unchanged=0" in drift.stdout
+    assert "drift: " in drift.stdout
+    assert "ruleset_hash" in drift.stdout
 
 
 def test_check_sensor_ingest_does_not_execute_live_security_scanners():
@@ -332,7 +471,7 @@ def test_check_sensor_ingest_does_not_execute_live_security_scanners():
     assert ".scan(" not in check_source
 
 
-@pytest.mark.parametrize("output_format", ["sarif", "gh-actions"])
+@pytest.mark.parametrize("output_format", ["gh-actions"])
 def test_check_sensor_flags_reject_code_only_formats(tmp_path: Path, output_format: str):
     repo = init_repo(tmp_path, origin_ref=True)
     sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
@@ -349,8 +488,237 @@ def test_check_sensor_flags_reject_code_only_formats(tmp_path: Path, output_form
     )
 
     assert result.returncode == 2
-    assert "sensor-enabled check supports only json or human output" in result.stderr
+    assert "sensor-enabled check supports json, human, or sarif output" in result.stderr
     assert result.stdout == ""
+
+
+def test_check_sarif_output_merges_security_results_into_same_run(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    high = _sast_finding(
+        "python.security.high",
+        severity="high",
+        source_span=SourceSpan(start_line=7, end_line=7, start_col=1, end_col=17),
+    )
+    info = _sast_finding("python.security.info", severity="info", ordinal=1)
+    medium = _sca_finding("PYSEC-2026-1", severity="medium")
+    provenances = (
+        _provenance(sensor_id="semgrep"),
+        _provenance(
+            sensor_id="pip-audit",
+            ruleset_hash=None,
+            advisory_db_hash="sha256:advisory-db",
+        ),
+    )
+    sensor_baseline = _write_sensor_state(
+        tmp_path / "sensor-baseline.json",
+        provenances=provenances,
+    )
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        provenances=provenances,
+        findings=(high, info, medium),
+    )
+
+    first = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+    second = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert first.returncode == 1
+    assert first.stdout == second.stdout
+    document = json.loads(first.stdout)
+    run = document["runs"][0]
+    results = {item["ruleId"]: item for item in run["results"]}
+    rule_ids = {rule["id"] for rule in run["tool"]["driver"]["rules"]}
+
+    assert "security/python.security.high" in rule_ids
+    assert "security/python.security.info" in rule_ids
+    assert "security/PYSEC-2026-1" in rule_ids
+    assert results["security/python.security.high"]["level"] == "error"
+    assert results["security/python.security.info"]["level"] == "note"
+    assert results["security/PYSEC-2026-1"]["level"] == "warning"
+    assert results["security/python.security.high"]["properties"] == {
+        "category": "sast",
+        "sensor_id": "semgrep",
+        "severity": "high",
+        "canonical_id": high.canonical_id,
+    }
+    high_location = results["security/python.security.high"]["locations"][0]
+    assert high_location["physicalLocation"]["artifactLocation"]["uri"] == "src/app.py"
+    assert high_location["physicalLocation"]["region"] == {
+        "startLine": 7,
+        "endLine": 7,
+        "startColumn": 1,
+        "endColumn": 17,
+    }
+    assert "locations" not in results["security/PYSEC-2026-1"]
+
+
+def test_check_sarif_output_emits_drift_note_for_unknown_sensor(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(
+        tmp_path / "sensor-baseline.json",
+        provenances=(_provenance(ruleset_hash="sha256:old"),),
+    )
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        provenances=(_provenance(ruleset_hash="sha256:new"),),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 3
+    document = json.loads(result.stdout)
+    drift = next(
+        item
+        for item in document["runs"][0]["results"]
+        if item["ruleId"] == "security/provenance-drift"
+    )
+    assert drift["level"] == "note"
+    assert drift["properties"]["sensor_id"] == "semgrep"
+    assert "ruleset_hash" in drift["message"]["text"]
+
+
+def test_check_sarif_output_emits_sensor_unknown_for_incomplete_sensor(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        provenances=(_provenance(status="error", error_message="semgrep execution failed"),),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 3
+    document = json.loads(result.stdout)
+    result_by_rule = {item["ruleId"]: item for item in document["runs"][0]["results"]}
+    unknown = result_by_rule["security/sensor-unknown"]
+    assert unknown["level"] == "note"
+    assert unknown["properties"]["sensor_id"] == "semgrep"
+    assert "semgrep execution failed" in unknown["message"]["text"]
+    assert "security/provenance-drift" not in result_by_rule
+
+
+def test_check_sarif_output_omits_zero_based_security_columns(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    finding = _sast_finding(
+        "python.security.zero-col",
+        severity="high",
+        source_span=SourceSpan(start_line=7, end_line=7, start_col=0, end_col=0),
+    )
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 1
+    document = json.loads(result.stdout)
+    result_by_rule = {item["ruleId"]: item for item in document["runs"][0]["results"]}
+    region = result_by_rule["security/python.security.zero-col"]["locations"][0][
+        "physicalLocation"
+    ]["region"]
+    assert region == {"startLine": 7, "endLine": 7}
+
+
+def test_check_sarif_output_surfaces_deny_added_info_policy_failure(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    write_file(repo / "target.yaml", TARGET_SECURITY_DENY_ADDED)
+    finding = _sast_finding("python.security.denied", severity="info")
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 1
+    document = json.loads(result.stdout)
+    results = {item["ruleId"]: item for item in document["runs"][0]["results"]}
+    assert results["security/python.security.denied"]["level"] == "note"
+    policy = results["security/policy-violation"]
+    assert policy["level"] == "error"
+    assert policy["properties"]["sensor_id"] == "semgrep"
+
+
+def test_check_sarif_output_surfaces_global_count_policy_failure(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    write_file(repo / "target.yaml", TARGET_SECURITY_MAX_COUNT_ZERO)
+    finding = _sast_finding("python.security.info", severity="info")
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 1
+    document = json.loads(result.stdout)
+    results = {item["ruleId"]: item for item in document["runs"][0]["results"]}
+    assert results["security/python.security.info"]["level"] == "note"
+    count_policy = results["security/policy-global-count"]
+    assert count_policy["level"] == "error"
+    assert count_policy["properties"]["category"] == "policy"
+
+
+def test_check_human_output_surfaces_global_count_policy_failure(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    write_file(repo / "target.yaml", TARGET_SECURITY_MAX_COUNT_ZERO)
+    finding = _sast_finding("python.security.info", severity="info")
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="human",
+    )
+
+    assert result.returncode == 1
+    assert "Security verdict: FAIL  (as_of=2026-09-01)" in result.stdout
+    assert "Security policy: findings.added.max_count exceeded" in result.stdout
+    assert "[semgrep] PASS  added=1 removed=0 suppressed=0 unchanged=0" in result.stdout
 
 
 def test_check_extractor_timeout_surfaces_extraction_unknown(
@@ -1052,7 +1420,7 @@ def _write_sensor_state(
     path: Path,
     *,
     provenances: tuple[SensorProvenance, ...] | None = None,
-    findings: tuple[SASTSecurityFinding, ...] = (),
+    findings: tuple[SASTSecurityFinding | SCASecurityFinding, ...] = (),
 ) -> Path:
     if provenances is None:
         sensor_ids = sorted({finding.sensor_id for finding in findings} or {"semgrep"})
@@ -1069,15 +1437,20 @@ def _provenance(
     sensor_id: str = "semgrep",
     *,
     ruleset_hash: str | None = "sha256:rules",
+    advisory_db_hash: str | None = None,
     adapter_version: str = "adapter-1",
     sensor_version: str = "tool-1",
+    status: str = "complete",
+    error_message: str | None = None,
 ) -> SensorProvenance:
     return SensorProvenance(
         sensor_id=sensor_id,
         sensor_version=sensor_version,
         adapter_version=adapter_version,
         ruleset_hash=ruleset_hash,
-        status="complete",
+        advisory_db_hash=advisory_db_hash,
+        status=status,
+        error_message=error_message,
     )
 
 
@@ -1087,6 +1460,7 @@ def _sast_finding(
     severity: str,
     sensor_id: str = "semgrep",
     ordinal: int = 0,
+    source_span: SourceSpan | None = None,
 ) -> SASTSecurityFinding:
     components = (
         "v1",
@@ -1110,6 +1484,36 @@ def _sast_finding(
         qualified_name="src.app.handler",
         normalized_text="eval(user_input)",
         ordinal=ordinal,
+        source_span=source_span,
+    )
+
+
+def _sca_finding(
+    advisory_id: str,
+    *,
+    severity: str,
+    sensor_id: str = "pip-audit",
+    package_name: str = "django",
+    installed_version: str = "3.2.0",
+) -> SCASecurityFinding:
+    components = (
+        "v1",
+        "sca",
+        sensor_id,
+        package_name,
+        installed_version,
+        advisory_id,
+    )
+    return SCASecurityFinding(
+        category="sca",
+        sensor_id=sensor_id,
+        canonical_id=canonical_id_for_identity(components),
+        identity_components=components,
+        severity=severity,
+        message="advisory",
+        package_name=package_name,
+        installed_version=installed_version,
+        advisory_id=advisory_id,
     )
 
 

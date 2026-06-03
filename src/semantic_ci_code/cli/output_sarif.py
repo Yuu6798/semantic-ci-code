@@ -13,11 +13,18 @@ def format_sarif(payload: dict[str, Any]) -> str:
     """Render a verdict payload as deterministic SARIF 2.1.0 JSON."""
 
     instructions = _instructions_by_id(payload)
-    results = [
+    code_results = [
         _sarif_result(result, instructions.get(result["constraint_id"]))
         for result in payload["results"]
     ]
-    rules = _rules_for_results(payload["results"], instructions)
+    security_results = _security_sarif_results(payload.get("security"))
+    results = code_results + security_results
+    rules = _dedupe_rules(
+        [
+            *_rules_for_results(payload["results"], instructions),
+            *_security_rules_for_results(security_results),
+        ]
+    )
     document = {
         "version": SARIF_VERSION,
         "$schema": SARIF_SCHEMA,
@@ -91,6 +98,13 @@ def _rules_for_results(
     return rules
 
 
+def _dedupe_rules(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_id: dict[str, dict[str, Any]] = {}
+    for rule in rules:
+        by_id.setdefault(rule["id"], rule)
+    return list(by_id.values())
+
+
 def _sarif_result(
     result: dict[str, Any],
     instruction: dict[str, Any] | None,
@@ -116,6 +130,148 @@ def _sarif_result(
     if location is not None:
         sarif_result["locations"] = [location]
     return sarif_result
+
+
+def _security_sarif_results(security: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if security is None:
+        return []
+    results: list[dict[str, Any]] = []
+    for sensor in sorted(security.get("sensors", []), key=lambda item: item["sensor_id"]):
+        drift_reason = sensor.get("drift_reason")
+        if sensor.get("status") == "unknown" and drift_reason:
+            results.append(_security_unknown_result(sensor, drift_reason))
+        sensor_results: list[dict[str, Any]] = []
+        for finding in sorted(sensor.get("added", []), key=lambda item: item["canonical_id"]):
+            sensor_results.append(_security_finding_result(finding))
+        results.extend(sensor_results)
+        if sensor.get("status") == "fail" and not _has_visible_failure(sensor_results):
+            results.append(
+                _security_policy_result(
+                    "security/policy-violation",
+                    f"Security policy failed for sensor {sensor['sensor_id']}.",
+                    sensor_id=sensor["sensor_id"],
+                )
+            )
+    if security.get("global_count_violated"):
+        results.append(
+            _security_policy_result(
+                "security/policy-global-count",
+                "Security policy findings.added.max_count was exceeded.",
+                sensor_id=None,
+            )
+        )
+    return results
+
+
+def _security_finding_result(finding: dict[str, Any]) -> dict[str, Any]:
+    rule_id = _security_rule_id(finding)
+    message = finding.get("message") or f"Security finding {finding['canonical_id']} was added."
+    result: dict[str, Any] = {
+        "ruleId": rule_id,
+        "level": _security_level(finding.get("severity")),
+        "message": {"text": message},
+        "properties": {
+            "category": finding["category"],
+            "sensor_id": finding["sensor_id"],
+            "severity": finding["severity"],
+            "canonical_id": finding["canonical_id"],
+        },
+    }
+    location = _security_location(finding)
+    if location is not None:
+        result["locations"] = [location]
+    return result
+
+
+def _security_unknown_result(sensor: dict[str, Any], reason: str) -> dict[str, Any]:
+    rule_id = (
+        "security/provenance-drift"
+        if sensor.get("provenance_changed")
+        else "security/sensor-unknown"
+    )
+    return {
+        "ruleId": rule_id,
+        "level": "note",
+        "message": {"text": reason},
+        "properties": {
+            "category": "sensor",
+            "sensor_id": sensor["sensor_id"],
+            "severity": "info",
+            "canonical_id": None,
+        },
+    }
+
+
+def _security_policy_result(rule_id: str, message: str, *, sensor_id: str | None) -> dict[str, Any]:
+    return {
+        "ruleId": rule_id,
+        "level": "error",
+        "message": {"text": message},
+        "properties": {
+            "category": "policy",
+            "sensor_id": sensor_id,
+            "severity": "critical",
+            "canonical_id": None,
+        },
+    }
+
+
+def _has_visible_failure(results: list[dict[str, Any]]) -> bool:
+    return any(result["level"] in {"error", "warning"} for result in results)
+
+
+def _security_rules_for_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rules: list[dict[str, Any]] = []
+    for result in results:
+        rule_id = result["ruleId"]
+        rules.append(
+            {
+                "id": rule_id,
+                "name": rule_id,
+                "shortDescription": {"text": rule_id},
+                "fullDescription": {"text": result["message"]["text"]},
+                "properties": {
+                    "source": "security",
+                    **result.get("properties", {}),
+                },
+            }
+        )
+    return rules
+
+
+def _security_rule_id(finding: dict[str, Any]) -> str:
+    if finding["category"] == "sast":
+        return f"security/{finding['rule_id']}"
+    return f"security/{finding['advisory_id']}"
+
+
+def _security_level(severity: str | None) -> str:
+    if severity in {"critical", "high"}:
+        return "error"
+    if severity == "medium":
+        return "warning"
+    return "note"
+
+
+def _security_location(finding: dict[str, Any]) -> dict[str, Any] | None:
+    if finding.get("category") != "sast":
+        return None
+    source_span = finding.get("source_span")
+    if not source_span:
+        return None
+    region = {
+        "startLine": source_span["start_line"],
+        "endLine": source_span["end_line"],
+    }
+    if source_span["start_col"] > 0 and source_span["end_col"] > 0:
+        region["startColumn"] = source_span["start_col"]
+        region["endColumn"] = source_span["end_col"]
+    return {
+        "physicalLocation": {
+            "artifactLocation": {"uri": normalize_annotation_path(finding["module_path"])},
+            "region": region,
+        }
+    }
 
 
 def _level(result: dict[str, Any], instruction: dict[str, Any] | None) -> str:

@@ -73,7 +73,7 @@ from semantic_ci_code.pipeline import (
 from semantic_ci_code.repair import emit_repair_plan
 from semantic_ci_code.sensor.models import SensorState
 from semantic_ci_code.suite.evaluator import SuiteResult, combine_verdict
-from semantic_ci_code.suite.security import evaluate_security
+from semantic_ci_code.suite.security import evaluate_security_detail
 
 _VOLATILE_SOURCES = frozenset(("working-tree", "staged-index"))
 
@@ -247,18 +247,18 @@ def run_check(args: Namespace) -> int:
             baseline_timed_out_dimensions=baseline_extraction.timed_out_dimensions,
             candidate_timed_out_dimensions=candidate_extraction.timed_out_dimensions,
         )
-        security_status = None
+        security_detail = None
         suite = None
         if sensor_enabled:
             if baseline_sensor is None or candidate_sensor is None or as_of is None:
                 raise AssertionError("sensor inputs must be loaded when sensor flags are enabled")
-            security_status = evaluate_security(
+            security_detail = evaluate_security_detail(
                 compiled.security,
                 baseline_sensor,
                 candidate_sensor,
                 as_of=as_of,
             )
-            suite = combine_verdict(verdict.result, security_status)
+            suite = combine_verdict(verdict.result, security_detail.status)
         repair_plan = emit_repair_plan(verdict)
         payload = build_payload(
             "check",
@@ -274,8 +274,7 @@ def run_check(args: Namespace) -> int:
             candidate_source=candidate_source,
             candidate_rev=candidate_rev,
             timed_out_dimensions=timed_out_dimensions,
-            security_verdict=security_status,
-            security_as_of=as_of.isoformat() if as_of is not None else None,
+            security_detail=security_detail,
             suite_verdict=suite.final.value if suite is not None else None,
         )
         output_status = _write_output(
@@ -351,10 +350,10 @@ def _sensor_flags_enabled(args: Namespace) -> bool:
 
 
 def _reject_unsupported_sensor_output_format(output_format: str | None) -> None:
-    if output_format in {"sarif", "gh-actions"}:
+    if output_format == "gh-actions":
         raise ValueError(
-            "sensor-enabled check supports only json or human output; "
-            f"--format {output_format} is deferred to G-4b"
+            "sensor-enabled check supports json, human, or sarif output; "
+            f"--format {output_format} is deferred to a later G-4 slice"
         )
 
 

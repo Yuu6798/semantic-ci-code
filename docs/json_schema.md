@@ -25,7 +25,23 @@ bump beyond the current CLI schema version.
   "subcommand": "check",
   "mode": "full",
   "verdict": "pass",
-  "security": {"verdict": "pass", "as_of": "2026-09-01"},
+  "security": {
+    "verdict": "pass",
+    "as_of": "2026-09-01",
+    "global_count_violated": false,
+    "sensors": [
+      {
+        "sensor_id": "semgrep",
+        "status": "pass",
+        "added": [],
+        "removed": [],
+        "suppressed": [],
+        "drift_reason": null,
+        "provenance_changed": false,
+        "unchanged_count": 0
+      }
+    ]
+  },
   "suite_verdict": "pass",
   "intent": "add user profile endpoint",
   "primary_kind": "feature",
@@ -76,7 +92,7 @@ bump beyond the current CLI schema version.
 | `subcommand` | One of `observe`, `compare`, `check`. |
 | `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
-| `security` | Optional `check` security verdict object present only when `--sensor-baseline` / `--sensor-candidate` are supplied. Shape: `{verdict: "pass"|"fail"|"unknown", as_of: "YYYY-MM-DD"}`. |
+| `security` | Optional `check` security verdict object present only when `--sensor-baseline` / `--sensor-candidate` are supplied. It includes aggregate `verdict`, `as_of`, `global_count_violated`, and `sensors[]` detail. Each sensor entry has `sensor_id`, `status`, `added`, `removed`, `suppressed`, `drift_reason`, `provenance_changed`, and `unchanged_count`; finding arrays contain `SecurityFinding.model_dump(mode="json")` objects with `category` (`sast` or `sca`) and their canonical identity fields. |
 | `suite_verdict` | Optional final suite verdict present only when `security` is present. Values: `pass`, `repair`, `fail`, or `unknown`; computed from code and security using `unknown > fail > repair > pass`. |
 | `intent` | Target intent, or `null` for `observe`. |
 | `primary_kind` | Target primary change kind, or `null` for `observe`. |
@@ -425,6 +441,10 @@ bump the envelope version.
   version. Consumers reading v6 can ignore these additive fields and keep using
   the code-only `verdict`; sensor-enabled callers should route exit behavior
   from `suite_verdict`.
+- CSCI-48b extends that optional `security` object with per-sensor `added`,
+  `removed`, `suppressed`, `drift_reason`, and `unchanged_count` detail. The
+  schema version stays `"6"` because this is an additive expansion of an
+  optional diagnostic object introduced in G-4a.
 - The CLI layer still materializes two directories for the engine; the engine
   does not receive source-category enums.
 

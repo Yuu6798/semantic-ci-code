@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime as dt
+import json
 import pickle
 import time
 from pathlib import Path
@@ -8,6 +10,12 @@ import pytest
 
 import semantic_ci_code.pipeline.python_code_state as code_state_pipeline
 from semantic_ci_code.cli.git_runtime import GitCommandError
+from semantic_ci_code.sensor.models import (
+    SASTSecurityFinding,
+    SensorProvenance,
+    SensorState,
+    canonical_id_for_identity,
+)
 
 from .git_helpers import (
     BAD_SOURCE,
@@ -47,6 +55,24 @@ constraints:
     expected: 1
     severity: soft
     unknown_policy: repair
+"""
+TARGET_SECURITY_DENY_ADDED = """\
+intent: add a public API with security policy
+change:
+  primary_kind: feature
+security:
+  rules:
+    deny_added:
+      - python.security.denied
+constraints:
+  - id: added_api_present
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_any
+    expected:
+      - fqn: mod.added
+        kind: function
+        visibility: public
 """
 
 
@@ -107,6 +133,203 @@ def test_origin_main_ref_is_used_when_present(tmp_path: Path):
 
     assert result.returncode == 0
     assert payload(result)["verdict"] == "pass"
+
+
+def test_check_without_sensor_flags_keeps_code_only_payload(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+
+    result = run_semantic_ci(repo, "check", "--mode", "smoke", "--no-fetch", "--format", "json")
+
+    assert result.returncode == 0
+    data = payload(result)
+    assert data["verdict"] == "pass"
+    assert "security" not in data
+    assert "suite_verdict" not in data
+
+
+def test_check_sensor_security_fail_changes_exit_and_payload(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(_sast_finding("python.security.eval", severity="high"),),
+    )
+
+    result = _run_check_with_sensors(repo, sensor_baseline, sensor_candidate)
+
+    assert result.returncode == 1
+    data = payload(result)
+    assert data["verdict"] == "pass"
+    assert data["security"] == {"verdict": "fail", "as_of": "2026-09-01"}
+    assert data["suite_verdict"] == "fail"
+
+
+def test_check_sensor_security_pass_preserves_code_exit(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(_sast_finding("python.security.info", severity="info"),),
+    )
+
+    result = _run_check_with_sensors(repo, sensor_baseline, sensor_candidate)
+
+    assert result.returncode == 0
+    data = payload(result)
+    assert data["verdict"] == "pass"
+    assert data["security"] == {"verdict": "pass", "as_of": "2026-09-01"}
+    assert data["suite_verdict"] == "pass"
+
+
+def test_check_sensor_unknown_returns_engine_error_exit(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(
+        tmp_path / "sensor-baseline.json",
+        provenances=(_provenance(ruleset_hash="sha256:old"),),
+    )
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        provenances=(_provenance(ruleset_hash="sha256:new"),),
+    )
+
+    result = _run_check_with_sensors(repo, sensor_baseline, sensor_candidate)
+
+    assert result.returncode == 3
+    data = payload(result)
+    assert data["verdict"] == "pass"
+    assert data["security"] == {"verdict": "unknown", "as_of": "2026-09-01"}
+    assert data["suite_verdict"] == "unknown"
+
+
+def test_check_sensor_flags_must_be_provided_together(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--sensor-baseline",
+        str(tmp_path / "sensor-baseline.json"),
+    )
+
+    assert result.returncode == 2
+    assert "--sensor-baseline and --sensor-candidate must be provided together" in result.stderr
+
+
+def test_check_sensor_state_invalid_json_is_usage_error(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    bad_sensor = tmp_path / "bad.json"
+    bad_sensor.write_text("{not-json", encoding="utf-8")
+    sensor_candidate = _write_sensor_state(tmp_path / "sensor-candidate.json")
+
+    result = _run_check_with_sensors(repo, bad_sensor, sensor_candidate)
+
+    assert result.returncode == 2
+    assert "--sensor-baseline must be a valid SensorState JSON file" in result.stderr
+
+
+def test_check_as_of_rejects_invalid_date(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(tmp_path / "sensor-candidate.json")
+
+    result = run_semantic_ci(
+        repo,
+        "check",
+        "--sensor-baseline",
+        str(sensor_baseline),
+        "--sensor-candidate",
+        str(sensor_candidate),
+        "--as-of",
+        "not-a-date",
+    )
+
+    assert result.returncode == 2
+    assert "--as-of must be a valid YYYY-MM-DD date" in result.stderr
+
+
+def test_check_as_of_rejects_invalid_date_without_sensor_flags(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+
+    result = run_semantic_ci(repo, "check", "--as-of", "not-a-date")
+
+    assert result.returncode == 2
+    assert "--as-of must be a valid YYYY-MM-DD date" in result.stderr
+
+
+def test_check_target_security_policy_can_fail_info_finding_by_rule(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    write_file(repo / "target.yaml", TARGET_SECURITY_DENY_ADDED)
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(_sast_finding("python.security.denied", severity="info"),),
+    )
+
+    result = _run_check_with_sensors(repo, sensor_baseline, sensor_candidate)
+
+    assert result.returncode == 1
+    data = payload(result)
+    assert data["verdict"] == "pass"
+    assert data["security"]["verdict"] == "fail"
+    assert data["suite_verdict"] == "fail"
+
+
+def test_check_as_of_controls_security_suppression_expiry(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    finding = _sast_finding("python.security.suppressed", severity="high")
+    write_file(repo / "target.yaml", _target_with_suppression(finding, expires=dt.date(2026, 9, 1)))
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    active = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        as_of="2026-09-01",
+    )
+    expired = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        as_of="2026-09-02",
+    )
+
+    assert active.returncode == 0
+    assert payload(active)["security"]["verdict"] == "pass"
+    assert payload(active)["suite_verdict"] == "pass"
+    assert expired.returncode == 1
+    assert payload(expired)["security"]["verdict"] == "fail"
+    assert payload(expired)["suite_verdict"] == "fail"
+
+
+def test_check_human_output_includes_security_and_suite_verdicts(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(tmp_path / "sensor-candidate.json")
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="human",
+    )
+
+    text = result.stdout
+    assert result.returncode == 0
+    assert "Security verdict: PASS  (as_of=2026-09-01)" in text
+    assert "Suite final: PASS" in text
+
+
+def test_check_sensor_ingest_does_not_execute_live_security_scanners():
+    check_source = (
+        REPO_ROOT / "src" / "semantic_ci_code" / "cli" / "commands" / "check.py"
+    ).read_text(encoding="utf-8")
+
+    assert "subprocess" not in check_source
+    assert ".scan(" not in check_source
 
 
 def test_check_extractor_timeout_surfaces_extraction_unknown(
@@ -776,3 +999,107 @@ def test_git_command_error_is_pickle_compatible(tmp_path: Path):
     restored = pickle.loads(pickle.dumps(err))
 
     assert str(restored) == str(err)
+
+
+def _run_check_with_sensors(
+    repo: Path,
+    sensor_baseline: Path,
+    sensor_candidate: Path,
+    *,
+    as_of: str = "2026-09-01",
+    output_format: str = "json",
+):
+    return run_semantic_ci(
+        repo,
+        "check",
+        "--mode",
+        "smoke",
+        "--no-fetch",
+        "--no-cache",
+        "--format",
+        output_format,
+        "--sensor-baseline",
+        str(sensor_baseline),
+        "--sensor-candidate",
+        str(sensor_candidate),
+        "--as-of",
+        as_of,
+    )
+
+
+def _write_sensor_state(
+    path: Path,
+    *,
+    provenances: tuple[SensorProvenance, ...] | None = None,
+    findings: tuple[SASTSecurityFinding, ...] = (),
+) -> Path:
+    if provenances is None:
+        sensor_ids = sorted({finding.sensor_id for finding in findings} or {"semgrep"})
+        provenances = tuple(_provenance(sensor_id=sensor_id) for sensor_id in sensor_ids)
+    state = SensorState(
+        provenance_by_sensor={item.sensor_id: item for item in provenances},
+        findings=tuple(sorted(findings, key=lambda finding: finding.canonical_id)),
+    )
+    path.write_text(state.model_dump_json(), encoding="utf-8")
+    return path
+
+
+def _provenance(
+    sensor_id: str = "semgrep",
+    *,
+    ruleset_hash: str | None = "sha256:rules",
+    adapter_version: str = "adapter-1",
+    sensor_version: str = "tool-1",
+) -> SensorProvenance:
+    return SensorProvenance(
+        sensor_id=sensor_id,
+        sensor_version=sensor_version,
+        adapter_version=adapter_version,
+        ruleset_hash=ruleset_hash,
+        status="complete",
+    )
+
+
+def _sast_finding(
+    rule_id: str,
+    *,
+    severity: str,
+    sensor_id: str = "semgrep",
+    ordinal: int = 0,
+) -> SASTSecurityFinding:
+    components = (
+        "v1",
+        "sast",
+        sensor_id,
+        rule_id,
+        "src/app.py",
+        "src.app.handler",
+        "eval(user_input)",
+        str(ordinal),
+    )
+    return SASTSecurityFinding(
+        category="sast",
+        sensor_id=sensor_id,
+        canonical_id=canonical_id_for_identity(components),
+        identity_components=components,
+        severity=severity,
+        message="finding",
+        rule_id=rule_id,
+        module_path="src/app.py",
+        qualified_name="src.app.handler",
+        normalized_text="eval(user_input)",
+        ordinal=ordinal,
+    )
+
+
+def _target_with_suppression(finding: SASTSecurityFinding, *, expires: dt.date) -> str:
+    return (
+        TARGET_PASS
+        + "\nsecurity:\n"
+        + "  suppressions:\n"
+        + f"    - canonical_id: {json.dumps(finding.canonical_id)}\n"
+        + f"      identity_components: {json.dumps(list(finding.identity_components))}\n"
+        + "      reason: accepted test fixture finding\n"
+        + f"      expires: {json.dumps(expires.isoformat())}\n"
+        + "      owner: security-team\n"
+    )

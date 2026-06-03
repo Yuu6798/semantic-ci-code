@@ -87,6 +87,25 @@ core scope guard「not an LLM-as-judge service」との衝突を解消する。
 これにより scope guard「not an LLM-as-judge service」との衝突が消える。
 LLM はジャッジしない。合否を出すのは決定論的な宣言制約 (target.yaml)。
 
+**実装規律 — verdict 分離 (PR #132 review P2 由来)**: D1 を実装で保証するには、
+LLM finding を Phase G の verdict 経路 (`compute_security_delta` →
+`evaluate_security_detail` → `combine_verdict`) に渡してはならない。現行 suite は
+failing severity の added `SecurityFinding` を自動的に fail に変換するため、LLM
+finding を通常の verdict-bearing candidate `SensorState` に frozen すると、
+scope guard に反して scout が verdict を直接 seat してしまう。よって:
+
+- suite evaluator に渡す **verdict-bearing SensorState は deterministic sensor
+  (semgrep / pip-audit) の finding のみ**を含む
+- LLM 由来 finding は **advisory-only な別チャネル (advisory SensorState /
+  surface、§2.4)** に分離し、verdict 計算に入れない
+- LLM finding が verdict に効くのは D8 の authoring freeze 後のみ (target.yaml に
+  宣言され deterministic な制約へ転写された時点。LLM が seat するのではない)
+
+この分離は H-1 の AC とし、failing-severity の LLM finding が存在しても
+`suite_verdict` が変化しないことを architecture test で enforce する。Q1 (§2.2)
+の category 選択 (相乗り vs `LLMSecurityFinding` 新設) はこの分離の二次手段で
+あり、**verdict 除外の一次保証はチャネル分離**である。
+
 ### 1.2 D2: 決定論の保全 — LLM は core の外、frozen SensorState を ingest
 
 **決定: LLM scan の実行は adapter 層に閉じ込め、core/suite は Phase G の
@@ -94,9 +113,12 @@ SensorState schema のみを知る。**
 
 Phase G が既に確立した「scanner 実行は adapter 責務、core は SensorState の
 schema だけ知る」境界 (phase_g_planning §5 Scope Guard) をそのまま継承する。
-LLM finding は adapter 層で `SASTSecurityFinding` (または新 category、§2.2) に
-翻訳され、`SensorState` として frozen される。suite evaluator は frozen state を
-食うだけなので、**評価層は決定論的**。
+LLM finding は adapter 層で SecurityFinding 系 schema (§2.2) に翻訳され、
+`SensorState` として frozen される。ただし §1.1 の verdict 分離規律により、
+この **LLM SensorState は verdict-bearing な candidate SensorState とは別の
+advisory チャネル**に置く。frozen state を食う点で評価層は決定論的だが、
+verdict を seat するのは deterministic sensor の SensorState のみで、LLM 由来
+state は verdict 計算に入らない。
 
 これは §23.1 input neutrality の鏡像: SensorState は hand-built / 仮想入力でも
 構築可能でなければならず (phase_g AC)、LLM 由来 state も「記録された観測」として
@@ -335,11 +357,19 @@ deterministic sensor と異なる (再 scan しても一致しないため versi
 
 ## 3. PR 分割案 (CSCI-50〜、Phase G-5 完走後)
 
-### H-1: LLMSensorAdapter Protocol + non_reproducible provenance (CSCI-50)
+### H-1: LLMSensorAdapter Protocol + advisory channel 分離 (CSCI-50)
 - `sensor/adapters/llm/protocol.py` + `SensorProvenance` 拡張 (§2.3)
 - `LLMSecurityFinding` category 採否を確定 (§2.2 / Q1)
-- **AC**: hand-built RawLLMFinding → SecurityFinding 射影が決定論的、
+- **verdict 分離 (§1.1 規律)**: LLM 由来 SensorState を verdict-bearing な
+  candidate SensorState から切り離し、suite evaluator の verdict 経路
+  (`compute_security_delta` → `combine_verdict`) に渡さない advisory チャネルへ
+  routing する
+- **AC 1**: hand-built RawLLMFinding → SecurityFinding 射影が決定論的、advisory
   SensorState に frozen 可能 (§23.1 鏡像)
+- **AC 2 (verdict 分離)**: failing-severity の LLM finding を advisory チャネルに
+  与えても `suite_verdict` が変化しないことを architecture test で enforce
+  (deterministic sensor の同 severity finding は従来通り verdict を動かすことも
+  同時に固定し、分離が deterministic 経路を壊していないことを確認)
 
 ### H-2: anchor projection + 決定論的 re-projection (CSCI-51)
 - `project_to_canonical()` の暫定実装 (D6、差し替え可能な構造)
@@ -387,8 +417,9 @@ deterministic sensor と異なる (再 scan しても一致しないため versi
 
 ## 5. Scope Guard
 
-- core evaluator (`evaluator/`) は変更しない。LLM 由来 finding も suite
-  evaluator が SensorState 経由で扱う
+- core evaluator (`evaluator/`) は変更しない。LLM 由来 finding は **advisory
+  チャネルに分離**し、suite の verdict 経路 (`compute_security_delta` →
+  `combine_verdict`) には渡さない (§1.1 verdict 分離規律)
 - CodeState / SensorState の既存 schema は変更しない (additive のみ)
 - LLM scan 実行は adapter 層の責務。core/suite は SensorState schema のみ知る
 - **LLM は scout であって judge ではない** (D1): verdict を seat するのは

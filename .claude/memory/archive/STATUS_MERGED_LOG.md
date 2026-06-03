@@ -883,3 +883,74 @@ CSCI-40 (CLI + SARIF + human format) = PR #112。全 PR CI green、P1 なし
 (PR #109 のみ P1 2件を修正後マージ)。`semantic-ci ssp scan` / `ssp from-json`
 で SSP v0.1 が end-to-end 使用可能。Issue #108 completed でクローズ。
 (2026-06-02 wrap-up で STATUS.md 直近 merged 5-cap 超過により移送)
+
+### 2026-05-28 Session 1 — Phase G (SSP core integration) planning landed (PR #114 + #115)
+
+SSP v0.1 完走直後の 2026-05-28 session で、SSP の実地テスト 21 ケース
+(実リポジトリ 9 + 仮想入力 5 + マルチエージェント想定 7) を実行する過程で
+**「SSP が core の横に並列配置され、core が持つ intent 宣言 + 構造比較の力を
+使えていない」** という構造的問題が surface。3 つの独立 AI 分析 (GPT / Gemini /
+Grok) を統合した `docs/phase_g_planning.md` を起草、Codex review 18 round で
+洗練後 PR #114 merge、続いて PR #115 で deep cross-reference review 7 件を消化。
+
+- **PR #114** (merged `d1f9f9e`): `docs(planning): add Phase G — SSP core integration`
+  - `docs/phase_g_planning.md` 新設 (5 PR 構成、CSCI-45〜49 想定)
+  - 設計の核: SensorState を CodeState と並列の別 state に分離 (GPT 案)、SAST
+    finding を adapter で FQN 空間に翻訳して自然キー化 (Gemini 案)、canonical_id
+    を JSON array hash で injective encoding + identity algorithm version 埋め込み
+    (Grok 案)、per-sensor provenance + status + advisory_db_hash で drift 検出、
+    suite evaluator で code_delta + security_delta を統合 verdict (unknown > fail
+    > repair > pass の aggregation)
+  - 18 round / 22 P2 で消化した設計欠陥: canonical_id の delimiter collision
+    (`:` → `\0` → JSON array)、 schema 整合性 (constraint kind/target/operator
+    の互換性 / effect extractor の limitation / suppression form 同期)、
+    multi-sensor support (sensor_id namespace / provenance_by_sensor map /
+    per-sensor unknown)、 source location 保持 (SARIF 出力対応)、 G-5 template
+    の実現可能性 (extractor 拡張要否で 2 カテゴリ分割)
+- **PR #115** (merged `b13f205`): Phase G planning deep cross-reference fixes
+  - 8 follow-up commits: identity_components の ordered tuple 型化、
+    PerSensorDelta の model_validator (drift と ownership)、 aggregate_status
+    consistency validator、 suppression migration の入力要件明示、
+    default-policy floor on PerSensorDelta.status、 example canonical_id hash の
+    identity tuple との一致確認、 non-complete sensor 拒否、 sensor_name →
+    sensor_id 命名統一、 `ensure_ascii=False` の追加 (SSP v0.1 §5.1 と同じ
+    canonical encoding、非 ASCII FQN での adapter / validator hash 乖離防止)
+  - PR #115 で `docs/ssp_usage_guide.md` も同 PR で land (SSP v0.1 実用ガイド)
+
+**設計判断のハイライト**:
+
+1. **「実地テスト → 設計問題発覚 → planning 起草」の連続フロー**: 「SSP どこまで
+   使えるかテスト」から始まり、テスト結果 (VTC4 のモジュール移動、S5 の
+   backdoor 検知) を user 対話で言語化する過程で設計問題が surface、その場で
+   planning doc を起こす。テスト結果が planning の具体例として残った
+2. **3 AI 並列分析の統合**: GPT (概念分離) + Gemini (自然キー戦略) + Grok
+   (横断品質) の組み合わせが互いの盲点を補完。user の「現提案をベースに 2 点
+   追加」即決判断で統合方針が確定
+3. **planning 段階で Codex review chase を回す**: 実装フェーズではなく planning
+   doc 1 ファイルで 18 round + deep cross-ref 7 件。実装 PR (G-1〜G-5) で同じ
+   trap を回避できる。AGENTS.md §5.4「round 数を leading quality indicator として
+   運用」の応用、29 round 累計 P2 を test に encode した PR #82/#84 の延長
+4. **user 主導の「妥協しない」方針宣言**: round 14 時点で user が「この設計
+   フェーズは妥協すると文書と実装でズレが起きる可能性がある。無くなるまで
+   やりたい」と明示、以降の round 15〜18 + PR #115 の deep chase の動機付け
+5. **「概念境界の純度」を維持する設計**: SecurityFinding を CodeState に直接
+   追加する初期案を GPT 分析で否定 (CodeState = AST 由来の構造状態、
+   SecurityFinding = 観測状態の概念分離)、SensorState を別 state にする案に変更
+6. **canonical_id encoding の段階的洗練**: delimiter join (`:`) → NUL join
+   (`\0`) → canonical JSON array (`json.dumps(ensure_ascii=False)`) の 3 段階で
+   alias collision class を構造的に排除。最終案は SSP v0.1 `_digest_array` §5.1
+   と同じ encoding
+
+**修正・訂正**:
+
+1. **「CodeState に SecurityFinding を直接追加」初期案** — GPT 分析で「コード状態
+   vs 観測状態」の概念分離を指摘され、SensorState を別 state にする案に変更
+2. **canonical_id の delimiter encoding** — Round 10 (`:` collision) → Round 15
+   (`\0` collision) → Round 19 (`ensure_ascii=False` 不足) の 3 段階で洗練
+3. **§0.1 で「effects constraint でロジック脆弱性検知可能」と書いた誤り** —
+   Round 14 で「effects は DB 登録済み副作用のみ抽出、純粋 auth guard は見えない」
+   と訂正、§1.6 / G-5 と整合性を取った
+4. **Phase 番号** — 当初 user が「F」と言及したが既存 Phase F (source-selection)
+   と衝突、planning doc / commit message で **G** に統一
+
+(2026-06-03 wrap-up で STATUS.md 直近 merged 5-cap 超過により移送)

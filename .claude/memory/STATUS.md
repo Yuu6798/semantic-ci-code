@@ -24,9 +24,51 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。2026-05-28 (S1) に **Phase G (SSP core integration) planning** が PR #114 + #115 で landed (`docs/phase_g_planning.md`、5 PR 構成 CSCI-45〜49、Codex 18 round + deep cross-ref 7 件で洗練済)。同日 S2 で並走していた **公開リポジトリ実 PR 8 件 dogfooding pass** の結果が PR #116 + #117 で land、`docs/dogfooding_real_pr_complexity.md` + 単一 tracker `docs/dogfooding_findings_tracker.md` (累計 21 ケース pin、D6/D7 追加) として artifact 化された。Phase G は SSP v0.1 (現状 core の横に並列) を core の縦接続に再構築する設計: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict、SAST finding を FQN 空間に翻訳、canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。2026-06-02 に **G-1 (CSCI-45) + G-2 (CSCI-46) merged** (PR #124 / #125): SensorState model + canonical_id + delta + SSP→SensorState 翻訳 adapter、SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定。Next queue: **Phase G の続き (G-3/CSCI-47 から)** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
+Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。Phase G (SSP core integration) は `docs/phase_g_planning.md` の 5 PR 構成 (CSCI-45〜49) で進行中で、設計の核は SSP v0.1 を core の横ではなく縦接続に再構築すること: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict (unknown > fail > repair > pass)、SAST finding を FQN 空間に翻訳して canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。2026-06-02 に **G-1/G-2 (CSCI-45/46)** が landed (PR #124/#125): SensorState model + canonical_id + delta + SSP→SensorState 翻訳 adapter、SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定。2026-06-03 に **G-3/G-4a/G-4b (CSCI-47/48/48b)** が landed (PR #127/#128/#129): G-3 = suite security policy evaluator、G-4a = `check --sensor-baseline/--sensor-candidate` で SensorState ingest + suite_verdict + exit code + 集約 security JSON、G-4b = per-sensor security detail (added/removed/suppressed/drift/unchanged) を JSON/human/SARIF に拡張 + SARIF を code constraint と同一 run にマージ (severity→level: critical/high=error, medium=warning, low/info=note)。Phase G 残は **G-5 (CSCI-49 = semantic security templates 2 カテゴリ) のみ**。Next queue: **G-5** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
 
 ## 直近 merged
+
+### 2026-06-03 — Phase G G-3〜G-4b 完走: CSCI-47 + CSCI-48 + CSCI-48b (PR #127 + #128 + #129)
+
+Phase G 実装 2 日目。suite evaluator から CLI 出力までの 3 スライスを cascade
+で landing し、Phase G 実装は **G-5 (CSCI-49) のみ残**。design (Claude brief) →
+Codex 実装 → Claude review → merge の標準サイクル。
+
+- **PR #127** (CSCI-47 / G-3): `src/semantic_ci_code/suite/` 新設。suite security
+  policy evaluator (code_delta + security_delta → suite_verdict)、`security:`
+  namespace、scanner drift 検出。fix commits: default floor on security gate
+  composition / suppression identity tuple shape 検証 / provenance drift reason
+  の決定論順序 / CI import 用 local helpers。
+- **PR #128** (CSCI-48 / G-4a): `check --sensor-baseline/--sensor-candidate` で
+  SensorState ingest + `suite_verdict` + exit code 配線 + 集約 `security:
+  {verdict, as_of}` JSON。この時点では `--format sarif/gh-actions` を明示 reject。
+- **PR #129** (CSCI-48b / G-4b): per-sensor security detail を JSON/human/SARIF の
+  3 format に拡張。`evaluate_security` を `evaluate_security_detail` への薄い
+  wrapper に再実装 (既存契約維持)、SARIF を code constraint と同一 run にマージ
+  (severity→level: critical/high=error, medium=warning, low/info=note)、
+  `schema_version` は "6" 据置 (optional `security` object の additive 拡張)。
+  follow-up 3 commit (surface security policy failures in SARIF / omit zero
+  security columns / distinguish unknown causes) で land。
+
+**設計判断のハイライト**:
+
+1. **G-4 を 4a/4b に分割**: G-4a で「ingest + 集約 verdict + exit code」の最小縦
+   動線を凍結し、G-4b を純粋な出力 enrichment + SARIF 解禁に限定。verdict/exit
+   semantics を先に固めることで G-4b review の attention budget を分離。
+2. **grounding-first brief (CSCI-48b)**: brief 起草前に `evaluate_security` 内部・
+   SecurityFinding field・SARIF mapping を逐語 read。2 つの「予定された破壊」
+   (wrapper 化での契約維持 / G-4a の `security == {verdict, as_of}` exact-match を
+   subset assert に緩和) を AC に事前 encode → PR #129 は review バグ 0。
+3. **設計フォークを AskUserQuestion で 2 軸 pin**: 粒度 (完全詳細) と SARIF 配置
+   (同一 run マージ) + severity→level を選択肢化して確定、そのまま AC 化。
+
+**修正・訂正**:
+
+1. PR #129 review の非ブロッキング指摘 2 点 = `build_payload` の dead な
+   `security_verdict`/`security_as_of` 引数 + SARIF column が SourceSpan の 0-based
+   を 1-based 必須の SARIF region に素通し。どちらも G-5 か別 PR で回収候補。
+2. wrap-up 起動時に STATUS.md が G-1/G-2 (2026-06-02) で stale だったのを検出、
+   git log で PR #127/#128/#129 merged を確認して sweep。
 
 ### 2026-06-02 — Phase G 着手: G-1/CSCI-45 + G-2/CSCI-46 完走 (PR #124 + #125 + #126)
 
@@ -166,75 +208,6 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
 2. **Pass naming**: `Session 4 dogfood` → `Session 4 self-dogfood` に
    refactor (自分自身の PR を入力に取る methodology を正確に表す)
 
-### 2026-05-28 Session 1 — Phase G (SSP core integration) planning landed (PR #114 + #115)
-
-SSP v0.1 完走直後の 2026-05-28 session で、SSP の実地テスト 21 ケース
-(実リポジトリ 9 + 仮想入力 5 + マルチエージェント想定 7) を実行する過程で
-**「SSP が core の横に並列配置され、core が持つ intent 宣言 + 構造比較の力を
-使えていない」** という構造的問題が surface。3 つの独立 AI 分析 (GPT / Gemini /
-Grok) を統合した `docs/phase_g_planning.md` を起草、Codex review 18 round で
-洗練後 PR #114 merge、続いて PR #115 で deep cross-reference review 7 件を消化。
-
-- **PR #114** (merged `d1f9f9e`): `docs(planning): add Phase G — SSP core integration`
-  - `docs/phase_g_planning.md` 新設 (5 PR 構成、CSCI-45〜49 想定)
-  - 設計の核: SensorState を CodeState と並列の別 state に分離 (GPT 案)、SAST
-    finding を adapter で FQN 空間に翻訳して自然キー化 (Gemini 案)、canonical_id
-    を JSON array hash で injective encoding + identity algorithm version 埋め込み
-    (Grok 案)、per-sensor provenance + status + advisory_db_hash で drift 検出、
-    suite evaluator で code_delta + security_delta を統合 verdict (unknown > fail
-    > repair > pass の aggregation)
-  - 18 round / 22 P2 で消化した設計欠陥: canonical_id の delimiter collision
-    (`:` → `\0` → JSON array)、 schema 整合性 (constraint kind/target/operator
-    の互換性 / effect extractor の limitation / suppression form 同期)、
-    multi-sensor support (sensor_id namespace / provenance_by_sensor map /
-    per-sensor unknown)、 source location 保持 (SARIF 出力対応)、 G-5 template
-    の実現可能性 (extractor 拡張要否で 2 カテゴリ分割)
-- **PR #115** (merged `b13f205`): Phase G planning deep cross-reference fixes
-  - 8 follow-up commits: identity_components の ordered tuple 型化、
-    PerSensorDelta の model_validator (drift と ownership)、 aggregate_status
-    consistency validator、 suppression migration の入力要件明示、
-    default-policy floor on PerSensorDelta.status、 example canonical_id hash の
-    identity tuple との一致確認、 non-complete sensor 拒否、 sensor_name →
-    sensor_id 命名統一、 `ensure_ascii=False` の追加 (SSP v0.1 §5.1 と同じ
-    canonical encoding、非 ASCII FQN での adapter / validator hash 乖離防止)
-  - PR #115 で `docs/ssp_usage_guide.md` も同 PR で land (SSP v0.1 実用ガイド)
-
-**設計判断のハイライト**:
-
-1. **「実地テスト → 設計問題発覚 → planning 起草」の連続フロー**: 「SSP どこまで
-   使えるかテスト」から始まり、テスト結果 (VTC4 のモジュール移動、S5 の
-   backdoor 検知) を user 対話で言語化する過程で設計問題が surface、その場で
-   planning doc を起こす。テスト結果が planning の具体例として残った
-2. **3 AI 並列分析の統合**: GPT (概念分離) + Gemini (自然キー戦略) + Grok
-   (横断品質) の組み合わせが互いの盲点を補完。user の「現提案をベースに 2 点
-   追加」即決判断で統合方針が確定
-3. **planning 段階で Codex review chase を回す**: 実装フェーズではなく planning
-   doc 1 ファイルで 18 round + deep cross-ref 7 件。実装 PR (G-1〜G-5) で同じ
-   trap を回避できる。AGENTS.md §5.4「round 数を leading quality indicator として
-   運用」の応用、29 round 累計 P2 を test に encode した PR #82/#84 の延長
-4. **user 主導の「妥協しない」方針宣言**: round 14 時点で user が「この設計
-   フェーズは妥協すると文書と実装でズレが起きる可能性がある。無くなるまで
-   やりたい」と明示、以降の round 15〜18 + PR #115 の deep chase の動機付け
-5. **「概念境界の純度」を維持する設計**: SecurityFinding を CodeState に直接
-   追加する初期案を GPT 分析で否定 (CodeState = AST 由来の構造状態、
-   SecurityFinding = 観測状態の概念分離)、SensorState を別 state にする案に変更
-6. **canonical_id encoding の段階的洗練**: delimiter join (`:`) → NUL join
-   (`\0`) → canonical JSON array (`json.dumps(ensure_ascii=False)`) の 3 段階で
-   alias collision class を構造的に排除。最終案は SSP v0.1 `_digest_array` §5.1
-   と同じ encoding
-
-**修正・訂正**:
-
-1. **「CodeState に SecurityFinding を直接追加」初期案** — GPT 分析で「コード状態
-   vs 観測状態」の概念分離を指摘され、SensorState を別 state にする案に変更
-2. **canonical_id の delimiter encoding** — Round 10 (`:` collision) → Round 15
-   (`\0` collision) → Round 19 (`ensure_ascii=False` 不足) の 3 段階で洗練
-3. **§0.1 で「effects constraint でロジック脆弱性検知可能」と書いた誤り** —
-   Round 14 で「effects は DB 登録済み副作用のみ抽出、純粋 auth guard は見えない」
-   と訂正、§1.6 / G-5 と整合性を取った
-4. **Phase 番号** — 当初 user が「F」と言及したが既存 Phase F (source-selection)
-   と衝突、planning doc / commit message で **G** に統一
-
 ### 古い merged entry (2026-05-27 以前) — archive 参照
 
 20 entry (2026-05-27 / 2026-05-26 / 2026-05-22 / 2026-05-21 S5 + S3 + S2 + S1 /
@@ -264,25 +237,18 @@ Phase X は ecosystem cross-repo 作業。
 log (`.claude/memory/YYYY-MM-DD.md`)。
 
 
-### G. Phase G(SSP core integration、 planning は PR #114 + #115 で取り込み済、 G-1/G-2 merged、 G-3〜G-5 残)
+### G. Phase G(SSP core integration、 planning は PR #114 + #115 で取り込み済、 G-1〜G-4b merged、 G-5 残)
 
 `docs/phase_g_planning.md` を planning source として、SSP v0.1 を core の
 横ではなく上 (縦接続) に再構築する 5 PR 構成 (CSCI-45〜49)。SensorState を
 CodeState と並列の別 state に分離し、suite evaluator で code_delta +
 security_delta を統合 verdict、SAST finding を FQN 空間に翻訳して自然キー化、
 canonical_id を canonical JSON array hash で injective encoding。
-**G-1 (CSCI-45) + G-2 (CSCI-46) は 2026-06-02 merged** (PR #124 / #125)、
-SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定形に。残は G-3〜G-5。
+**G-1〜G-4b (CSCI-45/46/47/48/48b) は 2026-06-02〜06-03 merged**
+(PR #124/#125/#127/#128/#129): SensorState model + delta + 翻訳 adapter +
+suite security evaluator + `check --sensor` 配線 + per-sensor detail を
+JSON/human/SARIF 出力。残は **G-5 のみ**。
 
-- **G-3. CSCI-47. Suite evaluator + security constraint**:
-  `src/semantic_ci_code/suite/` 新設。code_delta + security_delta →
-  suite_verdict、target.yaml `security:` namespace 解釈、scanner drift
-  検出 (provenance_changed → unknown)。AC: target.yaml に security
-  constraint を書いて verdict が出る
-- **G-4. CSCI-48. CLI 統合 + SSP v0.1 migration path**:
-  `semantic-ci check --sensor` 追加。SSP v0.1 の `ssp scan` /
-  `ssp from-json` は互換維持 (deprecated 予告)。suite verdict の
-  JSON / human / SARIF 出力
 - **G-5. CSCI-49. Semantic security templates** (2 カテゴリ):
   - カテゴリ A (extractor 拡張なし): `dangerous_imports_denied.yaml` +
     `validation_preserved.yaml`、既存 imports / api_surface で表現
@@ -290,11 +256,11 @@ SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定形に。残�
     `privileged_api_gated.yaml`、G-5 brief で extractor scope を AC として
     定義 (auth decorator 検出 or data_flow 実装)
 
-planning doc §6 Open Questions のうち Q1 (suite evaluator module placement) /
-Q2 (security DSL を target.yaml 統合 vs 分離) は G-3 brief 起草時に確定する。
-あわせて Suppression を planning §2.1.1 通り (expires/owner + finding identity
-tuple 併記) に G-3 で復活させ、§3 G-2 の fqn_resolver 記述を thin-translation
-確定に合わせて同期する。
+G-5 brief 起草時の回収候補 (G-4b review の非ブロッキング所見): ①
+`build_payload` の dead な `security_verdict`/`security_as_of` 引数 + elif 分岐の
+削除 / ② SARIF column の 1-based clamp (`max(1, start_col)`、SourceSpan が 0 を
+許容するため SARIF region 仕様 ≥1 と齟齬)。別 PR でも可。
+
 
 
 ### E. Phase X(UGH ecosystem formalization、 2026-05-21 Session 5 起草、 残 3 sub-phase)
@@ -333,8 +299,8 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 
 - **A/B/C/D/F 全完走**: Brief 1〜8 + ResultStatus split + source-selection
   redesign + Brief 7 (SSP v0.1) 全 merged
-- **G (Phase G) active**: 本 repo 内で完結する実装フェーズ、CSCI-45 から
-  順次 brief 起草 + Codex 実装 split で進行
+- **G (Phase G) active**: 本 repo 内で完結する実装フェーズ、G-1〜G-4b
+  (CSCI-45〜48b) merged、残 G-5 (CSCI-49 templates) のみ
 - **E (Phase X) active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
   は ecosystem cross-repo work で別 Claude Code session 委譲、E-3 (X-2
   validation 移植) は中長期 phase
@@ -344,11 +310,9 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 
 ### 直近最短経路
 
-- **G-1. CSCI-45 brief 起草**: SensorState model + canonical_id +
-  delta engine (新設のみ、既存コード変更なし)。planning doc §6
-  Open Questions のうち G-1 範囲を brief 起草時に確定
-- **G-2. CSCI-46 brief 起草** (G-1 merge 後): FQN 翻訳 adapter +
-  SSP v0.1 adapter 移植
+- **G-5. CSCI-49 brief 起草**: semantic security templates 2 カテゴリ
+  (A=extractor 拡張なし / B=auth decorator or data_flow 実装)。完走で
+  Phase G 全 5 PR landing。任意で G-4b review 由来の 2 cleanup を同梱
 - **E-1. Phase X-3. Cross-ref embedding** (並行可、別 session 委譲)
 - **E-2. Phase X-1 続き. Umbrella `docs/` 拡張** (並行可、別 session 委譲)
 - **E-3. Phase X-2. HA-style validation cross-domain 移植** (中長期)

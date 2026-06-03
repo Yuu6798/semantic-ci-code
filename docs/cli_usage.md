@@ -417,7 +417,10 @@ the process exit code for sensor-enabled `check` runs. Sensor-enabled `check`
 supports JSON, human, and SARIF output. JSON includes per-sensor added,
 removed, suppressed, drift, and unchanged-count detail; human output prints the
 same summary and added finding lines; SARIF appends security findings into the
-same `runs[0]` as code constraint results with `security/<rule>` rule IDs.
+same `runs[0]` as code constraint results with `security/<rule>` rule IDs. If a
+security policy fails for count or deny-list reasons while the underlying
+finding severity maps only to a SARIF note, SARIF also emits a
+`security/policy-*` error result so consumers can see the failing gate.
 `--format gh-actions` remains deferred to a later G-4 slice. Without sensor
 flags, the payload and exit behavior are unchanged.
 

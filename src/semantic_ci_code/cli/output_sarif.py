@@ -140,8 +140,26 @@ def _security_sarif_results(security: dict[str, Any] | None) -> list[dict[str, A
         drift_reason = sensor.get("drift_reason")
         if sensor.get("status") == "unknown" and drift_reason:
             results.append(_security_drift_result(sensor["sensor_id"], drift_reason))
+        sensor_results: list[dict[str, Any]] = []
         for finding in sorted(sensor.get("added", []), key=lambda item: item["canonical_id"]):
-            results.append(_security_finding_result(finding))
+            sensor_results.append(_security_finding_result(finding))
+        results.extend(sensor_results)
+        if sensor.get("status") == "fail" and not _has_visible_failure(sensor_results):
+            results.append(
+                _security_policy_result(
+                    "security/policy-violation",
+                    f"Security policy failed for sensor {sensor['sensor_id']}.",
+                    sensor_id=sensor["sensor_id"],
+                )
+            )
+    if security.get("global_count_violated"):
+        results.append(
+            _security_policy_result(
+                "security/policy-global-count",
+                "Security policy findings.added.max_count was exceeded.",
+                sensor_id=None,
+            )
+        )
     return results
 
 
@@ -177,6 +195,24 @@ def _security_drift_result(sensor_id: str, drift_reason: str) -> dict[str, Any]:
             "canonical_id": None,
         },
     }
+
+
+def _security_policy_result(rule_id: str, message: str, *, sensor_id: str | None) -> dict[str, Any]:
+    return {
+        "ruleId": rule_id,
+        "level": "error",
+        "message": {"text": message},
+        "properties": {
+            "category": "policy",
+            "sensor_id": sensor_id,
+            "severity": "critical",
+            "canonical_id": None,
+        },
+    }
+
+
+def _has_visible_failure(results: list[dict[str, Any]]) -> bool:
+    return any(result["level"] in {"error", "warning"} for result in results)
 
 
 def _security_rules_for_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:

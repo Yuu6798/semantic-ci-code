@@ -76,6 +76,24 @@ constraints:
         kind: function
         visibility: public
 """
+TARGET_SECURITY_MAX_COUNT_ZERO = """\
+intent: add a public API with security count policy
+change:
+  primary_kind: feature
+security:
+  findings:
+    added:
+      max_count: 0
+constraints:
+  - id: added_api_present
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_any
+    expected:
+      - fqn: mod.added
+        kind: function
+        visibility: public
+"""
 
 
 def compare_args(target: Path = COMPARE_PASS_TARGET) -> list[str]:
@@ -571,6 +589,58 @@ def test_check_sarif_output_emits_drift_note_for_unknown_sensor(tmp_path: Path):
     assert drift["level"] == "note"
     assert drift["properties"]["sensor_id"] == "semgrep"
     assert "ruleset_hash" in drift["message"]["text"]
+
+
+def test_check_sarif_output_surfaces_deny_added_info_policy_failure(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    write_file(repo / "target.yaml", TARGET_SECURITY_DENY_ADDED)
+    finding = _sast_finding("python.security.denied", severity="info")
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 1
+    document = json.loads(result.stdout)
+    results = {item["ruleId"]: item for item in document["runs"][0]["results"]}
+    assert results["security/python.security.denied"]["level"] == "note"
+    policy = results["security/policy-violation"]
+    assert policy["level"] == "error"
+    assert policy["properties"]["sensor_id"] == "semgrep"
+
+
+def test_check_sarif_output_surfaces_global_count_policy_failure(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    write_file(repo / "target.yaml", TARGET_SECURITY_MAX_COUNT_ZERO)
+    finding = _sast_finding("python.security.info", severity="info")
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 1
+    document = json.loads(result.stdout)
+    results = {item["ruleId"]: item for item in document["runs"][0]["results"]}
+    assert results["security/python.security.info"]["level"] == "note"
+    count_policy = results["security/policy-global-count"]
+    assert count_policy["level"] == "error"
+    assert count_policy["properties"]["category"] == "policy"
 
 
 def test_check_extractor_timeout_surfaces_extraction_unknown(

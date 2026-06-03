@@ -6,9 +6,9 @@ import datetime as dt
 from collections.abc import Iterable
 
 from semantic_ci_code.framework.security_policy import ScannerPolicy, SecurityPolicy, Suppression
-from semantic_ci_code.sensor.delta import compute_security_delta
+from semantic_ci_code.sensor.delta import DEFAULT_DRIFT_FIELDS, compute_security_delta
 from semantic_ci_code.sensor.models import (
-    _FAIL_SEVERITIES,
+    FAIL_SEVERITIES,
     SASTSecurityFinding,
     SecurityDeltaStatus,
     SecurityFinding,
@@ -18,14 +18,6 @@ from semantic_ci_code.sensor.models import (
 )
 
 _ALWAYS_DRIFT_FIELDS = frozenset({"adapter_version", "identity_algorithm_version"})
-_DEFAULT_DRIFT_FIELDS = frozenset(
-    {
-        "adapter_version",
-        "identity_algorithm_version",
-        "ruleset_hash",
-        "advisory_db_hash",
-    }
-)
 
 
 def evaluate_security(
@@ -47,6 +39,7 @@ def evaluate_security(
     )
 
     statuses: list[SecurityDeltaStatus] = []
+    total_added_count = 0
     for sensor_id in sorted(delta.deltas_by_sensor):
         per_sensor = delta.deltas_by_sensor[sensor_id]
         if per_sensor.status == "unknown":
@@ -57,13 +50,17 @@ def evaluate_security(
             for finding in per_sensor.added
             if finding.canonical_id not in active_suppression_ids
         )
+        total_added_count += len(added)
         statuses.append(_status_for_added(policy, added))
+
+    if _violates_global_count_policy(policy, total_added_count):
+        statuses.append("fail")
     return aggregate_status(statuses)
 
 
 def _drift_fields_for_scanner(scanner: ScannerPolicy | None) -> frozenset[str]:
     if scanner is None:
-        return _DEFAULT_DRIFT_FIELDS
+        return DEFAULT_DRIFT_FIELDS
 
     fields = set(_ALWAYS_DRIFT_FIELDS)
     if scanner.require_same_ruleset:
@@ -96,41 +93,37 @@ def _status_for_added(
     policy: SecurityPolicy | None,
     added: tuple[SecurityFinding, ...],
 ) -> SecurityDeltaStatus:
-    if _has_user_gate(policy):
-        return "fail" if _violates_user_policy(policy, added) else "pass"
-    return "fail" if any(finding.severity in _FAIL_SEVERITIES for finding in added) else "pass"
+    return "fail" if _violates_finding_policy(policy, added) else "pass"
 
 
-def _has_user_gate(policy: SecurityPolicy | None) -> bool:
-    if policy is None:
-        return False
-    added = policy.findings.added if policy.findings is not None else None
-    severity = added.severity if added is not None else None
-    return bool(
-        (severity is not None and severity.not_in)
-        or (added is not None and added.max_count is not None)
-        or (policy.rules is not None and policy.rules.deny_added)
-    )
-
-
-def _violates_user_policy(
+def _violates_finding_policy(
     policy: SecurityPolicy | None,
     added: tuple[SecurityFinding, ...],
 ) -> bool:
-    if policy is None:
-        return False
+    if any(finding.severity in _effective_fail_severities(policy) for finding in added):
+        return True
 
-    added_policy = policy.findings.added if policy.findings is not None else None
-    if added_policy is not None:
-        severity = added_policy.severity
-        if severity is not None and any(finding.severity in severity.not_in for finding in added):
-            return True
-        if added_policy.max_count is not None and len(added) > added_policy.max_count:
-            return True
-
-    denied = policy.rules.deny_added if policy.rules is not None else ()
+    denied = policy.rules.deny_added if policy is not None and policy.rules is not None else ()
     if denied and any(
         isinstance(finding, SASTSecurityFinding) and finding.rule_id in denied for finding in added
     ):
         return True
     return False
+
+
+def _effective_fail_severities(policy: SecurityPolicy | None) -> frozenset[str]:
+    if policy is None:
+        return FAIL_SEVERITIES
+    added_policy = policy.findings.added if policy.findings is not None else None
+    if added_policy is not None:
+        severity = added_policy.severity
+        if severity is not None and severity.not_in:
+            return frozenset(severity.not_in)
+    return FAIL_SEVERITIES
+
+
+def _violates_global_count_policy(policy: SecurityPolicy | None, total_added_count: int) -> bool:
+    if policy is None or policy.findings is None or policy.findings.added is None:
+        return False
+    max_count = policy.findings.added.max_count
+    return max_count is not None and total_added_count > max_count

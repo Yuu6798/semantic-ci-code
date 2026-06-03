@@ -124,6 +124,34 @@ def test_evaluate_security_max_count_can_fail_info_only_added_finding():
     assert status == "fail"
 
 
+def test_evaluate_security_max_count_does_not_replace_default_floor():
+    added = sast_finding("critical.rule", severity="critical")
+    policy = SecurityPolicy(findings=FindingsPolicy(added=AddedFindingsPolicy(max_count=10)))
+
+    status = evaluate_security(
+        policy,
+        sensor_state(findings=()),
+        sensor_state(findings=(added,)),
+        as_of=AS_OF,
+    )
+
+    assert status == "fail"
+
+
+def test_evaluate_security_deny_added_does_not_replace_default_floor():
+    added = sast_finding("other.rule", severity="high")
+    policy = SecurityPolicy(rules=RulesPolicy(deny_added=("sql-injection",)))
+
+    status = evaluate_security(
+        policy,
+        sensor_state(findings=()),
+        sensor_state(findings=(added,)),
+        as_of=AS_OF,
+    )
+
+    assert status == "fail"
+
+
 def test_evaluate_security_deny_added_rule_is_severity_independent():
     added = sast_finding("sql-injection", severity="info")
     policy = SecurityPolicy(rules=RulesPolicy(deny_added=("sql-injection",)))
@@ -132,6 +160,51 @@ def test_evaluate_security_deny_added_rule_is_severity_independent():
         policy,
         sensor_state(findings=()),
         sensor_state(findings=(added,)),
+        as_of=AS_OF,
+    )
+
+    assert status == "fail"
+
+
+def test_evaluate_security_not_in_high_critical_fails_high_added():
+    added = sast_finding("python.security.high", severity="high")
+    policy = SecurityPolicy(
+        findings=FindingsPolicy(
+            added=AddedFindingsPolicy(severity=SeverityFilter(not_in=("high", "critical")))
+        )
+    )
+
+    status = evaluate_security(
+        policy,
+        sensor_state(findings=()),
+        sensor_state(findings=(added,)),
+        as_of=AS_OF,
+    )
+
+    assert status == "fail"
+
+
+def test_evaluate_security_max_count_is_global_across_sensors():
+    first = sast_finding("info.rule", severity="info")
+    second = sca_finding("example", severity="info")
+    policy = SecurityPolicy(findings=FindingsPolicy(added=AddedFindingsPolicy(max_count=1)))
+
+    status = evaluate_security(
+        policy,
+        sensor_state(
+            provenances=(
+                provenance(sensor_id="semgrep"),
+                provenance(sensor_id="pip-audit"),
+            ),
+            findings=(),
+        ),
+        sensor_state(
+            provenances=(
+                provenance(sensor_id="semgrep"),
+                provenance(sensor_id="pip-audit"),
+            ),
+            findings=(first, second),
+        ),
         as_of=AS_OF,
     )
 
@@ -238,6 +311,7 @@ def test_evaluate_security_non_complete_sensor_contributes_unknown():
 
 
 def test_drift_fields_for_scanner_matches_default_and_overrides():
+    assert _drift_fields_for_scanner(None) == _drift_fields_for_scanner(ScannerPolicy())
     assert _drift_fields_for_scanner(None) == frozenset(
         {
             "adapter_version",

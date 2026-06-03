@@ -17,7 +17,8 @@ SecuritySeverity = Literal["critical", "high", "medium", "low", "info"]
 SecurityDeltaStatus = Literal["pass", "fail", "unknown"]
 SecurityFindingKind = Literal["sast", "sca"]
 
-_FAIL_SEVERITIES = frozenset({"critical", "high", "medium", "low"})
+FAIL_SEVERITIES = frozenset({"critical", "high", "medium", "low"})
+_FAIL_SEVERITIES = FAIL_SEVERITIES
 # When identity v2 lands, widen both IdentityAlgorithmVersion and canonical_id regexes.
 
 

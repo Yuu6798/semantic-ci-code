@@ -109,7 +109,49 @@ def _suite_lines(payload: dict[str, Any], *, use_color: bool) -> list[str]:
             enabled=use_color,
         ),
     ]
+    for sensor in security.get("sensors", []):
+        lines.extend(_security_sensor_lines(sensor, use_color=use_color))
     return lines
+
+
+def _security_sensor_lines(sensor: dict[str, Any], *, use_color: bool) -> list[str]:
+    status = sensor["status"]
+    lines = [
+        colored(
+            f"  [{sensor['sensor_id']}] {str(status).upper()}  "
+            f"added={len(sensor.get('added', []))} "
+            f"removed={len(sensor.get('removed', []))} "
+            f"suppressed={len(sensor.get('suppressed', []))} "
+            f"unchanged={sensor.get('unchanged_count', 0)}",
+            _VERDICT_COLOR.get(status, "gray"),
+            enabled=use_color,
+        )
+    ]
+    drift_reason = sensor.get("drift_reason")
+    if drift_reason:
+        lines.append(f"    drift: {drift_reason}")
+    for finding in sensor.get("added", []):
+        lines.append("    + " + _security_finding_summary(finding))
+    if sensor.get("suppressed"):
+        lines.append(f"    suppressed: {len(sensor['suppressed'])}")
+    return lines
+
+
+def _security_finding_summary(finding: dict[str, Any]) -> str:
+    if finding.get("category") == "sast":
+        rule = finding.get("rule_id") or finding.get("canonical_id")
+        location = finding.get("module_path") or "-"
+        source_span = finding.get("source_span") or {}
+        if source_span.get("start_line") is not None:
+            location = f"{location}:{source_span['start_line']}"
+        return f"{rule} [{finding.get('severity')}] at {location} - {finding.get('message') or '-'}"
+    advisory = finding.get("advisory_id") or finding.get("canonical_id")
+    package = finding.get("package_name") or "-"
+    version = finding.get("installed_version") or "-"
+    return (
+        f"{advisory} [{finding.get('severity')}] for {package} {version} - "
+        f"{finding.get('message') or '-'}"
+    )
 
 
 def _instruction_lines(item: dict[str, Any], *, use_color: bool) -> list[str]:

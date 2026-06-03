@@ -47,6 +47,7 @@ def build_payload(
     timed_out_dimensions: frozenset[str] | tuple[str, ...] | list[str] | None = None,
     security_verdict: str | None = None,
     security_as_of: str | None = None,
+    security_detail: Any | None = None,
     suite_verdict: str | None = None,
 ) -> dict[str, Any]:
     engine = _engine_payload(
@@ -62,7 +63,9 @@ def build_payload(
         "mode": mode,
         "verdict": verdict.result.value if verdict is not None else None,
     }
-    if security_verdict is not None:
+    if security_detail is not None:
+        payload["security"] = _serialize_security_detail(security_detail)
+    elif security_verdict is not None:
         payload["security"] = {"verdict": security_verdict, "as_of": security_as_of}
     if suite_verdict is not None:
         payload["suite_verdict"] = suite_verdict
@@ -301,6 +304,32 @@ def _serialize_cache_stats(stats: Any | None) -> dict[str, Any]:
         "write_failed": int(getattr(stats, "write_failed", 0)),
         "disabled": bool(getattr(stats, "disabled", False)),
     }
+
+
+def _serialize_security_detail(detail: Any) -> dict[str, Any]:
+    return {
+        "verdict": detail.status,
+        "as_of": detail.as_of.isoformat(),
+        "global_count_violated": bool(detail.global_count_violated),
+        "sensors": [
+            {
+                "sensor_id": sensor.sensor_id,
+                "status": sensor.status,
+                "added": [_serialize_security_finding(finding) for finding in sensor.added],
+                "removed": [_serialize_security_finding(finding) for finding in sensor.removed],
+                "suppressed": [
+                    _serialize_security_finding(finding) for finding in sensor.suppressed
+                ],
+                "drift_reason": sensor.drift_reason,
+                "unchanged_count": sensor.unchanged_count,
+            }
+            for sensor in detail.sensors
+        ],
+    }
+
+
+def _serialize_security_finding(finding: Any) -> dict[str, Any]:
+    return finding.model_dump(mode="json")
 
 
 def _pairs_to_dict(pairs: tuple[tuple[str, Any], ...]) -> dict[str, Any]:

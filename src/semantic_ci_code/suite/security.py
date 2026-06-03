@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from semantic_ci_code.framework.security_policy import ScannerPolicy, SecurityPolicy, Suppression
 from semantic_ci_code.sensor.delta import DEFAULT_DRIFT_FIELDS, compute_security_delta
@@ -20,6 +21,25 @@ from semantic_ci_code.sensor.models import (
 _ALWAYS_DRIFT_FIELDS = frozenset({"adapter_version", "identity_algorithm_version"})
 
 
+@dataclass(frozen=True)
+class SecuritySensorResult:
+    sensor_id: str
+    status: SecurityDeltaStatus
+    added: tuple[SecurityFinding, ...]
+    removed: tuple[SecurityFinding, ...]
+    suppressed: tuple[SecurityFinding, ...]
+    drift_reason: str | None
+    unchanged_count: int
+
+
+@dataclass(frozen=True)
+class SecuritySuiteResult:
+    status: SecurityDeltaStatus
+    as_of: dt.date
+    sensors: tuple[SecuritySensorResult, ...]
+    global_count_violated: bool
+
+
 def evaluate_security(
     policy: SecurityPolicy | None,
     baseline: SensorState,
@@ -28,6 +48,18 @@ def evaluate_security(
     as_of: dt.date,
 ) -> SecurityDeltaStatus:
     """Evaluate security policy against two SensorState values."""
+
+    return evaluate_security_detail(policy, baseline, candidate, as_of=as_of).status
+
+
+def evaluate_security_detail(
+    policy: SecurityPolicy | None,
+    baseline: SensorState,
+    candidate: SensorState,
+    *,
+    as_of: dt.date,
+) -> SecuritySuiteResult:
+    """Evaluate security policy and retain per-sensor security detail."""
 
     suppressions = policy.suppressions if policy is not None else ()
     _validate_suppressions(suppressions)
@@ -40,22 +72,57 @@ def evaluate_security(
 
     statuses: list[SecurityDeltaStatus] = []
     total_added_count = 0
+    sensors: list[SecuritySensorResult] = []
     for sensor_id in sorted(delta.deltas_by_sensor):
         per_sensor = delta.deltas_by_sensor[sensor_id]
         if per_sensor.status == "unknown":
             statuses.append("unknown")
+            sensors.append(
+                SecuritySensorResult(
+                    sensor_id=sensor_id,
+                    status="unknown",
+                    added=(),
+                    removed=per_sensor.removed,
+                    suppressed=(),
+                    drift_reason=per_sensor.error_message,
+                    unchanged_count=per_sensor.unchanged_count,
+                )
+            )
             continue
+        suppressed = tuple(
+            finding
+            for finding in per_sensor.added
+            if finding.canonical_id in active_suppression_ids
+        )
         added = tuple(
             finding
             for finding in per_sensor.added
             if finding.canonical_id not in active_suppression_ids
         )
         total_added_count += len(added)
-        statuses.append(_status_for_added(policy, added))
+        status = _status_for_added(policy, added)
+        statuses.append(status)
+        sensors.append(
+            SecuritySensorResult(
+                sensor_id=sensor_id,
+                status=status,
+                added=added,
+                removed=per_sensor.removed,
+                suppressed=suppressed,
+                drift_reason=per_sensor.error_message,
+                unchanged_count=per_sensor.unchanged_count,
+            )
+        )
 
-    if _violates_global_count_policy(policy, total_added_count):
+    global_count_violated = _violates_global_count_policy(policy, total_added_count)
+    if global_count_violated:
         statuses.append("fail")
-    return aggregate_status(statuses)
+    return SecuritySuiteResult(
+        status=aggregate_status(statuses),
+        as_of=as_of,
+        sensors=tuple(sensors),
+        global_count_violated=global_count_violated,
+    )
 
 
 def _drift_fields_for_scanner(scanner: ScannerPolicy | None) -> frozenset[str]:

@@ -391,7 +391,22 @@ output adds:
 
 ```json
 {
-  "security": {"verdict": "pass", "as_of": "2026-09-01"},
+  "security": {
+    "verdict": "pass",
+    "as_of": "2026-09-01",
+    "global_count_violated": false,
+    "sensors": [
+      {
+        "sensor_id": "semgrep",
+        "status": "pass",
+        "added": [],
+        "removed": [],
+        "suppressed": [],
+        "drift_reason": null,
+        "unchanged_count": 0
+      }
+    ]
+  },
   "suite_verdict": "pass"
 }
 ```
@@ -399,10 +414,12 @@ output adds:
 The code-only `verdict` field remains the evaluator verdict. `suite_verdict`
 combines code and security with `unknown > fail > repair > pass` and controls
 the process exit code for sensor-enabled `check` runs. Sensor-enabled `check`
-currently supports JSON and human output only; `--format sarif` and
-`--format gh-actions` are rejected until security-aware renderers land in a
-later G-4 slice. Without sensor flags, the payload and exit behavior are
-unchanged.
+supports JSON, human, and SARIF output. JSON includes per-sensor added,
+removed, suppressed, drift, and unchanged-count detail; human output prints the
+same summary and added finding lines; SARIF appends security findings into the
+same `runs[0]` as code constraint results with `security/<rule>` rule IDs.
+`--format gh-actions` remains deferred to a later G-4 slice. Without sensor
+flags, the payload and exit behavior are unchanged.
 
 **Migrated in Phase 3b**: `semantic-ci pre-commit [...]` became
 `semantic-ci check --candidate-source=staged-index [...]`. The evaluation

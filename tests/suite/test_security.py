@@ -16,7 +16,11 @@ from semantic_ci_code.framework.security_policy import (
     Suppression,
 )
 from semantic_ci_code.sensor.models import SensorState, canonical_id_for_identity
-from semantic_ci_code.suite.security import _drift_fields_for_scanner, evaluate_security
+from semantic_ci_code.suite.security import (
+    _drift_fields_for_scanner,
+    evaluate_security,
+    evaluate_security_detail,
+)
 
 from .helpers import provenance, sast_finding, sca_finding, sensor_state
 
@@ -68,6 +72,33 @@ def test_evaluate_security_active_suppression_turns_fail_into_pass():
     )
 
     assert status == "pass"
+
+
+def test_evaluate_security_detail_matches_wrapper_and_retains_suppressed_findings():
+    added = sast_finding("python.security.eval", severity="high")
+    policy = SecurityPolicy(
+        findings=FindingsPolicy(
+            added=AddedFindingsPolicy(severity=SeverityFilter(not_in=("high", "critical")))
+        ),
+        suppressions=(_suppression_for(added),),
+    )
+    baseline = sensor_state(findings=())
+    candidate = sensor_state(findings=(added,))
+
+    detail = evaluate_security_detail(policy, baseline, candidate, as_of=AS_OF)
+
+    assert detail.status == evaluate_security(policy, baseline, candidate, as_of=AS_OF)
+    assert detail.as_of == AS_OF
+    assert detail.global_count_violated is False
+    assert len(detail.sensors) == 1
+    sensor = detail.sensors[0]
+    assert sensor.sensor_id == "semgrep"
+    assert sensor.status == "pass"
+    assert sensor.added == ()
+    assert sensor.suppressed == (added,)
+    assert sensor.removed == ()
+    assert sensor.drift_reason is None
+    assert sensor.unchanged_count == 0
 
 
 def test_evaluate_security_expired_suppression_does_not_filter_added_finding():

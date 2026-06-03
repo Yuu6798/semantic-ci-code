@@ -112,6 +112,7 @@ go to stderr.
 | `check --sensor-baseline <file>` without `--sensor-candidate` | 2 | `--sensor-baseline and --sensor-candidate must be provided together` |
 | `check --sensor-baseline <invalid-json> --sensor-candidate <file>` | 2 | `--sensor-baseline must be a valid SensorState JSON file...` |
 | `check --sensor-baseline <file> --sensor-candidate <file> --as-of bad` | 2 | `--as-of must be a valid YYYY-MM-DD date` |
+| `check --sensor-baseline <file> --sensor-candidate <file> --format sarif` | 2 | `sensor-enabled check supports only json or human output...` |
 | `check` with sensor provenance drift / incomplete security signal | 3 | JSON or human output is still written with `security.verdict: unknown` and `suite_verdict: unknown`. |
 | `ssp scan --sensor semgrep` without `--config` | 2 | `--config is required when --sensor=semgrep` |
 | `ssp from-json` with a sensor error fixture | 3 | SSP envelope is still written with `aggregate_verdict: unknown`. |

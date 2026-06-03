@@ -398,8 +398,11 @@ output adds:
 
 The code-only `verdict` field remains the evaluator verdict. `suite_verdict`
 combines code and security with `unknown > fail > repair > pass` and controls
-the process exit code for sensor-enabled `check` runs. Without sensor flags,
-the payload and exit behavior are unchanged.
+the process exit code for sensor-enabled `check` runs. Sensor-enabled `check`
+currently supports JSON and human output only; `--format sarif` and
+`--format gh-actions` are rejected until security-aware renderers land in a
+later G-4 slice. Without sensor flags, the payload and exit behavior are
+unchanged.
 
 **Migrated in Phase 3b**: `semantic-ci pre-commit [...]` became
 `semantic-ci check --candidate-source=staged-index [...]`. The evaluation

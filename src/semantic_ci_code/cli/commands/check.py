@@ -97,6 +97,8 @@ def run_check(args: Namespace) -> int:
             explicit_rev=candidate_rev_explicit,
         )
         sensor_enabled = _sensor_flags_enabled(args)
+        if sensor_enabled:
+            _reject_unsupported_sensor_output_format(args.format)
         as_of = _as_of_date(args.as_of) if args.as_of is not None or sensor_enabled else None
         baseline_sensor = (
             _load_sensor_state(args.sensor_baseline, flag="--sensor-baseline")
@@ -346,6 +348,14 @@ def _sensor_flags_enabled(args: Namespace) -> bool:
     if has_baseline != has_candidate:
         raise ValueError("--sensor-baseline and --sensor-candidate must be provided together")
     return has_baseline and has_candidate
+
+
+def _reject_unsupported_sensor_output_format(output_format: str | None) -> None:
+    if output_format in {"sarif", "gh-actions"}:
+        raise ValueError(
+            "sensor-enabled check supports only json or human output; "
+            f"--format {output_format} is deferred to G-4b"
+        )
 
 
 def _as_of_date(raw: str | None) -> dt.date:

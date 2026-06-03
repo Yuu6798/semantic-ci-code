@@ -332,6 +332,27 @@ def test_check_sensor_ingest_does_not_execute_live_security_scanners():
     assert ".scan(" not in check_source
 
 
+@pytest.mark.parametrize("output_format", ["sarif", "gh-actions"])
+def test_check_sensor_flags_reject_code_only_formats(tmp_path: Path, output_format: str):
+    repo = init_repo(tmp_path, origin_ref=True)
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(_sast_finding("python.security.eval", severity="high"),),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format=output_format,
+    )
+
+    assert result.returncode == 2
+    assert "sensor-enabled check supports only json or human output" in result.stderr
+    assert result.stdout == ""
+
+
 def test_check_extractor_timeout_surfaces_extraction_unknown(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

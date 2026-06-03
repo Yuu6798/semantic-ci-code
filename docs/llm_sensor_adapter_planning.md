@@ -50,7 +50,10 @@ recall ノイズ** が混入する。これは Phase G の自然キー集合演�
 ### 0.4 設計の核 (壁打ち蒸留)
 
 本 planning は 2026-06-03 session の 5+ round 壁打ちで以下に収束した
-(`.claude/memory/2026-06-03.md` 参照)。最重要の転換は **「LLM は judge では
+(会話ログは session wrap-up 時に当日の `.claude/memory/` dated log へ
+externalize される。本 planning 起草時点での一次記録は下表 + §1 各 D 本文で
+あり、既存の `2026-06-03.md` は Phase G G-3〜G-4b の wrap-up のみで本議論は
+未収録)。最重要の転換は **「LLM は judge では
 なく scout」** — LLM はジャッジせず候補を炙り出すだけで、合否を出すのは
 あくまで決定論的な宣言制約 (target.yaml) である。この framing が
 core scope guard「not an LLM-as-judge service」との衝突を解消する。
@@ -418,4 +421,7 @@ deterministic sensor と異なる (再 scan しても一致しないため versi
 4. `docs/ssp_protocol.md` — Sensor Provenance Invariant の normative 定義
 5. `docs/target_authoring_surface.md` — authoring freeze (D8 昇格ゲートの前提)
 6. `src/semantic_ci_code/sensor/` — Phase G 実装 (相乗り先)
-7. 本 planning を生んだ session 議論ログ (`.claude/memory/2026-06-03.md`)
+7. 本 planning doc 自身 (§0.4 D1-D9 蒸留表 + §1 各 D 本文) — 設計判断の一次
+   記録。壁打ち会話ログは wrap-up 時に当日の `.claude/memory/` dated log へ
+   externalize される (起草時点では未 externalize。`2026-06-03.md` は Phase G
+   wrap-up のみで本議論は含まないため、この doc を読むこと)

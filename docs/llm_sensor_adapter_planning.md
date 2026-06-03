@@ -63,7 +63,7 @@ core scope guard「not an LLM-as-judge service」との衝突を解消する。
 | 非決定論ノイズ | one-run + 決定論的 re-projection を **LLM sensor では必須**化 | D4 |
 | 一般化 | LLM-general Adapter Protocol。Codex Security = first concrete | D5 |
 | anchor | Phase G canonical_id 空間へ射影。**具体レシピは暫定 (実装時調整)** | D6 |
-| 精度方針 | **誤検知 > 見逃し** (high recall / fine-grained / rename re-projection) | D7 |
+| 精度方針 | **誤検知 > 見逃し** (high recall / fine-grained / rename re-projection は code delta 拡張が前提) | D7 |
 | 昇格 | 自動昇格なし。target.yaml authoring freeze が昇格ゲート。沈黙 = 容認 | D8 |
 | 監査 / waiver | provenance に informed-consent 記録 (verdict 非参照)、waiver = advisory mute | D9 |
 
@@ -214,10 +214,21 @@ version prefix `vN:` により再構成時の hash 変化は Phase G の機構�
 3. **gate ではなく surface**: 高 recall の代償 (ノイズ) は、scout 出力を
    Advisor チャネル (止めない) に置くことで吸収する (D1)
 
-細粒度 anchor の代償 (rename で誤検知増) は、**core が既に持つ code delta
-(files_touched / module_graph の rename 追跡) 越しに anchor を再投影**して
-相殺する。これにより「誤検知に倒しつつ、一番うざい純粋 rename ノイズだけは
-構造的に消す」。
+細粒度 anchor の代償は rename で誤検知が増えることである (rename 前後で
+anchor の `qualified_name` / `module_path` がズレ、現存する脆弱性が "added" に
+見える)。これを相殺するには **old_path → new_path の rename マップが code delta
+に必要**だが、現状の core はこれを露出していない:
+
+- `cli/git_diff.py` の `NumstatEntry.old_path` は git numstat の rename 元パスを
+  parse 済だが、`cli/delta_overlay.py` は集約値 (`files_touched` / `loc_delta`)
+  しか overlay せず、old_path → new_path 対応を捨てている
+- `delta/code_state_delta.py` の `module_graph_delta` は import edge の集合差分の
+  みで rename を追跡しない
+
+したがって rename re-projection は「既存 core が rename 追跡を持つ」前提では
+成立せず、**code delta に rename マップを露出させる前提作業を H-2 の scope に
+含める** (§3 H-2)。この前提が入って初めて「誤検知に倒しつつ、一番うざい純粋
+rename ノイズだけは構造的に消す」が実現する。
 
 ### 1.8 D8: 昇格は target.yaml authoring freeze のみ — 沈黙 = 容認
 
@@ -330,9 +341,13 @@ deterministic sensor と異なる (再 scan しても一致しないため versi
 ### H-2: anchor projection + 決定論的 re-projection (CSCI-51)
 - `project_to_canonical()` の暫定実装 (D6、差し替え可能な構造)
 - sensor delta 層に one-run + baseline 再投影 (D4) を実装
-- rename re-projection を core code delta に接続 (D7)
+- **前提作業 (本 H-2 scope 内)**: code delta に old_path → new_path の rename
+  マップを露出させる (D7)。`NumstatEntry.old_path` は parse 済だが
+  `delta_overlay.py` / `code_state_delta.py` が捨てているため、まず rename マップ
+  を delta に乗せる必要がある
+- 上記 rename マップに rename re-projection を接続 (D7)
 - **AC**: 2-run 差分を取らないことを architecture test で enforce、
-  rename した baseline で同一脆弱性が "added" に出ない
+  rename マップ実装後、rename した baseline で同一脆弱性が "added" に出ない
 
 ### H-3: Codex Security reference adapter (CSCI-52)
 - `sensor/adapters/llm/codex_security.py` (first concrete, §1.5)

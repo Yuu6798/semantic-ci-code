@@ -7,6 +7,7 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 
 | Date | PR / commit | Outcome | Detail |
 |---|---|---|---|
+| 2026-06-03 (S2) | #130 → #131 → #132 | LLM security sensor / scout layer planning (Phase H candidate、`docs/llm_sensor_adapter_planning.md`、CSCI-50〜54、G-5 完走前提)。Codex Security 調査 → SSP/Phase G 接続の 5+ round 壁打ち → D1〜D9 (中心命題「LLM は scout であって judge ではない」/ verdict 分離 / 誤検知>見逃し / 沈黙=容認)。#130 を承認前に誤 merge → revert (#131) → 修正版 #132 で Codex P2 を 7 round 消化 (cross-model dedup / rename / verdict 分離 / absence+presence anchor 述語) して merge | `2026-06-03.md` |
 | 2026-06-03 | #127 + #128 + #129 | Phase G G-3〜G-4b 完走 (CSCI-47/48/48b)。suite security policy evaluator (#127) → `check --sensor` 配線 + suite_verdict + exit code + 集約 security JSON (#128) → per-sensor detail を JSON/human/SARIF に拡張 + SARIF 同一 run マージ (#129)。CSCI-48b は grounding-first brief で wrapper 化契約維持 + G-4a exact-match 緩和を事前 encode、PR #129 review バグ 0 (非ブロッキング 2 cleanup) → follow-up 3 commit で land。Phase G 残は G-5 (CSCI-49 templates) のみ | `2026-06-03.md` |
 | 2026-06-02 | #124 + #125 + #126 | Phase G 着手: G-1/CSCI-45 (SensorState+canonical_id+delta) + G-2/CSCI-46 (SSP→SensorState 翻訳 adapter) を 2 PR 完走。review で P2 捕捉→Codex 1 round 修正 (CSCI-45: ordinal を v1 identity に / suppression G-3 defer / SSP 命名整合、CSCI-46: SCA canonical_id dedup)。SAST identity を SSP 5 要素 fingerprint 整合の 8 要素に確定し planning を逆流同期 (#126) | `2026-06-02.md` |
 | 2026-05-29 (S2) | #120 + #121 | 2 Skill (new-brief/wrap-up) 動作確認 (構造・参照・gate 全検証、 dangling ゼロ) → SessionStart hook (dev-extras 自動導入、 startup/resume 限定、 出力抑制) + fixture 署名 OFF (host config 不変、 GIT_CONFIG env で commit.gpgsign false) で Web/local フルテスト緑化。self-dogfood PASS (D4 vacuous と正直報告)、 Codex P2×3 を 2 push で消化、 PR #120 merge。follow-up PR #121 で wrap-up gate を `python -m pytest` に統一 (PATH 差異の恒久 close、 Codex 👍 0-round) | `2026-05-29.md` |
@@ -42,6 +43,6 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 | 2026-05-05 (S3) | #33 / #37 | Brief 4b cache slice CSCI-25/26/27 3 brief 連続発行、 `--mode {smoke,full}` + CodeState cache + size-eviction | `2026-05-05.md` |
 | 2026-05-05 (S2) | — | PR #34 post-merge adversarial test (A 真陰 + D 偽陰) → effects slice 実装 gap 発見 (P2 で予定通り解消)、 docs only | `2026-05-05.md` |
 | 2026-05-05 (S1) | #34 | §23.1 入力 contract「engine は state 出自を問わない」 を仕様 → 実証済み性質に格上げ、 `pre_generation_validation_case.md` 新設 | `2026-05-05.md` |
-| 2026-05-04 | #20-#26 | Brief 3 残務 + Brief 4 全体 (CSCI-15〜19) を 1 セッション完結、 `semantic-ci` CLI 5 subcommand release 可能、 self-dogfood 初実証 | `2026-05-04.md` |
+| 2026-05-04 | #20-#26 | Brief 3 残務 + Brief 4 全体 (CSCI-15〜19) を 1 セッション完結、 `semantic-ci` CLI 5 subcommand release 可能、 self-dogfood 初実証。**archived** (30 日) | `archive/2026-05/2026-05-04.md` |
 | 2026-05-03 (S1+S2+S3) | #5 ほか | Brief 2 完結 (P1 抽出器 5 PR: api_surface/imports/module_graph/complexity/test_surface) + design.md §17-§22 追加 (P2.5 前倒し) + Brief 3 planning Q1〜Q4 + §23 新設 + Session Memory ワークフロー正式化。**archived** (>30 日) | `archive/2026-05/2026-05-03.md` |
 | 2026-05-02 | #3 / #4 / #5 | P1 effect extractor 3-stage 完成 (CSCI-2/3/4)。**archived** (>30 日) | `archive/2026-05/2026-05-02.md` |

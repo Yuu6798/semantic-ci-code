@@ -35,6 +35,7 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 | `STATUS_MERGED_LOG.md` | 2026-06-03 | `STATUS.md ## 直近 merged` の 12 entries (5/15 Session 2 〜 5/5 + 5/27 + 5/28 S1) | `0db925f` (Phase 1) 〜 2026-06-03 wrap-up |
 | `2026-05/2026-05-02.md` | 2026-06-02 (>30 日 TTL) | `_index.md` 2026-05-02 entry (初の dated-log 物理移送) | 2026-06-02 wrap-up |
 | `2026-05/2026-05-03.md` | 2026-06-03 (>30 日 TTL) | `_index.md` 2026-05-03 entry (S1+S2+S3 統合) | 2026-06-03 wrap-up |
+| `2026-05/2026-05-04.md` | 2026-06-03 (30 日 TTL) | `_index.md` 2026-05-04 entry (Brief 3 残務 + Brief 4 全体) | 2026-06-03 wrap-up (S2) |
 
 ## 移送 protocol
 

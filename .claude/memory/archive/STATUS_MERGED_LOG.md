@@ -954,3 +954,62 @@ Grok) を統合した `docs/phase_g_planning.md` を起草、Codex review 18 rou
    と衝突、planning doc / commit message で **G** に統一
 
 (2026-06-03 wrap-up で STATUS.md 直近 merged 5-cap 超過により移送)
+
+### 2026-05-28 Session 2 — Real-PR complexity dogfood report + tracker case-count landed (PR #116 + #117)
+
+同日 Session 1 (Phase G planning) と並走していた **公開 Python リポジトリ
+実 PR 8 件 (refactor 7 + feature 1) の complexity 制約 dogfooding pass** の
+結果を 2 PR cascade で artifact 化。 累計 21 ケース (Session 4 self-dogfood 3
++ TC10 仮想 10 + real-PR 8) を tracker 単体で即答可能化、 D6 / D7 を D# 名簿
+に追加。
+
+- **PR #116** (merged `0ac4e95`、2 commit):
+  `docs(dogfooding): add real-PR complexity report + consolidated findings tracker`
+  - `docs/dogfooding_real_pr_complexity.md` 新設 (8 case の per-PR matrix +
+    methodology + verdict 集計、 6/8 reviewer-relevant 一致、 1 vacuous PASS
+    = D6 (nested-function blind spot、 D4 sibling)、 1 authoring mismatch =
+    D7 (extract-method × cyclomatic 微増))
+  - `docs/dogfooding_findings_tracker.md` 新設 (D1〜D7 を全 dogfooding pass
+    横断で集約する単一 tracker、 既存 dogfooding report 内の D# entry は
+    cross-link のみ保持に refactor)
+  - 2nd commit (`f13c9cc`) で per-case base/head SHA pin + case 5 の
+    target.yaml inline (re-run reproducibility 確保)
+  - `CLAUDE.md` Design Documents table に 2 row 追加
+- **PR #117** (merged `575d398`、 1 commit):
+  `docs(dogfooding): pin per-pass case counts + cumulative total in tracker`
+  - user 問い「ドッグフーディングの件数って累積でカウントできるように
+    なってるか」 への応答、 Source pass index 表に Methodology + Cases
+    column 追加
+  - per-pass 件数 pin: Session 4 self-dogfood = 3 / TC10 = 10 / Real-PR
+    complexity = 8 / **累計 = 21**
+  - CASE STUDY (pre_generation_validation_case.md /
+    multi_agent_audit_case.md) は dogfooding pass と別カテゴリとして
+    累計から除外する rule を文章で pin、 将来の追加で同 confusion を防ぐ
+
+**設計判断のハイライト**:
+
+1. **「累計件数を tracker 単体で即答可能にする」design criterion**:
+   N=21 は 3 つの report に分散していたので、 source pass index 表に
+   Cases column + 累計 row を追加するだけで、 tracker が「単一 source of
+   truth」 として機能。 後続 dogfooding pass 追加時も Pass / Date /
+   Methodology / Cases / Doc / Findings の 6 列で同 invariant 維持可能
+2. **`AskUserQuestion` で 3 択 trade-off 提示**: PR #116 merge 後に
+   「件数 column 追加」 を独立 PR で出すか / wrap-up とバンドルか /
+   main 直 push (rule 違反) か の 3 択を提示、 user は推奨 (follow-up
+   PR) を即選択。 stale 件数記載が翌日に伸びることなく、 質問と回答の
+   context cohesion が高い間に encode 完了
+3. **PR auto-subscribe → merge までイベント駆動**: PR #117 で
+   `subscribe_pr_activity` を call、 CI in_progress を確認した時点で
+   turn を閉じ、 webhook 通知で merge を受け取り直ちにローカル main を
+   sync。 poll なしで PR closure を待つ運用
+
+**修正・訂正**:
+
+1. **Session 4 件数**: 初期に「Session 4 dogfood = 1 件」 と counting
+   しがちだが、 実態は init→compile_repair 同等シナリオ 1 + PR #59
+   self-dogfood 1 + PR #60 self-dogfood 1 = **3 件**。 tracker 起草時の
+   `.claude/memory/2026-05-07.md` 再読で正確な書き起こしに訂正
+2. **Pass naming**: `Session 4 dogfood` → `Session 4 self-dogfood` に
+   refactor (自分自身の PR を入力に取る methodology を正確に表す)
+
+(2026-06-03 wrap-up (S2) で STATUS.md 直近 merged 5-cap 超過により移送)

@@ -24,9 +24,48 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。Phase G (SSP core integration) は `docs/phase_g_planning.md` の 5 PR 構成 (CSCI-45〜49) で進行中で、設計の核は SSP v0.1 を core の横ではなく縦接続に再構築すること: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict (unknown > fail > repair > pass)、SAST finding を FQN 空間に翻訳して canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。2026-06-02 に **G-1/G-2 (CSCI-45/46)** が landed (PR #124/#125): SensorState model + canonical_id + delta + SSP→SensorState 翻訳 adapter、SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定。2026-06-03 に **G-3/G-4a/G-4b (CSCI-47/48/48b)** が landed (PR #127/#128/#129): G-3 = suite security policy evaluator、G-4a = `check --sensor-baseline/--sensor-candidate` で SensorState ingest + suite_verdict + exit code + 集約 security JSON、G-4b = per-sensor security detail (added/removed/suppressed/drift/unchanged) を JSON/human/SARIF に拡張 + SARIF を code constraint と同一 run にマージ (severity→level: critical/high=error, medium=warning, low/info=note)。Phase G 残は **G-5 (CSCI-49 = semantic security templates 2 カテゴリ) のみ**。Next queue: **G-5** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)。
+Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。Phase G (SSP core integration) は `docs/phase_g_planning.md` の 5 PR 構成 (CSCI-45〜49) で進行中で、設計の核は SSP v0.1 を core の横ではなく縦接続に再構築すること: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict (unknown > fail > repair > pass)、SAST finding を FQN 空間に翻訳して canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。2026-06-02 に **G-1/G-2 (CSCI-45/46)** が landed (PR #124/#125): SensorState model + canonical_id + delta + SSP→SensorState 翻訳 adapter、SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定。2026-06-03 に **G-3/G-4a/G-4b (CSCI-47/48/48b)** が landed (PR #127/#128/#129): G-3 = suite security policy evaluator、G-4a = `check --sensor-baseline/--sensor-candidate` で SensorState ingest + suite_verdict + exit code + 集約 security JSON、G-4b = per-sensor security detail (added/removed/suppressed/drift/unchanged) を JSON/human/SARIF に拡張 + SARIF を code constraint と同一 run にマージ (severity→level: critical/high=error, medium=warning, low/info=note)。Phase G 残は **G-5 (CSCI-49 = semantic security templates 2 カテゴリ) のみ**。2026-06-03 に **Phase H candidate** (LLM security sensor / 非決定論 scout layer、`docs/llm_sensor_adapter_planning.md`、CSCI-50〜54、PR #132) が planning 化 — ただし **Phase G-5 完走を前提**とし active queue 未投入 (中心命題「LLM は scout であって judge ではない」: 出力は Advisor surface 行きで verdict を直接 seat しない)。Next queue: **G-5** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)、その後 Phase H candidate。
 
 ## 直近 merged
+
+### 2026-06-03 Session 2 — LLM security sensor / scout layer planning (Phase H candidate、PR #130→#131→#132)
+
+OpenAI「Codex for Open Source」応募文面の相談から派生し、選択肢「Codex
+Security」(2026-03 の AI セキュリティエージェント、コーディング Codex とは別物)
+の正体確認 → 本 repo の SSP / Phase G 機構との接続可否の理論検討 → **非決定論
+センサー (LLM セキュリティオラクル) を Phase G の sensor 機構に 1 adapter として
+接続する設計** の planning doc 化。成果は `docs/llm_sensor_adapter_planning.md`
+(Phase H candidate、CSCI-50〜54 想定、**Phase G-5 完走を前提**、active queue 未投入)。
+
+- **PR #132** (merged `88406e9`、planning doc + `CLAUDE.md` 表 + README 行):
+  D1〜D9 を encode。**D1 中心命題「LLM は scout であって judge ではない」**
+  (on-demand / optional / 出力は Advisor surface → verdict を直接 seat しない →
+  scope guard「not an LLM-as-judge service」との衝突を解消) / D2-D4 決定論保全
+  (frozen SensorState ingest + one-run + 決定論的 re-projection、§23.1 weaken なし) /
+  D5 LLM-general Adapter Protocol (Codex Security = first concrete、cross-model 集約は
+  明示ステップ) / D6 anchor projection は暫定 (実装時較正) / **D7 誤検知 > 見逃し**
+  (高 recall、判定不能なら added に倒す) / **D8 昇格は target.yaml authoring freeze
+  のみ・沈黙 = 容認** / D9 informed-consent を provenance 記録・waiver = advisory mute。
+- **PR #130** (revert 済) → **PR #131** (revert PR): #130 を承認前に勝手に merge した
+  プロセス失敗を revert で立て直し → 修正版 #132 で作り直し。
+
+**設計判断のハイライト**:
+
+1. **「scout not judge」への reframe**: user の「LLM はオプション、欲しいときに呼ぶ」
+   +「誤検知に倒す」の 2 直感が、scope guard 衝突の解消と recall 方針を同時確定。
+2. **review 壁打ち → doc 質の転化**: #132 で Codex bot の P2 を 7 round 消化、各々が
+   planning doc の実 correctness issue (cross-model 自動 dedup 矛盾 / rename
+   re-projection は core 未実装 / **verdict 分離** = LLM finding を通常 SensorState に
+   流すと fail を seat する → advisory チャネル分離を D1 実装規律に / absence+presence
+   anchor は site 存在でなく脆弱な条件・経路を要求)。
+
+**修正・訂正**:
+
+1. **#130 を承認前に勝手に merge** (判断ミス): 「マージして」を受けても Codex review
+   状態を先に確認すべき。未対応 review があれば止める、を教訓化。
+2. **verdict 分離の見落とし** (Codex catch): D1 を「Advisor surface 行き」と書きながら
+   実装節では通常 SensorState 経路を想定 → `combine_verdict` で fail を seat してしまう
+   矛盾。advisory チャネル分離を明文化して解消。
 
 ### 2026-06-03 — Phase G G-3〜G-4b 完走: CSCI-47 + CSCI-48 + CSCI-48b (PR #127 + #128 + #129)
 
@@ -151,67 +190,11 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
 - 残: doc_refactor 自己 archive は Phase 3 cosmetic (§5 trim、 §5.3 merge は再考
   推奨 = 非実行) のため見送り。
 
-### 2026-05-28 Session 2 — Real-PR complexity dogfood report + tracker case-count landed (PR #116 + #117)
+### 古い merged entry (2026-05-28 S2 以前) — archive 参照
 
-同日 Session 1 (Phase G planning) と並走していた **公開 Python リポジトリ
-実 PR 8 件 (refactor 7 + feature 1) の complexity 制約 dogfooding pass** の
-結果を 2 PR cascade で artifact 化。 累計 21 ケース (Session 4 self-dogfood 3
-+ TC10 仮想 10 + real-PR 8) を tracker 単体で即答可能化、 D6 / D7 を D# 名簿
-に追加。
-
-- **PR #116** (merged `0ac4e95`、2 commit):
-  `docs(dogfooding): add real-PR complexity report + consolidated findings tracker`
-  - `docs/dogfooding_real_pr_complexity.md` 新設 (8 case の per-PR matrix +
-    methodology + verdict 集計、 6/8 reviewer-relevant 一致、 1 vacuous PASS
-    = D6 (nested-function blind spot、 D4 sibling)、 1 authoring mismatch =
-    D7 (extract-method × cyclomatic 微増))
-  - `docs/dogfooding_findings_tracker.md` 新設 (D1〜D7 を全 dogfooding pass
-    横断で集約する単一 tracker、 既存 dogfooding report 内の D# entry は
-    cross-link のみ保持に refactor)
-  - 2nd commit (`f13c9cc`) で per-case base/head SHA pin + case 5 の
-    target.yaml inline (re-run reproducibility 確保)
-  - `CLAUDE.md` Design Documents table に 2 row 追加
-- **PR #117** (merged `575d398`、 1 commit):
-  `docs(dogfooding): pin per-pass case counts + cumulative total in tracker`
-  - user 問い「ドッグフーディングの件数って累積でカウントできるように
-    なってるか」 への応答、 Source pass index 表に Methodology + Cases
-    column 追加
-  - per-pass 件数 pin: Session 4 self-dogfood = 3 / TC10 = 10 / Real-PR
-    complexity = 8 / **累計 = 21**
-  - CASE STUDY (pre_generation_validation_case.md /
-    multi_agent_audit_case.md) は dogfooding pass と別カテゴリとして
-    累計から除外する rule を文章で pin、 将来の追加で同 confusion を防ぐ
-
-**設計判断のハイライト**:
-
-1. **「累計件数を tracker 単体で即答可能にする」design criterion**:
-   N=21 は 3 つの report に分散していたので、 source pass index 表に
-   Cases column + 累計 row を追加するだけで、 tracker が「単一 source of
-   truth」 として機能。 後続 dogfooding pass 追加時も Pass / Date /
-   Methodology / Cases / Doc / Findings の 6 列で同 invariant 維持可能
-2. **`AskUserQuestion` で 3 択 trade-off 提示**: PR #116 merge 後に
-   「件数 column 追加」 を独立 PR で出すか / wrap-up とバンドルか /
-   main 直 push (rule 違反) か の 3 択を提示、 user は推奨 (follow-up
-   PR) を即選択。 stale 件数記載が翌日に伸びることなく、 質問と回答の
-   context cohesion が高い間に encode 完了
-3. **PR auto-subscribe → merge までイベント駆動**: PR #117 で
-   `subscribe_pr_activity` を call、 CI in_progress を確認した時点で
-   turn を閉じ、 webhook 通知で merge を受け取り直ちにローカル main を
-   sync。 poll なしで PR closure を待つ運用
-
-**修正・訂正**:
-
-1. **Session 4 件数**: 初期に「Session 4 dogfood = 1 件」 と counting
-   しがちだが、 実態は init→compile_repair 同等シナリオ 1 + PR #59
-   self-dogfood 1 + PR #60 self-dogfood 1 = **3 件**。 tracker 起草時の
-   `.claude/memory/2026-05-07.md` 再読で正確な書き起こしに訂正
-2. **Pass naming**: `Session 4 dogfood` → `Session 4 self-dogfood` に
-   refactor (自分自身の PR を入力に取る methodology を正確に表す)
-
-### 古い merged entry (2026-05-27 以前) — archive 参照
-
-20 entry (2026-05-27 / 2026-05-26 / 2026-05-22 / 2026-05-21 S5 + S3 + S2 + S1 /
-2026-05-19 / 2026-05-15 Session 4 + Session 3 + Session 2 /
+21 entry (2026-05-28 S2 / 2026-05-27 / 2026-05-26 / 2026-05-22 /
+2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
+2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
 2026-05-08 S1+S2 / 2026-05-07 S1+S4+S5 / 2026-05-05) は
 `.claude/memory/archive/STATUS_MERGED_LOG.md` に移送済。 詳細参照時は
@@ -221,8 +204,8 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
 + 2026-05-21 S5 wrap-up (5/15 S4 移送) + 2026-05-22 wrap-up (5/19 移送)
 + 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 S1 wrap-up (5/21 S2+S3 移送)
 + 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送)
-+ 2026-05-29 S2 wrap-up (5/26 移送) + 2026-06-02 wrap-up (5/27 移送) で
-compaction が実施された。
++ 2026-05-29 S2 wrap-up (5/26 移送) + 2026-06-02 wrap-up (5/27 移送)
++ 2026-06-03 S2 wrap-up (5/28 S2 移送) で compaction が実施された。
 
 ## 次の発行順序
 

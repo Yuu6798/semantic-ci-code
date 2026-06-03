@@ -109,6 +109,8 @@ def _suite_lines(payload: dict[str, Any], *, use_color: bool) -> list[str]:
             enabled=use_color,
         ),
     ]
+    if security.get("global_count_violated"):
+        lines.append("Security policy: findings.added.max_count exceeded")
     for sensor in security.get("sensors", []):
         lines.extend(_security_sensor_lines(sensor, use_color=use_color))
     return lines
@@ -129,7 +131,8 @@ def _security_sensor_lines(sensor: dict[str, Any], *, use_color: bool) -> list[s
     ]
     drift_reason = sensor.get("drift_reason")
     if drift_reason:
-        lines.append(f"    drift: {drift_reason}")
+        label = "drift" if sensor.get("provenance_changed") else "unknown"
+        lines.append(f"    {label}: {drift_reason}")
     for finding in sensor.get("added", []):
         lines.append("    + " + _security_finding_summary(finding))
     if sensor.get("suppressed"):

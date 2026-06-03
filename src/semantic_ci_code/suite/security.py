@@ -29,6 +29,7 @@ class SecuritySensorResult:
     removed: tuple[SecurityFinding, ...]
     suppressed: tuple[SecurityFinding, ...]
     drift_reason: str | None
+    provenance_changed: bool
     unchanged_count: int
 
 
@@ -85,6 +86,7 @@ def evaluate_security_detail(
                     removed=per_sensor.removed,
                     suppressed=(),
                     drift_reason=per_sensor.error_message,
+                    provenance_changed=per_sensor.provenance_changed,
                     unchanged_count=per_sensor.unchanged_count,
                 )
             )
@@ -110,6 +112,7 @@ def evaluate_security_detail(
                 removed=per_sensor.removed,
                 suppressed=suppressed,
                 drift_reason=per_sensor.error_message,
+                provenance_changed=per_sensor.provenance_changed,
                 unchanged_count=per_sensor.unchanged_count,
             )
         )

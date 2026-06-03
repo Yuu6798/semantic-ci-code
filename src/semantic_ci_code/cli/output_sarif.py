@@ -139,7 +139,7 @@ def _security_sarif_results(security: dict[str, Any] | None) -> list[dict[str, A
     for sensor in sorted(security.get("sensors", []), key=lambda item: item["sensor_id"]):
         drift_reason = sensor.get("drift_reason")
         if sensor.get("status") == "unknown" and drift_reason:
-            results.append(_security_drift_result(sensor["sensor_id"], drift_reason))
+            results.append(_security_unknown_result(sensor, drift_reason))
         sensor_results: list[dict[str, Any]] = []
         for finding in sorted(sensor.get("added", []), key=lambda item: item["canonical_id"]):
             sensor_results.append(_security_finding_result(finding))
@@ -183,14 +183,19 @@ def _security_finding_result(finding: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _security_drift_result(sensor_id: str, drift_reason: str) -> dict[str, Any]:
+def _security_unknown_result(sensor: dict[str, Any], reason: str) -> dict[str, Any]:
+    rule_id = (
+        "security/provenance-drift"
+        if sensor.get("provenance_changed")
+        else "security/sensor-unknown"
+    )
     return {
-        "ruleId": "security/provenance-drift",
+        "ruleId": rule_id,
         "level": "note",
-        "message": {"text": drift_reason},
+        "message": {"text": reason},
         "properties": {
             "category": "sensor",
-            "sensor_id": sensor_id,
+            "sensor_id": sensor["sensor_id"],
             "severity": "info",
             "canonical_id": None,
         },

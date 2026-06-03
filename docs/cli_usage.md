@@ -403,6 +403,7 @@ output adds:
         "removed": [],
         "suppressed": [],
         "drift_reason": null,
+        "provenance_changed": false,
         "unchanged_count": 0
       }
     ]

@@ -37,6 +37,7 @@ bump beyond the current CLI schema version.
         "removed": [],
         "suppressed": [],
         "drift_reason": null,
+        "provenance_changed": false,
         "unchanged_count": 0
       }
     ]
@@ -91,7 +92,7 @@ bump beyond the current CLI schema version.
 | `subcommand` | One of `observe`, `compare`, `check`. |
 | `mode` | `smoke`, `full`, or `null` when the subcommand has no execution mode. |
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
-| `security` | Optional `check` security verdict object present only when `--sensor-baseline` / `--sensor-candidate` are supplied. It includes aggregate `verdict`, `as_of`, `global_count_violated`, and `sensors[]` detail. Each sensor entry has `sensor_id`, `status`, `added`, `removed`, `suppressed`, `drift_reason`, and `unchanged_count`; finding arrays contain `SecurityFinding.model_dump(mode="json")` objects with `category` (`sast` or `sca`) and their canonical identity fields. |
+| `security` | Optional `check` security verdict object present only when `--sensor-baseline` / `--sensor-candidate` are supplied. It includes aggregate `verdict`, `as_of`, `global_count_violated`, and `sensors[]` detail. Each sensor entry has `sensor_id`, `status`, `added`, `removed`, `suppressed`, `drift_reason`, `provenance_changed`, and `unchanged_count`; finding arrays contain `SecurityFinding.model_dump(mode="json")` objects with `category` (`sast` or `sca`) and their canonical identity fields. |
 | `suite_verdict` | Optional final suite verdict present only when `security` is present. Values: `pass`, `repair`, `fail`, or `unknown`; computed from code and security using `unknown > fail > repair > pass`. |
 | `intent` | Target intent, or `null` for `observe`. |
 | `primary_kind` | Target primary change kind, or `null` for `observe`. |

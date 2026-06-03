@@ -321,6 +321,7 @@ def _serialize_security_detail(detail: Any) -> dict[str, Any]:
                     _serialize_security_finding(finding) for finding in sensor.suppressed
                 ],
                 "drift_reason": sensor.drift_reason,
+                "provenance_changed": bool(sensor.provenance_changed),
                 "unchanged_count": sensor.unchanged_count,
             }
             for sensor in detail.sensors

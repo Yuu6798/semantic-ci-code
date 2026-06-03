@@ -189,7 +189,7 @@ src/semantic_ci_code/
   scope.py
   api_surface/           # Python public-symbol extractor (CSCI-5)
   cli/                   # CLI surface (Brief 4 / 4b / 4d / 5)
-    main.py              # argparse entry; subparser for 9 subcommands
+    main.py              # argparse entry; subparser for 10 subcommands
     commands/            # one module per subcommand
       observe.py
       compare.py
@@ -260,9 +260,9 @@ Status legend: **ACTIVE** (current spec/contract, AI agents should read first) /
 | Document | Status | Purpose |
 |---|---|---|
 | `docs/code_semantic_ci_design.md` | ACTIVE | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop. Single source of truth for engine semantics |
-| `docs/cli_usage.md` | ACTIVE | User-facing CLI contract for all 9 subcommands (`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog`), target discovery, format selection, target authorship, severity routing |
+| `docs/cli_usage.md` | ACTIVE | User-facing CLI contract for all 10 subcommands (`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog` / `ssp`, where `ssp` is a sensor group with `scan` / `from-json`), target discovery, format selection, target authorship, severity routing |
 | `docs/exit_codes.md` | ACTIVE | Stable CLI exit code policy (0 / 1 / 2 / 3 / 4) for CI integration, including `--strict-repair`, `severity: info` Advisor channel, and per-subcommand notes |
-| `docs/json_schema.md` | ACTIVE | CLI JSON envelopes — verdict / compile at `schema_version="4"`, compile-repair / validate-plan at independent `schema_version="1"`. Includes compatibility policy and v2→v3 / v3→v4 diffs |
+| `docs/json_schema.md` | ACTIVE | CLI JSON envelopes — verdict / compile at `schema_version="6"`, compile-repair at independent `schema_version="1"`, validate-plan at independent `schema_version="2"`. Includes compatibility policy and v2→v3 through v5→v6 diffs (plus validate-plan v1→v2) |
 | `docs/cli_test_inventory.md` | ACTIVE | CLI test coverage inventory, runtime notes, and conservative reduction candidates |
 | `docs/target_yaml_guide.md` | ACTIVE | `target.yaml` authoring guide. Practical companion to `design.md §4` / `cli_usage.md`. Centralises authoring hazards D1 (`--package-root` scope vs `tests/` visibility), D3 (template / user constraint duplication), D4 (config-only PR の vacuous PASS) — 2026-05-07 Session 4 dogfooding 由来 |
 | `docs/target_authoring_surface.md` | ACTIVE | Authoring surface 設計契約 (Brief 8 / CSCI-41)。target.yaml は hand-written 必須でない / 生成経路 3 通り (recipe + sources / catalog 参照 / hand-written) / LLM 経路は Brief 8b 分離 / 全経路は verdict 前に declared intent として固定 / Authoring・Advisor・Provenance surface は evaluator 不可参照 / `candidate_code_used: false` 固定。§23.3.1 の実装側 catch-up |

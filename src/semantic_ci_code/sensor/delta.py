@@ -11,10 +11,25 @@ from semantic_ci_code.sensor.models import (
     aggregate_status,
 )
 
+DEFAULT_DRIFT_FIELDS = frozenset(
+    {
+        "ruleset_hash",
+        "advisory_db_hash",
+        "adapter_version",
+        "identity_algorithm_version",
+    }
+)
 
-def compute_security_delta(baseline: SensorState, candidate: SensorState) -> SecurityDelta:
+
+def compute_security_delta(
+    baseline: SensorState,
+    candidate: SensorState,
+    *,
+    drift_fields: frozenset[str] | None = None,
+) -> SecurityDelta:
     """Compute a security delta from two hand-built SensorState values."""
 
+    effective_drift_fields = DEFAULT_DRIFT_FIELDS if drift_fields is None else drift_fields
     deltas: dict[str, PerSensorDelta] = {}
     for sensor_id in sorted(
         set(baseline.provenance_by_sensor) | set(candidate.provenance_by_sensor)
@@ -27,6 +42,7 @@ def compute_security_delta(baseline: SensorState, candidate: SensorState) -> Sec
             candidate_provenance=candidate_provenance,
             baseline_findings=_findings_for_sensor(baseline, sensor_id),
             candidate_findings=_findings_for_sensor(candidate, sensor_id),
+            drift_fields=effective_drift_fields,
         )
     return SecurityDelta(
         deltas_by_sensor=deltas,
@@ -41,10 +57,13 @@ def _per_sensor_delta(
     candidate_provenance: SensorProvenance | None,
     baseline_findings: tuple[SecurityFinding, ...],
     candidate_findings: tuple[SecurityFinding, ...],
+    drift_fields: frozenset[str],
 ) -> PerSensorDelta:
-    # G-1 uses the default Phase G policy: ruleset/advisory DB/adapter/identity
-    # drift is comparison-blocking, while sensor_version drift is tolerated.
-    drift_reason = _provenance_drift_reason(baseline_provenance, candidate_provenance)
+    drift_reason = _provenance_drift_reason(
+        baseline_provenance,
+        candidate_provenance,
+        drift_fields=drift_fields,
+    )
     if drift_reason is not None:
         return PerSensorDelta(
             sensor_id=sensor_id,
@@ -90,15 +109,11 @@ def _findings_for_sensor(state: SensorState, sensor_id: str) -> tuple[SecurityFi
 def _provenance_drift_reason(
     baseline: SensorProvenance | None,
     candidate: SensorProvenance | None,
+    *,
+    drift_fields: frozenset[str],
 ) -> str | None:
     if baseline is None or candidate is None:
         return "sensor exists on only one side"
-    drift_fields = (
-        "ruleset_hash",
-        "advisory_db_hash",
-        "adapter_version",
-        "identity_algorithm_version",
-    )
     changed = [
         field for field in drift_fields if getattr(baseline, field) != getattr(candidate, field)
     ]

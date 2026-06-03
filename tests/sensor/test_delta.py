@@ -75,6 +75,50 @@ def test_sensor_version_drift_is_ignored_by_default_policy():
     assert delta.deltas_by_sensor["semgrep"].unchanged_count == 1
 
 
+def test_explicit_drift_fields_can_include_sensor_version():
+    finding = sast_finding("same.rule", severity="info")
+    baseline = sensor_state(
+        provenances=(provenance(sensor_version="tool-1"),),
+        findings=(finding,),
+    )
+    candidate = sensor_state(
+        provenances=(provenance(sensor_version="tool-2"),),
+        findings=(finding,),
+    )
+
+    delta = compute_security_delta(
+        baseline,
+        candidate,
+        drift_fields=frozenset({"adapter_version", "identity_algorithm_version", "sensor_version"}),
+    )
+
+    assert delta.deltas_by_sensor["semgrep"].status == "unknown"
+    assert delta.deltas_by_sensor["semgrep"].provenance_changed is True
+    assert "sensor_version" in (delta.deltas_by_sensor["semgrep"].error_message or "")
+
+
+def test_explicit_drift_fields_can_relax_ruleset_hash_drift():
+    finding = sast_finding("same.rule", severity="info")
+    baseline = sensor_state(
+        provenances=(provenance(ruleset_hash="sha256:old"),),
+        findings=(finding,),
+    )
+    candidate = sensor_state(
+        provenances=(provenance(ruleset_hash="sha256:new"),),
+        findings=(finding,),
+    )
+
+    delta = compute_security_delta(
+        baseline,
+        candidate,
+        drift_fields=frozenset({"adapter_version", "identity_algorithm_version"}),
+    )
+
+    assert delta.deltas_by_sensor["semgrep"].status == "pass"
+    assert delta.deltas_by_sensor["semgrep"].provenance_changed is False
+    assert delta.deltas_by_sensor["semgrep"].unchanged_count == 1
+
+
 def test_one_sided_sensor_is_unknown_and_marks_provenance_changed():
     baseline = sensor_state(provenances=(provenance(sensor_id="semgrep"),), findings=())
     candidate = sensor_state(

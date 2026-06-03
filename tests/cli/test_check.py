@@ -591,6 +591,35 @@ def test_check_sarif_output_emits_drift_note_for_unknown_sensor(tmp_path: Path):
     assert "ruleset_hash" in drift["message"]["text"]
 
 
+def test_check_sarif_output_omits_zero_based_security_columns(tmp_path: Path):
+    repo = init_repo(tmp_path, origin_ref=True)
+    finding = _sast_finding(
+        "python.security.zero-col",
+        severity="high",
+        source_span=SourceSpan(start_line=7, end_line=7, start_col=0, end_col=0),
+    )
+    sensor_baseline = _write_sensor_state(tmp_path / "sensor-baseline.json")
+    sensor_candidate = _write_sensor_state(
+        tmp_path / "sensor-candidate.json",
+        findings=(finding,),
+    )
+
+    result = _run_check_with_sensors(
+        repo,
+        sensor_baseline,
+        sensor_candidate,
+        output_format="sarif",
+    )
+
+    assert result.returncode == 1
+    document = json.loads(result.stdout)
+    result_by_rule = {item["ruleId"]: item for item in document["runs"][0]["results"]}
+    region = result_by_rule["security/python.security.zero-col"]["locations"][0][
+        "physicalLocation"
+    ]["region"]
+    assert region == {"startLine": 7, "endLine": 7}
+
+
 def test_check_sarif_output_surfaces_deny_added_info_policy_failure(tmp_path: Path):
     repo = init_repo(tmp_path, origin_ref=True)
     write_file(repo / "target.yaml", TARGET_SECURITY_DENY_ADDED)

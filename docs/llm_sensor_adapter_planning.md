@@ -166,9 +166,27 @@ candidate 側 miss は "removed" を捏造する) を構造的に断つ。
   candidate_findings = LLM_scan(candidate_code)         # 1 回だけ
   for f in candidate_findings:
       anchor = project_to_canonical(f)                  # D6
-      present_in_baseline = anchor_exists(anchor, baseline_code)  # 決定論的
-  # baseline 側の存在確認は LLM 再実行ではなくコード構造の決定論的照合
+      # baseline 照合は anchor 種別で述語が異なる (下記)。LLM 再実行ではなく
+      # コード構造の決定論的述語
+      already_in_baseline = baseline_predicate(anchor, baseline_code)
+      if not already_in_baseline:
+          mark_added(f)
 ```
+
+**presence anchor と absence anchor で baseline 述語が異なる (PR #132 review P2)**:
+
+- **presence anchor** (脆弱性 = 存在するコード片。injection / IDOR sink 等):
+  `baseline_predicate` = 「その sink / コード片が baseline に存在するか」。存在すれば
+  baseline 既出 → unchanged。site 存在チェックで正しい
+- **absence anchor** (脆弱性 = 欠落。`(site, expected_property)`、missing authz /
+  validation 等): site が baseline に存在することは「脆弱性が baseline にあった」を
+  **意味しない**。baseline で expected_property が満たされていた (check 在り) のに
+  candidate で削除された場合、site は両方に存在するが脆弱性は candidate で新規。
+  よって `baseline_predicate` は **「baseline で expected_property が満たされて
+  いたか」= 欠落プロパティ自体の決定論的述語**でなければならない (site 存在では不可)
+- **証明不能なら added (D7 recall 優先)**: expected_property の baseline 充足を
+  決定論的に判定できない場合、baseline presence を unproven とみなし、当該 finding は
+  unchanged ではなく **added** に倒す (見逃しより誤検知を選ぶ)
 
 semgrep のような決定論センサーでは re-projection は任意 (どちらでも結果同じ)
 だが、**LLM sensor では必須**。adapter Protocol (§2.1) はこの規律を型・契約で
@@ -379,8 +397,14 @@ deterministic sensor と異なる (再 scan しても一致しないため versi
   `delta_overlay.py` / `code_state_delta.py` が捨てているため、まず rename マップ
   を delta に乗せる必要がある
 - 上記 rename マップに rename re-projection を接続 (D7)
-- **AC**: 2-run 差分を取らないことを architecture test で enforce、
+- **absence anchor の baseline 述語**: `(site, expected_property)` 型 finding は
+  site 存在ではなく expected_property の baseline 充足を判定する述語を実装し、
+  判定不能なら added に倒す (D4)
+- **AC 1**: 2-run 差分を取らないことを architecture test で enforce、
   rename マップ実装後、rename した baseline で同一脆弱性が "added" に出ない
+- **AC 2 (absence anchor)**: baseline と candidate に同一 site が存在し baseline
+  のみ expected_property を満たす (candidate で check 削除) ケースで、finding が
+  unchanged ではなく "added" に出ることを test で固定
 
 ### H-3: Codex Security reference adapter (CSCI-52)
 - `sensor/adapters/llm/codex_security.py` (first concrete, §1.5)

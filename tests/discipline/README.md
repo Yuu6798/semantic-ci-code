@@ -18,6 +18,10 @@ These tests turn recurring discipline anti-patterns into CI failures:
   report must demonstrate both PASS and FAIL in its `Verdict` column (column
   parsed, not free prose), so a dogfooding pass cannot evidence detection
   power one-sidedly.
+- `test_pr_body_dogfood_disclosure.py`: PR bodies must disclose dogfooding
+  status. `Status: performed` requires command/result/evidence, and
+  `Status: skipped` requires an explicit reason. GitHub Actions enforces the
+  same rule with `scripts/check_pr_body_dogfood.py`.
 
 Phase 6 closeout (`docs/doc_refactor_planning.md`): the schema-grep and
 dual-case dogfood candidates landed as the two tests above. The

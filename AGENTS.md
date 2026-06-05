@@ -81,6 +81,12 @@ Codex should place this at the top of the PR body.
 - Added: <test names or count>
 - Result: <pass / fail / skipped>
 
+## Dogfooding
+- Status: performed | skipped
+- Commands: <commands run, or short evidence>
+- Result: <observed result>
+- Reason: <required when skipped; omit when performed>
+
 ## Files Changed
 <git diff --stat equivalent>
 

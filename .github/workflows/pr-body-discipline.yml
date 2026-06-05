@@ -1,0 +1,110 @@
+name: PR body discipline
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dogfooding-disclosure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require dogfooding disclosure
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          STATUS_RE = re.compile(r"^\s*(?:[-*]\s*)?Status:\s*(performed|skipped)\s*$", re.I)
+          LABEL_RE = re.compile(r"^\s*(?:[-*]\s*)?([A-Za-z ]+):\s*(.*)$")
+          DOGFOOD_HEADING = "## Dogfooding"
+
+
+          def extract_section(markdown: str, heading: str) -> str | None:
+              lines = markdown.splitlines()
+              section: list[str] = []
+              in_section = False
+              for line in lines:
+                  if line.strip() == heading:
+                      in_section = True
+                      continue
+                  if in_section and line.startswith("## "):
+                      break
+                  if in_section:
+                      section.append(line)
+              text = "\n".join(section).strip()
+              return text if text else None
+
+
+          def meaningful(value: str) -> bool:
+              stripped = value.strip()
+              if not stripped:
+                  return False
+              return not (stripped.startswith("<") and stripped.endswith(">"))
+
+
+          def label_has_content(section: str, labels: frozenset[str]) -> bool:
+              lines = section.splitlines()
+              for index, line in enumerate(lines):
+                  match = LABEL_RE.match(line)
+                  if match is None:
+                      continue
+                  label = match.group(1).strip().lower()
+                  if label not in labels:
+                      continue
+                  if meaningful(match.group(2)):
+                      return True
+                  for following in lines[index + 1 :]:
+                      stripped = following.strip()
+                      if not stripped:
+                          continue
+                      if LABEL_RE.match(following) is not None:
+                          break
+                      if meaningful(stripped.lstrip("-* ")):
+                          return True
+              return False
+
+
+          def fail(message: str) -> None:
+              print(f"dogfooding disclosure check failed: {message}", file=sys.stderr)
+              raise SystemExit(1)
+
+
+          event = json.loads(Path(os.environ["EVENT_PATH"]).read_text(encoding="utf-8"))
+          body = str(event.get("pull_request", {}).get("body") or "")
+          section = extract_section(body, DOGFOOD_HEADING)
+          if section is None:
+              fail(
+                  "PR body must include `## Dogfooding` with `Status: performed` "
+                  "or `Status: skipped`."
+              )
+
+          status_match = next(
+              (STATUS_RE.match(line) for line in section.splitlines() if STATUS_RE.match(line)),
+              None,
+          )
+          if status_match is None:
+              fail("`## Dogfooding` must include `Status: performed` or `Status: skipped`.")
+
+          status = status_match.group(1).lower()
+          if status == "skipped":
+              if not label_has_content(section, frozenset({"reason", "skip reason"})):
+                  fail("`Status: skipped` must include a non-empty `Reason:` line.")
+          elif not label_has_content(
+              section, frozenset({"commands", "command", "result", "evidence"})
+          ):
+              fail(
+                  "`Status: performed` must include non-empty dogfood evidence "
+                  "(`Commands:`, `Result:`, or `Evidence:`)."
+              )
+          PY

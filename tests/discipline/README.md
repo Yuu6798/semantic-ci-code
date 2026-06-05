@@ -21,7 +21,8 @@ These tests turn recurring discipline anti-patterns into CI failures:
 - `test_pr_body_dogfood_disclosure.py`: PR bodies must disclose dogfooding
   status. `Status: performed` requires command/result/evidence, and
   `Status: skipped` requires an explicit reason. GitHub Actions enforces the
-  same rule with `scripts/check_pr_body_dogfood.py`.
+  same rule in a trusted `pull_request_target` workflow that does not execute
+  PR-controlled code.
 
 Phase 6 closeout (`docs/doc_refactor_planning.md`): the schema-grep and
 dual-case dogfood candidates landed as the two tests above. The

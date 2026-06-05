@@ -4,20 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, edited]
     branches: [main]
 
 jobs:
-  pr-body-discipline:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Require dogfooding disclosure
-        run: python scripts/check_pr_body_dogfood.py --event-path "$GITHUB_EVENT_PATH"
-
   test:
     runs-on: ubuntu-latest
     strategy:

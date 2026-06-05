@@ -10,6 +10,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_pr_body_dogfood.py"
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+TRUSTED_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-body-discipline.yml"
 SPEC = importlib.util.spec_from_file_location("check_pr_body_dogfood", SCRIPT)
 assert SPEC is not None
 assert SPEC.loader is not None
@@ -107,3 +109,14 @@ def test_pr_body_dogfood_event_path_validates_pull_request_body(tmp_path: Path) 
     event = tmp_path / "pull_request.json"
     event.write_text(json.dumps({"pull_request": {"body": _body("")}}), encoding="utf-8")
     assert main(["--event-path", str(event)]) == 1
+
+
+def test_pr_body_dogfood_ci_uses_trusted_non_checkout_workflow() -> None:
+    trusted = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
+    ci = CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "pull_request_target:" in trusted
+    assert "types: [opened, synchronize, reopened, edited]" in trusted
+    assert "actions/checkout" not in trusted
+    assert "scripts/check_pr_body_dogfood.py" not in trusted
+    assert "scripts/check_pr_body_dogfood.py" not in ci

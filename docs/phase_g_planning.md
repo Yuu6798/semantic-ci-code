@@ -637,6 +637,30 @@ security:
 - **AC (カテゴリ B)**: G-5 brief が extractor 拡張の scope + AC を定義し、
   template は extractor 完了後に有効化される
 
+### G-6 (CSCI-50): auth/validation guard preservation — category B design record
+
+Category B covers the guard-preservation capability that cannot be expressed by
+the current imports / effects / api-surface overlays alone.
+
+- **Capability**: detect when an auth or validation guard present in baseline
+  is removed or weakened in candidate.
+- **Extractor choice**: extend the api_surface extractor with an auth-guard
+  facet for public functions. The v1 facet tracks configured auth decorator
+  names such as `@login_required`, `@requires_auth`, and
+  `@permission_required`.
+- **target.yaml surface**: expose a new delta facet such as
+  `auth_guards_delta.removed`; recipe `security:preserve-auth-guards` will run
+  on `primary_kind: generic` and constrain that delta with `excludes_all` /
+  `equals_baseline`.
+- **AC sketch**: baseline has `@login_required` and candidate removes it ->
+  FAIL; candidate keeps the decorator -> PASS.
+- **Explicit deferral**: inline guards such as
+  `if not user.is_authenticated` require data-flow / control-flow reasoning and
+  are out of G-6 v1. G-6 v1 only handles decorator-name allowlists.
+- **Input neutrality**: the new facet is a CodeState field and remains
+  hand-buildable; verdict evaluation does not require live git refs or scanner
+  execution.
+
 ## 4. 移行戦略
 
 ### SSP v0.1 との関係

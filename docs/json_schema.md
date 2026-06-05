@@ -323,7 +323,7 @@ schema. The full shape is pinned by
 {
   "schema_version": "catalog-1",
   "subcommand": "target-catalog",
-  "primary_kinds": ["bugfix", "feature", "refactor", "test_update"],
+  "primary_kinds": ["bugfix", "feature", "generic", "refactor", "test_update"],
   "targets": {},
   "templates": {},
   "operators": {}
@@ -334,6 +334,11 @@ The catalog content is required to stay byte-identical to the runtime
 registries (INV-5 catalog ↔ implementation parity, see
 `docs/brief_8_planning.md §5.2`). `--kind` narrows only the `templates`
 section, and `--target-path` narrows only the `targets` section.
+`targets.*.match_schema` mirrors the runtime Match Schema registry. Most
+record targets use `required_key` for both bare-string desugaring and record
+validation. Some targets, such as effects, also include `required_any_keys`
+when a record may specify one of several identity keys (`fqn` or
+`effect_class`).
 
 ## Compatibility Policy
 

@@ -27,7 +27,13 @@ def test_json_default_returns_catalog1_envelope():
     payload = _catalog()
     assert payload["schema_version"] == "catalog-1"
     assert payload["subcommand"] == "target-catalog"
-    assert payload["primary_kinds"] == ["bugfix", "feature", "refactor", "test_update"]
+    assert payload["primary_kinds"] == [
+        "bugfix",
+        "feature",
+        "generic",
+        "refactor",
+        "test_update",
+    ]
     assert "api_surface_delta.added" in payload["targets"]
     assert "includes_all" in payload["operators"]
     jsonschema.validate(payload, CATALOG_SCHEMA)
@@ -46,6 +52,15 @@ def test_kind_filter_narrows_templates_only():
     payload = _catalog("--kind", "feature")
     full = _catalog()
     assert list(payload["templates"]) == ["feature"]
+    assert payload["targets"] == full["targets"]
+    assert payload["operators"] == full["operators"]
+
+
+def test_generic_kind_filter_returns_empty_template_entry():
+    payload = _catalog("--kind", "generic")
+    full = _catalog()
+    assert list(payload["templates"]) == ["generic"]
+    assert payload["templates"]["generic"] == {"expanded_constraints": []}
     assert payload["targets"] == full["targets"]
     assert payload["operators"] == full["operators"]
 

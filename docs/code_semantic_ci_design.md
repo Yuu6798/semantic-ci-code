@@ -134,7 +134,7 @@ typescript_specific:
 ```yaml
 intent: "<人間可読の意図 1 行>"
 change:
-  primary_kind: refactor | feature | bugfix | test_update
+  primary_kind: refactor | feature | bugfix | test_update | generic
   allowed_secondary_kinds: [...]
   scope:
     files: [...]
@@ -182,6 +182,7 @@ change:
 | **bugfix** | 公開 API 不変, 回帰テスト追加 | 局所変更, 局所複雑度変化 | 新公開 API, 大規模構造変更, 未宣言 effect |
 | **refactor** | 公開 API 不変, 型契約不変, effect 不変 | 内部構造変更, 複雑度低下, 命名整理 | 公開 API 変更, 型契約変更, 新 effect, テスト期待値変更 |
 | **test_update** | テスト追加/修正 | fixture 更新 | production code の意味変更 |
+| **generic** | no built-in template; user constraints only | overlay gates such as dangerous-import / dangerous-effect denies | vacuous PASS if no user constraints are authored |
 
 ### 4.4 複合 PR の扱い
 

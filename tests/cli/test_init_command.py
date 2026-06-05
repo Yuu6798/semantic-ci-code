@@ -13,7 +13,7 @@ from .helpers import payload, run_semantic_ci
 EXPECTED_TEMPLATE = """# semantic-ci target.yaml — declared change intent + constraints
 intent: ""  # 1-line human-readable description of this PR
 change:
-  primary_kind: refactor  # feature | bugfix | refactor | test_update
+  primary_kind: refactor  # feature | bugfix | refactor | test_update | generic
   allowed_secondary_kinds: []
   scope:
     files: []

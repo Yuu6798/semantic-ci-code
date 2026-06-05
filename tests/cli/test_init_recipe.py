@@ -20,8 +20,23 @@ from pathlib import Path
 
 import yaml
 
+from semantic_ci_code.cli.init_recipes.security_deny_dangerous_effects import (
+    DANGEROUS_EFFECT_CLASSES,
+)
+from semantic_ci_code.cli.init_recipes.security_deny_dangerous_imports import (
+    DANGEROUS_IMPORT_MODULES,
+)
+from semantic_ci_code.compiler import compile_target_svp
 from semantic_ci_code.compiler.templates import TEMPLATE_CONSTRAINTS
-from semantic_ci_code.domain.state_schema import ChangeKind
+from semantic_ci_code.delta import compute_code_state_delta
+from semantic_ci_code.domain.state_schema import (
+    ChangeKind,
+    CodeState,
+    EffectClass,
+    EffectEntry,
+    ImportEntry,
+)
+from semantic_ci_code.evaluator import VerdictResult, evaluate_constraints
 
 from .helpers import payload, run_semantic_ci
 
@@ -50,6 +65,17 @@ def _compile_target(tmp_path: Path, target_path: Path | None = None) -> dict:
 
 def _target_bytes(tmp_path: Path) -> bytes:
     return (tmp_path / ".semantic-ci" / "target.yaml").read_bytes()
+
+
+def _compiled_generated_target(tmp_path: Path):
+    target = tmp_path / ".semantic-ci" / "target.yaml"
+    return compile_target_svp(target.read_text(encoding="utf-8"), filename=str(target))
+
+
+def _evaluate_generated_target(tmp_path: Path, *, baseline: CodeState, candidate: CodeState):
+    compiled = _compiled_generated_target(tmp_path)
+    delta = compute_code_state_delta(baseline, candidate)
+    return evaluate_constraints(compiled, delta, baseline=baseline, candidate=candidate)
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +180,40 @@ def test_a_recipe_with_intent_populates_intent_field(tmp_path: Path):
 
     assert rc == 0
     assert data["intent"] == "add sym"
+
+
+def test_a_security_imports_recipe_emits_generic_overlay_constraint(tmp_path: Path):
+    rc, data = _run_init(tmp_path, "--recipe", "security:deny-dangerous-imports")
+
+    assert rc == 0
+    assert data["change"]["primary_kind"] == "generic"
+    assert data["constraints"] == [
+        {
+            "id": "security:deny-dangerous-imports",
+            "kind": "delta",
+            "target": "imports_delta.added",
+            "operator": "excludes_all",
+            "expected": [{"module": module} for module in DANGEROUS_IMPORT_MODULES],
+        }
+    ]
+
+
+def test_a_security_effects_recipe_emits_generic_overlay_constraint(tmp_path: Path):
+    rc, data = _run_init(tmp_path, "--recipe", "security:deny-dangerous-effects")
+
+    assert rc == 0
+    assert data["change"]["primary_kind"] == "generic"
+    assert data["constraints"] == [
+        {
+            "id": "security:deny-dangerous-effects",
+            "kind": "delta",
+            "target": "effect_changes.added",
+            "operator": "excludes_all",
+            "expected": [
+                {"effect_class": effect_class} for effect_class in DANGEROUS_EFFECT_CLASSES
+            ],
+        }
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +336,22 @@ def test_c_test_update_recipe_output_compiles(tmp_path: Path):
     assert data["compiled_target"]["primary_kind"] == "test_update"
 
 
+def test_c_security_recipes_compile_as_generic_user_constraints_only(tmp_path: Path):
+    for index, recipe in enumerate(
+        ("security:deny-dangerous-imports", "security:deny-dangerous-effects")
+    ):
+        run_dir = tmp_path / f"recipe_{index}"
+        run_dir.mkdir()
+        rc, _ = _run_init(run_dir, "--recipe", recipe)
+        assert rc == 0
+
+        data = _compile_target(run_dir)
+        compiled = data["compiled_target"]
+        assert compiled["primary_kind"] == "generic"
+        assert len(compiled["constraints"]) == 1
+        assert {constraint["source"] for constraint in compiled["constraints"]} == {"user"}
+
+
 # ---------------------------------------------------------------------------
 # Section D — visibility preservation
 # ---------------------------------------------------------------------------
@@ -339,6 +415,52 @@ def test_e_test_update_recipe_does_not_duplicate_template_constraints(
     template_keys = {(c.target, c.operator.value) for c in template_constraints}
     user_keys = {(c["target"], c["operator"]) for c in data["constraints"]}
     assert not (template_keys & user_keys)
+
+
+def test_e2_security_imports_recipe_fails_dangerous_import_and_passes_safe_import(
+    tmp_path: Path,
+):
+    rc, _ = _run_init(tmp_path, "--recipe", "security:deny-dangerous-imports")
+    assert rc == 0
+
+    baseline = CodeState(imports=())
+    fail_verdict = _evaluate_generated_target(
+        tmp_path,
+        baseline=baseline,
+        candidate=CodeState(imports=(ImportEntry(module="pickle"),)),
+    )
+    pass_verdict = _evaluate_generated_target(
+        tmp_path,
+        baseline=baseline,
+        candidate=CodeState(imports=(ImportEntry(module="json"),)),
+    )
+
+    assert fail_verdict.result is VerdictResult.FAIL
+    assert pass_verdict.result is VerdictResult.PASS
+
+
+def test_e2_security_effects_recipe_fails_dangerous_effect_and_passes_safe_effect(
+    tmp_path: Path,
+):
+    rc, _ = _run_init(tmp_path, "--recipe", "security:deny-dangerous-effects")
+    assert rc == 0
+
+    baseline = CodeState(effects=())
+    fail_verdict = _evaluate_generated_target(
+        tmp_path,
+        baseline=baseline,
+        candidate=CodeState(
+            effects=(EffectEntry(fqn="pkg.run", effect_class=EffectClass.PROCESS),)
+        ),
+    )
+    pass_verdict = _evaluate_generated_target(
+        tmp_path,
+        baseline=baseline,
+        candidate=CodeState(effects=(EffectEntry(fqn="pkg.safe", effect_class=EffectClass.PURE),)),
+    )
+
+    assert fail_verdict.result is VerdictResult.FAIL
+    assert pass_verdict.result is VerdictResult.PASS
 
 
 # ---------------------------------------------------------------------------

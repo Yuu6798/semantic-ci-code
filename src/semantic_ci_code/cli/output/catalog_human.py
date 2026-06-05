@@ -22,7 +22,8 @@ def format_catalog_human(catalog: dict[str, Any]) -> str:
             schema = entry["match_schema"]
             optional = _join(schema["optional_keys"])
             forbidden = _join(schema["forbidden_keys"])
-            lines.append(f"  match_schema: required={schema['required_key']}")
+            required = " or ".join(schema.get("required_any_keys", ())) or schema["required_key"]
+            lines.append(f"  match_schema: required={required}")
             lines.append(f"    optional: {optional}")
             lines.append(f"    forbidden: {forbidden}")
         lines.append(f"  operators: {_join(entry['operators'])}")

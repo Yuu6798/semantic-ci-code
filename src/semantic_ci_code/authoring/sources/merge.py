@@ -19,12 +19,16 @@ RECIPE_FEATURE_ADD_API = "feature:add-api"
 RECIPE_BUGFIX_REGRESSION_TEST = "bugfix:regression-test"
 RECIPE_REFACTOR_PRESERVE_API = "refactor:preserve-api-with-allowlist"
 RECIPE_TEST_UPDATE_ADD_TEST_CASE = "test-update:add-test-case"
+RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS = "security:deny-dangerous-imports"
+RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS = "security:deny-dangerous-effects"
 
 RECIPE_TO_PRIMARY_KIND: dict[str, ChangeKind] = {
     RECIPE_FEATURE_ADD_API: ChangeKind.FEATURE,
     RECIPE_BUGFIX_REGRESSION_TEST: ChangeKind.BUGFIX,
     RECIPE_REFACTOR_PRESERVE_API: ChangeKind.REFACTOR,
     RECIPE_TEST_UPDATE_ADD_TEST_CASE: ChangeKind.TEST_UPDATE,
+    RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS: ChangeKind.GENERIC,
+    RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS: ChangeKind.GENERIC,
 }
 
 _API_FQN = "api_fqn"
@@ -35,6 +39,8 @@ RECIPE_CONSUMES: dict[str, frozenset[str]] = {
     RECIPE_BUGFIX_REGRESSION_TEST: frozenset({_TEST_ID}),
     RECIPE_REFACTOR_PRESERVE_API: frozenset(),
     RECIPE_TEST_UPDATE_ADD_TEST_CASE: frozenset({_TEST_ID}),
+    RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS: frozenset(),
+    RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS: frozenset(),
 }
 
 CANONICAL_SURFACE_ORDER: tuple[str, ...] = (

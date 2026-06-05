@@ -18,6 +18,7 @@ class ChangeKind(StrEnum):
     BUGFIX = "bugfix"
     REFACTOR = "refactor"
     TEST_UPDATE = "test_update"
+    GENERIC = "generic"
 
 
 class EffectClass(StrEnum):

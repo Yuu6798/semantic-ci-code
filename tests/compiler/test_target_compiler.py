@@ -83,6 +83,29 @@ change:
     assert compiled.constraints == TEMPLATE_CONSTRAINTS[primary_kind]
 
 
+def test_generic_primary_kind_injects_no_template_constraints():
+    yaml_source = """
+intent: generic security overlay
+change:
+  primary_kind: generic
+constraints:
+  - id: deny_pickle
+    kind: delta
+    target: imports_delta.added
+    operator: excludes_all
+    expected:
+      - module: pickle
+"""
+
+    compiled = compile_target_svp(yaml_source)
+
+    assert TEMPLATE_CONSTRAINTS[ChangeKind.GENERIC] == ()
+    assert compiled.primary_kind is ChangeKind.GENERIC
+    assert len(compiled.constraints) == 1
+    assert compiled.constraints[0].id == "deny_pickle"
+    assert compiled.constraints[0].source is ConstraintSource.USER
+
+
 def test_user_constraints_append_after_templates_and_keep_yaml_order():
     yaml_source = """
 intent: order test

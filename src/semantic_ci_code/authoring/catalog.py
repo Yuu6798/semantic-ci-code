@@ -77,13 +77,16 @@ def _target_entry(target: str) -> dict[str, Any]:
     }
     match_schema = schema_for_target(target)
     if match_schema is not None:
-        entry["match_schema"] = {
+        match_schema_entry = {
             "required_key": match_schema.required_key,
             "optional_keys": sorted(match_schema.optional_keys),
             "forbidden_keys": {
                 key: match_schema.forbidden_keys[key] for key in sorted(match_schema.forbidden_keys)
             },
         }
+        if match_schema.required_any_keys:
+            match_schema_entry["required_any_keys"] = sorted(match_schema.required_any_keys)
+        entry["match_schema"] = match_schema_entry
     return entry
 
 

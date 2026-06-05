@@ -36,6 +36,7 @@ def test_change_kind_values_are_complete():
         "bugfix",
         "refactor",
         "test_update",
+        "generic",
     }
 
 

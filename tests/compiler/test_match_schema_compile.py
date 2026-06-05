@@ -119,6 +119,17 @@ def test_effect_confidence_key_is_forbidden():
     assert "forbidden match key 'confidence'" in exc_info.value.message
 
 
+def test_effect_class_only_partial_match_compiles_for_effect_targets():
+    constraint = _compile_constraint(
+        target="effect_changes.added",
+        operator="excludes_all",
+        expected="""
+      - effect_class: process""",
+    )
+
+    assert constraint.expected == ({"effect_class": "process"},)
+
+
 def test_import_symbols_key_is_forbidden():
     with pytest.raises(CompileError) as exc_info:
         _compile_constraint(

@@ -658,6 +658,37 @@ def test_g_c1_matching_label_passes(tmp_path: Path):
     assert result.returncode == 0
 
 
+def test_g_generic_security_recipe_accepts_matching_label(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "security:deny-dangerous-imports",
+        "--from-labels",
+        "kind:generic",
+    )
+    assert result.returncode == 0, result.stderr
+
+    data = yaml.safe_load((tmp_path / ".semantic-ci" / "target.yaml").read_text(encoding="utf-8"))
+    assert data["change"]["primary_kind"] == "generic"
+    assert data["authorship"]["generation_metadata"]["source_surfaces"] == ["labels"]
+
+
+def test_g_generic_security_recipe_rejects_mismatched_label(tmp_path: Path):
+    result = run_semantic_ci(
+        tmp_path,
+        "init",
+        "--recipe",
+        "security:deny-dangerous-imports",
+        "--from-labels",
+        "kind:feature",
+    )
+    assert result.returncode == 2
+    assert "security:deny-dangerous-imports" in result.stderr
+    assert "generic" in result.stderr
+    assert "feature" in result.stderr
+
+
 def test_g_recipe_flag_compat_add_api_with_bugfix(tmp_path: Path):
     result = run_semantic_ci(
         tmp_path,

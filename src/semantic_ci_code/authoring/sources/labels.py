@@ -11,6 +11,7 @@ LABEL_TO_KIND: dict[str, ChangeKind] = {
     "kind:bugfix": ChangeKind.BUGFIX,
     "kind:refactor": ChangeKind.REFACTOR,
     "kind:test_update": ChangeKind.TEST_UPDATE,
+    "kind:generic": ChangeKind.GENERIC,
 }
 
 

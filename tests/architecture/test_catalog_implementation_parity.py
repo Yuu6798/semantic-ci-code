@@ -29,13 +29,16 @@ def test_catalog_target_operator_template_key_sets_mirror_registries():
 def test_catalog_match_schema_entries_mirror_registry():
     catalog = build_catalog()
     for target, schema in _SCHEMAS.items():
-        assert catalog["targets"][target]["match_schema"] == {
+        expected = {
             "required_key": schema.required_key,
             "optional_keys": sorted(schema.optional_keys),
             "forbidden_keys": {
                 key: schema.forbidden_keys[key] for key in sorted(schema.forbidden_keys)
             },
         }
+        if schema.required_any_keys:
+            expected["required_any_keys"] = sorted(schema.required_any_keys)
+        assert catalog["targets"][target]["match_schema"] == expected
     for target, entry in catalog["targets"].items():
         if target not in _SCHEMAS:
             assert "match_schema" not in entry

@@ -106,4 +106,5 @@ TEMPLATE_CONSTRAINTS: dict[ChangeKind, tuple[CompiledConstraint, ...]] = {
             operator=Operator.EQUALS_BASELINE,
         ),
     ),
+    ChangeKind.GENERIC: (),
 }

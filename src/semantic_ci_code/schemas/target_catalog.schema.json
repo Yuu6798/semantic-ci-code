@@ -35,6 +35,10 @@
                 "type": "array",
                 "items": {"type": "string"}
               },
+              "required_any_keys": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
               "forbidden_keys": {
                 "type": "object",
                 "additionalProperties": {"type": "string"}

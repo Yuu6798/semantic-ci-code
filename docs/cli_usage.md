@@ -153,8 +153,8 @@ Match Schema registry:
 | `api_surface`, `api_surface_public` | `fqn` | `kind`, `visibility` | `signature` |
 | `api_surface_delta.added`, `.removed`, `.removed_public` | `fqn` | `kind`, `visibility` | `signature` |
 | `api_surface_delta.changed` | `fqn` | `kind` | `signature`, `visibility`, `before`, `after` |
-| `effects` | `fqn` | `effect_class` | `confidence`, `evidence` |
-| `effect_changes.added`, `.removed` | `fqn` | `effect_class` | `confidence`, `evidence` |
+| `effects` | `fqn` or `effect_class` | `effect_class` | `confidence`, `evidence` |
+| `effect_changes.added`, `.removed` | `fqn` or `effect_class` | `effect_class` | `confidence`, `evidence` |
 | `imports` | `module` | `from` | `symbols` |
 | `imports_delta.added`, `.removed` | `module` | `from` | `symbols` |
 
@@ -182,6 +182,9 @@ is compiled as:
 expected:
   - fqn: src.api.users.fetch_user_profile
 ```
+
+Effect targets also accept `effect_class`-only records, which is useful for
+deny gates that should match any new effect of a class regardless of FQN.
 
 Flat projections are convenience aliases only: `api_surface_delta.added.fqns`,
 `effect_changes.added.fqns`, and `imports_delta.added.modules`. They compare
@@ -281,6 +284,8 @@ semantic-ci init --path target.yaml
 semantic-ci init --path .semantic-ci/target.yaml --force
 semantic-ci init --recipe feature:add-api --add-api pkg.api.create_user --intent "add user API"
 semantic-ci init --recipe bugfix:regression-test --test-case tests/test_login.py::test_regression --doctor
+semantic-ci init --recipe security:deny-dangerous-imports
+semantic-ci init --recipe security:deny-dangerous-effects
 ```
 
 After successful generation, `init` prints next-step commands for compile and
@@ -288,6 +293,17 @@ target-doctor. Recipe output also suggests `validate-plan`. Recipe generation
 prints a short note about the template constraints it implies; recipes that add
 `test_surface_delta.*` constraints also remind the user to ensure
 `--package-root` covers the test directory.
+
+Recipe IDs:
+
+| Recipe | Primary kind | User constraint |
+|---|---|---|
+| `feature:add-api` | `feature` | Requires declared public API additions. |
+| `bugfix:regression-test` | `bugfix` | Requires or checks for regression test additions. |
+| `refactor:preserve-api-with-allowlist` | `refactor` | Optionally allow-lists selected public API changes. |
+| `test-update:add-test-case` | `test_update` | Requires or checks for test case additions. |
+| `security:deny-dangerous-imports` | `generic` | Denies newly added imports such as `pickle`, `subprocess`, and `marshal`. |
+| `security:deny-dangerous-effects` | `generic` | Denies newly added `process`, `dynamic_code`, and `unsafe_deserialize` effects. |
 
 `--doctor` runs target-doctor inline after writing the file and prints the human
 advisory output to stderr. `--package-root` is accepted only together with
@@ -673,7 +689,7 @@ semantic-ci target-doctor --target target.yaml --baseline-rev origin/main \
 
 ```text
 semantic-ci target-catalog [--format {json,human}]
-                           [--kind {feature,bugfix,refactor,test_update}]
+                           [--kind {feature,bugfix,generic,refactor,test_update}]
                            [--target-path <path>]
                            [--output <file>]
 ```
@@ -689,7 +705,7 @@ The JSON envelope is independent of verdict / compile schema versions:
 {
   "schema_version": "catalog-1",
   "subcommand": "target-catalog",
-  "primary_kinds": ["bugfix", "feature", "refactor", "test_update"],
+  "primary_kinds": ["bugfix", "feature", "generic", "refactor", "test_update"],
   "targets": {},
   "templates": {},
   "operators": {}
@@ -713,6 +729,8 @@ single entry while leaving `templates` and `operators` unchanged. The two
 filters can be combined. `--target-path` also accepts valid open-dimension
 paths such as `python_specific.value`; these render as `kind: open` with
 `category: unknown_open`.
+`--kind generic` is accepted and renders an empty template entry because
+`generic` injects no built-in constraints.
 
 Examples:
 

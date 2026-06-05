@@ -26,6 +26,7 @@ class MatchSchema:
     required_key: str
     optional_keys: frozenset[str]
     forbidden_keys: dict[str, str]
+    required_any_keys: frozenset[str] = frozenset()
 
     @property
     def allowed_keys(self) -> frozenset[str]:
@@ -71,6 +72,7 @@ _EFFECT_SCHEMA = MatchSchema(
         "confidence": "confidence is an extractor-dependent score; exact equality is unsafe",
         "evidence": "evidence is extractor-format coupling and is not stable policy input",
     },
+    required_any_keys=frozenset({"fqn", "effect_class"}),
 )
 _IMPORT_SCHEMA = MatchSchema(
     target="imports",
@@ -183,7 +185,13 @@ def _normalize_record(target: str, schema: MatchSchema, item: dict[str, Any]) ->
             message += f" Did you mean: {', '.join(suggestions)}?"
         raise MatchSchemaError(message)
 
-    if schema.required_key not in item:
+    required_keys = schema.required_any_keys or frozenset({schema.required_key})
+    if not (keys & required_keys):
+        if len(required_keys) > 1:
+            required = ", ".join(sorted(required_keys))
+            raise MatchSchemaError(
+                f"partial match for target {target!r} requires one of: {required}"
+            )
         raise MatchSchemaError(
             f"partial match for target {target!r} requires key {schema.required_key!r}"
         )

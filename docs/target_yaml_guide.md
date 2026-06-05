@@ -96,6 +96,7 @@ require additions. Concretely, what the current compiler installs (see
 | `bugfix` | `api_surface_public equals_baseline`; `effect_changes.added == ()` |
 | `refactor` | `api_surface_public equals_baseline`; `type_relations equals_baseline`; `effect_changes == {added: (), removed: ()}`; `test_surface equals_baseline` |
 | `test_update` | `api_surface_public equals_baseline`; `effect_changes == {added: (), removed: ()}`; `imports equals_baseline` |
+| `generic` | No auto-installed invariants. Use this for pure overlay policies where every gate is declared as a user constraint. |
 
 This means:
 
@@ -137,6 +138,28 @@ positive ("this addition must be present", "this test must be added") is
 your responsibility to author. The §4.3 design table in
 `code_semantic_ci_design.md` lists positive expectations under "必須" — that
 column is the design intent, not what the engine currently enforces.
+
+### Generic overlays and security recipes
+
+`primary_kind: generic` deliberately injects no template constraints. It is
+useful when the target is an overlay gate, such as "deny newly added dangerous
+imports", and should not inherit feature / bugfix / refactor locks.
+
+Because `generic` has no template floor, a target with `primary_kind: generic`
+and no `constraints` is a vacuous PASS. Always pair it with explicit user
+constraints.
+
+Two built-in recipes generate generic security overlays:
+
+```bash
+semantic-ci init --recipe security:deny-dangerous-imports
+semantic-ci init --recipe security:deny-dangerous-effects
+```
+
+- `security:deny-dangerous-imports` denies newly added imports such as
+  `pickle`, `subprocess`, and `marshal` using `imports_delta.added`.
+- `security:deny-dangerous-effects` denies newly added `process`,
+  `dynamic_code`, and `unsafe_deserialize` effects using `effect_changes.added`.
 
 ## Hazard 1 — `--package-root` decides what is observed (D1)
 

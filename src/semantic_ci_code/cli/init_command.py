@@ -23,6 +23,8 @@ from semantic_ci_code.authoring.sources.merge import (
     RECIPE_BUGFIX_REGRESSION_TEST,
     RECIPE_FEATURE_ADD_API,
     RECIPE_REFACTOR_PRESERVE_API,
+    RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS,
+    RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS,
     RECIPE_TEST_UPDATE_ADD_TEST_CASE,
     MergeError,
     RecipeFlagCompatibilityError,
@@ -37,7 +39,7 @@ from semantic_ci_code.cli.init_recipes.feature_add_api import FeatureRecipeError
 TARGET_TEMPLATE = """# semantic-ci target.yaml — declared change intent + constraints
 intent: ""  # 1-line human-readable description of this PR
 change:
-  primary_kind: refactor  # feature | bugfix | refactor | test_update
+  primary_kind: refactor  # feature | bugfix | refactor | test_update | generic
   allowed_secondary_kinds: []
   scope:
     files: []
@@ -74,6 +76,14 @@ _RECIPE_NOTES: dict[str, str] = {
     ),
     RECIPE_TEST_UPDATE_ADD_TEST_CASE: (
         "note: template locks api_surface, effect_changes, and imports to baseline"
+    ),
+    RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS: (
+        "note: generic security overlay denies newly added dangerous imports "
+        "(pickle, subprocess, marshal, shelve, dill)"
+    ),
+    RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS: (
+        "note: generic security overlay denies newly added process, dynamic_code, "
+        "and unsafe_deserialize effects"
     ),
 }
 

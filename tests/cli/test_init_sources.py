@@ -278,18 +278,26 @@ def test_parse_kind_labels_maps_each_recognised_kind():
     assert parse_kind_labels(("kind:bugfix",)) is ChangeKind.BUGFIX
     assert parse_kind_labels(("kind:refactor",)) is ChangeKind.REFACTOR
     assert parse_kind_labels(("kind:test_update",)) is ChangeKind.TEST_UPDATE
+    assert parse_kind_labels(("kind:generic",)) is ChangeKind.GENERIC
 
 
 def test_parse_kind_labels_ignores_non_kind_labels():
     assert parse_kind_labels(("kind:feature", "priority:high")) is ChangeKind.FEATURE
 
 
-def test_parse_kind_labels_raises_c2_on_intra_label_conflict():
+@pytest.mark.parametrize(
+    ("first", "second"),
+    (
+        ("kind:feature", "kind:bugfix"),
+        ("kind:generic", "kind:feature"),
+    ),
+)
+def test_parse_kind_labels_raises_c2_on_intra_label_conflict(first: str, second: str):
     with pytest.raises(LabelsParseError) as exc_info:
-        parse_kind_labels(("kind:feature", "kind:bugfix"))
+        parse_kind_labels((first, second))
     msg = str(exc_info.value)
-    assert "feature" in msg
-    assert "bugfix" in msg
+    assert first.removeprefix("kind:") in msg
+    assert second.removeprefix("kind:") in msg
 
 
 def test_parse_kind_labels_raises_on_unrecognised_kind_label():

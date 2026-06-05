@@ -229,6 +229,8 @@ def build_parser() -> argparse.ArgumentParser:
             "bugfix:regression-test",
             "refactor:preserve-api-with-allowlist",
             "test-update:add-test-case",
+            "security:deny-dangerous-imports",
+            "security:deny-dangerous-effects",
         ),
         help="generate target.yaml from a recipe instead of the bare scaffold",
     )
@@ -351,7 +353,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     target_catalog.add_argument(
         "--kind",
-        choices=("feature", "bugfix", "refactor", "test_update"),
+        choices=("feature", "bugfix", "refactor", "test_update", "generic"),
         default=None,
         help="narrow the templates section to one primary change kind",
     )

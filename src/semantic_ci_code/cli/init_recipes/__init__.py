@@ -9,6 +9,8 @@ from semantic_ci_code.authoring.sources.merge import (
     RECIPE_BUGFIX_REGRESSION_TEST,
     RECIPE_FEATURE_ADD_API,
     RECIPE_REFACTOR_PRESERVE_API,
+    RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS,
+    RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS,
     RECIPE_TEST_UPDATE_ADD_TEST_CASE,
     MergedSources,
 )
@@ -16,6 +18,8 @@ from semantic_ci_code.cli.init_recipes import (
     bugfix_regression_test,
     feature_add_api,
     refactor_preserve_api,
+    security_deny_dangerous_effects,
+    security_deny_dangerous_imports,
     test_update_add_test_case,
 )
 
@@ -26,6 +30,8 @@ RECIPES: dict[str, RecipeBuilder] = {
     RECIPE_BUGFIX_REGRESSION_TEST: bugfix_regression_test.build,
     RECIPE_REFACTOR_PRESERVE_API: refactor_preserve_api.build,
     RECIPE_TEST_UPDATE_ADD_TEST_CASE: test_update_add_test_case.build,
+    RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS: security_deny_dangerous_imports.build,
+    RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS: security_deny_dangerous_effects.build,
 }
 
 

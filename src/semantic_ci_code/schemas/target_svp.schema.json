@@ -177,7 +177,8 @@
         "feature",
         "bugfix",
         "refactor",
-        "test_update"
+        "test_update",
+        "generic"
       ],
       "title": "ChangeKind",
       "type": "string"

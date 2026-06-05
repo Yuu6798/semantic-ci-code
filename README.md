@@ -6,6 +6,27 @@ returns stable JSON or human-readable repair guidance.
 
 It is not a linter, type checker, test runner, or LLM-as-judge service.
 
+## Project Status
+
+**Experimental — pre-release.** This project is actively developed and
+dogfooded, but it is **not** production-ready:
+
+- **API, policy, and JSON output are unstable** and may change without notice.
+  No stability guarantee is offered, and there is no tagged or published
+  release (the `0.1.0` in `pyproject.toml` is a development placeholder, not a
+  release).
+- It is designed for **early review and dogfooding**, not for pinning in a
+  production CI gate.
+- What it is: a **deterministic** semantic CI layer that flags intent drift a
+  linter, type checker, test suite, or LLM judge would miss — see the scope
+  guard above.
+
+See [`ROADMAP.md`](ROADMAP.md) for what must hold before a stable release, and
+the [Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md) for the
+honest record of what it has and has not caught (real-PR pass: 6 of 8 cases
+matched reviewer-relevant signal, with 1 vacuous PASS and 1 authoring mismatch;
+5 of 7 D-class findings resolved).
+
 ## Install
 
 ```bash
@@ -83,6 +104,11 @@ semantic-ci check --format json | semantic-ci compile-repair --adapter claude-co
 ```
 
 ## Documentation
+
+Start here:
+
+- [ROADMAP.md](ROADMAP.md) — maturity status, exit criteria for a stable release, and the surfaces that may still break
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, the design / implementation split, and good first issues
 
 Active references (current behavior):
 

@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 
-from scripts.check_pr_body_dogfood import DogfoodDisclosureError, main, validate_pr_body
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = REPO_ROOT / "scripts" / "check_pr_body_dogfood.py"
+SPEC = importlib.util.spec_from_file_location("check_pr_body_dogfood", SCRIPT)
+assert SPEC is not None
+assert SPEC.loader is not None
+MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(MODULE)
+
+DogfoodDisclosureError = MODULE.DogfoodDisclosureError
+main = MODULE.main
+validate_pr_body = MODULE.validate_pr_body
 
 
 def _body(section: str) -> str:

@@ -39,7 +39,7 @@ Status taxonomy:
 - **重複・関連 pairs**: D4 ↔ D6 (both are "vacuous PASS" via extractor coverage gap, distinct mechanism — D4 is "diff outside Python scope", D6 is "diff inside scope but inside nested function")
 - **解決 (5 of 8)**: D1, D2, D3, D4, D5
 - **未解決 (3 of 8)**: D6 (mitigation path open), D7 (authoring advice, low priority), D8 (SCA discovery gap, fixable defect)
-- **observation-only (not a D#)**: F6 (pattern-SAST logic-vuln blindspot) — inherent limitation of deterministic SAST, recorded in `docs/dogfooding_scale_and_security.md` and cross-linked to Phase H (`docs/llm_sensor_adapter_planning.md`) as empirical motivation, not a core fix target. Same hazard-vs-observation distinction as F3 / F4 / F5 in the real-PR complexity report
+- **observation-only (not a D#)**: F6 (pattern-SAST logic-vuln blindspot) — **UNTESTED HYPOTHESIS, not a demonstrated observation in the 2026-06-07 pass**: the Semgrep registry rulesets returned HTTP 403, so Semgrep ran with 0 loaded rules over 0 paths and produced no valid SAST measurement. F6 records the *a-priori* expectation that deterministic SAST misses semantic / business-logic vulns, cross-linked to Phase H (`docs/llm_sensor_adapter_planning.md`) as **motivation** — it is **not** empirically validated by this pass. Recorded in `docs/dogfooding_scale_and_security.md` (which now carries a validity warning + repro note for redoing the SAST sub-pass under a network policy allowing `semgrep.dev`). Distinct from the demonstrated observations of the same pass: real vulns merged-then-fixed (git evidence) and SCA clean-on-litellm (pip-audit positive-controlled with `jinja2==2.11.2` → 5 CVEs)
 
 ## Source pass index
 
@@ -48,7 +48,7 @@ Status taxonomy:
 | Session 4 self-dogfood | 2026-05-07 | self-dogfood on own PRs (#59, #60) + `init → compile_repair` 実走 | 3 | `.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4" | D1, D2, D3, D4 |
 | TC10 virtual report | 2026-05-07 Session 5 | hand-built virtual `baseline/` and `candidate/` package trees | 10 | `docs/dogfooding_TC10_report.md` | FINDING-1 → D5, FINDING-2 (resolved in PR #61), FINDING-3 (resolved in PR #61) |
 | Real-PR complexity | 2026-05-28 | external public PRs + per-PR `target.yaml` under complexity constraints | 8 | `docs/dogfooding_real_pr_complexity.md` | F1 → D6, F2 → D7, F3 / F4 / F5 → observations only |
-| Scale + security | 2026-06-07 | external public merged commits: 5 scale (`check`, randomized constraint seed 20260607) + 5 random-sampling (extractor robustness) + 5 security (SSP SAST/SCA, incl. 2 real merged-then-fixed vulns) | 15 | `docs/dogfooding_scale_and_security.md` | SCA gap → D8, SAST logic-vuln blindspot → F6 (observation only) |
+| Scale + security | 2026-06-07 | external public merged commits: 5 scale (`check`, randomized constraint seed 20260607) + 5 random-sampling (extractor robustness) + 5 security (SSP SCA = pip-audit valid + positive-controlled; SSP SAST = Semgrep **network-blocked, HTTP 403, 0 rules — NOT a valid SAST measurement**; 2 real merged-then-fixed vulns established from git history) | 15 | `docs/dogfooding_scale_and_security.md` | SCA gap → D8, SAST logic-vuln blindspot → F6 (untested hypothesis here, not demonstrated — registry 403) |
 | **累計** | | | **36** | | D1〜D8 |
 
 CASE STUDY 系の empirical 観察 (`docs/pre_generation_validation_case.md` 3

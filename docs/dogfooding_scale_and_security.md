@@ -94,14 +94,34 @@ JSON**, including the +5951 LOC `litellm/proxy` change.
 
 ## Pass 3 — Security (SSP: SAST = Semgrep, SCA = pip-audit)
 
+> **VALIDITY WARNING — SAST sub-pass was network-blocked.** Every Semgrep
+> registry ruleset (`p/security-audit`, `p/secrets`, `p/python`) returned
+> **HTTP 403 from semgrep.dev** under this environment's network policy
+> ("Failed to download configuration from
+> https://semgrep.dev/c/p/security-audit HTTP 403" + "invalid configuration
+> file found"). Consequently **Semgrep scanned 0 paths with 0 loaded
+> rules** — the "0 findings" results are `0-rules × 0-files`, i.e.
+> meaningless. **The SAST detection results in this Pass are NOT VALID as a
+> capability measurement.** The claim that pattern SAST "misses" the SSRF /
+> business-logic vulnerabilities could **not be tested in this run**; it
+> remains an a-priori hypothesis (Phase H rationale), not an empirical
+> result of this pass. The SCA (pip-audit) sub-pass is unaffected and was
+> separately positive-controlled (see below).
+
 **Setup note.** Semgrep was installed in an isolated venv (a
 debian-managed PyJWT blocked a global install); pip-audit was
-pre-installed. SAST registry rulesets used:
-`p/security-audit` + `p/secrets` + `p/python` (real rules).
+pre-installed. SAST registry rulesets (`p/security-audit` + `p/secrets` +
+`p/python`) were **attempted but unreachable** (HTTP 403, see validity
+warning above), so no real rules ever loaded.
 
-Two **real vulnerabilities** were selected — each was MERGED unnoticed
-and later manually fixed, so the parent of each fix commit
-(`<fix>^`) is the vulnerable merged state:
+Two **real vulnerabilities** were selected from litellm git history —
+each was MERGED unnoticed and later manually fixed, so the parent of each
+fix commit (`<fix>^`) is the vulnerable merged state. **This selection is
+independent of any scanner**: the evidence that these vulns existed and
+were merged unnoticed comes from the fix commits and their commit-message
+descriptions, not from a SAST run. This is the one empirically solid
+security finding of the pass — *real vulnerabilities do get merged
+unnoticed and only later fixed by hand*:
 
 - `BerriAI/litellm` `f1d07c13e5` — *"fix: block SSRF fields in RAG
   ingest vector_store config"*. **SSRF**:
@@ -117,28 +137,54 @@ and later manually fixed, so the parent of each fix commit
   to `register_model()` → permanently mutates the shared global
   `litellm.model_cost` for **all** users.
 
-### SAST results (Semgrep)
+### SAST results (Semgrep) — NOT VALID (registry 403, 0 rules loaded)
 
-| Target | Findings | Verdict-relevant signal |
+The table below is retained only to record what was attempted. **Every
+"0" is `0-rules × 0-files`** because the registry rulesets returned HTTP
+403 and Semgrep scanned 0 paths — see the validity warning at the top of
+this Pass. **None of these rows demonstrate a SAST blind spot**; they
+demonstrate only that the registry was unreachable.
+
+| Target | "Findings" | Status |
 |---|---|---|
-| SSRF vulnerable parent (`f1d07c13e5^`, `endpoints.py`) | **0** | Pattern-based SAST did **not** detect the business-logic SSRF |
-| mcp PR `4ec4ab99` touched files (incl. `key_management_endpoints.py`) | 0 added | clean |
-| otel PR `f047b157` touched files | 0 added | clean |
+| SSRF vulnerable parent (`f1d07c13e5^`, `endpoints.py`) | 0 (0 rules / 0 paths) | NOT VALID — Semgrep never ran with real rules (403) |
+| mcp PR `4ec4ab99` touched files (incl. `key_management_endpoints.py`) | 0 (0 rules / 0 paths) | NOT VALID — same 403 |
+| otel PR `f047b157` touched files | 0 (0 rules / 0 paths) | NOT VALID — same 403 |
 
-**SSP product path.** Running `ssp scan --sensor semgrep` on the SSRF
-vuln→fix pair with a curated 10-rule **local** ruleset returned
-`aggregate_verdict = pass`, exit 0, clean envelope → product wiring is
-healthy. (Authoring note: a curated-ruleset YAML parse error — a colon
-inside a JWT `options` dict pattern — had to be quoted/simplified. The
-semgrep adapter requires a **local** ruleset file; registry shorthands
-(`p/...`) are rejected by design for determinism.)
+Whether pattern SAST would detect the business-logic SSRF / pricing
+injection therefore **remains untested in this run**. It is an a-priori
+expectation (the basis for Phase H), not an observation produced here. To
+test it for real, a future pass needs a network policy that allows
+`semgrep.dev` (or a fully-local equivalent of the registry rules).
 
-### SCA results (pip-audit)
+**SSP product path — WIRING SMOKE TEST ONLY.** Running `ssp scan --sensor
+semgrep` on the SSRF vuln→fix pair with a curated 10-rule **local**
+ruleset (no 403, because it is local) returned `aggregate_verdict =
+pass`, exit 0, clean envelope. This confirms only that the **product
+wiring is healthy** — the local 10-rule set contained **no SSRF or
+business-logic rule**, so the `0` / `pass` result says **nothing about
+detection capability**. It is not evidence that the vuln is undetectable;
+it is evidence that the CLI → adapter → envelope path works end-to-end.
+(Authoring note: a curated-ruleset YAML parse error — a colon inside a JWT
+`options` dict pattern — had to be quoted/simplified. The semgrep adapter
+requires a **local** ruleset file; registry shorthands (`p/...`) are
+rejected by design for determinism.)
+
+### SCA results (pip-audit) — VALID (vuln DB reachable, positive-controlled)
+
+Unlike the SAST sub-pass, SCA worked: the pip-audit vulnerability database
+was reachable in this environment, confirmed by an explicit **positive
+control**.
 
 | Target | Result |
 |---|---|
-| Direct audit of litellm's 12 declared deps (53 resolved incl. transitive) | **0 known vulnerabilities** — clean core dependency tree |
-| SSP product path `ssp scan --sensor pip-audit` on litellm worktrees | `status = unknown` / `aggregate_verdict = unknown` / **exit 3** |
+| **Positive control**: `jinja2==2.11.2` (known-vulnerable) | **5 known CVEs** detected (PYSEC-2021-66, CVE-2024-22195, CVE-2024-34064, CVE-2024-56326, CVE-2025-27516) — confirms the vuln DB is reachable and the sensor reports real hits |
+| Direct audit of litellm's 12 declared deps (53 resolved incl. transitive) | **0 known vulnerabilities** — a **real negative** (not a silent failure, given the positive control above): clean core dependency tree |
+| SSP product path `ssp scan --sensor pip-audit` on litellm worktrees | `status = unknown` / `aggregate_verdict = unknown` / **exit 3** (auto-discovery gap → D8) |
+
+Because the `jinja2==2.11.2` positive control returned its 5 CVEs, the
+litellm "0 known vulnerabilities" is a credible true negative, not a
+silently-broken scan.
 
 **Root cause of the `unknown`.** SSP SCA auto-discovery
 (`_requirements_file` in `src/semantic_ci_code/cli/commands/ssp.py`) only
@@ -162,18 +208,38 @@ LOC; a huge `utils.py` correctly aggregated to Δcyclomatic +49. The
 **Conclusion: the engine functions on large-scale / large-function
 inputs.**
 
-**Security.** Deterministic pattern SAST **systematically misses
-semantic / business-logic vulnerabilities** — it reported 0 findings on
-exactly the two real merged-then-fixed litellm vulns (SSRF, pricing
-injection) — and SCA auto-discovery does not recognise modern dependency
-declarations (PEP 621 pyproject, pdm.lock). This **empirically validates
-the motivation for Phase H** (LLM security scout layer,
-`docs/llm_sensor_adapter_planning.md`, CSCI-50〜54): *"the LLM is a
-scout, not a judge"* — a non-deterministic sensor exists precisely to
-catch the logic vulnerabilities that a pattern matcher cannot express.
-The SSP product wiring itself is healthy (clean envelope, correct
-`unknown` degradation), so the gap is in **sensor reach**, not in the
-protocol.
+**Security.** The empirically supported findings of this pass are:
+
+1. **Real vulnerabilities get merged unnoticed.** Two genuine litellm
+   vulns (SSRF `f1d07c13e5`, pricing injection `b95130eb32`) were merged
+   on main and only later fixed by hand — established from git history /
+   commit messages, **independent of any scanner**.
+2. **SCA works and litellm's core deps are clean.** pip-audit found 0
+   known vulnerabilities across litellm's 12 declared (53 resolved) deps,
+   and a `jinja2==2.11.2` positive control returned 5 CVEs, so the 0 is a
+   **real negative**, not a silent failure.
+3. **SCA auto-discovery gap (D8).** SSP SCA does not recognise modern
+   dependency declarations (PEP 621 pyproject, `pdm.lock`), degrading to
+   `unknown` (exit 3) — correct graceful degradation, but a real
+   usability gap and a fixable `semantic-ci` defect.
+
+**Not demonstrated in this pass (untested here).** Whether deterministic
+pattern SAST misses the SSRF / business-logic vulns **could not be tested**:
+the Semgrep registry rulesets were network-blocked (HTTP 403, 0 rules
+loaded, 0 paths scanned). The "pattern SAST misses logic vulns" position
+therefore remains the **a-priori motivation** for Phase H (LLM security
+scout layer, `docs/llm_sensor_adapter_planning.md`, CSCI-50〜54) —
+*"the LLM is a scout, not a judge"* — but this pass does **not**
+empirically validate that blind spot. Redoing the SAST sub-pass requires a
+network policy that allows `semgrep.dev` or a fully-local equivalent of the
+registry rules.
+
+**SSP product wiring is healthy.** The CLI → adapter → envelope path
+produced clean envelopes and correct `unknown` degradation in every run
+(the semgrep run with a local ruleset was a wiring smoke test only). So
+the limitation surfaced here is in **SCA dependency-source discovery**
+(D8) and in the **test environment's network policy** (the 403 that
+blocked SAST), not in the SSP protocol itself.
 
 ## Reproduction
 
@@ -269,8 +335,19 @@ change:
 
 ### Security reproduction
 
+> **403 limitation (must read before redoing the SAST sub-pass).** In this
+> environment, all `semgrep.dev` registry rulesets (`p/security-audit`,
+> `p/secrets`, `p/python`) returned **HTTP 403**, so Semgrep loaded 0 rules
+> and scanned 0 paths. To redo the SAST sub-pass as a real capability test,
+> run it under a network policy that allows `semgrep.dev`, **or** vendor a
+> fully-local equivalent of those registry rules (the local ruleset used
+> here was only a 10-rule wiring smoke test with no SSRF / logic rule). The
+> SCA sub-pass below is unaffected.
+
 ```bash
 # SAST: registry rulesets p/security-audit + p/secrets + p/python
+# NOTE: returned HTTP 403 in this environment (0 rules loaded) — needs a
+# network policy allowing semgrep.dev, or a fully-local ruleset, to be valid.
 semantic-ci ssp scan --sensor semgrep \
   --baseline-dir <f1d07c13e5^ tree> --candidate-dir <f1d07c13e5 tree> \
   --config <local-ruleset.yml> --package-root litellm/proxy
@@ -280,6 +357,9 @@ semantic-ci ssp scan --sensor semgrep \
 # SCA
 semantic-ci ssp scan --sensor pip-audit \
   --baseline-dir <tree> --candidate-dir <tree> --package-root litellm
+# SCA positive control (confirms the vuln DB is reachable):
+#   pip-audit on jinja2==2.11.2 → 5 CVEs (PYSEC-2021-66, CVE-2024-22195,
+#   CVE-2024-34064, CVE-2024-56326, CVE-2025-27516)
 ```
 
 The semgrep adapter requires a **local** ruleset file; `p/...` registry
@@ -296,10 +376,15 @@ prior passes is consolidated in
   PEP 621 pyproject / `poetry.lock` / `pdm.lock`, so modern dependency
   declarations degrade to `unknown`. A genuine, fixable `semantic-ci`
   defect.
-- **F6** (SAST logic-vuln blindspot) — observation only, **inherent
-  limitation of pattern SAST, not a core fix target**; cross-linked to
-  Phase H (`docs/llm_sensor_adapter_planning.md`) as empirical
-  motivation.
+- **F6** (SAST logic-vuln blindspot) — **UNTESTED HYPOTHESIS in this
+  pass**, not a demonstrated observation: the Semgrep registry rulesets
+  returned HTTP 403, so Semgrep never ran with real rules (0 rules / 0
+  paths). The expectation that pattern SAST misses semantic / business-logic
+  vulns remains an a-priori limitation cross-linked to Phase H
+  (`docs/llm_sensor_adapter_planning.md`) as **motivation**, not as an
+  empirical result. Observation-only line (not a D#). To convert it into a
+  demonstrated observation, redo the SAST sub-pass under a network policy
+  allowing `semgrep.dev` or with a fully-local equivalent ruleset.
 
 Do not re-tabulate D-class status inside this report; update the tracker
 when D8 status changes.

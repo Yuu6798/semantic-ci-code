@@ -15,7 +15,10 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # explanatory text must still fail. Reports without a verdict matrix
 # (TC10 uses ✅/❌ emoji, the findings tracker is a D-class summary) are out of
 # scope by construction. Add a report here when it grows a verdict matrix.
-CASE_VERDICT_REPORTS = ("docs/dogfooding_real_pr_complexity.md",)
+CASE_VERDICT_REPORTS = (
+    "docs/dogfooding_real_pr_complexity.md",
+    "docs/dogfooding_scale_and_security.md",
+)
 
 VERDICT_HEADER = "verdict"
 PASS_TOKEN = re.compile(r"\bPASS\b")

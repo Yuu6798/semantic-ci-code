@@ -24,6 +24,7 @@ Status taxonomy:
 | D5 | 2026-05-07 Session 5 dogfood (FINDING-1) | set operator partial-match semantics | partial-dict `expected` items canonicalised as different elements from full extractor records — false positive on `includes_*` / `subset_of` / `superset_of`, **false negative (CI bypass) on `excludes_all`** | **解決** | PR #65 (CSCI-35c) — Match Schema partial-record matching + flat-projection aliases + `evidence.matched`; schema_version v4→v5 |
 | D6 | 2026-05-28 real-PR complexity dogfood (FINDING-F1) | vacuous PASS (extractor coverage gap) — **重複・関連 = sibling of D4** | nested function bodies are excluded from `ComplexityEntry` by `python_complexity_extractor` spec (`api_surface` parity); refactor that nests outer-function body into nested helpers reports large CC drop while real complexity is unchanged | **未解決** | Candidate paths: (a) `docs/target_yaml_guide.md` new Hazard 4 + `ADVISORY-D6` detector mirroring D4; (b) extractor spec change to emit nested-function entries (long-term, schema-impacting). Reproduction: langgraph PR #3700 (8/1 vacuous PASS in real-PR pass) |
 | D7 | 2026-05-28 real-PR complexity dogfood (FINDING-F2) | authoring mismatch (operator / constraint pairing) | `extract-method` refactor is mathematically guaranteed to **micro-increase cyclomatic** (each extracted function adds base 1), even with `_` prefix discipline and api_surface preserved. Cognitive is the metric that drops. Authors declaring `complexity_delta.cyclomatic ≤ 0` for extract-method refactors hit a structural false-FAIL | **未解決** | Candidate paths: (a) authoring guide section "Choosing complexity metric per refactor pattern" recommending `cognitive_delta` for extract-method; (b) future `ADVISORY-D7` detector emitted when a `change.primary_kind=refactor` target uses `cyclomatic_delta ≤ 0` and the diff matches extract-method shape. Low priority: this is authoring advice, not a CI integrity hazard |
+| D8 | 2026-06-07 scale + security dogfood (SCA gap) | SCA sensor dependency-source discovery gap | SSP SCA auto-discovery (`_requirements_file` in `src/semantic_ci_code/cli/commands/ssp.py`) only finds `requirements.txt` at repo root; the `--locked` fallback only accepts `pylock.toml` / requirements lockfiles. PEP 621 pyproject-only projects (litellm) and `pdm.lock` projects (pdm) declare deps in unrecognised formats → `pip-audit --locked .` errors "no lockfiles found" → empty JSON → adapter degrades to `unknown` (exit 3). Correct graceful degradation (no silent false PASS, honours `unknown > fail > pass`) but a real usability gap that blocks SCA on most modern Python projects | **未解決** | Candidate fix: extend `_requirements_file` / the pip-audit adapter to recognise PEP 621 `pyproject.toml`, `poetry.lock`, and `pdm.lock` (e.g. `pip-audit` against the resolved env or a generated lock). Genuine fixable `semantic-ci` defect, not an inherent sensor limitation |
 
 ## Reading order
 
@@ -36,8 +37,9 @@ Status taxonomy:
 ## Classification at a glance
 
 - **重複・関連 pairs**: D4 ↔ D6 (both are "vacuous PASS" via extractor coverage gap, distinct mechanism — D4 is "diff outside Python scope", D6 is "diff inside scope but inside nested function")
-- **解決 (5 of 7)**: D1, D2, D3, D4, D5
-- **未解決 (2 of 7)**: D6 (mitigation path open), D7 (authoring advice, low priority)
+- **解決 (5 of 8)**: D1, D2, D3, D4, D5
+- **未解決 (3 of 8)**: D6 (mitigation path open), D7 (authoring advice, low priority), D8 (SCA discovery gap, fixable defect)
+- **observation-only (not a D#)**: F6 (pattern-SAST logic-vuln blindspot) — inherent limitation of deterministic SAST, recorded in `docs/dogfooding_scale_and_security.md` and cross-linked to Phase H (`docs/llm_sensor_adapter_planning.md`) as empirical motivation, not a core fix target. Same hazard-vs-observation distinction as F3 / F4 / F5 in the real-PR complexity report
 
 ## Source pass index
 
@@ -46,7 +48,8 @@ Status taxonomy:
 | Session 4 self-dogfood | 2026-05-07 | self-dogfood on own PRs (#59, #60) + `init → compile_repair` 実走 | 3 | `.claude/memory/2026-05-07.md` §"dogfood 発見 D1〜D4" | D1, D2, D3, D4 |
 | TC10 virtual report | 2026-05-07 Session 5 | hand-built virtual `baseline/` and `candidate/` package trees | 10 | `docs/dogfooding_TC10_report.md` | FINDING-1 → D5, FINDING-2 (resolved in PR #61), FINDING-3 (resolved in PR #61) |
 | Real-PR complexity | 2026-05-28 | external public PRs + per-PR `target.yaml` under complexity constraints | 8 | `docs/dogfooding_real_pr_complexity.md` | F1 → D6, F2 → D7, F3 / F4 / F5 → observations only |
-| **累計** | | | **21** | | D1〜D7 |
+| Scale + security | 2026-06-07 | external public merged commits: 5 scale (`check`, randomized constraint seed 20260607) + 5 random-sampling (extractor robustness) + 5 security (SSP SAST/SCA, incl. 2 real merged-then-fixed vulns) | 15 | `docs/dogfooding_scale_and_security.md` | SCA gap → D8, SAST logic-vuln blindspot → F6 (observation only) |
+| **累計** | | | **36** | | D1〜D8 |
 
 CASE STUDY 系の empirical 観察 (`docs/pre_generation_validation_case.md` 3
 ケース、 `docs/multi_agent_audit_case.md` 3 並列 agent 比較) は dogfooding

@@ -28,14 +28,17 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 - `_index.md` 1-line summary では情報不足で dated 原文が必要な時
 - archive 移送 protocol 自体の audit / drift check
 
-## Current contents (2026-06-03 時点)
+## Current contents (2026-06-07 時点)
 
 | File / Directory | 移送 cutoff | 移送元 | Migration commit |
 |---|---|---|---|
-| `STATUS_MERGED_LOG.md` | 2026-06-03 | `STATUS.md ## 直近 merged` の 12 entries (5/15 Session 2 〜 5/5 + 5/27 + 5/28 S1) | `0db925f` (Phase 1) 〜 2026-06-03 wrap-up |
+| `STATUS_MERGED_LOG.md` | 2026-06-07 | `STATUS.md ## 直近 merged` の 13 entries (5/15 Session 2 〜 5/5 + 5/27 + 5/28 S1 + 5/29 doc-refactor) | `0db925f` (Phase 1) 〜 2026-06-07 wrap-up |
 | `2026-05/2026-05-02.md` | 2026-06-02 (>30 日 TTL) | `_index.md` 2026-05-02 entry (初の dated-log 物理移送) | 2026-06-02 wrap-up |
 | `2026-05/2026-05-03.md` | 2026-06-03 (>30 日 TTL) | `_index.md` 2026-05-03 entry (S1+S2+S3 統合) | 2026-06-03 wrap-up |
 | `2026-05/2026-05-04.md` | 2026-06-03 (30 日 TTL) | `_index.md` 2026-05-04 entry (Brief 3 残務 + Brief 4 全体) | 2026-06-03 wrap-up (S2) |
+| `2026-05/2026-05-05.md` | 2026-06-07 (>30 日 TTL) | `_index.md` 2026-05-05 entry (S1-S4 統合: §23.1 格上げ + Brief 4b/4c/4d + Brief 5 planning) | 2026-06-07 wrap-up |
+| `2026-05/2026-05-06.md` | 2026-06-07 (>30 日 TTL) | `_index.md` 2026-05-06 entry (S1-S3 統合: §23.3 + SSP 4 層化 + #50) | 2026-06-07 wrap-up |
+| `2026-05/2026-05-07.md` | 2026-06-07 (>30 日 TTL) | `_index.md` 2026-05-07 entry (S1-S5 統合: Brief 5 完走 + D1〜D5 dogfood + Brief 7 申し送り) | 2026-06-07 wrap-up |
 
 ## 移送 protocol
 

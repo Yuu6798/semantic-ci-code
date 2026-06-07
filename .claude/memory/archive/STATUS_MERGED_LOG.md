@@ -1013,3 +1013,30 @@ Grok) を統合した `docs/phase_g_planning.md` を起草、Codex review 18 rou
    refactor (自分自身の PR を入力に取る methodology を正確に表す)
 
 (2026-06-03 wrap-up (S2) で STATUS.md 直近 merged 5-cap 超過により移送)
+
+---
+
+### 2026-05-29 — doc-refactor Phase 6 完走 + doc hygiene sweep (PR #118)
+
+`doc_refactor_planning.md` Phase 6 の残 "future hardening" 3 候補を closeout し、
+起動時 audit で surface した doc drift を同 PR に積んだ。
+
+- **PR #118** (merged、 commits `aa56332`→`f8f004c`):
+  - Phase 6: schema-grep を `tests/discipline/test_json_schema_version_sync.py`
+    (CLI envelope `schema_version` 定数 ↔ `docs/json_schema.md` anchor 同期)、
+    dual-case dogfood を `test_dogfood_dual_case.py` (registered case/verdict-matrix
+    report の `Verdict` 列が PASS/FAIL 両方向を含むか) に test 化。round-count は
+    retire (prose proxy が脆い → `CLAUDE.md` wrap-up checklist へ格下げ)。
+  - hygiene: `CLAUDE.md` 表に `phase_g_planning.md` 行追加、 README Planning 補完
+    + stale schema_version 修正、 STATUS 2026-05-22 entry 圧縮 (418→349 行)、
+    `AGENTS.md §5.5` enforcement cell を実 test パスへ同期。
+  - Codex bot review P2 (dual-case の prose-scan 誤通過) に対応し **verdict 列
+    パース**へ改修 + `test_dual_case_ignores_prose_tokens` 回帰追加。CI 一度 fail
+    (ruff format 見落とし) → 修正で 3.11/3.12/3.13 green。
+- 壁打ち成果 (実装は Codex 不在で見送り): **B = coverage advisory** の設計思想・
+  実務順序・較正方針を `.claude/memory/2026-05-29.md` 専用 section に externalize。
+  メタ原理「検証不能な真値 → 検証可能な保守的代理」。
+- 残: doc_refactor 自己 archive は Phase 3 cosmetic (§5 trim、 §5.3 merge は再考
+  推奨 = 非実行) のため見送り。
+
+(2026-06-07 wrap-up で STATUS.md 直近 merged 5-cap 超過により移送)

@@ -28,6 +28,35 @@ Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selecti
 
 ## 直近 merged
 
+### 2026-06-07 — スケール & セキュリティ dogfooding pass (dogfood PR、user merge)
+
+外部実 PR (litellm/langgraph/pdm) に対する 3 sub-pass dogfooding。成果は
+`docs/dogfooding_scale_and_security.md` + tracker (D8 登録) + CLAUDE.md/README +
+discipline test 追加 (commit `fcd5b82` → `fed1b87`、user が PR 化 → merge)。
+
+- **Pass 1 (大規模スケール、目標アリ、制約ランダム seed=20260607)**: 大関数・高複雑度
+  commit 5 件 + complexity/effects 補足。全件動作・クラッシュ 0、cyc+49 等正確に集計、
+  cold 103s → warm 11s (CodeState cache 有効)。FAIL は全て merged だが §23.3 scope guard
+  により false positive ではない (宣言 intent に対する判定)。
+- **Pass 2 (ランダム頑健性、generic 0 制約)**: 無作為 5 件、全件 well-formed JSON、
+  最大 +5951 行/37 ファイルも処理成功。
+- **Pass 3 (セキュリティ SSP)**: litellm の実 SSRF (`f1d07c13e5`) + pricing injection
+  (`b95130eb32`) を git 履歴から発見 (マージ後に手動修正された実例)。SCA=pip-audit は
+  positive control (jinja2==2.11.2→5 CVE) で DB 到達確認、litellm コア依存 0 脆弱性。
+  **D8** = SCA auto-discovery gap (`_requirements_file` が root requirements.txt のみ →
+  pyproject/pdm.lock 非対応で unknown 退化、fixable defect)。**SAST=Semgrep は registry
+  が HTTP 403 でルール 0 個 → SAST 盲点は未検証** (当初の過大主張を `fed1b87` で訂正、
+  F6 = untested hypothesis として記録)。
+
+**設計判断・修正のハイライト**:
+
+1. **過大主張 2 回を自己検証で訂正**: (a) SAST 403 (scanned paths:0 → 「見逃し」は
+   未実証)、(b) 「事後ガードレールにすぎない」誤結論。どちらも user の push + 追検証で発覚。
+2. **navigate 実証 (未 encode 課題)**: `check --candidate-source working-tree` で実装中の
+   API drift 検出、`compare` の仮想スタブで生成前計画判定を実証 → semantic-ci は in-loop /
+   pre-generation の steering として機能 (merge 済レポートには未収録、次 session で encode 候補)。
+3. **背景 agent persist + フロント議論の並行運用** (user 要望「保存は background、議論は front」)。
+
 ### 2026-06-03 Session 2 — LLM security sensor / scout layer planning (Phase H candidate、PR #130→#131→#132)
 
 OpenAI「Codex for Open Source」応募文面の相談から派生し、選択肢「Codex
@@ -166,29 +195,6 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
   `pytest` → `python -m pytest` に統一 (`CLAUDE.md` step 8 + `wrap-up` SKILL.md
   3 箇所 + rationale 1 行)。bare `pytest` が PATH 上の cov-plugin 無し interpreter
   を引くと `--no-cov` 未認識でゲートが誤 fail する穴を恒久 close。
-
-### 2026-05-29 — doc-refactor Phase 6 完走 + doc hygiene sweep (PR #118)
-
-`doc_refactor_planning.md` Phase 6 の残 "future hardening" 3 候補を closeout し、
-起動時 audit で surface した doc drift を同 PR に積んだ。
-
-- **PR #118** (merged、 commits `aa56332`→`f8f004c`):
-  - Phase 6: schema-grep を `tests/discipline/test_json_schema_version_sync.py`
-    (CLI envelope `schema_version` 定数 ↔ `docs/json_schema.md` anchor 同期)、
-    dual-case dogfood を `test_dogfood_dual_case.py` (registered case/verdict-matrix
-    report の `Verdict` 列が PASS/FAIL 両方向を含むか) に test 化。round-count は
-    retire (prose proxy が脆い → `CLAUDE.md` wrap-up checklist へ格下げ)。
-  - hygiene: `CLAUDE.md` 表に `phase_g_planning.md` 行追加、 README Planning 補完
-    + stale schema_version 修正、 STATUS 2026-05-22 entry 圧縮 (418→349 行)、
-    `AGENTS.md §5.5` enforcement cell を実 test パスへ同期。
-  - Codex bot review P2 (dual-case の prose-scan 誤通過) に対応し **verdict 列
-    パース**へ改修 + `test_dual_case_ignores_prose_tokens` 回帰追加。CI 一度 fail
-    (ruff format 見落とし) → 修正で 3.11/3.12/3.13 green。
-- 壁打ち成果 (実装は Codex 不在で見送り): **B = coverage advisory** の設計思想・
-  実務順序・較正方針を `.claude/memory/2026-05-29.md` 専用 section に externalize。
-  メタ原理「検証不能な真値 → 検証可能な保守的代理」。
-- 残: doc_refactor 自己 archive は Phase 3 cosmetic (§5 trim、 §5.3 merge は再考
-  推奨 = 非実行) のため見送り。
 
 ### 古い merged entry (2026-05-28 S2 以前) — archive 参照
 

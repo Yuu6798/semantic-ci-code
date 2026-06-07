@@ -146,7 +146,8 @@ Out-of-core observation (case studies and dogfooding):
 
 - [Dogfooding TC10 Report](docs/dogfooding_TC10_report.md) — 10 virtual-package cases through the CLI; FINDING-1 / D5 (set operator partial-dict semantics) resolved in PR #65
 - [Dogfooding Real-PR Complexity Report](docs/dogfooding_real_pr_complexity.md) — 8 real-PR cases under complexity constraints; surfaces D6 (nested-function vacuous PASS) and D7 (extract-method × cyclomatic authoring mismatch), both open
-- [Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md) — consolidated D-class status (D1〜D7) across all dogfooding passes
+- [Dogfooding Scale & Security Report](docs/dogfooding_scale_and_security.md) — 15 cases across litellm / langgraph / pdm: scale + large-function robustness (89-file / 514-symbol-delta / +5951 LOC inputs, 0 crashes, cache cold 103s → warm 11s) and SSP security observation (pip-audit SCA valid + positive-controlled; 2 real merged-then-fixed vulns established from git history; Semgrep SAST sub-pass network-blocked, HTTP 403 / 0 rules — not a valid SAST measurement); surfaces D8 (SCA pyproject/pdm.lock discovery gap) and F6 (pattern-SAST logic-vuln blindspot — untested-here hypothesis / Phase H motivation, not demonstrated this pass)
+- [Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md) — consolidated D-class status (D1〜D8) across all dogfooding passes
 - [Pre-Generation Validation Case](docs/pre_generation_validation_case.md) — observation that stub-only candidates are accepted by the engine input contract; reproduction in `experiments/pre_generation_validation/`
 - [Multi-Agent Audit Case](docs/multi_agent_audit_case.md) — orchestrator-blindspot observation when running parallel agents
 

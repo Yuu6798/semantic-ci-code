@@ -1,0 +1,21 @@
+intent: add a pure markdown summary formatter; do not add deserialization or dangerous imports
+change:
+  primary_kind: generic
+constraints:
+  - id: no_unsafe_deserialize
+    kind: delta
+    target: effect_changes.added
+    operator: excludes_all
+    expected:
+      - effect_class: unsafe_deserialize
+    severity: hard
+    unknown_policy: fail
+  - id: no_pickle_import
+    kind: delta
+    target: imports_delta.added
+    operator: excludes_all
+    expected:
+      - module: pickle
+    severity: hard
+    unknown_policy: fail
+

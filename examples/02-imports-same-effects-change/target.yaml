@@ -1,0 +1,13 @@
+intent: keep status rendering free of process execution
+change:
+  primary_kind: generic
+constraints:
+  - id: no_process_execution
+    kind: delta
+    target: effect_changes.added
+    operator: excludes_all
+    expected:
+      - effect_class: process
+    severity: hard
+    unknown_policy: fail
+

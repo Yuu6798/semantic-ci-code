@@ -13,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Require dogfooding disclosure
-        env:
-          EVENT_PATH: ${{ github.event_path }}
         run: |
           python - <<'PY'
           from __future__ import annotations
@@ -80,7 +78,11 @@ jobs:
               raise SystemExit(1)
 
 
-          event = json.loads(Path(os.environ["EVENT_PATH"]).read_text(encoding="utf-8"))
+          event_path = os.environ.get("GITHUB_EVENT_PATH")
+          if not event_path:
+              fail("GITHUB_EVENT_PATH is not set; cannot read pull_request event.")
+
+          event = json.loads(Path(event_path).read_text(encoding="utf-8-sig"))
           body = str(event.get("pull_request", {}).get("body") or "")
           section = extract_section(body, DOGFOOD_HEADING)
           if section is None:

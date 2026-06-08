@@ -1,0 +1,14 @@
+intent: add coupon application API
+change:
+  primary_kind: generic
+constraints:
+  - id: expected_coupon_api
+    kind: delta
+    target: api_surface_delta.added
+    operator: includes_all
+    expected:
+      - fqn: billing.apply_coupon
+        visibility: public
+    severity: hard
+    unknown_policy: fail
+

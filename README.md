@@ -116,6 +116,7 @@ Active references (current behavior):
 - [Exit Codes](docs/exit_codes.md) — CI-facing exit code contract
 - [JSON Output Schema](docs/json_schema.md) — verdict / compile envelopes (`schema_version="6"`) + compile-repair (`"1"`) / validate-plan (`"2"`) envelopes (independent versions)
 - [Code Semantic CI Design](docs/code_semantic_ci_design.md) — Code Edition v0.1 design spec (3-state RPE, constraint type system, phase plan)
+- [Runnable Examples Gallery](examples/README.md) — four deterministic `compare` cases for the scope-guard failure modes
 - [CLI Test Inventory](docs/cli_test_inventory.md) — CLI test coverage map and reduction candidates
 - [target.yaml Authoring Guide](docs/target_yaml_guide.md) — practical authoring guide; centralises hazards D1/D3/D4 (`--package-root` scope, template/user constraint duplication, config-only vacuous PASS)
 - [Target Authoring Surface](docs/target_authoring_surface.md) — Authoring surface design contract (target.yaml generation paths, surface isolation, `candidate_code_used: false`)

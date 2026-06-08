@@ -1,0 +1,17 @@
+intent: keep pricing logic simple while preserving the API shape
+change:
+  primary_kind: generic
+constraints:
+  - id: api_surface_unchanged
+    kind: delta
+    target: api_surface_public
+    operator: equals_baseline
+    severity: hard
+    unknown_policy: fail
+  - id: no_extra_cyclomatic_complexity
+    kind: delta
+    target: complexity_delta.cyclomatic
+    operator: within_range
+    expected: [0, 0]
+    severity: hard
+    unknown_policy: fail

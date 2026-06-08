@@ -98,6 +98,7 @@ CodeState:
 ```yaml
 CodeStateDelta:
   api_surface_delta: { added: [...], removed: [...], changed: [...] }
+  decorators_delta: { added: [...], removed: [...], changed: [] }
   type_changes: [...]
   effect_changes: { added: [...], removed: [...] }
   cfg_delta: { new_branches, removed_branches }

@@ -262,10 +262,9 @@ def _security_location(finding: dict[str, Any]) -> dict[str, Any] | None:
     region = {
         "startLine": source_span["start_line"],
         "endLine": source_span["end_line"],
+        "startColumn": max(1, source_span["start_col"]),
+        "endColumn": max(1, source_span["end_col"]),
     }
-    if source_span["start_col"] > 0 and source_span["end_col"] > 0:
-        region["startColumn"] = source_span["start_col"]
-        region["endColumn"] = source_span["end_col"]
     return {
         "physicalLocation": {
             "artifactLocation": {"uri": normalize_annotation_path(finding["module_path"])},

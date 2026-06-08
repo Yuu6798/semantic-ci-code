@@ -154,12 +154,16 @@ Two built-in recipes generate generic security overlays:
 ```bash
 semantic-ci init --recipe security:deny-dangerous-imports
 semantic-ci init --recipe security:deny-dangerous-effects
+semantic-ci init --recipe security:preserve-auth-guards
 ```
 
 - `security:deny-dangerous-imports` denies newly added imports such as
   `pickle`, `subprocess`, and `marshal` using `imports_delta.added`.
 - `security:deny-dangerous-effects` denies newly added `process`,
   `dynamic_code`, and `unsafe_deserialize` effects using `effect_changes.added`.
+- `security:preserve-auth-guards` denies removal of public API decorators named
+  `login_required`, `requires_auth`, or `permission_required` using
+  `decorators_delta.removed`.
 
 ## Hazard 1 — `--package-root` decides what is observed (D1)
 

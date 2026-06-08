@@ -225,6 +225,7 @@ def test_removed_public_alias_matches_public_removed_api_records():
     assert result.status is ResultStatus.SATISFIED
     assert dict(result.evidence)["observed"] == (
         (
+            ("decorators", ()),
             ("fqn", "pkg.public_removed"),
             ("kind", "function"),
             ("signature", "def f(): ..."),

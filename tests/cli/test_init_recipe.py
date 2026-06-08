@@ -26,10 +26,14 @@ from semantic_ci_code.cli.init_recipes.security_deny_dangerous_effects import (
 from semantic_ci_code.cli.init_recipes.security_deny_dangerous_imports import (
     DANGEROUS_IMPORT_MODULES,
 )
+from semantic_ci_code.cli.init_recipes.security_preserve_auth_guards import (
+    AUTH_GUARD_DECORATORS,
+)
 from semantic_ci_code.compiler import compile_target_svp
 from semantic_ci_code.compiler.templates import TEMPLATE_CONSTRAINTS
 from semantic_ci_code.delta import compute_code_state_delta
 from semantic_ci_code.domain.state_schema import (
+    APISurfaceEntry,
     ChangeKind,
     CodeState,
     EffectClass,
@@ -221,6 +225,24 @@ def test_a_security_effects_recipe_emits_generic_overlay_constraint(tmp_path: Pa
 # ---------------------------------------------------------------------------
 
 
+def test_a_security_auth_guards_recipe_emits_generic_overlay_constraint(tmp_path: Path):
+    rc, data = _run_init(tmp_path, "--recipe", "security:preserve-auth-guards")
+
+    assert rc == 0
+    assert data["change"]["primary_kind"] == "generic"
+    assert data["constraints"] == [
+        {
+            "id": "security:preserve-auth-guards",
+            "kind": "delta",
+            "target": "decorators_delta.removed",
+            "operator": "excludes_all",
+            "expected": [{"decorator": decorator} for decorator in AUTH_GUARD_DECORATORS],
+            "severity": "hard",
+            "unknown_policy": "fail",
+        }
+    ]
+
+
 def test_b_feature_recipe_byte_identical_across_three_runs(tmp_path: Path):
     args = ("--recipe", "feature:add-api", "--add-api", "pkg.A", "--add-api", "pkg.B")
     outputs = []
@@ -338,7 +360,11 @@ def test_c_test_update_recipe_output_compiles(tmp_path: Path):
 
 def test_c_security_recipes_compile_as_generic_user_constraints_only(tmp_path: Path):
     for index, recipe in enumerate(
-        ("security:deny-dangerous-imports", "security:deny-dangerous-effects")
+        (
+            "security:deny-dangerous-imports",
+            "security:deny-dangerous-effects",
+            "security:preserve-auth-guards",
+        )
     ):
         run_dir = tmp_path / f"recipe_{index}"
         run_dir.mkdir()
@@ -466,6 +492,45 @@ def test_e2_security_effects_recipe_fails_dangerous_effect_and_passes_safe_effec
 # ---------------------------------------------------------------------------
 # Section F — source-merge fixtures
 # ---------------------------------------------------------------------------
+
+
+def test_e2_security_auth_guards_recipe_fails_removed_guard_and_passes_kept_guard(
+    tmp_path: Path,
+):
+    rc, _ = _run_init(tmp_path, "--recipe", "security:preserve-auth-guards")
+    assert rc == 0
+
+    baseline = CodeState(
+        api_surface=(
+            APISurfaceEntry(
+                fqn="pkg.views.account",
+                kind="function",
+                visibility="public",
+                decorators=("login_required",),
+            ),
+        )
+    )
+    fail_verdict = _evaluate_generated_target(
+        tmp_path,
+        baseline=baseline,
+        candidate=CodeState(
+            api_surface=(
+                APISurfaceEntry(
+                    fqn="pkg.views.account",
+                    kind="function",
+                    visibility="public",
+                ),
+            )
+        ),
+    )
+    pass_verdict = _evaluate_generated_target(
+        tmp_path,
+        baseline=baseline,
+        candidate=baseline,
+    )
+
+    assert fail_verdict.result is VerdictResult.FAIL
+    assert pass_verdict.result is VerdictResult.PASS
 
 
 def _write_pr_body(tmp_path: Path, content: str) -> Path:

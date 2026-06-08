@@ -189,6 +189,9 @@
       ],
       "default": null
     },
+    "decorators_delta": {
+      "$ref": "#/$defs/SymbolDelta"
+    },
     "effect_changes": {
       "$ref": "#/$defs/EffectChanges"
     },

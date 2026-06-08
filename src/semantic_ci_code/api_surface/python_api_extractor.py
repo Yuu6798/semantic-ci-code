@@ -59,6 +59,7 @@ def extract_python_api_surface(
                     kind=ASYNC_FUNCTION_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    decorators=_decorator_names(stmt.decorator_list),
                     preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
@@ -69,6 +70,7 @@ def extract_python_api_surface(
                     kind=FUNCTION_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    decorators=_decorator_names(stmt.decorator_list),
                     preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
@@ -80,6 +82,7 @@ def extract_python_api_surface(
                     kind=CLASS_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    decorators=_decorator_names(stmt.decorator_list),
                 )
             )
             candidates.extend(_extract_class_methods(stmt, class_fqn))
@@ -159,6 +162,7 @@ def _extract_class_methods(node: ast.ClassDef, class_fqn: str) -> list[_SurfaceC
                     kind=ASYNC_METHOD_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    decorators=_decorator_names(stmt.decorator_list),
                     preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
@@ -169,6 +173,7 @@ def _extract_class_methods(node: ast.ClassDef, class_fqn: str) -> list[_SurfaceC
                     kind=METHOD_KIND,
                     signature=_render_signature(stmt),
                     leaf_name=stmt.name,
+                    decorators=_decorator_names(stmt.decorator_list),
                     preserve_signature_duplicates=_is_overload_definition(stmt),
                 )
             )
@@ -202,6 +207,7 @@ def _constant_targets(stmt: ast.Assign | ast.AnnAssign) -> tuple[ast.Name, ...]:
 
 def _render_signature(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> str:
     stripped = copy.deepcopy(node)
+    stripped.decorator_list = []
     stripped.body = [ast.Expr(value=ast.Constant(value=Ellipsis))]
     ast.fix_missing_locations(stripped)
     return ast.unparse(stripped)
@@ -213,12 +219,14 @@ def _entry(
     kind: str,
     signature: str | None,
     leaf_name: str,
+    decorators: tuple[str, ...] = (),
 ) -> APISurfaceEntry:
     return APISurfaceEntry(
         fqn=fqn,
         kind=kind,
         signature=signature,
         visibility=_visibility_for_leaf_name(leaf_name),
+        decorators=decorators,
     )
 
 
@@ -228,6 +236,7 @@ def _candidate(
     kind: str,
     signature: str | None,
     leaf_name: str,
+    decorators: tuple[str, ...] = (),
     preserve_signature_duplicates: bool = False,
 ) -> _SurfaceCandidate:
     return _SurfaceCandidate(
@@ -236,6 +245,7 @@ def _candidate(
             kind=kind,
             signature=signature,
             leaf_name=leaf_name,
+            decorators=decorators,
         ),
         preserve_signature_duplicates=preserve_signature_duplicates,
     )
@@ -277,6 +287,21 @@ def _is_overload_decorator(node: ast.expr) -> bool:
     if isinstance(node, ast.Call):
         return _is_overload_decorator(node.func)
     return False
+
+
+def _decorator_names(decorators: list[ast.expr]) -> tuple[str, ...]:
+    return tuple(name for decorator in decorators if (name := _decorator_name(decorator)))
+
+
+def _decorator_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        base = _decorator_name(node.value)
+        return f"{base}.{node.attr}" if base else node.attr
+    if isinstance(node, ast.Call):
+        return _decorator_name(node.func)
+    return None
 
 
 def _visibility_for_leaf_name(name: str) -> str:

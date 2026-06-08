@@ -107,6 +107,14 @@ bump beyond the current CLI schema version.
 | `cache` | Cache stats for this invocation: `hit`, `miss`, `invalid`, `write_failed`, and `disabled`. |
 | `engine` | Python minor version, package version, optional source provenance, and optional extraction diagnostics. `check` includes `engine.baseline` and `engine.candidate` sub-objects with `{source, rev}`; `source` is `commit`, `working-tree`, or `staged-index`, and `rev` is a resolved commit SHA for commit-backed sources or `null` for volatile sources. When `check --extractor-timeout` causes one or more dimensions to fall back to schema defaults, `engine.timed_out_dimensions` is a sorted list of dimension names. Other verdict-producing subcommands may omit these sub-objects. |
 
+`CodeState.api_surface[]` records include an additive `decorators: string[]`
+field. It is empty by default and contains syntactic decorator names such as
+`login_required`, `app.route`, or `auth.requires`. `CodeStateDelta` includes an
+additive `decorators_delta` `SymbolDelta`; its `added` and `removed` records are
+`{"fqn": "...", "decorator": "..."}`. These fields do not require a verdict
+envelope schema bump because they are nested CodeState / CodeStateDelta
+expansions with empty defaults and are absent from top-level envelope routing.
+
 Extractor exclude config changes cache identity but not the JSON envelope shape.
 `check` includes the effective exclude key in its internal CodeState cache key;
 schema version `"5"` was unchanged by this operational cache-key extension. The
@@ -450,6 +458,11 @@ bump the envelope version.
   `removed`, `suppressed`, `drift_reason`, and `unchanged_count` detail. The
   schema version stays `"6"` because this is an additive expansion of an
   optional diagnostic object introduced in G-4a.
+- G-5 adds `CodeState.api_surface[].decorators` and
+  `CodeStateDelta.decorators_delta` for syntactic public API decorator tracking.
+  The verdict envelope schema version stays `"6"` because these are additive
+  nested state/delta fields with empty defaults, not new top-level envelope
+  fields.
 - The CLI layer still materializes two directories for the engine; the engine
   does not receive source-category enums.
 

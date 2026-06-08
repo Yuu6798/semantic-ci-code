@@ -45,8 +45,6 @@ def build_payload(
     candidate_source: str | None = None,
     candidate_rev: str | None = None,
     timed_out_dimensions: frozenset[str] | tuple[str, ...] | list[str] | None = None,
-    security_verdict: str | None = None,
-    security_as_of: str | None = None,
     security_detail: Any | None = None,
     suite_verdict: str | None = None,
 ) -> dict[str, Any]:
@@ -65,8 +63,6 @@ def build_payload(
     }
     if security_detail is not None:
         payload["security"] = _serialize_security_detail(security_detail)
-    elif security_verdict is not None:
-        payload["security"] = {"verdict": security_verdict, "as_of": security_as_of}
     if suite_verdict is not None:
         payload["suite_verdict"] = suite_verdict
     payload.update(

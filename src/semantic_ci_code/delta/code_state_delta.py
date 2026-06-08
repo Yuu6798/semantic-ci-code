@@ -15,6 +15,9 @@ Delta rules:
   sorted variant groups. If either side has multiple variants, ``before`` and
   ``after`` are lists of entry dumps; singleton changes keep the scalar dump
   shape. Lists are sorted by ``(fqn, kind)`` plus variant fields where needed.
+- ``decorators_delta`` records public API decorator changes as
+  ``{"fqn", "decorator"}`` records. Pure decorator changes do not affect
+  ``api_surface_delta``.
 - ``type_changes`` is always ``()`` in P1 until a ``type_relations`` extractor
   exists.
 - ``effect_changes`` uses identity key ``(fqn, effect_class, resolved_call)``
@@ -95,6 +98,7 @@ def compute_code_state_delta(
     """
     return CodeStateDelta(
         api_surface_delta=_api_surface_delta(baseline.api_surface, candidate.api_surface),
+        decorators_delta=_decorators_delta(baseline.api_surface, candidate.api_surface),
         type_changes=(),
         effect_changes=_effect_changes(baseline.effects, candidate.effects),
         cfg_delta=CFGDelta(),
@@ -302,7 +306,7 @@ def _sort_api_entries(entries: list[APISurfaceEntry]) -> list[APISurfaceEntry]:
 
 
 def _api_group_dumps(entries: list[APISurfaceEntry]) -> list[JsonValue]:
-    return [_dump(entry) for entry in _sort_api_entries(entries)]
+    return [_api_variant_dump(entry) for entry in _sort_api_entries(entries)]
 
 
 def _api_changed_entry(
@@ -321,10 +325,43 @@ def _api_changed_entry(
 
 
 def _api_changed_payload(entries: list[APISurfaceEntry], *, force_list: bool) -> JsonValue:
-    dumps = _api_group_dumps(entries)
+    dumps = [_dump(entry) for entry in _sort_api_entries(entries)]
     if force_list:
         return dumps
     return dumps[0]
+
+
+def _decorators_delta(
+    baseline: tuple[APISurfaceEntry, ...],
+    candidate: tuple[APISurfaceEntry, ...],
+) -> SymbolDelta:
+    base = _public_decorator_pairs(baseline)
+    cand = _public_decorator_pairs(candidate)
+    return SymbolDelta(
+        added=tuple(_decorator_record(pair) for pair in sorted(cand - base)),
+        removed=tuple(_decorator_record(pair) for pair in sorted(base - cand)),
+        changed=(),
+    )
+
+
+def _public_decorator_pairs(entries: tuple[APISurfaceEntry, ...]) -> frozenset[tuple[str, str]]:
+    return frozenset(
+        (entry.fqn, decorator)
+        for entry in entries
+        if entry.visibility == "public"
+        for decorator in entry.decorators
+    )
+
+
+def _decorator_record(pair: tuple[str, str]) -> JsonMapping:
+    fqn, decorator = pair
+    return {"fqn": fqn, "decorator": decorator}
+
+
+def _api_variant_dump(entry: APISurfaceEntry) -> JsonValue:
+    dumped = entry.model_dump(mode="json")
+    dumped.pop("decorators", None)
+    return dumped
 
 
 def _effect_key(entry: EffectEntry) -> tuple[str, str, str]:

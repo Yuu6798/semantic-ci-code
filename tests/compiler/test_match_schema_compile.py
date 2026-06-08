@@ -130,6 +130,27 @@ def test_effect_class_only_partial_match_compiles_for_effect_targets():
     assert constraint.expected == ({"effect_class": "process"},)
 
 
+def test_decorator_only_partial_match_compiles_for_decorators_delta():
+    constraint = _compile_constraint(
+        target="decorators_delta.removed",
+        operator="excludes_all",
+        expected="""
+      - decorator: login_required""",
+    )
+
+    assert constraint.expected == ({"decorator": "login_required"},)
+
+
+def test_decorator_bare_string_desugars_to_decorator_key():
+    constraint = _compile_constraint(
+        target="decorators_delta.removed",
+        operator="excludes_all",
+        expected='      - "login_required"',
+    )
+
+    assert constraint.expected == ({"decorator": "login_required"},)
+
+
 def test_import_symbols_key_is_forbidden():
     with pytest.raises(CompileError) as exc_info:
         _compile_constraint(

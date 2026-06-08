@@ -25,6 +25,7 @@ from semantic_ci_code.authoring.sources.merge import (
     RECIPE_REFACTOR_PRESERVE_API,
     RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS,
     RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS,
+    RECIPE_SECURITY_PRESERVE_AUTH_GUARDS,
     RECIPE_TEST_UPDATE_ADD_TEST_CASE,
     MergeError,
     RecipeFlagCompatibilityError,
@@ -84,6 +85,10 @@ _RECIPE_NOTES: dict[str, str] = {
     RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS: (
         "note: generic security overlay denies newly added process, dynamic_code, "
         "and unsafe_deserialize effects"
+    ),
+    RECIPE_SECURITY_PRESERVE_AUTH_GUARDS: (
+        "note: generic security overlay denies removing auth guard decorators "
+        "(login_required, requires_auth, permission_required)"
     ),
 }
 

@@ -93,6 +93,7 @@ def test_code_state_exposes_all_ten_dimensions_and_extensions():
     }
     assert dumped["coverage"] is None
     assert dumped["imports"][0]["from"] == "src.api"
+    assert dumped["api_surface"][0]["decorators"] == ()
 
 
 def test_code_state_delta_exposes_all_delta_fields_and_extensions():
@@ -115,6 +116,7 @@ def test_code_state_delta_exposes_all_delta_fields_and_extensions():
 
     assert set(dumped) == {
         "api_surface_delta",
+        "decorators_delta",
         "type_changes",
         "effect_changes",
         "cfg_delta",

@@ -11,6 +11,7 @@ from semantic_ci_code.authoring.sources.merge import (
     RECIPE_REFACTOR_PRESERVE_API,
     RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS,
     RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS,
+    RECIPE_SECURITY_PRESERVE_AUTH_GUARDS,
     RECIPE_TEST_UPDATE_ADD_TEST_CASE,
     MergedSources,
 )
@@ -20,6 +21,7 @@ from semantic_ci_code.cli.init_recipes import (
     refactor_preserve_api,
     security_deny_dangerous_effects,
     security_deny_dangerous_imports,
+    security_preserve_auth_guards,
     test_update_add_test_case,
 )
 
@@ -32,6 +34,7 @@ RECIPES: dict[str, RecipeBuilder] = {
     RECIPE_TEST_UPDATE_ADD_TEST_CASE: test_update_add_test_case.build,
     RECIPE_SECURITY_DENY_DANGEROUS_IMPORTS: security_deny_dangerous_imports.build,
     RECIPE_SECURITY_DENY_DANGEROUS_EFFECTS: security_deny_dangerous_effects.build,
+    RECIPE_SECURITY_PRESERVE_AUTH_GUARDS: security_preserve_auth_guards.build,
 }
 
 

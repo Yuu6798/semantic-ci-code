@@ -617,7 +617,7 @@ def test_check_sarif_output_emits_sensor_unknown_for_incomplete_sensor(tmp_path:
     assert "security/provenance-drift" not in result_by_rule
 
 
-def test_check_sarif_output_omits_zero_based_security_columns(tmp_path: Path):
+def test_check_sarif_output_clamps_zero_based_security_columns(tmp_path: Path):
     repo = init_repo(tmp_path, origin_ref=True)
     finding = _sast_finding(
         "python.security.zero-col",
@@ -643,7 +643,7 @@ def test_check_sarif_output_omits_zero_based_security_columns(tmp_path: Path):
     region = result_by_rule["security/python.security.zero-col"]["locations"][0][
         "physicalLocation"
     ]["region"]
-    assert region == {"startLine": 7, "endLine": 7}
+    assert region == {"startLine": 7, "endLine": 7, "startColumn": 1, "endColumn": 1}
 
 
 def test_check_sarif_output_surfaces_deny_added_info_policy_failure(tmp_path: Path):

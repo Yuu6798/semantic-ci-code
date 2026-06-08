@@ -40,6 +40,7 @@ class APISurfaceEntry(FrozenModel):
     kind: str
     signature: str | None = None
     visibility: str | None = None
+    decorators: tuple[str, ...] = Field(default_factory=tuple)
 
 
 class TypeRelation(FrozenModel):
@@ -160,6 +161,7 @@ class LocDelta(FrozenModel):
 
 class CodeStateDelta(FrozenModel):
     api_surface_delta: SymbolDelta = Field(default_factory=SymbolDelta)
+    decorators_delta: SymbolDelta = Field(default_factory=SymbolDelta)
     type_changes: tuple[JsonValue, ...] = Field(default_factory=tuple)
     effect_changes: EffectChanges = Field(default_factory=EffectChanges)
     cfg_delta: CFGDelta = Field(default_factory=CFGDelta)

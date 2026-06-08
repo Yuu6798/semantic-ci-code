@@ -3,6 +3,13 @@
     "APISurfaceEntry": {
       "additionalProperties": false,
       "properties": {
+        "decorators": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Decorators",
+          "type": "array"
+        },
         "fqn": {
           "title": "Fqn",
           "type": "string"

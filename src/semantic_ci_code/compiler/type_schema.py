@@ -128,6 +128,8 @@ _FLAT_PROJECTION_CATEGORIES: dict[str, TargetCategory] = {
     "imports_delta.added.modules": TargetCategory.STRING_COLLECTION,
 }
 
+_REMOVED_PUBLIC_ALIASES: frozenset[str] = frozenset({"api_surface_delta"})
+
 
 class TypeMismatchSide(StrEnum):
     """Which side of the constraint triple the mismatch is attributed to.
@@ -282,9 +284,10 @@ def _walk(prefix: str, annotation: Any, mapping: dict[str, TargetCategory]) -> N
         sub_path = f"{prefix}.{sub_name}"
         _walk(sub_path, sub_info.annotation, mapping)
 
-    # ``removed_public`` is a visibility-filtered view of ``removed``;
-    # in every registered case it is itself a record_collection.
-    if "removed" in model.model_fields:
+    # ``removed_public`` is a visibility-filtered view of API ``removed``
+    # records. Do not synthesize it for SymbolDelta roots whose records lack
+    # visibility, such as ``decorators_delta``.
+    if prefix in _REMOVED_PUBLIC_ALIASES and "removed" in model.model_fields:
         mapping[f"{prefix}.removed_public"] = TargetCategory.RECORD_COLLECTION
 
 

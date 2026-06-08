@@ -1,0 +1,12 @@
+intent: preserve auth guard decorators
+change:
+  primary_kind: generic
+constraints:
+  - id: preserve_auth_guards
+    kind: delta
+    target: decorators_delta.removed
+    operator: excludes_all
+    expected:
+      - decorator_leaf: login_required
+    severity: hard
+    unknown_policy: fail

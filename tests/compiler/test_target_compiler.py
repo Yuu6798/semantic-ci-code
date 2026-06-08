@@ -476,6 +476,27 @@ constraints:
     assert "api_surface_delta.removed_public" in targets
 
 
+def test_decorators_delta_removed_public_alias_is_not_published():
+    yaml_source = """
+intent: decorators alias footgun
+change:
+  primary_kind: generic
+constraints:
+  - id: bad_decorator_alias
+    kind: delta
+    target: decorators_delta.removed_public
+    operator: excludes_all
+    expected:
+      - decorator_leaf: login_required
+"""
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_target_svp(yaml_source, filename="target.yaml")
+
+    assert exc_info.value.path == "constraints[0].target"
+    assert "decorators_delta.removed_public" in exc_info.value.message
+
+
 def test_unknown_operator_raises_compile_error_with_constraint_path():
     yaml_source = """
 intent: bad operator

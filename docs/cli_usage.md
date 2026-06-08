@@ -155,6 +155,7 @@ Match Schema registry:
 | `api_surface_delta.changed` | `fqn` | `kind` | `signature`, `visibility`, `before`, `after` |
 | `effects` | `fqn` or `effect_class` | `effect_class` | `confidence`, `evidence` |
 | `effect_changes.added`, `.removed` | `fqn` or `effect_class` | `effect_class` | `confidence`, `evidence` |
+| `decorators_delta.added`, `.removed` | `decorator` or `decorator_leaf` | `fqn` | - |
 | `imports` | `module` | `from` | `symbols` |
 | `imports_delta.added`, `.removed` | `module` | `from` | `symbols` |
 
@@ -185,6 +186,10 @@ expected:
 
 Effect targets also accept `effect_class`-only records, which is useful for
 deny gates that should match any new effect of a class regardless of FQN.
+Decorator delta targets accept `decorator` records for exact dotted decorator
+matches and `decorator_leaf` records for qualified-insensitive matches. The
+auth-guard recipe uses `decorator_leaf` so `@auth.login_required` is matched by
+the configured `login_required` guard name.
 
 Flat projections are convenience aliases only: `api_surface_delta.added.fqns`,
 `effect_changes.added.fqns`, and `imports_delta.added.modules`. They compare
@@ -286,6 +291,7 @@ semantic-ci init --recipe feature:add-api --add-api pkg.api.create_user --intent
 semantic-ci init --recipe bugfix:regression-test --test-case tests/test_login.py::test_regression --doctor
 semantic-ci init --recipe security:deny-dangerous-imports
 semantic-ci init --recipe security:deny-dangerous-effects
+semantic-ci init --recipe security:preserve-auth-guards
 ```
 
 After successful generation, `init` prints next-step commands for compile and
@@ -304,6 +310,7 @@ Recipe IDs:
 | `test-update:add-test-case` | `test_update` | Requires or checks for test case additions. |
 | `security:deny-dangerous-imports` | `generic` | Denies newly added imports such as `pickle`, `subprocess`, and `marshal`. |
 | `security:deny-dangerous-effects` | `generic` | Denies newly added `process`, `dynamic_code`, and `unsafe_deserialize` effects. |
+| `security:preserve-auth-guards` | `generic` | Denies removal of public API decorators whose leaf name is `login_required`, `requires_auth`, or `permission_required`. |
 
 `--doctor` runs target-doctor inline after writing the file and prints the human
 advisory output to stderr. `--package-root` is accepted only together with

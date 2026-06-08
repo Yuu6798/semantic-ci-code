@@ -211,8 +211,18 @@ def test_removed_public_alias_matches_public_removed_api_records():
         CodeStateDelta(
             api_surface_delta=SymbolDelta(
                 removed=(
-                    _api("pkg.public_removed", visibility="public"),
-                    _api("pkg.private_removed", visibility="private"),
+                    {
+                        "fqn": "pkg.public_removed",
+                        "kind": "function",
+                        "signature": "def f(): ...",
+                        "visibility": "public",
+                    },
+                    {
+                        "fqn": "pkg.private_removed",
+                        "kind": "function",
+                        "signature": "def f(): ...",
+                        "visibility": "private",
+                    },
                 )
             )
         ),

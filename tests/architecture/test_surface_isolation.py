@@ -221,6 +221,7 @@ CSCI_42_MODULES = (
     "semantic_ci_code.cli.init_recipes.test_update_add_test_case",
     "semantic_ci_code.cli.init_recipes.security_deny_dangerous_imports",
     "semantic_ci_code.cli.init_recipes.security_deny_dangerous_effects",
+    "semantic_ci_code.cli.init_recipes.security_preserve_auth_guards",
     "semantic_ci_code.authoring.sources",
     "semantic_ci_code.authoring.sources.pr_body",
     "semantic_ci_code.authoring.sources.issue",

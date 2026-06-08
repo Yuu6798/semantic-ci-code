@@ -43,8 +43,21 @@ def api(
     kind: str = "function",
     signature: str | None = "def f():\n    ...",
     visibility: str | None = "public",
+    decorators: tuple[str, ...] = (),
 ) -> APISurfaceEntry:
-    return APISurfaceEntry(fqn=fqn, kind=kind, signature=signature, visibility=visibility)
+    return APISurfaceEntry(
+        fqn=fqn,
+        kind=kind,
+        signature=signature,
+        visibility=visibility,
+        decorators=decorators,
+    )
+
+
+def api_delta_record(entry: APISurfaceEntry) -> dict[str, object]:
+    dumped = entry.model_dump(mode="json")
+    dumped.pop("decorators", None)
+    return dumped
 
 
 def effect(
@@ -120,42 +133,136 @@ def test_api_surface_added_removed_and_changed_entries():
     baseline = CodeState(
         api_surface=(
             api("pkg.removed"),
+            api("pkg.removed_decorated", decorators=("login_required",)),
             api("pkg.changed_sig", signature="def changed_sig(x: int):\n    ..."),
-            api("pkg.changed_visibility", visibility="public"),
+            api("pkg.changed_visibility", visibility="public", decorators=("login_required",)),
         )
     )
     candidate = CodeState(
         api_surface=(
-            api("pkg.added"),
+            api("pkg.added", decorators=("login_required",)),
             api("pkg.changed_sig", signature="def changed_sig(x: str):\n    ..."),
-            api("pkg.changed_visibility", visibility="private"),
+            api("pkg.changed_visibility", visibility="private", decorators=("requires_auth",)),
         )
     )
 
     delta = compute_code_state_delta(baseline, candidate)
 
-    assert delta.api_surface_delta.added == (api("pkg.added").model_dump(mode="json"),)
-    assert delta.api_surface_delta.removed == (api("pkg.removed").model_dump(mode="json"),)
+    assert delta.api_surface_delta.added == (
+        api_delta_record(api("pkg.added", decorators=("login_required",))),
+    )
+    assert delta.api_surface_delta.removed == (
+        api_delta_record(api("pkg.removed")),
+        api_delta_record(api("pkg.removed_decorated", decorators=("login_required",))),
+    )
     assert delta.api_surface_delta.changed == (
         {
             "fqn": "pkg.changed_sig",
             "kind": "function",
-            "before": api(
-                "pkg.changed_sig",
-                signature="def changed_sig(x: int):\n    ...",
-            ).model_dump(mode="json"),
-            "after": api(
-                "pkg.changed_sig",
-                signature="def changed_sig(x: str):\n    ...",
-            ).model_dump(mode="json"),
+            "before": api_delta_record(
+                api(
+                    "pkg.changed_sig",
+                    signature="def changed_sig(x: int):\n    ...",
+                )
+            ),
+            "after": api_delta_record(
+                api(
+                    "pkg.changed_sig",
+                    signature="def changed_sig(x: str):\n    ...",
+                )
+            ),
         },
         {
             "fqn": "pkg.changed_visibility",
             "kind": "function",
-            "before": api("pkg.changed_visibility", visibility="public").model_dump(mode="json"),
-            "after": api("pkg.changed_visibility", visibility="private").model_dump(mode="json"),
+            "before": api_delta_record(
+                api("pkg.changed_visibility", visibility="public", decorators=("login_required",))
+            ),
+            "after": api_delta_record(
+                api("pkg.changed_visibility", visibility="private", decorators=("requires_auth",))
+            ),
         },
     )
+    assert all("decorators" not in item for item in delta.api_surface_delta.added)
+    assert all("decorators" not in item for item in delta.api_surface_delta.removed)
+    assert all(
+        "decorators" not in payload
+        for change in delta.api_surface_delta.changed
+        for payload in (change["before"], change["after"])
+    )
+    assert delta.decorators_delta.added == (
+        {"fqn": "pkg.added", "decorator": "login_required", "decorator_leaf": "login_required"},
+    )
+    assert delta.decorators_delta.removed == (
+        {
+            "fqn": "pkg.changed_visibility",
+            "decorator": "login_required",
+            "decorator_leaf": "login_required",
+        },
+        {
+            "fqn": "pkg.removed_decorated",
+            "decorator": "login_required",
+            "decorator_leaf": "login_required",
+        },
+    )
+
+
+def test_decorator_changes_are_recorded_without_api_surface_change():
+    baseline = CodeState(
+        api_surface=(
+            api("pkg.view", decorators=("auth.login_required", "app.route")),
+            api("pkg._internal", visibility="private", decorators=("login_required",)),
+        )
+    )
+    candidate = CodeState(
+        api_surface=(
+            api("pkg.view", decorators=("app.route",)),
+            api("pkg._internal", visibility="private"),
+        )
+    )
+
+    delta = compute_code_state_delta(baseline, candidate)
+
+    assert delta.api_surface_delta == SymbolDelta()
+    assert delta.decorators_delta == SymbolDelta(
+        removed=(
+            {
+                "fqn": "pkg.view",
+                "decorator": "auth.login_required",
+                "decorator_leaf": "login_required",
+            },
+        )
+    )
+
+
+def test_decorator_delta_records_added_and_removed_in_sorted_order():
+    baseline = CodeState(
+        api_surface=(
+            api("pkg.b", decorators=("requires_auth",)),
+            api("pkg.a", decorators=("login_required",)),
+        )
+    )
+    candidate = CodeState(
+        api_surface=(
+            api("pkg.b", decorators=("permission_required",)),
+            api("pkg.a", decorators=("login_required", "requires_auth")),
+        )
+    )
+
+    delta = compute_code_state_delta(baseline, candidate)
+
+    assert delta.decorators_delta.added == (
+        {"fqn": "pkg.a", "decorator": "requires_auth", "decorator_leaf": "requires_auth"},
+        {
+            "fqn": "pkg.b",
+            "decorator": "permission_required",
+            "decorator_leaf": "permission_required",
+        },
+    )
+    assert delta.decorators_delta.removed == (
+        {"fqn": "pkg.b", "decorator": "requires_auth", "decorator_leaf": "requires_auth"},
+    )
+    assert delta.decorators_delta.changed == ()
 
 
 def test_api_surface_duplicate_identity_keys_are_group_compared():
@@ -174,12 +281,12 @@ def test_api_surface_duplicate_identity_keys_are_group_compared():
             "fqn": "pkg.parse",
             "kind": "function",
             "before": [
-                overload_int.model_dump(mode="json"),
-                overload_str.model_dump(mode="json"),
+                api_delta_record(overload_int),
+                api_delta_record(overload_str),
             ],
             "after": [
-                overload_bytes.model_dump(mode="json"),
-                overload_int.model_dump(mode="json"),
+                api_delta_record(overload_bytes),
+                api_delta_record(overload_int),
             ],
         },
     )
@@ -446,8 +553,8 @@ def test_hand_built_virtual_code_state_engine_contract():
 
     delta = compute_code_state_delta(baseline, candidate)
 
-    assert delta.api_surface_delta.added == (api("virtual.new").model_dump(mode="json"),)
-    assert delta.api_surface_delta.removed == (api("virtual.old").model_dump(mode="json"),)
+    assert delta.api_surface_delta.added == (api_delta_record(api("virtual.new")),)
+    assert delta.api_surface_delta.removed == (api_delta_record(api("virtual.old")),)
 
 
 def test_p1_unimplemented_fields_stay_at_defaults():
@@ -478,6 +585,11 @@ def _flip_delta(delta: CodeStateDelta) -> CodeStateDelta:
             added=delta.api_surface_delta.removed,
             removed=delta.api_surface_delta.added,
             changed=tuple(_flip_before_after(change) for change in delta.api_surface_delta.changed),
+        ),
+        decorators_delta=SymbolDelta(
+            added=delta.decorators_delta.removed,
+            removed=delta.decorators_delta.added,
+            changed=(),
         ),
         effect_changes=EffectChanges(
             added=delta.effect_changes.removed,

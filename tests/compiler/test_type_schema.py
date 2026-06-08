@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from semantic_ci_code.compiler import CompileError, compile_target_svp
+from semantic_ci_code.compiler.path_schema import valid_delta_target_paths
 from semantic_ci_code.compiler.type_schema import (
     TargetCategory,
     TypeMismatch,
@@ -37,6 +38,8 @@ from semantic_ci_code.framework.constraint_types import Operator
         ("api_surface_delta.removed", TargetCategory.RECORD_COLLECTION),
         ("api_surface_delta.removed_public", TargetCategory.RECORD_COLLECTION),
         ("api_surface_delta.changed", TargetCategory.RECORD_COLLECTION),
+        ("decorators_delta.added", TargetCategory.RECORD_COLLECTION),
+        ("decorators_delta.removed", TargetCategory.RECORD_COLLECTION),
         ("effect_changes.added", TargetCategory.RECORD_COLLECTION),
         ("effect_changes.removed", TargetCategory.RECORD_COLLECTION),
         ("imports_delta.added", TargetCategory.RECORD_COLLECTION),
@@ -54,6 +57,7 @@ from semantic_ci_code.framework.constraint_types import Operator
         ("files_touched", TargetCategory.SCALAR_NUMBER),
         ("loc_delta.added", TargetCategory.SCALAR_NUMBER),
         ("api_surface_delta", TargetCategory.RECORD),
+        ("decorators_delta", TargetCategory.RECORD),
         ("effect_changes", TargetCategory.RECORD),
         ("cfg_delta", TargetCategory.RECORD),
         ("imports_delta", TargetCategory.RECORD),
@@ -69,6 +73,14 @@ from semantic_ci_code.framework.constraint_types import Operator
 )
 def test_category_for_target_resolves_static_type(target: str, category: TargetCategory):
     assert category_for_target(target) is category
+
+
+def test_decorators_delta_paths_are_schema_reflected():
+    paths = valid_delta_target_paths()
+    assert "decorators_delta.added" in paths
+    assert "decorators_delta.removed" in paths
+    assert "decorators_delta.removed_public" not in paths
+    assert category_for_target("decorators_delta.removed_public") is TargetCategory.UNKNOWN_OPEN
 
 
 # --- observed-side rejections ----------------------------------------------

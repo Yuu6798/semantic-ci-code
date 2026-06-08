@@ -74,6 +74,13 @@ _EFFECT_SCHEMA = MatchSchema(
     },
     required_any_keys=frozenset({"fqn", "effect_class"}),
 )
+_DECORATOR_SCHEMA = MatchSchema(
+    target="decorators_delta",
+    required_key="decorator",
+    optional_keys=frozenset({"decorator_leaf", "fqn"}),
+    forbidden_keys={},
+    required_any_keys=frozenset({"decorator", "decorator_leaf"}),
+)
 _IMPORT_SCHEMA = MatchSchema(
     target="imports",
     required_key="module",
@@ -93,6 +100,8 @@ _SCHEMAS: dict[str, MatchSchema] = {
     "effects": _EFFECT_SCHEMA,
     "effect_changes.added": _EFFECT_SCHEMA,
     "effect_changes.removed": _EFFECT_SCHEMA,
+    "decorators_delta.added": _DECORATOR_SCHEMA,
+    "decorators_delta.removed": _DECORATOR_SCHEMA,
     "imports": _IMPORT_SCHEMA,
     "imports_delta.added": _IMPORT_SCHEMA,
     "imports_delta.removed": _IMPORT_SCHEMA,

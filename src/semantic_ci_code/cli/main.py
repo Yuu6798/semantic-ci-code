@@ -231,6 +231,7 @@ def build_parser() -> argparse.ArgumentParser:
             "test-update:add-test-case",
             "security:deny-dangerous-imports",
             "security:deny-dangerous-effects",
+            "security:preserve-auth-guards",
         ),
         help="generate target.yaml from a recipe instead of the bare scaffold",
     )

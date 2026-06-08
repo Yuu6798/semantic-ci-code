@@ -169,18 +169,35 @@ class Outer:
     assert "pkg.nested.Outer.Nested.method" not in fqns
 
 
-def test_decorated_function_preserves_decorators_in_signature():
+def test_decorated_function_records_decorators_without_signature_coupling():
     source = """
 @decorator(arg=1)
+@auth.requires
 def decorated(x: int) -> int:
     return x
 """.lstrip()
 
     entries = extract_python_api_surface(source, module_fqn="pkg.decorators")
+    entry = _by_fqn(entries)["pkg.decorators.decorated"]
 
-    assert _by_fqn(entries)["pkg.decorators.decorated"].signature == (
-        "@decorator(arg=1)\ndef decorated(x: int) -> int:\n    ..."
-    )
+    assert entry.decorators == ("decorator", "auth.requires")
+    assert entry.signature == "def decorated(x: int) -> int:\n    ..."
+
+
+def test_class_and_method_decorator_names_include_call_function():
+    source = """
+@app.route("/users")
+class Users:
+    @login_required
+    async def get(self) -> None:
+        pass
+""".lstrip()
+
+    entries = extract_python_api_surface(source, module_fqn="pkg.decorators")
+    by_fqn = _by_fqn(entries)
+
+    assert by_fqn["pkg.decorators.Users"].decorators == ("app.route",)
+    assert by_fqn["pkg.decorators.Users.get"].decorators == ("login_required",)
 
 
 def test_overload_stubs_each_emit_one_entry():
@@ -202,9 +219,10 @@ def parse(value):
 
     assert len(parse_entries) == 3
     signatures = {entry.signature for entry in parse_entries}
-    assert "@overload\ndef parse(value: int) -> int:\n    ..." in signatures
-    assert "@overload\ndef parse(value: str) -> str:\n    ..." in signatures
+    assert "def parse(value: int) -> int:\n    ..." in signatures
+    assert "def parse(value: str) -> str:\n    ..." in signatures
     assert "def parse(value):\n    ..." in signatures
+    assert {entry.decorators for entry in parse_entries} == {("overload",), ()}
 
 
 def test_regular_redefinition_keeps_first_signature_only():

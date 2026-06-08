@@ -28,7 +28,7 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 - `_index.md` 1-line summary では情報不足で dated 原文が必要な時
 - archive 移送 protocol 自体の audit / drift check
 
-## Current contents (2026-06-03 時点)
+## Current contents (2026-06-08 時点)
 
 | File / Directory | 移送 cutoff | 移送元 | Migration commit |
 |---|---|---|---|
@@ -36,6 +36,10 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 | `2026-05/2026-05-02.md` | 2026-06-02 (>30 日 TTL) | `_index.md` 2026-05-02 entry (初の dated-log 物理移送) | 2026-06-02 wrap-up |
 | `2026-05/2026-05-03.md` | 2026-06-03 (>30 日 TTL) | `_index.md` 2026-05-03 entry (S1+S2+S3 統合) | 2026-06-03 wrap-up |
 | `2026-05/2026-05-04.md` | 2026-06-03 (30 日 TTL) | `_index.md` 2026-05-04 entry (Brief 3 残務 + Brief 4 全体) | 2026-06-03 wrap-up (S2) |
+| `2026-05/2026-05-05.md` | 2026-06-08 (>30 日 TTL) | `_index.md` 2026-05-05 entry (S1〜S4 統合) | 2026-06-08 wrap-up |
+| `2026-05/2026-05-06.md` | 2026-06-08 (>30 日 TTL) | `_index.md` 2026-05-06 entry (S1〜S3 統合) | 2026-06-08 wrap-up |
+| `2026-05/2026-05-07.md` | 2026-06-08 (>30 日 TTL) | `_index.md` 2026-05-07 entry (S1〜S5 統合) | 2026-06-08 wrap-up |
+| `2026-05/2026-05-08.md` | 2026-06-08 (>30 日 TTL) | `_index.md` 2026-05-08 entry | 2026-06-08 wrap-up |
 
 ## 移送 protocol
 

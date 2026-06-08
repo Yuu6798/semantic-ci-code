@@ -7,6 +7,7 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 
 | Date | PR / commit | Outcome | Detail |
 |---|---|---|---|
+| 2026-06-08 | #136 + #138 + #139 | Pre-release credibility トラック完走 (CRED-1 README `## Project Status`+ROADMAP+CONTRIBUTING / F1-F2 repo desc+topics 手動設定 / CRED-2 examples gallery 4 ケース+anti-rot test) + **Phase G 完走** (G-5/CSCI-49 = decorators_delta auth-guard facet + `security:preserve-auth-guards` recipe + G-4b cleanups)。tag は切らない方針 / ROADMAP に v0.1.0 exit criteria (schema_version 連続3brief不変+exit-code不変+D全解決)。auth_guards_delta を config-free decorators_delta で realize、G-6→Phase H 番号一本化。#136 が自前 dogfooding 開示 CI に被弾→本文修正で通過 | `2026-06-08.md` |
 | 2026-06-03 (S2) | #130 → #131 → #132 | LLM security sensor / scout layer planning (Phase H candidate、`docs/llm_sensor_adapter_planning.md`、CSCI-50〜54、G-5 完走前提)。Codex Security 調査 → SSP/Phase G 接続の 5+ round 壁打ち → D1〜D9 (中心命題「LLM は scout であって judge ではない」/ verdict 分離 / 誤検知>見逃し / 沈黙=容認)。#130 を承認前に誤 merge → revert (#131) → 修正版 #132 で Codex P2 を 7 round 消化 (cross-model dedup / rename / verdict 分離 / absence+presence anchor 述語) して merge | `2026-06-03.md` |
 | 2026-06-03 | #127 + #128 + #129 | Phase G G-3〜G-4b 完走 (CSCI-47/48/48b)。suite security policy evaluator (#127) → `check --sensor` 配線 + suite_verdict + exit code + 集約 security JSON (#128) → per-sensor detail を JSON/human/SARIF に拡張 + SARIF 同一 run マージ (#129)。CSCI-48b は grounding-first brief で wrapper 化契約維持 + G-4a exact-match 緩和を事前 encode、PR #129 review バグ 0 (非ブロッキング 2 cleanup) → follow-up 3 commit で land。Phase G 残は G-5 (CSCI-49 templates) のみ | `2026-06-03.md` |
 | 2026-06-02 | #124 + #125 + #126 | Phase G 着手: G-1/CSCI-45 (SensorState+canonical_id+delta) + G-2/CSCI-46 (SSP→SensorState 翻訳 adapter) を 2 PR 完走。review で P2 捕捉→Codex 1 round 修正 (CSCI-45: ordinal を v1 identity に / suppression G-3 defer / SSP 命名整合、CSCI-46: SCA canonical_id dedup)。SAST identity を SSP 5 要素 fingerprint 整合の 8 要素に確定し planning を逆流同期 (#126) | `2026-06-02.md` |
@@ -30,19 +31,10 @@ Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
 | 2026-05-15 (S1) | #76-#79 | ResultStatus split 完走 (D1-2 / D1-3 / D1-4 / D3、 ABCD-A 軸 landed、 4 PR 一気通貫) | `2026-05-15.md` |
 | 2026-05-12 | #74 | ResultStatus planning 取り込み (§1b Brief 8 boundary 新設) + ABCD 完成度境界確認、 「半年の壁打ちが ABCD に蒸留」 と言語化 | `2026-05-12.md` |
 | 2026-05-09 | #70 / #71 | 緊急 perf brief 2 連続 (test in-process 化 -75%、 template repo reuse -31%) + ResultStatus planning C+B 仮固定 | `2026-05-09.md` |
-| 2026-05-08 | #69 | `docs/target_yaml_guide.md` 新設 (5/7 S4 dogfood の D1/D3/D4 hazard 集約) + ResultStatus 棚卸し start | `2026-05-08.md` |
-| 2026-05-07 (S5) | #61 / #62 | TC10 dogfood 完走 (10/10 verdict 契約通り)、 FINDING-1〜3 抽出、 D5 (set operator partial-dict) を tracking 統合 | `2026-05-07.md` |
-| 2026-05-07 (S4) | #58 / #59 / #60 | 弱点分析 → 実地 dogfood → 緊急パッチ 3 連続 (compile-time path 検証 + symlink guard + dep 上限ピン)、 D1〜D4 発見 | `2026-05-07.md` |
-| 2026-05-07 (S3) | — | Kai 探索 + call_graph dimension 検討、 いずれも採用見送り (Python 未実装 + §23.3 グレー / `module_graph_delta` 既存) | `2026-05-07.md` |
-| 2026-05-07 (S2) | — | 並走 brief 発行 (CSCI-30b〜34 起草) + Brief 7 設計申し送り 11 項目を AGENTS.md Forward Design Note に永続化 | `2026-05-07.md` |
-| 2026-05-07 (S1) | #53-#57 | Brief 5 (P2.5) 完走、 CSCI-32〜35 + 完了宣言、 Vibe Coding Adapter 3 種 + `compile-repair` / `validate-plan` release 可能 | `2026-05-07.md` |
-| 2026-05-06 (S3) | #50 | PR #50 (SSP planning + Brief 6 凍結) を Codex 7 round 全消化、 SSP spec implementability + memory handoff source-of-truth 再定義 | `2026-05-06.md` |
-| 2026-05-06 (S2) | (#50) | Issue #48 (Semgrep) audit → 別 protocol SSP として §20.1 4 層化、 6 論点確定 (SAST+SCA / Python only / 5 要素 fp / Sensor Provenance Invariant) | `2026-05-06.md` |
-| 2026-05-06 (S1) | `fa5f887` | Responsibility Boundary 確立、 §23.3 (intent 側鏡像 / 4 surface 模型) 新設、 Scope guard 2 行拡張 | `2026-05-06.md` |
-| 2026-05-05 (S4) | #35 / #36 / #39 / #40 / #42 / #43 / #44 | P1 完走 (Brief 4b/4c/4d 全 merged) + Brief 5 planning (P2.5 entry)、 redistribution table で残課題行先明示 | `2026-05-05.md` |
-| 2026-05-05 (S3) | #33 / #37 | Brief 4b cache slice CSCI-25/26/27 3 brief 連続発行、 `--mode {smoke,full}` + CodeState cache + size-eviction | `2026-05-05.md` |
-| 2026-05-05 (S2) | — | PR #34 post-merge adversarial test (A 真陰 + D 偽陰) → effects slice 実装 gap 発見 (P2 で予定通り解消)、 docs only | `2026-05-05.md` |
-| 2026-05-05 (S1) | #34 | §23.1 入力 contract「engine は state 出自を問わない」 を仕様 → 実証済み性質に格上げ、 `pre_generation_validation_case.md` 新設 | `2026-05-05.md` |
+| 2026-05-08 | #69 | `docs/target_yaml_guide.md` 新設 (D1/D3/D4 hazard 集約) + ResultStatus 棚卸し start。**archived** (>30 日) | `archive/2026-05/2026-05-08.md` |
+| 2026-05-07 (S1〜S5) | #53-#62 | Brief 5 (P2.5) 完走 + 並走 brief 発行 + Brief 7 設計申し送り永続化 + Kai/call_graph 見送り + 弱点分析→dogfood→緊急パッチ (D1〜D4) + TC10 dogfood (D5 統合)。**archived** (>30 日) | `archive/2026-05/2026-05-07.md` |
+| 2026-05-06 (S1〜S3) | #50 + `fa5f887` | Responsibility Boundary / §23.3 確立 + Issue #48 audit→SSP 別protocol化 (6論点) + PR #50 (SSP planning + Brief 6 凍結) を Codex 7 round 消化。**archived** (>30 日) | `archive/2026-05/2026-05-06.md` |
+| 2026-05-05 (S1〜S4) | #33-#44 | §23.1 入力 contract 格上げ + adversarial test で effects gap 発見 + Brief 4b cache slice (CSCI-25/26/27) + P1 完走 (Brief 4b/4c/4d) + Brief 5 planning。**archived** (>30 日) | `archive/2026-05/2026-05-05.md` |
 | 2026-05-04 | #20-#26 | Brief 3 残務 + Brief 4 全体 (CSCI-15〜19) を 1 セッション完結、 `semantic-ci` CLI 5 subcommand release 可能、 self-dogfood 初実証。**archived** (30 日) | `archive/2026-05/2026-05-04.md` |
 | 2026-05-03 (S1+S2+S3) | #5 ほか | Brief 2 完結 (P1 抽出器 5 PR: api_surface/imports/module_graph/complexity/test_surface) + design.md §17-§22 追加 (P2.5 前倒し) + Brief 3 planning Q1〜Q4 + §23 新設 + Session Memory ワークフロー正式化。**archived** (>30 日) | `archive/2026-05/2026-05-03.md` |
 | 2026-05-02 | #3 / #4 / #5 | P1 effect extractor 3-stage 完成 (CSCI-2/3/4)。**archived** (>30 日) | `archive/2026-05/2026-05-02.md` |

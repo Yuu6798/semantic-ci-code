@@ -24,9 +24,51 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜5 + Brief 8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor 全完走。Phase G (SSP core integration) は `docs/phase_g_planning.md` の 5 PR 構成 (CSCI-45〜49) で進行中で、設計の核は SSP v0.1 を core の横ではなく縦接続に再構築すること: CodeState と並列の SensorState を新設、suite evaluator で code_delta + security_delta を統合 verdict (unknown > fail > repair > pass)、SAST finding を FQN 空間に翻訳して canonical_id を JSON array hash で injective encoding、per-sensor provenance で drift 検出。2026-06-02 に **G-1/G-2 (CSCI-45/46)** が landed (PR #124/#125): SensorState model + canonical_id + delta + SSP→SensorState 翻訳 adapter、SAST identity は SSP 5 要素 fingerprint 整合の 8 要素確定。2026-06-03 に **G-3/G-4a/G-4b (CSCI-47/48/48b)** が landed (PR #127/#128/#129): G-3 = suite security policy evaluator、G-4a = `check --sensor-baseline/--sensor-candidate` で SensorState ingest + suite_verdict + exit code + 集約 security JSON、G-4b = per-sensor security detail (added/removed/suppressed/drift/unchanged) を JSON/human/SARIF に拡張 + SARIF を code constraint と同一 run にマージ (severity→level: critical/high=error, medium=warning, low/info=note)。Phase G 残は **G-5 (CSCI-49 = semantic security templates 2 カテゴリ) のみ**。2026-06-03 に **Phase H candidate** (LLM security sensor / 非決定論 scout layer、`docs/llm_sensor_adapter_planning.md`、CSCI-50〜54、PR #132) が planning 化 — ただし **Phase G-5 完走を前提**とし active queue 未投入 (中心命題「LLM は scout であって judge ではない」: 出力は Advisor surface 行きで verdict を直接 seat しない)。Next queue: **G-5** + Phase X (ecosystem formalization) の残 sub-phase (E-1〜E-3)、その後 Phase H candidate。
+Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走**。Phase G は SSP v0.1 を core の横ではなく縦接続に再構築する設計で、CodeState と並列の SensorState を新設、suite evaluator で code+security を統合 verdict (unknown > fail > repair > pass)、SAST finding を FQN 空間に canonical_id 化、per-sensor provenance で drift 検出。最終スライス G-5/CSCI-49 を 2026-06-08 に PR #139 で landing: planning の `auth_guards_delta` を config-free な汎用 `decorators_delta` (CodeState 側 facet) + `security:preserve-auth-guards` recipe で realize し、public API の auth decorator 除去を semantic delta 化 (path_schema/evaluator は schema 反射で不変、§23.1 維持)、G-4b cleanups (build_payload dead args / SARIF 1-based clamp) を同梱。並行して 2026-06-08 に **pre-release credibility トラック** (PR #136 README `## Project Status`+`ROADMAP.md` の falsifiable な v0.1.0 exit criteria+`CONTRIBUTING.md` / PR #138 `examples/` 4 ケース gallery+anti-rot test / repo description+topics 手動設定) を完走し、tag は切らず experimental 明示の方針を確立。repo-internal の ready 実装 queue は空。次は D-class closure (D6/D7、exit criteria 前進) / Phase H (LLM security scout layer、CSCI-50〜54、G-5 完走で gate 解除・active 投入は要判断) / Phase X (ecosystem cross-repo、別 session) のいずれか。
 
 ## 直近 merged
+
+### 2026-06-08 — Pre-release credibility トラック完走 + Phase G 完走 (PR #136 + #138 + #139)
+
+外部ビュアー向け信頼作り (正式リリースを切らない方針) と Phase G 最終スライスを
+1 session で landing。全 PR を本人が Codex bot 👍 後にマージ。
+
+- **PR #136** (CRED-1): README `## Project Status` (experimental/unstable) +
+  `ROADMAP.md` (v0.1.0 exit criteria = schema_version 連続3brief不変 + exit-code
+  不変 + D全解決/waive、配布は post-Phase-X deferred) + `CONTRIBUTING.md`。自前の
+  dogfooding 開示 CI (`pr-body-discipline`) に被弾 → 実 self-dogfood (docs-only =
+  D4 vacuous PASS) を正直開示する本文に修正して通過。
+- **F1/F2**: repo description = "Deterministic semantic CI that flags intent
+  drift in AI-assisted code changes (experimental, pre-release)" + topics 6 件
+  (MCP に repo settings tool 無く本人が手動設定)。
+- **PR #138** (CRED-2): `examples/` 4 ケース (scope-guard 差別化: not test
+  runner/linter/type checker/LLM judge)、各 hand-built baseline/candidate +
+  target.yaml + README、`compare` で verdict+exit code 実測。anti-rot guard test
+  が README の expected を実結果と突合。§23.1 維持 (compare、git ref なし)。
+- **PR #139** (G-5/CSCI-49): `APISurfaceEntry.decorators` + `CodeStateDelta.
+  decorators_delta` (public のみ) + `security:preserve-auth-guards` recipe +
+  G-4b cleanups。**Phase G 完走**。
+
+**設計判断のハイライト**:
+
+1. **credibility の軸を「release/no-release」から「stability promise/no-promise」へ**。
+   tag は切らない (0.0.x も見送り)、credibility の本体は falsifiable な exit
+   criteria + 走る失敗例 + tracked FN/FP。doc は reader-facing 最上層に置き
+   canonical へ link DOWN only (bloat 回避)。
+2. **G-5 grounding で planning 矛盾を発見**: Category A (deny imports/effects) は
+   既に recipe 実装済 → 冗長な `templates/security/` static dir を作らず、本当に
+   新規価値の Category B (auth guard) を G-5 に。`auth_guards_delta` を config-free
+   `decorators_delta` + recipe allowlist で realize (delta 層を domain 非依存に保ち
+   「not an intent interpreter」遵守)。G-6 を G-5 に畳み CSCI-50 は Phase H に一本化。
+3. **AskUserQuestion で scope fork を先に確定** → 各 brief が 1 発で landing。
+
+**修正・訂正**:
+
+1. **#136 が自前 discipline CI に被弾** (自家撞着)。学び: PR 本文プレースホルダは
+   `<...>` でなくバッククォート (`<generic docs target>` が HTML 視され除去)。
+2. **G-5 review 指摘** (follow-up 候補): `decorators` が `api_surface_delta` 記録に
+   不統一に出る (added/removed 保持・changed group strip)。全経路 strip 推奨を
+   コードブロックで提示済 (全緑のため verdict バグではない)。
 
 ### 2026-06-03 Session 2 — LLM security sensor / scout layer planning (Phase H candidate、PR #130→#131→#132)
 
@@ -167,32 +209,9 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
   3 箇所 + rationale 1 行)。bare `pytest` が PATH 上の cov-plugin 無し interpreter
   を引くと `--no-cov` 未認識でゲートが誤 fail する穴を恒久 close。
 
-### 2026-05-29 — doc-refactor Phase 6 完走 + doc hygiene sweep (PR #118)
-
-`doc_refactor_planning.md` Phase 6 の残 "future hardening" 3 候補を closeout し、
-起動時 audit で surface した doc drift を同 PR に積んだ。
-
-- **PR #118** (merged、 commits `aa56332`→`f8f004c`):
-  - Phase 6: schema-grep を `tests/discipline/test_json_schema_version_sync.py`
-    (CLI envelope `schema_version` 定数 ↔ `docs/json_schema.md` anchor 同期)、
-    dual-case dogfood を `test_dogfood_dual_case.py` (registered case/verdict-matrix
-    report の `Verdict` 列が PASS/FAIL 両方向を含むか) に test 化。round-count は
-    retire (prose proxy が脆い → `CLAUDE.md` wrap-up checklist へ格下げ)。
-  - hygiene: `CLAUDE.md` 表に `phase_g_planning.md` 行追加、 README Planning 補完
-    + stale schema_version 修正、 STATUS 2026-05-22 entry 圧縮 (418→349 行)、
-    `AGENTS.md §5.5` enforcement cell を実 test パスへ同期。
-  - Codex bot review P2 (dual-case の prose-scan 誤通過) に対応し **verdict 列
-    パース**へ改修 + `test_dual_case_ignores_prose_tokens` 回帰追加。CI 一度 fail
-    (ruff format 見落とし) → 修正で 3.11/3.12/3.13 green。
-- 壁打ち成果 (実装は Codex 不在で見送り): **B = coverage advisory** の設計思想・
-  実務順序・較正方針を `.claude/memory/2026-05-29.md` 専用 section に externalize。
-  メタ原理「検証不能な真値 → 検証可能な保守的代理」。
-- 残: doc_refactor 自己 archive は Phase 3 cosmetic (§5 trim、 §5.3 merge は再考
-  推奨 = 非実行) のため見送り。
-
 ### 古い merged entry (2026-05-28 S2 以前) — archive 参照
 
-21 entry (2026-05-28 S2 / 2026-05-27 / 2026-05-26 / 2026-05-22 /
+22 entry (2026-05-29 (#118) / 2026-05-28 S2 / 2026-05-27 / 2026-05-26 / 2026-05-22 /
 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
 2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
@@ -205,45 +224,21 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
 + 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 S1 wrap-up (5/21 S2+S3 移送)
 + 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送)
 + 2026-05-29 S2 wrap-up (5/26 移送) + 2026-06-02 wrap-up (5/27 移送)
-+ 2026-06-03 S2 wrap-up (5/28 S2 移送) で compaction が実施された。
++ 2026-06-03 S2 wrap-up (5/28 S2 移送) + 2026-06-08 wrap-up (5/29 #118 移送) で compaction が実施された。
 
 ## 次の発行順序
 
-ABCD-A/B + Brief 7 (SSP v0.1) + D + F 全完走。active queue は
-**G (SSP core integration、 planning は PR #114 + #115 で取り込み済、 G-1/G-2 (CSCI-45/46) は 2026-06-02 merged、 G-3〜G-5 残)**
-と **E (Phase X 残)** の 2 軸。Phase G は本 repo 内で完結する実装フェーズ、
-Phase X は ecosystem cross-repo 作業。
+ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G (CSCI-45〜49) 全完走**。本 repo 内で
+完結する ready な実装 queue は空。残る軸は **E (Phase X、ecosystem cross-repo、別
+Claude Code session 委譲)**、G-5 完走で gate 解除された **Phase H candidate (LLM
+security scout layer、CSCI-50〜54、`docs/llm_sensor_adapter_planning.md`、active 投入
+は要判断)**、および repo-internal の **D-class closure (D6/D7、ROADMAP v0.1.0 exit
+criteria を前進)**。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
 `.claude/memory/archive/STATUS_MERGED_LOG.md` (古い entry) + dated session
 log (`.claude/memory/YYYY-MM-DD.md`)。
-
-
-### G. Phase G(SSP core integration、 planning は PR #114 + #115 で取り込み済、 G-1〜G-4b merged、 G-5 残)
-
-`docs/phase_g_planning.md` を planning source として、SSP v0.1 を core の
-横ではなく上 (縦接続) に再構築する 5 PR 構成 (CSCI-45〜49)。SensorState を
-CodeState と並列の別 state に分離し、suite evaluator で code_delta +
-security_delta を統合 verdict、SAST finding を FQN 空間に翻訳して自然キー化、
-canonical_id を canonical JSON array hash で injective encoding。
-**G-1〜G-4b (CSCI-45/46/47/48/48b) は 2026-06-02〜06-03 merged**
-(PR #124/#125/#127/#128/#129): SensorState model + delta + 翻訳 adapter +
-suite security evaluator + `check --sensor` 配線 + per-sensor detail を
-JSON/human/SARIF 出力。残は **G-5 のみ**。
-
-- **G-5. CSCI-49. Semantic security templates** (2 カテゴリ):
-  - カテゴリ A (extractor 拡張なし): `dangerous_imports_denied.yaml` +
-    `validation_preserved.yaml`、既存 imports / api_surface で表現
-  - カテゴリ B (extractor 拡張必要): `auth_guard_preserved.yaml` +
-    `privileged_api_gated.yaml`、G-5 brief で extractor scope を AC として
-    定義 (auth decorator 検出 or data_flow 実装)
-
-G-5 brief 起草時の回収候補 (G-4b review の非ブロッキング所見): ①
-`build_payload` の dead な `security_verdict`/`security_as_of` 引数 + elif 分岐の
-削除 / ② SARIF column の 1-based clamp (`max(1, start_col)`、SourceSpan が 0 を
-許容するため SARIF region 仕様 ≥1 と齟齬)。別 PR でも可。
-
 
 
 ### E. Phase X(UGH ecosystem formalization、 2026-05-21 Session 5 起草、 残 3 sub-phase)
@@ -280,24 +275,22 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 
 ### Sequencing decisions
 
-- **A/B/C/D/F 全完走**: Brief 1〜8 + ResultStatus split + source-selection
-  redesign + Brief 7 (SSP v0.1) 全 merged
-- **G (Phase G) active**: 本 repo 内で完結する実装フェーズ、G-1〜G-4b
-  (CSCI-45〜48b) merged、残 G-5 (CSCI-49 templates) のみ
+- **A/B/C/D/F/G 全完走**: Brief 1〜8 + ResultStatus split + source-selection
+  redesign + Brief 7 (SSP v0.1) + Phase G (CSCI-45〜49) 全 merged
 - **E (Phase X) active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
   は ecosystem cross-repo work で別 Claude Code session 委譲、E-3 (X-2
   validation 移植) は中長期 phase
-- **G と E の優先順位**: G は本 repo 単独完結なので Codex split で平行
-  進行可能、E は別 session 委譲で本 session と非同期。本 repo 内の作業
-  優先度では G が先
+- **Phase H candidate** (CSCI-50〜54): G-5 完走で gate 解除。LLM security
+  scout layer、active queue 投入は要判断 (大型・設計重め)
+- **D-class closure** (D6/D7): repo-internal の bounded 候補、ROADMAP の
+  v0.1.0 exit criteria (D 全解決/waive) を直接前進
 
 ### 直近最短経路
 
-- **G-5. CSCI-49 brief 起草**: semantic security templates 2 カテゴリ
-  (A=extractor 拡張なし / B=auth decorator or data_flow 実装)。完走で
-  Phase G 全 5 PR landing。任意で G-4b review 由来の 2 cleanup を同梱
-- **E-1. Phase X-3. Cross-ref embedding** (並行可、別 session 委譲)
-- **E-2. Phase X-1 続き. Umbrella `docs/` 拡張** (並行可、別 session 委譲)
+- **D-class closure (D6/D7)**: repo-internal、bounded ~1日、exit criteria 前進
+  (D6=ADVISORY-D6 + guide Hazard 4、D7=guide 節 + 任意 ADVISORY-D7)
+- **Phase H 着手 (CSCI-50〜54)**: G-5 完走で gate 解除、H-1 brief 起草から
+- **E-1/E-2. Phase X cross-ref / umbrella docs** (別 session 委譲)
 - **E-3. Phase X-2. HA-style validation cross-domain 移植** (中長期)
 
 ## Frozen / Deferred

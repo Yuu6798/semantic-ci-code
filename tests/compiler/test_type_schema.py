@@ -79,6 +79,8 @@ def test_decorators_delta_paths_are_schema_reflected():
     paths = valid_delta_target_paths()
     assert "decorators_delta.added" in paths
     assert "decorators_delta.removed" in paths
+    assert "decorators_delta.removed_public" not in paths
+    assert category_for_target("decorators_delta.removed_public") is TargetCategory.UNKNOWN_OPEN
 
 
 # --- observed-side rejections ----------------------------------------------

@@ -34,7 +34,11 @@ def resolve_path(root: object, segments: tuple[str, ...]) -> tuple[object, str |
             current = _public_api_entries(current.api_surface)
             continue
 
-        if segment == "removed_public" and hasattr(current, "removed"):
+        if (
+            segment == "removed_public"
+            and segments[: index + 1] == ("api_surface_delta", "removed_public")
+            and hasattr(current, "removed")
+        ):
             current = _public_api_entries(current.removed)
             continue
 

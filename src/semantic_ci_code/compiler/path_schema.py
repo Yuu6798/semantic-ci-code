@@ -37,9 +37,11 @@ _TARGET_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]
 # ``path_resolver.resolve_path``.
 _CODE_STATE_ALIASES: frozenset[str] = frozenset({"api_surface_public"})
 
-# Subfield aliases recognized when the parent has a ``removed`` field
-# (SymbolDelta and lookalikes). Mirrors ``resolve_path`` line 31-33.
-_REMOVED_PUBLIC_ALIAS: str = "removed_public"
+# Subfield aliases recognized by the evaluator that do not appear in the
+# Pydantic schema. ``removed_public`` is valid only for API-surface records,
+# because those records carry ``visibility``; other SymbolDelta roots may have
+# a ``removed`` field but cannot support this filter safely.
+_REMOVED_PUBLIC_ALIASES: frozenset[str] = frozenset({"api_surface_delta"})
 
 # Flat projection aliases recognized by ``path_resolver.resolve_path`` for
 # string-set gating surfaces. These do not appear in the Pydantic schema.
@@ -144,8 +146,8 @@ def _walk(prefix: str, annotation: Any, paths: set[str]) -> None:
     for sub_name, sub_info in model.model_fields.items():
         sub_path = f"{prefix}.{sub_name}"
         _walk(sub_path, sub_info.annotation, paths)
-    if "removed" in model.model_fields:
-        paths.add(f"{prefix}.{_REMOVED_PUBLIC_ALIAS}")
+    if prefix in _REMOVED_PUBLIC_ALIASES and "removed" in model.model_fields:
+        paths.add(f"{prefix}.removed_public")
 
 
 def _model_class(annotation: Any) -> type[BaseModel] | None:

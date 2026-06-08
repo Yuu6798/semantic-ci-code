@@ -51,7 +51,6 @@ constraints:
         {
             "expected_item": {"fqn": "mod.added"},
             "observed_record": {
-                "decorators": [],
                 "fqn": "mod.added",
                 "kind": "function",
                 "signature": "def added() -> int:\n    ...",

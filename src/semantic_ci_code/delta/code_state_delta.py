@@ -120,12 +120,12 @@ def _api_surface_delta(
     cand = _group_by(candidate, _api_key)
 
     added = tuple(
-        _dump(entry)
+        _api_variant_dump(entry)
         for key in _sorted_added_keys(base, cand)
         for entry in _sort_api_entries(cand[key])
     )
     removed = tuple(
-        _dump(entry)
+        _api_variant_dump(entry)
         for key in _sorted_removed_keys(base, cand)
         for entry in _sort_api_entries(base[key])
     )
@@ -325,7 +325,7 @@ def _api_changed_entry(
 
 
 def _api_changed_payload(entries: list[APISurfaceEntry], *, force_list: bool) -> JsonValue:
-    dumps = [_dump(entry) for entry in _sort_api_entries(entries)]
+    dumps = [_api_variant_dump(entry) for entry in _sort_api_entries(entries)]
     if force_list:
         return dumps
     return dumps[0]

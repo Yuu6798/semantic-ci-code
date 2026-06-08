@@ -77,8 +77,9 @@ _EFFECT_SCHEMA = MatchSchema(
 _DECORATOR_SCHEMA = MatchSchema(
     target="decorators_delta",
     required_key="decorator",
-    optional_keys=frozenset({"fqn"}),
+    optional_keys=frozenset({"decorator_leaf", "fqn"}),
     forbidden_keys={},
+    required_any_keys=frozenset({"decorator", "decorator_leaf"}),
 )
 _IMPORT_SCHEMA = MatchSchema(
     target="imports",

@@ -7,6 +7,6 @@ constraints:
     target: decorators_delta.removed
     operator: excludes_all
     expected:
-      - decorator: login_required
+      - decorator_leaf: login_required
     severity: hard
     unknown_policy: fail

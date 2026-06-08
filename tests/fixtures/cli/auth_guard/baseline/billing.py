@@ -1,10 +1,14 @@
 from collections.abc import Callable
 
 
-def login_required(fn: Callable) -> Callable:
-    return fn
+class Auth:
+    def login_required(self, fn: Callable) -> Callable:
+        return fn
 
 
-@login_required
+auth = Auth()
+
+
+@auth.login_required
 def account_dashboard(user_id: str) -> str:
     return f"dashboard:{user_id}"

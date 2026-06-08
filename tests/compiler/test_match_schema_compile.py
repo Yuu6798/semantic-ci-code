@@ -141,6 +141,17 @@ def test_decorator_only_partial_match_compiles_for_decorators_delta():
     assert constraint.expected == ({"decorator": "login_required"},)
 
 
+def test_decorator_leaf_partial_match_compiles_for_decorators_delta():
+    constraint = _compile_constraint(
+        target="decorators_delta.removed",
+        operator="excludes_all",
+        expected="""
+      - decorator_leaf: login_required""",
+    )
+
+    assert constraint.expected == ({"decorator_leaf": "login_required"},)
+
+
 def test_decorator_bare_string_desugars_to_decorator_key():
     constraint = _compile_constraint(
         target="decorators_delta.removed",

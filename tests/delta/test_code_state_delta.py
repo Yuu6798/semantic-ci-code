@@ -190,17 +190,27 @@ def test_api_surface_added_removed_and_changed_entries():
         for change in delta.api_surface_delta.changed
         for payload in (change["before"], change["after"])
     )
-    assert delta.decorators_delta.added == ({"fqn": "pkg.added", "decorator": "login_required"},)
+    assert delta.decorators_delta.added == (
+        {"fqn": "pkg.added", "decorator": "login_required", "decorator_leaf": "login_required"},
+    )
     assert delta.decorators_delta.removed == (
-        {"fqn": "pkg.changed_visibility", "decorator": "login_required"},
-        {"fqn": "pkg.removed_decorated", "decorator": "login_required"},
+        {
+            "fqn": "pkg.changed_visibility",
+            "decorator": "login_required",
+            "decorator_leaf": "login_required",
+        },
+        {
+            "fqn": "pkg.removed_decorated",
+            "decorator": "login_required",
+            "decorator_leaf": "login_required",
+        },
     )
 
 
 def test_decorator_changes_are_recorded_without_api_surface_change():
     baseline = CodeState(
         api_surface=(
-            api("pkg.view", decorators=("login_required", "app.route")),
+            api("pkg.view", decorators=("auth.login_required", "app.route")),
             api("pkg._internal", visibility="private", decorators=("login_required",)),
         )
     )
@@ -215,7 +225,13 @@ def test_decorator_changes_are_recorded_without_api_surface_change():
 
     assert delta.api_surface_delta == SymbolDelta()
     assert delta.decorators_delta == SymbolDelta(
-        removed=({"fqn": "pkg.view", "decorator": "login_required"},)
+        removed=(
+            {
+                "fqn": "pkg.view",
+                "decorator": "auth.login_required",
+                "decorator_leaf": "login_required",
+            },
+        )
     )
 
 
@@ -236,10 +252,16 @@ def test_decorator_delta_records_added_and_removed_in_sorted_order():
     delta = compute_code_state_delta(baseline, candidate)
 
     assert delta.decorators_delta.added == (
-        {"fqn": "pkg.a", "decorator": "requires_auth"},
-        {"fqn": "pkg.b", "decorator": "permission_required"},
+        {"fqn": "pkg.a", "decorator": "requires_auth", "decorator_leaf": "requires_auth"},
+        {
+            "fqn": "pkg.b",
+            "decorator": "permission_required",
+            "decorator_leaf": "permission_required",
+        },
     )
-    assert delta.decorators_delta.removed == ({"fqn": "pkg.b", "decorator": "requires_auth"},)
+    assert delta.decorators_delta.removed == (
+        {"fqn": "pkg.b", "decorator": "requires_auth", "decorator_leaf": "requires_auth"},
+    )
     assert delta.decorators_delta.changed == ()
 
 

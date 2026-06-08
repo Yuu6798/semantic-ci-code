@@ -112,7 +112,9 @@ field. It is empty by default and contains syntactic decorator names such as
 `login_required`, `app.route`, or `auth.requires`; `api_surface[].signature`
 does not include decorator lines. `CodeStateDelta` includes an additive
 `decorators_delta` `SymbolDelta`; its `added` and `removed` records are
-`{"fqn": "...", "decorator": "..."}`. These fields do not require a verdict
+`{"fqn": "...", "decorator": "...", "decorator_leaf": "..."}`. `decorator`
+preserves the normalized dotted source name, while `decorator_leaf` supports
+qualified-insensitive policy matching. These fields do not require a verdict
 envelope schema bump because they are nested CodeState / CodeStateDelta
 expansions with empty defaults and are absent from top-level envelope routing.
 

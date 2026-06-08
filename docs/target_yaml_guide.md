@@ -161,9 +161,10 @@ semantic-ci init --recipe security:preserve-auth-guards
   `pickle`, `subprocess`, and `marshal` using `imports_delta.added`.
 - `security:deny-dangerous-effects` denies newly added `process`,
   `dynamic_code`, and `unsafe_deserialize` effects using `effect_changes.added`.
-- `security:preserve-auth-guards` denies removal of public API decorators named
-  `login_required`, `requires_auth`, or `permission_required` using
-  `decorators_delta.removed`.
+- `security:preserve-auth-guards` denies removal of public API decorators whose
+  leaf name is `login_required`, `requires_auth`, or `permission_required`
+  using `decorators_delta.removed`. For example, `@auth.login_required`
+  matches the recipe's `login_required` guard.
 
 ## Hazard 1 — `--package-root` decides what is observed (D1)
 

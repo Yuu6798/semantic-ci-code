@@ -16,8 +16,8 @@ Delta rules:
   ``after`` are lists of entry dumps; singleton changes keep the scalar dump
   shape. Lists are sorted by ``(fqn, kind)`` plus variant fields where needed.
 - ``decorators_delta`` records public API decorator changes as
-  ``{"fqn", "decorator"}`` records. Pure decorator changes do not affect
-  ``api_surface_delta``.
+  ``{"fqn", "decorator", "decorator_leaf"}`` records. Pure decorator changes
+  do not affect ``api_surface_delta``.
 - ``type_changes`` is always ``()`` in P1 until a ``type_relations`` extractor
   exists.
 - ``effect_changes`` uses identity key ``(fqn, effect_class, resolved_call)``
@@ -355,7 +355,11 @@ def _public_decorator_pairs(entries: tuple[APISurfaceEntry, ...]) -> frozenset[t
 
 def _decorator_record(pair: tuple[str, str]) -> JsonMapping:
     fqn, decorator = pair
-    return {"fqn": fqn, "decorator": decorator}
+    return {"fqn": fqn, "decorator": decorator, "decorator_leaf": _decorator_leaf(decorator)}
+
+
+def _decorator_leaf(decorator: str) -> str:
+    return decorator.rsplit(".", maxsplit=1)[-1]
 
 
 def _api_variant_dump(entry: APISurfaceEntry) -> JsonValue:

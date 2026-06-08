@@ -236,7 +236,7 @@ def test_a_security_auth_guards_recipe_emits_generic_overlay_constraint(tmp_path
             "kind": "delta",
             "target": "decorators_delta.removed",
             "operator": "excludes_all",
-            "expected": [{"decorator": decorator} for decorator in AUTH_GUARD_DECORATORS],
+            "expected": [{"decorator_leaf": decorator} for decorator in AUTH_GUARD_DECORATORS],
             "severity": "hard",
             "unknown_policy": "fail",
         }
@@ -506,7 +506,7 @@ def test_e2_security_auth_guards_recipe_fails_removed_guard_and_passes_kept_guar
                 fqn="pkg.views.account",
                 kind="function",
                 visibility="public",
-                decorators=("login_required",),
+                decorators=("auth.login_required",),
             ),
         )
     )

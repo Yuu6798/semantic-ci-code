@@ -22,7 +22,7 @@ def build(merged: MergedSources) -> dict[str, Any]:
             "kind": "delta",
             "target": "decorators_delta.removed",
             "operator": "excludes_all",
-            "expected": [{"decorator": decorator} for decorator in AUTH_GUARD_DECORATORS],
+            "expected": [{"decorator_leaf": decorator} for decorator in AUTH_GUARD_DECORATORS],
             "severity": "hard",
             "unknown_policy": "fail",
         }

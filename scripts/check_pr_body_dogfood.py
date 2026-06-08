@@ -103,7 +103,7 @@ def validate_pr_body(body: str) -> None:
 
 
 def _body_from_event(path: Path) -> str | None:
-    event = json.loads(path.read_text(encoding="utf-8"))
+    event = json.loads(path.read_text(encoding="utf-8-sig"))
     pull_request = event.get("pull_request")
     if not isinstance(pull_request, dict):
         return None

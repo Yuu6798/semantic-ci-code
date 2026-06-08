@@ -111,6 +111,27 @@ def test_pr_body_dogfood_event_path_validates_pull_request_body(tmp_path: Path) 
     assert main(["--event-path", str(event)]) == 1
 
 
+def test_pr_body_dogfood_event_path_accepts_utf8_bom(tmp_path: Path) -> None:
+    event = tmp_path / "pull_request.json"
+    event.write_text(
+        json.dumps(
+            {
+                "pull_request": {
+                    "body": _body(
+                        """## Dogfooding
+Status: performed
+Commands: `semantic-ci compare ...`
+"""
+                    )
+                }
+            }
+        ),
+        encoding="utf-8-sig",
+    )
+
+    assert main(["--event-path", str(event)]) == 0
+
+
 def test_pr_body_dogfood_ci_uses_trusted_non_checkout_workflow() -> None:
     trusted = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
     ci = CI_WORKFLOW.read_text(encoding="utf-8")
@@ -118,5 +139,8 @@ def test_pr_body_dogfood_ci_uses_trusted_non_checkout_workflow() -> None:
     assert "pull_request_target:" in trusted
     assert "types: [opened, synchronize, reopened, edited]" in trusted
     assert "actions/checkout" not in trusted
+    assert "GITHUB_EVENT_PATH" in trusted
+    assert "EVENT_PATH:" not in trusted
+    assert "${{ github.event_path }}" not in trusted
     assert "scripts/check_pr_body_dogfood.py" not in trusted
     assert "scripts/check_pr_body_dogfood.py" not in ci

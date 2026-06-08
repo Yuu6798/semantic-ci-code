@@ -1040,3 +1040,34 @@ Grok) を統合した `docs/phase_g_planning.md` を起草、Codex review 18 rou
   推奨 = 非実行) のため見送り。
 
 (2026-06-07 wrap-up で STATUS.md 直近 merged 5-cap 超過により移送)
+
+---
+
+### 2026-05-29 Session 2 — SessionStart hook + fixture 署名修正 (PR #120)
+
+2 Skill (new-brief / wrap-up) の動作確認から派生した tooling 系 PR。active
+queue (Phase G / Phase X) には未着手で、 Web セッションの実行基盤を整備。
+
+- **PR #120** (merged `a570a85`、 commits `717d10f`→`5acf441`):
+  - `.claude/hooks/session-start.sh` + `.claude/settings.json` 新設:
+    remote-only / startup・resume 限定 / 同期で `pip install -e ".[dev]"`。
+    SessionStart stdout が model context に注入されるため pip 出力は log 捕捉
+    し失敗時のみ stderr、 成功時 1 行。`$CLAUDE_PROJECT_DIR` は引用 (空白パス
+    word-split 防止)。狙いは `/wrap-up` step 8 (`pytest tests/discipline/
+    -q --no-cov`、 cov plugin 必須) の起動時成立。
+  - fixture 署名修正: `tests/cli/git_helpers.py` (`run`) +
+    `tests/architecture/test_check_provenance.py` (`_git`) に `GIT_CONFIG_*`
+    env で `commit.gpgsign`/`tag.gpgsign` false 注入。host の署名強制
+    (`/tmp/code-sign`、 fixture commit を "missing source" で拒否) を継承して
+    フルスイートが 466 件 fail/error していた問題を host config 不変で解消
+    (既存 `test_target_doctor._git` の precedent に idiom 統一)。フルスイート
+    1436 passed / coverage 90%。
+  - self-dogfood: PR diff に `semantic-ci check` (refactor:API保持) → PASS /
+    exit 0。変更全件が package-root 外 (tests/ + .claude/) のため D4 (vacuous
+    PASS) に該当することを正直報告 (誤検知ではなく射程外)。
+  - Codex bot review P2 × 3 (pip 出力の context 注入 / matcher 全 source 一致 /
+    `$CLAUDE_PROJECT_DIR` 未引用) を 2 push で消化。
+- **PR #121** (merged `3e33ef3`、 Codex 👍 0-round): follow-up。wrap-up gate を
+  `pytest` → `python -m pytest` に統一 (`CLAUDE.md` step 8 + `wrap-up` SKILL.md
+  3 箇所 + rationale 1 行)。bare `pytest` が PATH 上の cov-plugin 無し interpreter
+  を引くと `--no-cov` 未認識でゲートが誤 fail する穴を恒久 close。

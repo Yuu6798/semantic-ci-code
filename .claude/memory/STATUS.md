@@ -24,9 +24,51 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走**。Phase G は SSP v0.1 を core の横ではなく縦接続に再構築する設計で、CodeState と並列の SensorState を新設、suite evaluator で code+security を統合 verdict (unknown > fail > repair > pass)、SAST finding を FQN 空間に canonical_id 化、per-sensor provenance で drift 検出。最終スライス G-5/CSCI-49 を 2026-06-08 に PR #139 で landing: planning の `auth_guards_delta` を config-free な汎用 `decorators_delta` (CodeState 側 facet) + `security:preserve-auth-guards` recipe で realize し、public API の auth decorator 除去を semantic delta 化 (path_schema/evaluator は schema 反射で不変、§23.1 維持)、G-4b cleanups (build_payload dead args / SARIF 1-based clamp) を同梱。並行して 2026-06-08 に **pre-release credibility トラック** (PR #136 README `## Project Status`+`ROADMAP.md` の falsifiable な v0.1.0 exit criteria+`CONTRIBUTING.md` / PR #138 `examples/` 4 ケース gallery+anti-rot test / repo description+topics 手動設定) を完走し、tag は切らず experimental 明示の方針を確立。repo-internal の ready 実装 queue は空。次は D-class closure (D6/D7/D8、exit criteria 前進) / Phase H (LLM security scout layer、CSCI-50〜54、G-5 完走で gate 解除・active 投入は要判断) / Phase X (ecosystem cross-repo、別 session) のいずれか。
+Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer) 始動**。Phase G は SSP v0.1 を core の縦接続に再構築 (CodeState と並列の SensorState、suite evaluator で code+security 統合 verdict、SAST finding を FQN 空間に canonical_id 化、per-sensor provenance で drift 検出)、最終 G-5/CSCI-49 は config-free `decorators_delta` + `security:preserve-auth-guards` recipe で realize 済。2026-06-09 に **Phase H が gate 解除後始動**: 「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構に advisory-only で接続する設計を 3 スライス landing — H-1/CSCI-50 (PR #142、`LLMSecurityFinding` + `project_to_canonical` + `LLMSensorProvenance` + `compute_security_delta` の verdict reject guard) / H-2a/CSCI-51 (PR #143、`CodeStateDelta.renames` + `RenameEntry` CLI overlay) / H-2b/CSCI-51b (PR #144、`sensor/advisory.py` = baseline `CodeState` のみ ingest する deterministic one-run re-projection、absence anchor は固定表 decorator 判定・presence/未知 class/site 解決不能は D7 fallback で added、`AdvisoryReprojection` を verdict から型+import 二重隔離)。Phase H 残は H-3 (Codex Security concrete adapter + fixture mode) / H-4 (advisory surface + mute ledger + CLI 配線 + informed-consent) / H-5。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。次は Phase H 継続 (H-3 着手) / D-class closure (D6/D7/D8、exit criteria 前進) / Phase X (ecosystem cross-repo、別 session) のいずれか。
 
 ## 直近 merged
+
+### 2026-06-09 — Phase H 始動: LLM security scout layer H-1〜H-2b (PR #142 + #143 + #144)
+
+Phase G-5 完走で gate 解除された **Phase H (LLM security scout layer)** が始動。
+「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを
+Phase G の sensor 機構へ **advisory-only** (verdict 非参与) で接続する 3 スライス
+を landing。本 session の主眼は H-2b の設計確定 + PR #144 review。
+
+- **PR #142** (CSCI-50 / H-1): LLM advisory finding protocol。`LLMSecurityFinding`
+  (9 要素 identity) + `project_to_canonical(finding, *, sensor_id)` +
+  `LLMSensorProvenance` (model_id/prompt_hash 必須・`non_reproducible=Literal[True]`)
+  + `compute_security_delta` の LLM finding reject guard。
+- **PR #143** (CSCI-51 / H-2a): `CodeStateDelta.renames` + `RenameEntry` を git
+  numstat から CLI overlay で露出 (rename re-projection の前提データ)。
+- **PR #144** (CSCI-51b / H-2b): `sensor/advisory.py` =
+  `compute_advisory_reprojection(candidate_findings, baseline_code, *, renames)`
+  + `AdvisoryReprojection`。**baseline は `CodeState` のみ ingest** (2-run LLM diff
+  を型で不可能化、D4)。absence anchor は固定表 (`missing-authz` →
+  decorator allowlist) で baseline guard 有無を判定、presence / 未知 class /
+  site 解決不能は **D7 fallback で added** (recall-first)。verdict から型
+  (`AdvisoryReprojection` ≠ `SecurityDelta`) + import (suite 非 import の
+  transitive-closure test) の二重隔離。merge 直前に Codex 4 follow-up
+  (enclosing-class guard / package-root rename / `sensor/__init__.py` export 撤回
+  / dup API 保持)。
+
+**設計判断のハイライト**:
+
+1. **述語深さ A=decorator-based を AskUserQuestion で先に確定** + ガードレール
+   (固定表は小さく / advisory 専用 / heuristic・recall-first を docs/test 明記)
+   を AC に encode → PR #144 review バグ 0。
+2. **review 深掘り 2 点を自力裏取り**: (a) `_decorator_leaf` recall 方向 →
+   `python_api_extractor.py:302-303` が `ast.Call` を `node.func` に unwrap して
+   call args を捨てる事を確認 (decorator-with-args 取りこぼし無し)。(b)
+   `compute_security_delta` の raise が CLI graceful か → `check.py:300` の
+   `except ValueError → _usage_error` (exit 2) で着地。
+
+**修正・訂正**:
+
+1. `compute_security_delta` が LLM finding を silent filter → `ValueError` raise
+   に変更 (fail-closed 強化、brief OUT-scope を技術的に跨ぐが受容)。
+   `--candidate-sensor` 経由の silent-pass→usage-error 化は H-4 の CLI 配線時に
+   `docs/exit_codes.md`/`cli_usage.md` へ 1 行 doc 化して回収。
 
 ### 2026-06-08 — Pre-release credibility トラック完走 + Phase G 完走 (PR #136 + #138 + #139)
 
@@ -178,38 +220,10 @@ Codex 実装 → Claude review → merge の標準サイクル。
 2. wrap-up 起動時に STATUS.md が G-1/G-2 (2026-06-02) で stale だったのを検出、
    git log で PR #127/#128/#129 merged を確認して sweep。
 
-### 2026-06-02 — Phase G 着手: G-1/CSCI-45 + G-2/CSCI-46 完走 (PR #124 + #125 + #126)
+### 古い merged entry (2026-06-02 以前) — archive 参照
 
-Phase G (SSP core integration) 実装の最初の 2 PR を 1 session で完走。design
-(Claude brief) → Codex 実装 → Claude review で P2 発見 → Codex 1 round 修正 →
-merge の標準サイクル。
-
-- **PR #124** (merged, CSCI-45 / G-1): `src/semantic_ci_code/sensor/{models,delta}.py`
-  新設。SecurityFinding (SAST/SCA discriminated union) / SensorState /
-  SensorProvenance / PerSensorDelta / SecurityDelta + canonical_id ベース集合差分。
-  review で 3 P2 (ordinal 脱落 / suppression-in-state / suppression shape) → repair
-  commit で **SAST identity を SSP 5 要素 fingerprint 整合の 8 要素に確定** (ordinal
-  含む) / suppression を G-3 に defer (SensorState を観測状態に純化) / discriminator
-  `category` + `deltas_by_sensor` 命名整合。bonus fix 2 件 (module_path POSIX 正規化 /
-  isolation test auto-discovery)。
-- **PR #125** (merged, CSCI-46 / G-2): `sensor/adapters/{semgrep,pip_audit}_adapter.py`
-  新設。SSP scan output → SensorState 翻訳の薄い層 (SSP adapter 再利用、full 吸収は
-  G-4)。`assign_sast_ordinals` 再利用で同位置重複 finding に distinct ordinal/canonical_id。
-  review で SCA dedup P2 (SAST は assign_sast_ordinals で安全だが SCA 素通し →
-  uniqueness validator crash) → Codex が `_dedup_by_canonical_id` (SSP
-  `_dedup_fingerprinted` 鏡像) + 回帰 test で修正。isolation: adapters は ssp 可、
-  models/delta は ssp-free を別 test で固定。
-- **PR #126** (merged, doc): `docs/phase_g_planning.md` を CSCI-45 確定形に逆流同期
-  (§1.2/§1.3/§2.1/§2.1.1/§2.3/§2.2、example canonical_id は実計算値、Suppression を
-  G-3 scope と明記)。
-
-設計判断: ordinal は v1 のうちに identity slot を確定 (G-2 での v1→v2 強制 bump 回避)。
-suppression = 宣言ポリシーなので観測状態 (SensorState) から分離し G-3 へ。両 review とも
-1 round 解決、設計フォークは AskUserQuestion 推奨付き N 択 / robustness 修正は直接 repair text。
-
-### 古い merged entry (2026-05-28 S2 以前) — archive 参照
-
-22 entry (2026-05-29 S2 (#120/#121) / 2026-05-28 S2 / 2026-05-27 / 2026-05-26 / 2026-05-22 /
+23 entry (2026-06-02 (#124/#125/#126) / 2026-05-29 S2 (#120/#121) / 2026-05-28 S2 /
+2026-05-27 / 2026-05-26 / 2026-05-22 /
 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
 2026-05-15 Session 4 + Session 3 + Session 2 /
 2026-05-14-15 ResultStatus split / 2026-05-12 / 2026-05-09 /
@@ -222,16 +236,18 @@ suppression = 宣言ポリシーなので観測状態 (SensorState) から分離
 + 2026-05-26 wrap-up (5/21 S1 移送) + 2026-05-28 S1 wrap-up (5/21 S2+S3 移送)
 + 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送)
 + 2026-05-29 S2 wrap-up (5/26 移送) + 2026-06-02 wrap-up (5/27 移送)
-+ 2026-06-03 S2 wrap-up (5/28 S2 移送) + 2026-06-08 wrap-up (5/29 S2 移送) で compaction が実施された。
++ 2026-06-03 S2 wrap-up (5/28 S2 移送) + 2026-06-08 wrap-up (5/29 S2 移送)
++ 2026-06-09 wrap-up (6/02 移送) で compaction が実施された。
 
 ## 次の発行順序
 
-ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G (CSCI-45〜49) 全完走**。本 repo 内で
-完結する ready な実装 queue は空。残る軸は **E (Phase X、ecosystem cross-repo、別
-Claude Code session 委譲)**、G-5 完走で gate 解除された **Phase H candidate (LLM
-security scout layer、CSCI-50〜54、`docs/llm_sensor_adapter_planning.md`、active 投入
-は要判断)**、および repo-internal の **D-class closure (D6/D7/D8、ROADMAP v0.1.0 exit
-criteria を前進)**。
+ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G (CSCI-45〜49) 全完走** +
+**Phase H 始動 (H-1/H-2a/H-2b = CSCI-50/51/51b merged)**。active な実装軸は
+**Phase H 継続 (H-3/CSCI-52 = Codex Security concrete adapter + fixture mode →
+H-4/CSCI-53 = advisory surface + mute ledger + CLI 配線 + informed-consent →
+H-5/CSCI-54、`docs/llm_sensor_adapter_planning.md` §3)**。残る軸は **E (Phase X、
+ecosystem cross-repo、別 Claude Code session 委譲)** と repo-internal の
+**D-class closure (D6/D7/D8、ROADMAP v0.1.0 exit criteria を前進)**。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
@@ -275,20 +291,24 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 
 - **A/B/C/D/F/G 全完走**: Brief 1〜8 + ResultStatus split + source-selection
   redesign + Brief 7 (SSP v0.1) + Phase G (CSCI-45〜49) 全 merged
+- **Phase H active** (CSCI-50〜54): G-5 完走で gate 解除し 2026-06-09 始動。
+  H-1/H-2a/H-2b (CSCI-50/51/51b) merged、次は H-3 (CSCI-52)。LLM security
+  scout layer、advisory-only で verdict 非参与
 - **E (Phase X) active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
   は ecosystem cross-repo work で別 Claude Code session 委譲、E-3 (X-2
   validation 移植) は中長期 phase
-- **Phase H candidate** (CSCI-50〜54): G-5 完走で gate 解除。LLM security
-  scout layer、active queue 投入は要判断 (大型・設計重め)
 - **D-class closure** (D6/D7/D8): repo-internal の bounded 候補、ROADMAP の
   v0.1.0 exit criteria (D 全解決/waive) を直接前進
 
 ### 直近最短経路
 
+- **Phase H 継続 (H-3/CSCI-52)**: Codex Security concrete adapter + fixture
+  mode (記録済み出力 ingest)。LLM-general Adapter Protocol の first concrete、
+  on-demand 実行。続く H-4 で advisory surface + CLI 配線 (silent-pass→
+  usage-error の doc 化を回収)
 - **D-class closure (D6/D7/D8)**: repo-internal、bounded、exit criteria 前進
   (D6=nested-function vacuous PASS、D7=extract-method authoring advice、
   D8=SCA auto-discovery gap = fixable defect)
-- **Phase H 着手 (CSCI-50〜54)**: G-5 完走で gate 解除、H-1 brief 起草から
 - **E-1/E-2. Phase X cross-ref / umbrella docs** (別 session 委譲)
 - **E-3. Phase X-2. HA-style validation cross-domain 移植** (中長期)
 

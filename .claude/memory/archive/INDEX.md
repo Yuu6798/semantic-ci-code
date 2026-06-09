@@ -40,6 +40,7 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 | `2026-05/2026-05-06.md` | 2026-06-07 (>30 日 TTL) | `_index.md` 2026-05-06 entry (S1-S3 統合: §23.3 + SSP 4 層化 + #50) | 2026-06-07 wrap-up |
 | `2026-05/2026-05-07.md` | 2026-06-07 (>30 日 TTL) | `_index.md` 2026-05-07 entry (S1-S5 統合: Brief 5 完走 + D1〜D5 dogfood + Brief 7 申し送り) | 2026-06-07 wrap-up |
 | `2026-05/2026-05-08.md` | 2026-06-08 (>30 日 TTL) | `_index.md` 2026-05-08 entry | 2026-06-08 wrap-up |
+| `2026-05/2026-05-09.md` | 2026-06-09 (>30 日 TTL) | `_index.md` 2026-05-09 entry (perf brief #70/#71 + ResultStatus C+B) | 2026-06-09 wrap-up |
 
 ## 移送 protocol
 

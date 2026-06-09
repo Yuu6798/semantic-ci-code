@@ -1071,3 +1071,32 @@ queue (Phase G / Phase X) には未着手で、 Web セッションの実行基�
   `pytest` → `python -m pytest` に統一 (`CLAUDE.md` step 8 + `wrap-up` SKILL.md
   3 箇所 + rationale 1 行)。bare `pytest` が PATH 上の cov-plugin 無し interpreter
   を引くと `--no-cov` 未認識でゲートが誤 fail する穴を恒久 close。
+
+### 2026-06-02 — Phase G 着手: G-1/CSCI-45 + G-2/CSCI-46 完走 (PR #124 + #125 + #126)
+
+Phase G (SSP core integration) 実装の最初の 2 PR を 1 session で完走。design
+(Claude brief) → Codex 実装 → Claude review で P2 発見 → Codex 1 round 修正 →
+merge の標準サイクル。
+
+- **PR #124** (merged, CSCI-45 / G-1): `src/semantic_ci_code/sensor/{models,delta}.py`
+  新設。SecurityFinding (SAST/SCA discriminated union) / SensorState /
+  SensorProvenance / PerSensorDelta / SecurityDelta + canonical_id ベース集合差分。
+  review で 3 P2 (ordinal 脱落 / suppression-in-state / suppression shape) → repair
+  commit で **SAST identity を SSP 5 要素 fingerprint 整合の 8 要素に確定** (ordinal
+  含む) / suppression を G-3 に defer (SensorState を観測状態に純化) / discriminator
+  `category` + `deltas_by_sensor` 命名整合。bonus fix 2 件 (module_path POSIX 正規化 /
+  isolation test auto-discovery)。
+- **PR #125** (merged, CSCI-46 / G-2): `sensor/adapters/{semgrep,pip_audit}_adapter.py`
+  新設。SSP scan output → SensorState 翻訳の薄い層 (SSP adapter 再利用、full 吸収は
+  G-4)。`assign_sast_ordinals` 再利用で同位置重複 finding に distinct ordinal/canonical_id。
+  review で SCA dedup P2 (SAST は assign_sast_ordinals で安全だが SCA 素通し →
+  uniqueness validator crash) → Codex が `_dedup_by_canonical_id` (SSP
+  `_dedup_fingerprinted` 鏡像) + 回帰 test で修正。isolation: adapters は ssp 可、
+  models/delta は ssp-free を別 test で固定。
+- **PR #126** (merged, doc): `docs/phase_g_planning.md` を CSCI-45 確定形に逆流同期
+  (§1.2/§1.3/§2.1/§2.1.1/§2.3/§2.2、example canonical_id は実計算値、Suppression を
+  G-3 scope と明記)。
+
+設計判断: ordinal は v1 のうちに identity slot を確定 (G-2 での v1→v2 強制 bump 回避)。
+suppression = 宣言ポリシーなので観測状態 (SensorState) から分離し G-3 へ。両 review とも
+1 round 解決、設計フォークは AskUserQuestion 推奨付き N 択 / robustness 修正は直接 repair text。

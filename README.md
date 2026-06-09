@@ -124,6 +124,7 @@ Active references (current behavior):
 - [SSP v0.1 Protocol Spec](docs/ssp_protocol.md) — normative v0.1 spec: definitions, fingerprint, Python profile, delta computation, verdict, JSON Schema, Sensor Provenance Invariant
 - [SSP Usage Guide](docs/ssp_usage_guide.md) — practical guide: quick start, output formats, CI integration, hand-built fixtures, delta mechanics
 - [SSP v0.1 Forward Design Note](docs/ssp_protocol_design_note.md) — Brief 7 implementer 用 一次資料 (Phase 4 で AGENTS.md inline から分離)
+- [Repository Layout](docs/repository_layout.md) — full `src/` / `tests/` tree with per-module CSCI annotations (offloaded from CLAUDE.md to keep policy lean)
 - [CLAUDE.md](CLAUDE.md) — repository-level agent operating policy
 
 Planning (open):

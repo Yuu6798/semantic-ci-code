@@ -23,6 +23,11 @@ These tests turn recurring discipline anti-patterns into CI failures:
   `Status: skipped` requires an explicit reason. GitHub Actions enforces the
   same rule in a trusted `pull_request_target` workflow that does not execute
   PR-controlled code.
+- `test_claude_md_line_cap.py`: `CLAUDE.md` must stay ≤ 300 lines. It is
+  always-loaded policy (per-turn fixed cost + instruction-following risk past
+  ~150-200 lines), so reference detail (the `src/` tree, the session-memory
+  procedure) is offloaded to `docs/repository_layout.md` and the wrap-up skill,
+  leaving pointers in `CLAUDE.md`. Enforced via the wrap-up gate (step 8).
 
 Phase 6 closeout (`docs/doc_refactor_planning.md`): the schema-grep and
 dual-case dogfood candidates landed as the two tests above. The
@@ -31,4 +36,5 @@ test -- review-round count exists only as hand-written prose, so any test is a
 fragile proxy that cannot detect the very "encode forgotten" case it targets,
 and adding it would re-trigger the framework-self-bloat paradox the doc
 refactor fought. Its intent (externalize 5+ round disputes) instead lives as a
-wrap-up checklist item in `CLAUDE.md` 終了時ルール.
+wrap-up checklist item in the wrap-up skill (`.claude/skills/wrap-up/SKILL.md`
+step 7).

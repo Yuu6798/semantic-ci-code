@@ -58,39 +58,22 @@ the primary use case, but any setup that can produce a well-formed
 including virtual, predicted, mocked, or hand-built `CodeState` values.
 
 This input-side provenance neutrality is required by
-`docs/code_semantic_ci_design.md` §23.1 (Generic 2-state Comparator) and
-§23.2 (Application Matrix), and is confirmed empirically by:
-
-- `docs/pre_generation_validation_case.md` — stub-only candidates (3 cases)
-  validated through `semantic-ci compare`, reproduction in
-  `experiments/pre_generation_validation/`.
-- `docs/dogfooding_TC10_report.md` — 10 virtual-package cases (TC1〜TC10)
-  exercising `compare` / `validate-plan` / `compile-repair` end-to-end with
-  hand-built `baseline/` and `candidate/` trees; verdict + exit code match
-  the documented contract for every case.
-- `docs/dogfooding_real_pr_complexity.md` — 8 real-PR cases exercising
-  `check` against external Python repositories under complexity
-  constraints; verdict matches reviewer-relevant signal in 6/8, with 1
-  vacuous PASS (D6) and 1 authoring mismatch (D7) registered in the
-  consolidated tracker.
+`docs/code_semantic_ci_design.md` §23.1 (Generic 2-state Comparator) and §23.2
+(Application Matrix), and is confirmed empirically by the stub-only,
+virtual-package, and real-PR passes documented in the Design Documents table
+below (`pre_generation_validation_case` / `dogfooding_TC10_report` /
+`dogfooding_real_pr_complexity` / `dogfooding_findings_tracker`).
 
 If new feature work weakens this neutrality (e.g. requiring a real git ref
 to compute a verdict), it MUST be flagged as a §23.1 violation in the brief.
 
 ## Current Status
 
-The day-to-day project status (current phase, recent merged PRs, and the
-`次の発行順序` action queue) lives in `.claude/memory/STATUS.md` so this
-policy doc stays stable while the snapshot can be edited freely.
-
-- Live status: [`.claude/memory/STATUS.md`](.claude/memory/STATUS.md)
-- Per-session log: [`.claude/memory/_index.md`](.claude/memory/_index.md) +
-  the dated `YYYY-MM-DD.md` files
-- Phase plan and Brief table (canonical, change-tracked): see
-  `docs/code_semantic_ci_design.md` §12 / §25
-
-When other docs need to point at the live tracker, they MUST link to
-`.claude/memory/STATUS.md` 次の発行順序 — not to this file.
+Day-to-day status (current phase, recent merged PRs, `次の発行順序` action
+queue) lives in [`.claude/memory/STATUS.md`](.claude/memory/STATUS.md) +
+[`.claude/memory/_index.md`](.claude/memory/_index.md) so this policy doc
+stays stable. Canonical phase plan / Brief table: `docs/code_semantic_ci_design.md`
+§12 / §25. Other docs MUST link to `STATUS.md 次の発行順序`, not to this file.
 
 ## Required Reading Before Editing
 
@@ -128,25 +111,17 @@ surface that in the response rather than acting without it.
 
 ### Tier C — On-demand for the specific task
 
-- `docs/brief_*_planning.md` (full read of the relevant planning doc)
-- 直近 3 dated session logs (`.claude/memory/YYYY-MM-DD.md`) in full
-- Related case study or dogfooding report
-  (`docs/multi_agent_audit_case.md` / `docs/dogfooding_TC10_report.md` /
-  `docs/dogfooding_real_pr_complexity.md` / etc.). For D-class hazard
-  status start at `docs/dogfooding_findings_tracker.md` and follow links
-  back to the originating report.
-- `docs/code_semantic_ci_design.md` §23 (engine contract / boundary)
-  before changing engine, evaluator, repair compiler, or adapter
-  behavior
-- `docs/ssp_protocol_design_note.md` (Brief 7 / SSP v0.1 一次資料、 旧
-  AGENTS.md Forward Design Note から分離) only when touching Brief 7
-  work
+- Relevant `docs/<topic>_planning.md` (full read) + 直近 3 dated session logs.
+- `docs/code_semantic_ci_design.md` §23 (engine contract / boundary) before
+  changing engine, evaluator, repair compiler, or adapter behavior.
+- Related case study / dogfooding report — for D-class hazard status start at
+  `docs/dogfooding_findings_tracker.md`; `docs/ssp_protocol_design_note.md`
+  only when touching Brief 7. (See the Design Documents table for the full set.)
 
 ### Tier D — Debug / archeology only
 
-- `.claude/memory/archive/` — compacted historical session logs
-- 30 日以上前の dated session logs
-- 旧 `STATUS.md ## 直近 merged` log (after Phase 1 archive)
+- `.claude/memory/archive/` (compacted history), 30 日以上前の dated logs,
+  旧 `STATUS.md ## 直近 merged` log.
 
 If the memory is stale or incomplete, surface that in the response
 rather than acting without it.
@@ -181,77 +156,12 @@ Default cycle:
 
 ## Repository Layout
 
-```text
-src/semantic_ci_code/
-  __init__.py            # legacy entrypoint (semantic-ci-code script)
-  __main__.py
-  config.py
-  scope.py
-  api_surface/           # Python public-symbol extractor (CSCI-5)
-  cli/                   # CLI surface (Brief 4 / 4b / 4d / 5)
-    main.py              # argparse entry; subparser for 10 subcommands
-    commands/            # one module per subcommand
-      observe.py
-      compare.py
-      check.py
-      compile.py
-      compile_repair.py  # Brief 5
-      validate_plan.py   # Brief 5
-    output/              # json / human / sarif / gh-actions formatters
-    output_sarif.py
-    output_gh_actions.py
-    init_command.py      # Brief 4d
-    git_runtime.py       # detached worktree materialization
-    code_state_cache.py  # CSCI-26 / 27
-    target_loader.py
-    delta_overlay.py     # files_touched / loc_delta from git numstat
-  compiler/              # target.yaml -> CompiledTarget (CSCI-12)
-    target_compiler.py
-    templates.py         # change_kind template constraints
-    path_schema.py       # PR #58 compile-time path validation
-  complexity/            # cyclomatic / cognitive (CSCI-7)
-  delta/                 # CodeStateDelta (CSCI-11)
-  domain/                # state_schema (CodeState root)
-  effects/               # effect_db + AST visitor (CSCI-2 / 3 / 4 / 29)
-  evaluator/             # constraint evaluator (CSCI-13)
-    operators.py
-    path_resolver.py
-  framework/             # modality-agnostic (TargetSVP, ConstraintKind)
-  imports/               # CSCI-6
-  module_graph/          # CSCI-8
-  pipeline/              # extract_python_code_state (CSCI-10)
-  repair/                # RepairPlan emitter (CSCI-14)
-  repair_compiler/       # Brief 5: Adapter Protocol + adapters
-    core.py
-    types.py
-    risk_summary.py
-    adapters/
-      claude_code.py
-      cursor.py
-      codex.py
-      markdown.py
-  schemas/               # JSON Schema artifacts
-  ssp/                   # Semantic Security Protocol v0.1 (Brief 7)
-    models.py            # Pydantic v2 models (SensorOutput, Finding, SSPDelta, etc.)
-    fingerprint.py       # SAST 5-element + SCA 3-element canonical fingerprint
-    python_profile.py    # AST normalization for SAST normalized_text
-    delta.py             # compute_delta + ordinal assignment
-    verdict.py           # per-sensor + aggregate verdict
-  test_surface/          # CSCI-9
-tests/
-  cli/                   # CLI integration tests
-  compiler/              # CSCI-12
-  delta/                 # CSCI-11
-  evaluator/             # CSCI-13
-  pipeline/              # CSCI-10
-  repair/                # CSCI-14
-  repair_compiler/       # Brief 5
-  ssp/                   # SSP models, fingerprint, delta, verdict tests
-  fixtures/              # hand-built before/after trees + expected verdicts
-docs/                    # see Design Documents table below
-experiments/             # observation-only reproductions (out of core scope)
-.claude/memory/          # session memory (handoff source of truth)
-```
+The full `src/` / `tests/` tree with per-module CSCI annotations lives in
+`docs/repository_layout.md` (read on demand). Key roots:
+`src/semantic_ci_code/` (engine + CLI + compiler + evaluator + repair + ssp),
+`tests/` (mirrored per component, incl. `tests/discipline/`),
+`docs/` (see the Design Documents table below),
+`.claude/memory/` (session memory, handoff source of truth).
 
 ## Design Documents
 
@@ -260,6 +170,7 @@ Status legend: **ACTIVE** (current spec/contract, AI agents should read first) /
 | Document | Status | Purpose |
 |---|---|---|
 | `docs/code_semantic_ci_design.md` | ACTIVE | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop. Single source of truth for engine semantics |
+| `docs/repository_layout.md` | ACTIVE | Full `src/` / `tests/` tree with per-module CSCI annotations. Moved out of `CLAUDE.md` so the always-loaded policy doc stays lean (read on demand) |
 | `docs/cli_usage.md` | ACTIVE | User-facing CLI contract for all 10 subcommands (`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog` / `ssp`, where `ssp` is a sensor group with `scan` / `from-json`), target discovery, format selection, target authorship, severity routing |
 | `docs/exit_codes.md` | ACTIVE | Stable CLI exit code policy (0 / 1 / 2 / 3 / 4) for CI integration, including `--strict-repair`, `severity: info` Advisor channel, and per-subcommand notes |
 | `docs/json_schema.md` | ACTIVE | CLI JSON envelopes — verdict / compile at `schema_version="6"`, compile-repair at independent `schema_version="1"`, validate-plan at independent `schema_version="2"`. Includes compatibility policy and v2→v3 through v5→v6 diffs (plus validate-plan v1→v2) |
@@ -328,129 +239,26 @@ See `docs/code_semantic_ci_design.md` §23 for the full Application Matrix.
 
 ## Session Memory (永続記憶ワークフロー)
 
-Long-running design conversations are recorded in `.claude/memory/` so that
-later sessions can resume without losing context.
+Design conversations are recorded in `.claude/memory/`: dated `YYYY-MM-DD.md`
+logs (同日複数は `## Session N`), each indexed 1–2 lines in `_index.md`;
+`STATUS.md` holds the live `## Phase` + `次の発行順序` snapshot.
 
-### 仕組み
+- **起動時**: read `_index.md` (直近 5) + `STATUS.md` per Tier A before
+  answering about prior design decisions.
+- **終了時 (自動トリガー)**: on a session-end signal (「今日はここまで」「セッション
+  終了」「また明日」「お疲れ様」「done for today」「that's all」) or `/wrap-up`,
+  run the **wrap-up skill** confirmation-free. `.claude/skills/wrap-up/SKILL.md`
+  is the **source of truth** for the full procedure (reflection → index →
+  archive → `STATUS.md` sweep → discipline gate) and the archive-TTL table,
+  summary layout, and anti-pattern list. If it and `CLAUDE.md` diverge, the
+  **skill wins** — fix this pointer/summary, never edit the skill to match
+  a stale `CLAUDE.md`.
 
-- 場所: `.claude/memory/`
-- ファイル: `YYYY-MM-DD.md` (同日に複数セッションあれば「Session 2」「Session 3」と節を切って 1 ファイルに追記)
-- 索引: `_index.md` に各セッションの 1 行要約を追記
-
-### 起動時ルール
-
-1. セッション開始時に `_index.md` を読んで過去の決定事項を把握する
-2. 直近 3 件のサマリーは必要に応じて詳細参照する
-3. 過去の設計判断に関する質問はサマリーを確認してから回答する
-
-### 終了時ルール (自動トリガー)
-
-ユーザーが終了意図を示すフレーズを発したら、確認なしで即座に `/wrap-up` 相当の
-処理 (memory への振り返りサマリー保存 + `_index.md` 追記) を実行する。
-
-トリガーフレーズの例:
-- 「今日はここまで」「今日は終わり」「今日はおわり」
-- 「セッション終了」「セッション閉じて」
-- 「また明日」「また今度」「お疲れ様」「お疲れさま」
-- 「done for today」「that's all」
-- 手動: `/wrap-up`
-
-実行内容 (本 wrap-up):
-
-1. 会話の振り返りサマリーを `.claude/memory/YYYY-MM-DD.md` に保存
-   (新規 file or 同日 Session N として追記)
-2. `_index.md` に **1-2 行** サマリーを追記 (本来仕様の index format、
-   essay 化 anti-pattern を回避。 col: Date | PR/commit | One-line
-   outcome | Detail。 `docs/doc_refactor_planning.md` Phase 2 で復元
-   された format に従う)
-3. **30 日以上前の dated entries を `archive/YYYY-MM/` に移送**
-   (自動 compaction、 移送後の `_index.md` 該当行は 1 行 summary + archive
-   path に書換、 dated file 本体は archive に原文保存)
-4. **`STATUS.md 次の発行順序` の sweep** (CLAUDE.md rule:
-   `If a CSCI / Brief / D# item is closed, remove the corresponding
-   entry from 次の発行順序`。 stale entry 検出時は削除して 直近 merged
-   に移送、 `tests/discipline/test_status_md_next_queue_no_completed.py`
-   (Phase 6 で導入予定) で自動検出される rule)。 **step 5 (直近 merged
-   compaction) より先に行うこと** — sweep が完走 entry を 直近 merged
-   に move したのち compaction で 5 cap を再評価する単一 pass を実現する
-   ため (PR #92 review で指摘)
-5. **`STATUS.md ## 直近 merged` で 5 entries 超過分を
-   `archive/STATUS_MERGED_LOG.md` に移送** (Phase 1 で確立した archive
-   経路、 最新 5 のみ inline、 残りは archive 参照)。 step 4 の sweep
-   後に実行することで「sweep が cap 超過を再導入する」 race を回避
-6. **`STATUS.md ## Phase` の上書き check** (新 paragraph 追加時は旧
-   paragraph を必ず削除、 1 paragraph 厳守。 5/21 で Codex / Claude
-   両方が再発させた drift category、
-   `tests/discipline/test_status_md_phase_single_paragraph.py` (Phase 6)
-   で自動検出される rule)
-7. **5+ round 論点の encode check**: 当 session で review / 壁打ちが 5
-   round 以上に達した曖昧 spec があれば、 その解決を docs / tests に
-   encode 済か確認し、 未 encode なら externalize する (Experience
-   Externalization の核。 `docs/doc_refactor_planning.md` Phase 6 で test
-   化を検討したが、 round 数は hand-written prose proxy で脆く「encode
-   忘れ」 case こそ検出できないため checklist 項目として常駐させる判断)。
-   併せて `CLAUDE.md` / `AGENTS.md` への更新候補があればユーザーに提案する
-8. **memory 直 push 前に `python -m pytest tests/discipline/ -q --no-cov` を実行
-   し `tests/discipline/` 全 test pass を確認**。 fail がある場合は step
-   4-6 のいずれかで drift が残っているので push せず該当 file を修正。 memory exception
-   (`.claude/memory/` 直 main push 許可) は **PR ceremony を省く**
-   ためのものだが、 PR 経由と異なり **post-hoc 検出のみ** なので
-   discipline test 違反があると main branch が直接 red になる。
-   step 8 (約 5 秒) を **必ず実行** することで、 memory exception の
-   速度メリットを保持しつつ品質崩壊を構造的に抑止する。 同 rule は
-   Codex / 並列 agent / 任意の direct main push 経路すべてに適用
-
-Anti-pattern (`AGENTS.md §5.5` の対応 row 参照):
-
-- `_index.md` entry を essay 化させる (Phase 2 で 53KB → 5KB 復元の前例、
-  cell ≤ 500 chars constraint は
-  `tests/discipline/test_index_md_entry_compactness.py` で enforce 予定)
-- 完走済 CSCI を `次の発行順序` に残置 (5/21 で ADVISORY-S1 + R17 で 2
-  連続発生、 PR merge 直後の即時 sweep が必須)
-- `## Phase` に新 paragraph を追加するが旧 paragraph を残置 (5/21 で
-  Codex follow-up で初回発生、 Claude の今回 session 直前にも発生する
-  drift)
-- archive 移送を「後で」 と先送り (30 日経過 dated entry の archive 移送
-  を session wrap-up 時に必ず実行、 後述 archive policy 参照)
-- **discipline test の pre-push verification を skip して memory を直
-  main push する** (step 8 違反): post-hoc 検出のみのため main red を
-  直接引き起こす。 PR 経由なら CI 赤で merge ブロックされて検出するが、
-  memory exception 直 push では fail 後の main が red になるまで気付かない
-
-### Archive policy (compaction TTL)
-
-`.claude/memory/` の disk-resident artifact は以下の TTL で archive 移送:
-
-| Artifact | TTL | 移送先 | 移送後の本体 source |
-|---|---|---|---|
-| dated session log `YYYY-MM-DD.md` | 30 日 | `archive/YYYY-MM/YYYY-MM-DD.md` | 原文保存 (情報損失ゼロ) |
-| `_index.md` の対応 entry | 同上 | inline → 1 行 summary + archive path 追記 | 詳細は archive file 経由で参照可 |
-| `STATUS.md ## 直近 merged` entry | 直近 5 を超えた時点 | `archive/STATUS_MERGED_LOG.md` 末尾 | 原文保存 |
-| `STATUS.md 次の発行順序` の 完走 entry | merge と同時 | `## 直近 merged` の新 entry に変換 | 完走宣言として保存 |
-| `STATUS.md ## Phase` paragraph | 上書き時 | (保存しない、 1 paragraph 厳守) | 旧 phase の history は dated session log / `_index.md` に分散保存 |
-
-Archive infrastructure は `.claude/memory/archive/` directory + index file
-(`archive/INDEX.md`) で管理 (Phase 5 で完備予定)。 archive 移送は
-**memory exception 枠**で main 直 push 可能 (本 Git Workflow の例外
-section 参照)。
-
-### サマリーの構成 (慣例フォーマット)
-
-過去ファイルに合わせて以下のセクションで構成する:
-
-- **コンテキスト** — そのセッションが何を扱ったか 1〜2 段落
-- **設計判断** — なぜその選択をしたか
-- **成功パターン** — 効いたアプローチ
-- **修正・訂正** — バグ・誤認識の記録
-- **工程サマリー** — 表形式で工程と成果
-- **成果物** — マージされた PR / 追加ファイル
-- **次セッションへの引き継ぎ** — 残課題
-- **メモ** — 雑多な気づき
-
-### Git Workflow の例外
-
-`.claude/memory/` の運用ログのみ、 main 直 push の唯一の例外として認められている。
-これ以外の変更はすべて feature branch + PR の通常フローを守る。
+Git exception: only `.claude/memory/` logs may go direct to main; everything
+else is feature branch + PR. Before any direct-main push run
+`python -m pytest tests/discipline/ -q --no-cov` (the exception is post-hoc
+only, so a discipline violation reddens main directly). Applies to Codex /
+parallel agents / any direct-main-push path.
 
 ## Experience Externalization (経験値の外部化)
 

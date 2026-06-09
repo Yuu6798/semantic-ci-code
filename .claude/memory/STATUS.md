@@ -7,8 +7,8 @@ the policy doc can stay stable while this file changes freely.
 Update rules:
 
 - This file is part of `.claude/memory/` and may be edited directly on `main`
-  under the same exception as `_index.md` (see `CLAUDE.md` § Session Memory →
-  Git Workflow の例外).
+  under the same exception as `_index.md` (see `CLAUDE.md` § Session Memory,
+  Git exception).
 - After each merged PR or session wrap-up, refresh **直近 merged** and
   **次の発行順序** here, and append a 1-line entry to `_index.md`.
 - Other docs that need to point at the live tracker should reference

@@ -1,8 +1,10 @@
 # Repository Layout
 
-Full `src/` / `tests/` tree with per-module CSCI annotations. `CLAUDE.md`
-keeps only a pointer here so the always-loaded policy doc stays lean; this
-file carries the detail and is read on demand.
+Structural map of the `src/` / `tests/` package tree with key modules and
+per-package CSCI annotations. `CLAUDE.md` keeps only a pointer here so the
+always-loaded policy doc stays lean; this file carries the detail and is read
+on demand. The **filesystem is authoritative** for exhaustive contents — this
+map orients agents to the main code surfaces and is not regenerated per file.
 
 ```text
 src/semantic_ci_code/
@@ -17,6 +19,12 @@ src/semantic_ci_code/
     catalog.py           # target-catalog recipe / reference paths
     hazards.py
     provenance.py        # candidate_code_used: false provenance record
+    sources/             # source-selection parsers (imported by cli/init_command.py)
+      pr_body.py
+      issue.py
+      labels.py
+      commits.py
+      merge.py           # multi-source conflict merging
   cli/                   # CLI surface (Brief 4 / 4b / 4d / 5)
     main.py              # argparse entry; subparser for 10 subcommands
     commands/            # one module per subcommand
@@ -29,6 +37,7 @@ src/semantic_ci_code/
       target_doctor.py
       target_catalog.py
       ssp.py             # SSP sensor group (scan / from-json)
+    init_recipes/        # one module per change-kind / security init recipe
     output/              # json / human / sarif / gh-actions formatters
     output_sarif.py
     output_gh_actions.py
@@ -67,12 +76,15 @@ src/semantic_ci_code/
     models.py            # SensorState parallel to CodeState (CSCI-45)
     delta.py             # canonical_id-keyed security delta (CSCI-45)
     advisory.py          # deterministic one-run re-projection (CSCI-51b, verdict-isolated)
+    adapters/            # SSP -> SensorState translation (semgrep / pip-audit)
+      llm/               # LLM advisory scout adapter protocol (Phase H)
   ssp/                   # Semantic Security Protocol v0.1 (Brief 7)
     models.py            # Pydantic v2 models (SensorOutput, Finding, SSPDelta, etc.)
     fingerprint.py       # SAST 5-element + SCA 3-element canonical fingerprint
     python_profile.py    # AST normalization for SAST normalized_text
     delta.py             # compute_delta + ordinal assignment
     verdict.py           # per-sensor + aggregate verdict
+    adapters/            # Semgrep SAST + pip-audit SCA sensor adapters
   suite/                 # Phase G: suite evaluator (code + security delta)
     evaluator.py         # unified verdict over code_delta + security_delta (CSCI-47)
     security.py          # suite security policy evaluator (CSCI-48)

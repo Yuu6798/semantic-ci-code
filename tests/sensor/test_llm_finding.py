@@ -10,7 +10,8 @@ from semantic_ci_code.sensor.models import (
     SourceSpan,
     canonical_id_for_identity,
 )
-from tests.sensor.helpers import llm_components, provenance
+
+from .helpers import llm_components, provenance
 
 
 def test_llm_security_finding_identity_and_canonical_id_match():

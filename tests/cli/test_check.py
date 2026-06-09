@@ -1278,9 +1278,8 @@ constraints:
     target: renames
     operator: includes_all
     expected:
-      -
-        - [old_path, mod.py]
-        - [new_path, renamed.py]
+      - old_path: mod.py
+        new_path: renamed.py
 """,
     )
 

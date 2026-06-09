@@ -89,6 +89,13 @@ _IMPORT_SCHEMA = MatchSchema(
         "symbols": "symbols is list-valued; exact equality is a partial-match footgun",
     },
 )
+_RENAME_SCHEMA = MatchSchema(
+    target="renames",
+    required_key="old_path",
+    optional_keys=frozenset({"new_path"}),
+    forbidden_keys={},
+    required_any_keys=frozenset({"old_path", "new_path"}),
+)
 
 _SCHEMAS: dict[str, MatchSchema] = {
     "api_surface": _API_SCHEMA,
@@ -105,6 +112,7 @@ _SCHEMAS: dict[str, MatchSchema] = {
     "imports": _IMPORT_SCHEMA,
     "imports_delta.added": _IMPORT_SCHEMA,
     "imports_delta.removed": _IMPORT_SCHEMA,
+    "renames": _RENAME_SCHEMA,
 }
 
 

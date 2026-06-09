@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import sys
 from pathlib import Path
 
 PROJECT_PREFIX = "semantic_ci_code"
@@ -110,3 +111,11 @@ def test_suite_package_does_not_import_llm_advisory_channel():
             failures[module] = leaks
 
     assert not failures, f"Suite package imported advisory-only LLM channel: {failures}"
+
+
+def test_suite_runtime_import_does_not_load_llm_advisory_channel():
+    sys.modules.pop(SUITE_ADVISORY_IMPORT, None)
+
+    import semantic_ci_code.suite.security  # noqa: F401
+
+    assert SUITE_ADVISORY_IMPORT not in sys.modules

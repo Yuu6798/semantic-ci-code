@@ -154,7 +154,7 @@ def _enclosing_entries(
     for index in range(len(parts) - 1, 0, -1):
         candidate = ".".join(parts[:index])
         entry = baseline_by_fqn.get(candidate)
-        if entry is not None:
+        if entry is not None and entry.kind == "class":
             entries.append(entry)
     return tuple(entries)
 

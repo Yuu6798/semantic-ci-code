@@ -104,6 +104,25 @@ def test_absence_anchor_without_enclosing_class_guard_is_pre_existing():
     assert result.pre_existing == (finding,)
 
 
+def test_absence_anchor_ignores_non_class_fqn_prefix_guards():
+    finding = llm_finding(
+        finding_class="missing-authz",
+        module_path="pkg/admin.py",
+        qualified_name="pkg.admin.get",
+        anchor_kind="absence",
+        expected_property="requires authorization guard",
+    )
+    baseline = _code_state(
+        _site(fqn="pkg.admin", kind="function", decorators=("login_required",)),
+        _site(fqn="pkg.admin.get", decorators=()),
+    )
+
+    result = compute_advisory_reprojection((finding,), baseline)
+
+    assert result.added == ()
+    assert result.pre_existing == (finding,)
+
+
 def test_presence_anchor_is_always_added_fallback():
     finding = llm_finding(
         finding_class="ssrf",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from semantic_ci_code.sensor.models import (
+    LLMSecurityFinding,
     PerSensorDelta,
     SecurityDelta,
     SecurityFinding,
@@ -29,6 +30,8 @@ def compute_security_delta(
 ) -> SecurityDelta:
     """Compute a security delta from two hand-built SensorState values."""
 
+    baseline = _without_advisory_data(baseline)
+    candidate = _without_advisory_data(candidate)
     effective_drift_fields = DEFAULT_DRIFT_FIELDS if drift_fields is None else drift_fields
     deltas: dict[str, PerSensorDelta] = {}
     for sensor_id in sorted(
@@ -104,6 +107,36 @@ def _per_sensor_delta(
 
 def _findings_for_sensor(state: SensorState, sensor_id: str) -> tuple[SecurityFinding, ...]:
     return tuple(finding for finding in state.findings if finding.sensor_id == sensor_id)
+
+
+def _without_advisory_data(state: SensorState) -> SensorState:
+    advisory_sensor_ids = {
+        sensor_id
+        for sensor_id, provenance in state.provenance_by_sensor.items()
+        if provenance.non_reproducible
+    } | {finding.sensor_id for finding in state.findings if isinstance(finding, LLMSecurityFinding)}
+    if not advisory_sensor_ids:
+        return state
+
+    mixed_verdict_findings = [
+        finding
+        for finding in state.findings
+        if finding.sensor_id in advisory_sensor_ids and not isinstance(finding, LLMSecurityFinding)
+    ]
+    if mixed_verdict_findings:
+        raise ValueError("advisory-only sensors must not include verdict-bearing findings")
+
+    return SensorState(
+        identity_algorithm_version=state.identity_algorithm_version,
+        provenance_by_sensor={
+            sensor_id: provenance
+            for sensor_id, provenance in state.provenance_by_sensor.items()
+            if sensor_id not in advisory_sensor_ids
+        },
+        findings=tuple(
+            finding for finding in state.findings if finding.sensor_id not in advisory_sensor_ids
+        ),
+    )
 
 
 def _provenance_drift_reason(

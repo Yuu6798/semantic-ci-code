@@ -2,6 +2,7 @@
 
 from semantic_ci_code.sensor.delta import compute_security_delta
 from semantic_ci_code.sensor.models import (
+    LLMSecurityFinding,
     SASTSecurityFinding,
     SCASecurityFinding,
     SecurityDelta,
@@ -13,6 +14,7 @@ from semantic_ci_code.sensor.models import (
 )
 
 __all__ = [
+    "LLMSecurityFinding",
     "SASTSecurityFinding",
     "SCASecurityFinding",
     "SecurityDelta",

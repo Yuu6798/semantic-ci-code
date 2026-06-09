@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from semantic_ci_code.sensor.models import (
+    LLMSecurityFinding,
     SASTSecurityFinding,
     SCASecurityFinding,
     SensorProvenance,
@@ -44,6 +45,29 @@ def sca_components(
         package_name,
         installed_version,
         advisory_id,
+    )
+
+
+def llm_components(
+    finding_class: str = "missing-authz",
+    *,
+    sensor_id: str = "llm-scout",
+    module_path: str = "src/app.py",
+    qualified_name: str = "src.app.handler",
+    anchor_kind: str = "absence",
+    expected_property: str = "requires authorization guard",
+    ordinal: int = 0,
+) -> tuple[str, ...]:
+    return (
+        "v1",
+        "llm",
+        sensor_id,
+        finding_class,
+        module_path,
+        qualified_name,
+        anchor_kind,
+        expected_property,
+        str(ordinal),
     )
 
 
@@ -103,6 +127,42 @@ def sca_finding(
     )
 
 
+def llm_finding(
+    finding_class: str = "missing-authz",
+    *,
+    sensor_id: str = "llm-scout",
+    severity: str = "critical",
+    module_path: str = "src/app.py",
+    qualified_name: str = "src.app.handler",
+    anchor_kind: str = "absence",
+    expected_property: str = "requires authorization guard",
+    ordinal: int = 0,
+) -> LLMSecurityFinding:
+    components = llm_components(
+        finding_class,
+        sensor_id=sensor_id,
+        module_path=module_path,
+        qualified_name=qualified_name,
+        anchor_kind=anchor_kind,
+        expected_property=expected_property,
+        ordinal=ordinal,
+    )
+    return LLMSecurityFinding(
+        category="llm",
+        sensor_id=sensor_id,
+        canonical_id=canonical_id_for_identity(components),
+        identity_components=components,
+        severity=severity,
+        finding_class=finding_class,
+        module_path=module_path,
+        qualified_name=qualified_name,
+        anchor_kind=anchor_kind,
+        expected_property=expected_property,
+        ordinal=ordinal,
+        message="advisory finding",
+    )
+
+
 def provenance(
     sensor_id: str = "semgrep",
     *,
@@ -112,6 +172,9 @@ def provenance(
     sensor_version: str = "tool-1",
     status: str = "complete",
     error_message: str | None = None,
+    model_id: str | None = None,
+    prompt_hash: str | None = None,
+    non_reproducible: bool = False,
 ) -> SensorProvenance:
     return SensorProvenance(
         sensor_id=sensor_id,
@@ -119,6 +182,9 @@ def provenance(
         adapter_version=adapter_version,
         ruleset_hash=ruleset_hash,
         advisory_db_hash=advisory_db_hash,
+        model_id=model_id,
+        prompt_hash=prompt_hash,
+        non_reproducible=non_reproducible,
         status=status,
         error_message=error_message,
     )
@@ -127,7 +193,7 @@ def provenance(
 def sensor_state(
     *,
     provenances: tuple[SensorProvenance, ...] | None = None,
-    findings: tuple[SASTSecurityFinding | SCASecurityFinding, ...] = (),
+    findings: tuple[SASTSecurityFinding | SCASecurityFinding | LLMSecurityFinding, ...] = (),
 ) -> SensorState:
     if provenances is None:
         sensors = sorted({finding.sensor_id for finding in findings} or {"semgrep"})

@@ -15,7 +15,8 @@ IdentityAlgorithmVersion = Literal["v1"]
 SensorRunStatus = Literal["complete", "error", "timeout", "skipped"]
 SecuritySeverity = Literal["critical", "high", "medium", "low", "info"]
 SecurityDeltaStatus = Literal["pass", "fail", "unknown"]
-SecurityFindingKind = Literal["sast", "sca"]
+SecurityFindingKind = Literal["sast", "sca", "llm"]
+LLMAnchorKind = Literal["presence", "absence"]
 
 FAIL_SEVERITIES = frozenset({"critical", "high", "medium", "low"})
 _FAIL_SEVERITIES = FAIL_SEVERITIES
@@ -48,6 +49,9 @@ class SensorProvenance(FrozenModel):
     identity_algorithm_version: IdentityAlgorithmVersion = "v1"
     ruleset_hash: str | None = None
     advisory_db_hash: str | None = None
+    model_id: str | None = None
+    prompt_hash: str | None = None
+    non_reproducible: bool = False
     status: SensorRunStatus = "complete"
     error_message: str | None = None
 
@@ -149,8 +153,61 @@ class SCASecurityFinding(_SecurityFindingBase):
         return self
 
 
+class LLMSecurityFinding(_SecurityFindingBase):
+    category: Literal["llm"] = "llm"
+    finding_class: str = Field(min_length=1)
+    module_path: str = Field(min_length=1)
+    qualified_name: str = Field(min_length=1)
+    anchor_kind: LLMAnchorKind
+    expected_property: str = ""
+    ordinal: int = Field(ge=0)
+    source_span: SourceSpan | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_module_path(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        module_path = normalized.get("module_path")
+        if isinstance(module_path, str):
+            normalized["module_path"] = _posix_path(module_path)
+        identity_components = normalized.get("identity_components")
+        if isinstance(identity_components, (list, tuple)) and len(identity_components) == 9:
+            components = list(identity_components)
+            if isinstance(components[4], str):
+                components[4] = _posix_path(components[4])
+            normalized["identity_components"] = tuple(components)
+        return normalized
+
+    @model_validator(mode="after")
+    def _identity_components_match_llm_fields(self) -> LLMSecurityFinding:
+        expected = (
+            self.identity_components[0] if self.identity_components else "",
+            "llm",
+            self.sensor_id,
+            self.finding_class,
+            self.module_path,
+            self.qualified_name,
+            self.anchor_kind,
+            self.expected_property,
+            str(self.ordinal),
+        )
+        if self.identity_components != expected:
+            raise ValueError("LLM identity_components must match finding fields")
+        return self
+
+    @model_validator(mode="after")
+    def _anchor_kind_matches_expected_property(self) -> LLMSecurityFinding:
+        if self.anchor_kind == "absence" and self.expected_property == "":
+            raise ValueError("absence LLM findings require expected_property")
+        if self.anchor_kind == "presence" and self.expected_property != "":
+            raise ValueError("presence LLM findings must not include expected_property")
+        return self
+
+
 SecurityFinding = Annotated[
-    SASTSecurityFinding | SCASecurityFinding,
+    SASTSecurityFinding | SCASecurityFinding | LLMSecurityFinding,
     Field(discriminator="category"),
 ]
 

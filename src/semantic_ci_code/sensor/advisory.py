@@ -113,13 +113,12 @@ def _resolve_baseline_site(
     old_path = rename_old_by_new.get(_posix_path(finding.module_path))
     if old_path is None:
         return None
-    candidate_module = _module_name_from_path(finding.module_path)
-    baseline_module = _module_name_from_path(old_path)
-    if finding.qualified_name == candidate_module:
-        baseline_fqn = baseline_module
-    elif finding.qualified_name.startswith(candidate_module + "."):
-        baseline_fqn = baseline_module + finding.qualified_name[len(candidate_module) :]
-    else:
+    baseline_fqn = _remap_renamed_fqn(
+        finding.qualified_name,
+        new_path=finding.module_path,
+        old_path=old_path,
+    )
+    if baseline_fqn is None:
         return None
     return baseline_by_fqn.get(baseline_fqn)
 
@@ -171,6 +170,24 @@ def _module_name_from_path(path: str) -> str:
     elif normalized.endswith(".py"):
         normalized = normalized[:-3]
     return normalized.replace("/", ".")
+
+
+def _remap_renamed_fqn(
+    qualified_name: str,
+    *,
+    new_path: str,
+    old_path: str,
+) -> str | None:
+    new_parts = tuple(part for part in _module_name_from_path(new_path).split(".") if part)
+    old_parts = tuple(part for part in _module_name_from_path(old_path).split(".") if part)
+    for suffix_length in range(min(len(new_parts), len(old_parts)), 0, -1):
+        candidate_module = ".".join(new_parts[-suffix_length:])
+        baseline_module = ".".join(old_parts[-suffix_length:])
+        if qualified_name == candidate_module:
+            return baseline_module
+        if qualified_name.startswith(candidate_module + "."):
+            return baseline_module + qualified_name[len(candidate_module) :]
+    return None
 
 
 def _posix_path(path: str) -> str:

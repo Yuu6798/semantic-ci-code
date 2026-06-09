@@ -167,6 +167,26 @@ def test_rename_map_prevents_pre_existing_absence_from_becoming_added():
     assert without_renames.pre_existing == ()
 
 
+def test_rename_map_handles_repo_relative_paths_with_package_root_prefix():
+    finding = llm_finding(
+        finding_class="missing-authz",
+        module_path="src/pkg/renamed.py",
+        qualified_name="pkg.renamed.handler",
+        anchor_kind="absence",
+        expected_property="requires authorization guard",
+    )
+    baseline = _code_state(_site(fqn="pkg.original.handler", decorators=()))
+    renames = (RenameEntry(old_path="src/pkg/original.py", new_path="src/pkg/renamed.py"),)
+
+    with_renames = compute_advisory_reprojection((finding,), baseline, renames=renames)
+    without_renames = compute_advisory_reprojection((finding,), baseline)
+
+    assert with_renames.added == ()
+    assert with_renames.pre_existing == (finding,)
+    assert without_renames.added == (finding,)
+    assert without_renames.pre_existing == ()
+
+
 def test_reprojection_output_is_sorted_by_canonical_id():
     later = llm_finding(
         finding_class="missing-authz",

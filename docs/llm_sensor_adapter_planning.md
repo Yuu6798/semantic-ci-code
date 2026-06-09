@@ -422,6 +422,15 @@ deterministic sensor と異なる (再 scan しても一致しないため versi
   のみ保護 (sanitization / authz / source-flow) で安全だった (candidate で保護削除)
   ケースで、finding が unchanged ではなく "added" に出ることを test で固定
 
+**Implementation note (H-2a/H-2b landed):** rename map exposure is carried by
+`CodeStateDelta.renames` as a CLI overlay, and LLM advisory re-projection is a
+separate advisory-only engine. The H-2b baseline predicate is intentionally
+heuristic and recall-first: presence anchors are fallback-only and therefore
+remain `added`; absence anchors use `api_surface.decorators` plus a small fixed
+guard-decorator table (for example `missing-authz`) to suppress pre-existing
+baseline absence findings. If the class or site cannot be resolved, the finding
+stays `added`. None of this participates in verdict computation.
+
 ### H-3: Codex Security reference adapter (CSCI-52)
 - `sensor/adapters/llm/codex_security.py` (first concrete, §1.5)
 - on-demand 実行 (D1)、fixture mode (記録済み出力の ingest) 必須

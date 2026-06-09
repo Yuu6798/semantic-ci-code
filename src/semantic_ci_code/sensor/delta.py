@@ -30,6 +30,8 @@ def compute_security_delta(
 ) -> SecurityDelta:
     """Compute a security delta from two hand-built SensorState values."""
 
+    _reject_llm_findings(baseline)
+    _reject_llm_findings(candidate)
     baseline = _without_advisory_data(baseline)
     candidate = _without_advisory_data(candidate)
     effective_drift_fields = DEFAULT_DRIFT_FIELDS if drift_fields is None else drift_fields
@@ -109,12 +111,17 @@ def _findings_for_sensor(state: SensorState, sensor_id: str) -> tuple[SecurityFi
     return tuple(finding for finding in state.findings if finding.sensor_id == sensor_id)
 
 
+def _reject_llm_findings(state: SensorState) -> None:
+    if any(isinstance(finding, LLMSecurityFinding) for finding in state.findings):
+        raise ValueError("LLM findings are advisory-only and cannot enter verdict security delta")
+
+
 def _without_advisory_data(state: SensorState) -> SensorState:
     advisory_sensor_ids = {
         sensor_id
         for sensor_id, provenance in state.provenance_by_sensor.items()
         if provenance.non_reproducible
-    } | {finding.sensor_id for finding in state.findings if isinstance(finding, LLMSecurityFinding)}
+    }
     if not advisory_sensor_ids:
         return state
 

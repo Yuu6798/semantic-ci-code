@@ -7,6 +7,7 @@ from pathlib import Path
 PROJECT_PREFIX = "semantic_ci_code"
 SUITE_PACKAGE = "semantic_ci_code.suite"
 SUITE_FORBIDDEN_IMPORTS = ("semantic_ci_code.cli",)
+SUITE_ADVISORY_IMPORT = "semantic_ci_code.sensor.advisory"
 
 
 def _module_to_path(module_name: str) -> Path | None:
@@ -94,3 +95,18 @@ def test_suite_package_does_not_import_cli_layer():
             failures[module] = leaks
 
     assert not failures, f"Suite package isolation violation: {failures}"
+
+
+def test_suite_package_does_not_import_llm_advisory_channel():
+    failures: dict[str, list[str]] = {}
+    for module in _discover_package_modules(SUITE_PACKAGE):
+        closure = _transitive_closure(module)
+        leaks = sorted(
+            item
+            for item in closure
+            if item == SUITE_ADVISORY_IMPORT or item.startswith(SUITE_ADVISORY_IMPORT + ".")
+        )
+        if leaks:
+            failures[module] = leaks
+
+    assert not failures, f"Suite package imported advisory-only LLM channel: {failures}"

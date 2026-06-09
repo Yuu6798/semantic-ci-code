@@ -1262,6 +1262,35 @@ def test_loc_delta_matches_git_numstat_for_different_refs(tmp_path: Path):
     assert data["loc_delta"] == {"added": 4, "removed": 0}
 
 
+def test_check_exposes_git_rename_map_to_delta_constraints(tmp_path: Path):
+    repo = init_repo_without_candidate_commit(tmp_path)
+    git(repo, "mv", "mod.py", "renamed.py")
+    git(repo, "commit", "-m", "rename module")
+    write_file(
+        repo / "target.yaml",
+        """\
+intent: expose git rename map
+change:
+  primary_kind: generic
+constraints:
+  - id: rename_record_present
+    kind: delta
+    target: renames
+    operator: includes_all
+    expected:
+      -
+        - [old_path, mod.py]
+        - [new_path, renamed.py]
+""",
+    )
+
+    result = run_semantic_ci(repo, "check", "--no-fetch", "--format", "json")
+    data = payload(result)
+
+    assert result.returncode == 0
+    assert data["verdict"] == "pass"
+
+
 def test_target_yaml_is_loaded_from_invoking_cwd_not_worktree(tmp_path: Path):
     repo = init_repo(tmp_path)
     git(repo, "switch", "main")

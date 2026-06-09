@@ -4,9 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from semantic_ci_code.cli.delta_overlay import overlay_delta, summarize_numstat
+from semantic_ci_code.cli.delta_overlay import (
+    overlay_delta,
+    renames_from_numstat,
+    summarize_numstat,
+)
 from semantic_ci_code.cli.git_diff import NumstatEntry, parse_numstat
-from semantic_ci_code.domain.state_schema import CodeStateDelta, LocDelta
+from semantic_ci_code.domain.state_schema import CodeStateDelta, LocDelta, RenameEntry
 
 
 def test_parse_numstat_text_file_modify():
@@ -45,11 +49,39 @@ def test_parse_numstat_mixed_records_and_summary():
     assert loc_delta == LocDelta(added=7, removed=4)
 
 
+def test_renames_from_numstat_extracts_renames_with_posix_paths_and_sorting():
+    entries = (
+        NumstatEntry(
+            added=0,
+            removed=0,
+            path=Path("pkg\\z_new.py"),
+            old_path=Path("pkg\\z_old.py"),
+            is_rename=True,
+        ),
+        NumstatEntry(added=1, removed=0, path=Path("pkg/added.py")),
+        NumstatEntry(
+            added=0,
+            removed=0,
+            path=Path("pkg\\a_new.py"),
+            old_path=Path("pkg\\a_old.py"),
+            is_binary=True,
+            is_rename=True,
+        ),
+        NumstatEntry(added=1, removed=1, path=Path("pkg/not_rename.py"), old_path=Path("old.py")),
+    )
+
+    assert renames_from_numstat(entries) == (
+        RenameEntry(old_path="pkg/a_old.py", new_path="pkg/a_new.py"),
+        RenameEntry(old_path="pkg/z_old.py", new_path="pkg/z_new.py"),
+    )
+
+
 def test_parse_numstat_empty_input():
     entries = parse_numstat("")
 
     assert entries == ()
     assert summarize_numstat(entries) == (0, LocDelta())
+    assert renames_from_numstat(entries) == ()
 
 
 def test_parse_numstat_malformed_input_raises_value_error():
@@ -59,10 +91,18 @@ def test_parse_numstat_malformed_input_raises_value_error():
 
 def test_overlay_delta_updates_only_git_metadata():
     original = CodeStateDelta()
+    renames = (RenameEntry(old_path="old.py", new_path="new.py"),)
 
-    overlaid = overlay_delta(original, files_touched=2, loc_delta=LocDelta(added=7, removed=4))
+    overlaid = overlay_delta(
+        original,
+        files_touched=2,
+        loc_delta=LocDelta(added=7, removed=4),
+        renames=renames,
+    )
 
     assert original.files_touched == 0
     assert original.loc_delta == LocDelta()
+    assert original.renames == ()
     assert overlaid.files_touched == 2
     assert overlaid.loc_delta == LocDelta(added=7, removed=4)
+    assert overlaid.renames == renames

@@ -56,6 +56,7 @@ from semantic_ci_code.framework.constraint_types import Operator
         ("coverage_delta.branch", TargetCategory.SCALAR_NUMBER),
         ("files_touched", TargetCategory.SCALAR_NUMBER),
         ("loc_delta.added", TargetCategory.SCALAR_NUMBER),
+        ("renames", TargetCategory.RECORD_COLLECTION),
         ("api_surface_delta", TargetCategory.RECORD),
         ("decorators_delta", TargetCategory.RECORD),
         ("effect_changes", TargetCategory.RECORD),
@@ -81,6 +82,12 @@ def test_decorators_delta_paths_are_schema_reflected():
     assert "decorators_delta.removed" in paths
     assert "decorators_delta.removed_public" not in paths
     assert category_for_target("decorators_delta.removed_public") is TargetCategory.UNKNOWN_OPEN
+
+
+def test_renames_path_is_schema_reflected():
+    paths = valid_delta_target_paths()
+    assert "renames" in paths
+    assert category_for_target("renames") is TargetCategory.RECORD_COLLECTION
 
 
 # --- observed-side rejections ----------------------------------------------

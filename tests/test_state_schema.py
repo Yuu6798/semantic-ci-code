@@ -19,6 +19,7 @@ from semantic_ci_code.domain.state_schema import (
     ImportEntry,
     LocDelta,
     ModuleGraphEntry,
+    RenameEntry,
     SymbolDelta,
     TypeRelation,
 )
@@ -108,6 +109,7 @@ def test_code_state_delta_exposes_all_delta_fields_and_extensions():
         coverage_delta=CoverageDelta(line=2.5, branch=None),
         files_touched=2,
         loc_delta=LocDelta(added=40, removed=3),
+        renames=(RenameEntry(old_path="src/old.py", new_path="src/new.py"),),
         python_specific={"decorators_changed": []},
         typescript_specific=None,
     )
@@ -126,11 +128,13 @@ def test_code_state_delta_exposes_all_delta_fields_and_extensions():
         "coverage_delta",
         "files_touched",
         "loc_delta",
+        "renames",
         "python_specific",
         "typescript_specific",
     }
     assert delta.files_touched == 2
     assert delta.coverage_delta is not None
+    assert delta.renames == (RenameEntry(old_path="src/old.py", new_path="src/new.py"),)
 
 
 def test_code_state_rejects_unknown_fields():

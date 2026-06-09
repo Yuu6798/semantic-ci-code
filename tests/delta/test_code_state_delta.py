@@ -565,6 +565,7 @@ def test_p1_unimplemented_fields_stay_at_defaults():
     assert delta.coverage_delta is None
     assert delta.files_touched == 0
     assert delta.loc_delta == LocDelta()
+    assert delta.renames == ()
     assert delta.typescript_specific is None
 
 

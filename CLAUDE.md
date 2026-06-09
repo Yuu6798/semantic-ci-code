@@ -251,7 +251,8 @@ logs (同日複数は `## Session N`), each indexed 1–2 lines in `_index.md`;
   is the **source of truth** for the full procedure (reflection → index →
   archive → `STATUS.md` sweep → discipline gate) and the archive-TTL table,
   summary layout, and anti-pattern list. If it and `CLAUDE.md` diverge, the
-  **skill wins** — fix the skill, do not re-inline the procedure here.
+  **skill wins** — fix this pointer/summary, never edit the skill to match
+  a stale `CLAUDE.md`.
 
 Git exception: only `.claude/memory/` logs may go direct to main; everything
 else is feature branch + PR. Before any direct-main push run

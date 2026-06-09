@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from semantic_ci_code.sensor.adapters.llm import RawLLMFinding, project_to_canonical
+from semantic_ci_code.sensor.adapters.llm import (
+    LLMSensorProvenance,
+    RawLLMFinding,
+    project_to_canonical,
+)
 
 
 def test_raw_llm_finding_normalizes_module_path_before_projection():
@@ -47,4 +51,28 @@ def test_raw_llm_finding_validates_anchor_shape(
             expected_property=expected_property,
             ordinal=0,
             severity="high",
+        )
+
+
+def test_llm_sensor_provenance_is_always_non_reproducible():
+    provenance = LLMSensorProvenance(
+        sensor_id="llm-scout",
+        sensor_version="model-x",
+        adapter_version="llm-adapter-1",
+        model_id="model-x",
+        prompt_hash="sha256:prompt",
+    )
+
+    assert provenance.non_reproducible is True
+
+
+def test_llm_sensor_provenance_rejects_reproducible_value():
+    with pytest.raises(ValueError):
+        LLMSensorProvenance(
+            sensor_id="llm-scout",
+            sensor_version="model-x",
+            adapter_version="llm-adapter-1",
+            model_id="model-x",
+            prompt_hash="sha256:prompt",
+            non_reproducible=False,
         )

@@ -7,7 +7,7 @@ and deterministic so LLM output cannot become a verdict-bearing judge.
 
 from __future__ import annotations
 
-from typing import Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias
 
 from pydantic import Field, model_validator
 
@@ -22,6 +22,16 @@ from semantic_ci_code.sensor.models import (
 )
 
 CodeView: TypeAlias = CodeState
+
+
+class LLMSensorProvenance(SensorProvenance):
+    """Provenance for advisory-only LLM scout runs.
+
+    LLM scout runs are intentionally non-reproducible and must never be accepted
+    by the verdict-bearing security delta path.
+    """
+
+    non_reproducible: Literal[True] = True
 
 
 class RawLLMFinding(FrozenModel):
@@ -103,5 +113,5 @@ class LLMSensorAdapter(Protocol):
     def project_to_canonical(self, finding: RawLLMFinding) -> LLMSecurityFinding:
         """Project one raw finding to canonical advisory form."""
 
-    def provenance(self) -> SensorProvenance:
-        """Return provenance for the advisory sensor run."""
+    def provenance(self) -> LLMSensorProvenance:
+        """Return non-reproducible provenance for the advisory sensor run."""

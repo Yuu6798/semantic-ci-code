@@ -104,7 +104,7 @@ def _sensor_state(
     )
 
 
-def test_llm_findings_are_rejected_from_verdict_delta_path():
+def test_llm_findings_are_ignored_by_verdict_delta_path():
     baseline = _sensor_state(
         provenances=(
             _provenance(
@@ -129,14 +129,17 @@ def test_llm_findings_are_rejected_from_verdict_delta_path():
         findings=(_llm_finding(sensor_id="llm-scout"),),
     )
 
-    with pytest.raises(ValueError, match="advisory-only"):
-        compute_security_delta(baseline, candidate)
-    with pytest.raises(ValueError, match="advisory-only"):
-        evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
+    delta = compute_security_delta(baseline, candidate)
+    detail = evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
+
+    assert delta.aggregate_status == "pass"
+    assert delta.deltas_by_sensor == {}
+    assert detail.status == "pass"
+    assert detail.sensors == ()
 
 
-def test_llm_only_provenance_is_rejected_from_verdict_delta_path():
-    baseline = _sensor_state(findings=())
+def test_llm_only_provenance_is_ignored_by_verdict_delta_path():
+    baseline = _sensor_state(provenances=())
     candidate = _sensor_state(
         provenances=(
             _provenance(
@@ -149,10 +152,32 @@ def test_llm_only_provenance_is_rejected_from_verdict_delta_path():
         )
     )
 
-    with pytest.raises(ValueError, match="non-reproducible sensor provenance"):
-        compute_security_delta(baseline, candidate)
-    with pytest.raises(ValueError, match="non-reproducible sensor provenance"):
-        evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
+    delta = compute_security_delta(baseline, candidate)
+    detail = evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
+
+    assert delta.aggregate_status == "pass"
+    assert delta.deltas_by_sensor == {}
+    assert detail.status == "pass"
+    assert detail.sensors == ()
+
+
+def test_advisory_sensor_rejects_mixed_verdict_bearing_findings():
+    finding = _sast_finding(severity="critical")
+    candidate = _sensor_state(
+        provenances=(
+            _provenance(
+                sensor_id=finding.sensor_id,
+                adapter_version="llm-adapter-1",
+                model_id="model-x",
+                prompt_hash="sha256:prompt",
+                non_reproducible=True,
+            ),
+        ),
+        findings=(finding,),
+    )
+
+    with pytest.raises(ValueError, match="advisory-only sensors"):
+        compute_security_delta(_sensor_state(findings=()), candidate)
 
 
 def test_deterministic_sast_finding_still_drives_suite_fail():

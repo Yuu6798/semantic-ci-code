@@ -1100,3 +1100,45 @@ merge の標準サイクル。
 設計判断: ordinal は v1 のうちに identity slot を確定 (G-2 での v1→v2 強制 bump 回避)。
 suppression = 宣言ポリシーなので観測状態 (SensorState) から分離し G-3 へ。両 review とも
 1 round 解決、設計フォークは AskUserQuestion 推奨付き N 択 / robustness 修正は直接 repair text。
+
+### 2026-06-03 — Phase G G-3〜G-4b 完走: CSCI-47 + CSCI-48 + CSCI-48b (PR #127 + #128 + #129)
+
+Phase G 実装 2 日目。suite evaluator から CLI 出力までの 3 スライスを cascade
+で landing し、Phase G 実装は **G-5 (CSCI-49) のみ残**。design (Claude brief) →
+Codex 実装 → Claude review → merge の標準サイクル。
+
+- **PR #127** (CSCI-47 / G-3): `src/semantic_ci_code/suite/` 新設。suite security
+  policy evaluator (code_delta + security_delta → suite_verdict)、`security:`
+  namespace、scanner drift 検出。fix commits: default floor on security gate
+  composition / suppression identity tuple shape 検証 / provenance drift reason
+  の決定論順序 / CI import 用 local helpers。
+- **PR #128** (CSCI-48 / G-4a): `check --sensor-baseline/--sensor-candidate` で
+  SensorState ingest + `suite_verdict` + exit code 配線 + 集約 `security:
+  {verdict, as_of}` JSON。この時点では `--format sarif/gh-actions` を明示 reject。
+- **PR #129** (CSCI-48b / G-4b): per-sensor security detail を JSON/human/SARIF の
+  3 format に拡張。`evaluate_security` を `evaluate_security_detail` への薄い
+  wrapper に再実装 (既存契約維持)、SARIF を code constraint と同一 run にマージ
+  (severity→level: critical/high=error, medium=warning, low/info=note)、
+  `schema_version` は "6" 据置 (optional `security` object の additive 拡張)。
+  follow-up 3 commit (surface security policy failures in SARIF / omit zero
+  security columns / distinguish unknown causes) で land。
+
+**設計判断のハイライト**:
+
+1. **G-4 を 4a/4b に分割**: G-4a で「ingest + 集約 verdict + exit code」の最小縦
+   動線を凍結し、G-4b を純粋な出力 enrichment + SARIF 解禁に限定。verdict/exit
+   semantics を先に固めることで G-4b review の attention budget を分離。
+2. **grounding-first brief (CSCI-48b)**: brief 起草前に `evaluate_security` 内部・
+   SecurityFinding field・SARIF mapping を逐語 read。2 つの「予定された破壊」
+   (wrapper 化での契約維持 / G-4a の `security == {verdict, as_of}` exact-match を
+   subset assert に緩和) を AC に事前 encode → PR #129 は review バグ 0。
+3. **設計フォークを AskUserQuestion で 2 軸 pin**: 粒度 (完全詳細) と SARIF 配置
+   (同一 run マージ) + severity→level を選択肢化して確定、そのまま AC 化。
+
+**修正・訂正**:
+
+1. PR #129 review の非ブロッキング指摘 2 点 = `build_payload` の dead な
+   `security_verdict`/`security_as_of` 引数 + SARIF column が SourceSpan の 0-based
+   を 1-based 必須の SARIF region に素通し。どちらも G-5 か別 PR で回収候補。
+2. wrap-up 起動時に STATUS.md が G-1/G-2 (2026-06-02) で stale だったのを検出、
+   git log で PR #127/#128/#129 merged を確認して sweep。

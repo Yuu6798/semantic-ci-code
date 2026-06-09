@@ -28,6 +28,37 @@ Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc r
 
 ## 直近 merged
 
+### 2026-06-09 (Session 2) — CLAUDE.md 圧縮 + 300 行 cap を discipline test 化 (PR #145)
+
+記事 (とんのかつ氏「2 層メモリ + 自己改善ループ」) と本 repo 機構の機能比較から
+派生し、「CLAUDE.md が肥大化原則を超過 (483 行) している実害」を repo 自身の記録で
+実証 → user 指示で 2 修正を実装・merge。phase 進行には非影響の infra 改善。
+
+- **圧縮**: CLAUDE.md 483 → 290 行 (ルール削除ゼロ)。src/tests ツリー →
+  `docs/repository_layout.md` 新設、125 行 Session Memory 手順 → wrap-up skill
+  (source-of-truth を CLAUDE.md から skill へ反転、archive-TTL/summary/anti-pattern
+  を Appendix 化で情報損失ゼロ)。重複参照ブロックも圧縮。
+- **discipline test**: `tests/discipline/test_claude_md_line_cap.py` (CLAUDE.md ≤ 300、
+  超過検出の負例込み)。`tests/discipline/` 配置で wrap-up step 8 gate に自動編入 →
+  終了プロトコルが cap 超過で fail するように。
+
+**設計判断のハイライト**:
+
+1. **実害は repo 自己記録で実証**: `doc_refactor_planning.md` の ≤200 目標 (起案 320)
+   に対し CLAUDE.md だけが 483 にリグレッション。トークン固定費は 1M Opus で誤差だが、
+   遵守劣化は documented recurring failure mode + 散文ルールの test 強制格上げ履歴で裏づけ。
+2. **閾値は CLAUDE.md のみ ≤300** (AskUserQuestion 確定): STATUS.md 336 行ゆえ一律不可。
+3. **layout doc を「構造マップ・filesystem 正典」に再定義**: 「Full per-module tree」の
+   過剰約束が「hidden module X」型 review を無限誘発した根本原因を断つ。
+
+**修正・訂正**:
+
+1. **divergence 修正方向の論理矛盾** (Codex P2、私の混入バグ): 「skill wins」直後に
+   「fix the skill」→ 正典上書き指示。「fix this pointer/summary」に訂正。
+2. **移設ツリーが数世代 stale** (Codex P2 ×3): commands 6/10・authoring/sensor/suite
+   欠落・nested subpackage 全欠落を filesystem diff が空になるまで補完。本 PR が解こうと
+   した「always-loaded doc に詳細を抱えると腐る」問題の実例 (4 commit で消化、全 thread resolved)。
+
 ### 2026-06-09 — Phase H 始動: LLM security scout layer H-1〜H-2b (PR #142 + #143 + #144)
 
 Phase G-5 完走で gate 解除された **Phase H (LLM security scout layer)** が始動。
@@ -178,51 +209,9 @@ Security」(2026-03 の AI セキュリティエージェント、コーディ�
    実装節では通常 SensorState 経路を想定 → `combine_verdict` で fail を seat してしまう
    矛盾。advisory チャネル分離を明文化して解消。
 
-### 2026-06-03 — Phase G G-3〜G-4b 完走: CSCI-47 + CSCI-48 + CSCI-48b (PR #127 + #128 + #129)
+### 古い merged entry (2026-06-03 以前) — archive 参照
 
-Phase G 実装 2 日目。suite evaluator から CLI 出力までの 3 スライスを cascade
-で landing し、Phase G 実装は **G-5 (CSCI-49) のみ残**。design (Claude brief) →
-Codex 実装 → Claude review → merge の標準サイクル。
-
-- **PR #127** (CSCI-47 / G-3): `src/semantic_ci_code/suite/` 新設。suite security
-  policy evaluator (code_delta + security_delta → suite_verdict)、`security:`
-  namespace、scanner drift 検出。fix commits: default floor on security gate
-  composition / suppression identity tuple shape 検証 / provenance drift reason
-  の決定論順序 / CI import 用 local helpers。
-- **PR #128** (CSCI-48 / G-4a): `check --sensor-baseline/--sensor-candidate` で
-  SensorState ingest + `suite_verdict` + exit code 配線 + 集約 `security:
-  {verdict, as_of}` JSON。この時点では `--format sarif/gh-actions` を明示 reject。
-- **PR #129** (CSCI-48b / G-4b): per-sensor security detail を JSON/human/SARIF の
-  3 format に拡張。`evaluate_security` を `evaluate_security_detail` への薄い
-  wrapper に再実装 (既存契約維持)、SARIF を code constraint と同一 run にマージ
-  (severity→level: critical/high=error, medium=warning, low/info=note)、
-  `schema_version` は "6" 据置 (optional `security` object の additive 拡張)。
-  follow-up 3 commit (surface security policy failures in SARIF / omit zero
-  security columns / distinguish unknown causes) で land。
-
-**設計判断のハイライト**:
-
-1. **G-4 を 4a/4b に分割**: G-4a で「ingest + 集約 verdict + exit code」の最小縦
-   動線を凍結し、G-4b を純粋な出力 enrichment + SARIF 解禁に限定。verdict/exit
-   semantics を先に固めることで G-4b review の attention budget を分離。
-2. **grounding-first brief (CSCI-48b)**: brief 起草前に `evaluate_security` 内部・
-   SecurityFinding field・SARIF mapping を逐語 read。2 つの「予定された破壊」
-   (wrapper 化での契約維持 / G-4a の `security == {verdict, as_of}` exact-match を
-   subset assert に緩和) を AC に事前 encode → PR #129 は review バグ 0。
-3. **設計フォークを AskUserQuestion で 2 軸 pin**: 粒度 (完全詳細) と SARIF 配置
-   (同一 run マージ) + severity→level を選択肢化して確定、そのまま AC 化。
-
-**修正・訂正**:
-
-1. PR #129 review の非ブロッキング指摘 2 点 = `build_payload` の dead な
-   `security_verdict`/`security_as_of` 引数 + SARIF column が SourceSpan の 0-based
-   を 1-based 必須の SARIF region に素通し。どちらも G-5 か別 PR で回収候補。
-2. wrap-up 起動時に STATUS.md が G-1/G-2 (2026-06-02) で stale だったのを検出、
-   git log で PR #127/#128/#129 merged を確認して sweep。
-
-### 古い merged entry (2026-06-02 以前) — archive 参照
-
-23 entry (2026-06-02 (#124/#125/#126) / 2026-05-29 S2 (#120/#121) / 2026-05-28 S2 /
+24 entry (2026-06-03 (#127/#128/#129) / 2026-06-02 (#124/#125/#126) / 2026-05-29 S2 (#120/#121) / 2026-05-28 S2 /
 2026-05-27 / 2026-05-26 / 2026-05-22 /
 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
 2026-05-15 Session 4 + Session 3 + Session 2 /
@@ -237,7 +226,8 @@ Codex 実装 → Claude review → merge の標準サイクル。
 + 2026-05-28 S2 wrap-up (5/21 S5 移送) + 2026-05-29 wrap-up (5/22 移送)
 + 2026-05-29 S2 wrap-up (5/26 移送) + 2026-06-02 wrap-up (5/27 移送)
 + 2026-06-03 S2 wrap-up (5/28 S2 移送) + 2026-06-08 wrap-up (5/29 S2 移送)
-+ 2026-06-09 wrap-up (6/02 移送) で compaction が実施された。
++ 2026-06-09 wrap-up (6/02 移送) + 2026-06-09 S2 wrap-up (6/03 移送)
+で compaction が実施された。
 
 ## 次の発行順序
 

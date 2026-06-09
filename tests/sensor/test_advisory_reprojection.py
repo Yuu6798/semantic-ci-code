@@ -52,6 +52,23 @@ def test_absence_anchor_without_baseline_guard_is_pre_existing():
     assert result.pre_existing == (finding,)
 
 
+def test_absence_anchor_checks_all_duplicate_fqn_entries():
+    finding = llm_finding(
+        finding_class="missing-authz",
+        anchor_kind="absence",
+        expected_property="requires authorization guard",
+    )
+    baseline = _code_state(
+        _site(decorators=()),
+        _site(decorators=("login_required",)),
+    )
+
+    result = compute_advisory_reprojection((finding,), baseline)
+
+    assert result.added == (finding,)
+    assert result.pre_existing == ()
+
+
 def test_absence_guard_match_uses_decorator_leaf():
     finding = llm_finding(
         finding_class="missing-authz",

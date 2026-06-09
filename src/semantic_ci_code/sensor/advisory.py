@@ -51,7 +51,7 @@ def compute_advisory_reprojection(
     never accepted, and unresolved predicates fall back to `added`.
     """
 
-    baseline_by_fqn = {entry.fqn: entry for entry in baseline_code.api_surface}
+    baseline_by_fqn = _entries_by_fqn(baseline_code.api_surface)
     rename_old_by_new = {
         _posix_path(rename.new_path): _posix_path(rename.old_path) for rename in renames
     }
@@ -76,7 +76,7 @@ def compute_advisory_reprojection(
 def _already_in_baseline(
     finding: LLMSecurityFinding,
     *,
-    baseline_by_fqn: Mapping[str, APISurfaceEntry],
+    baseline_by_fqn: Mapping[str, tuple[APISurfaceEntry, ...]],
     rename_old_by_new: Mapping[str, str],
 ) -> bool:
     if finding.anchor_kind == "presence":
@@ -86,41 +86,41 @@ def _already_in_baseline(
     if guard_decorators is None:
         return False
 
-    baseline_site = _resolve_baseline_site(
+    baseline_sites = _resolve_baseline_sites(
         finding,
         baseline_by_fqn=baseline_by_fqn,
         rename_old_by_new=rename_old_by_new,
     )
-    if baseline_site is None:
+    if not baseline_sites:
         return False
     return not _has_guard_decorator_in_scope(
-        baseline_site,
+        baseline_sites,
         baseline_by_fqn=baseline_by_fqn,
         guard_decorators=guard_decorators,
     )
 
 
-def _resolve_baseline_site(
+def _resolve_baseline_sites(
     finding: LLMSecurityFinding,
     *,
-    baseline_by_fqn: Mapping[str, APISurfaceEntry],
+    baseline_by_fqn: Mapping[str, tuple[APISurfaceEntry, ...]],
     rename_old_by_new: Mapping[str, str],
-) -> APISurfaceEntry | None:
-    direct = baseline_by_fqn.get(finding.qualified_name)
-    if direct is not None:
+) -> tuple[APISurfaceEntry, ...]:
+    direct = baseline_by_fqn.get(finding.qualified_name, ())
+    if direct:
         return direct
 
     old_path = rename_old_by_new.get(_posix_path(finding.module_path))
     if old_path is None:
-        return None
+        return ()
     baseline_fqn = _remap_renamed_fqn(
         finding.qualified_name,
         new_path=finding.module_path,
         old_path=old_path,
     )
     if baseline_fqn is None:
-        return None
-    return baseline_by_fqn.get(baseline_fqn)
+        return ()
+    return baseline_by_fqn.get(baseline_fqn, ())
 
 
 def _has_guard_decorator(
@@ -131,15 +131,16 @@ def _has_guard_decorator(
 
 
 def _has_guard_decorator_in_scope(
-    entry: APISurfaceEntry,
+    entries: tuple[APISurfaceEntry, ...],
     *,
-    baseline_by_fqn: Mapping[str, APISurfaceEntry],
+    baseline_by_fqn: Mapping[str, tuple[APISurfaceEntry, ...]],
     guard_decorators: frozenset[str],
 ) -> bool:
-    if _has_guard_decorator(entry, guard_decorators):
+    if any(_has_guard_decorator(entry, guard_decorators) for entry in entries):
         return True
     return any(
         _has_guard_decorator(enclosing, guard_decorators)
+        for entry in entries
         for enclosing in _enclosing_entries(entry.fqn, baseline_by_fqn=baseline_by_fqn)
     )
 
@@ -147,16 +148,24 @@ def _has_guard_decorator_in_scope(
 def _enclosing_entries(
     fqn: str,
     *,
-    baseline_by_fqn: Mapping[str, APISurfaceEntry],
+    baseline_by_fqn: Mapping[str, tuple[APISurfaceEntry, ...]],
 ) -> tuple[APISurfaceEntry, ...]:
     entries: list[APISurfaceEntry] = []
     parts = fqn.split(".")
     for index in range(len(parts) - 1, 0, -1):
         candidate = ".".join(parts[:index])
-        entry = baseline_by_fqn.get(candidate)
-        if entry is not None and entry.kind == "class":
+        for entry in baseline_by_fqn.get(candidate, ()):
+            if entry.kind != "class":
+                continue
             entries.append(entry)
     return tuple(entries)
+
+
+def _entries_by_fqn(entries: Iterable[APISurfaceEntry]) -> dict[str, tuple[APISurfaceEntry, ...]]:
+    grouped: dict[str, list[APISurfaceEntry]] = {}
+    for entry in entries:
+        grouped.setdefault(entry.fqn, []).append(entry)
+    return {fqn: tuple(items) for fqn, items in grouped.items()}
 
 
 def _decorator_leaf(decorator: str) -> str:

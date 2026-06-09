@@ -11,6 +11,12 @@ src/semantic_ci_code/
   config.py
   scope.py
   api_surface/           # Python public-symbol extractor (CSCI-5)
+  authoring/             # Brief 8: target.yaml authoring surface (evaluator-isolated)
+    advisory.py          # Advisor channel (severity: info, never in verdict)
+    canonical.py         # canonical form + authoring hazards encode
+    catalog.py           # target-catalog recipe / reference paths
+    hazards.py
+    provenance.py        # candidate_code_used: false provenance record
   cli/                   # CLI surface (Brief 4 / 4b / 4d / 5)
     main.py              # argparse entry; subparser for 10 subcommands
     commands/            # one module per subcommand
@@ -57,23 +63,37 @@ src/semantic_ci_code/
       codex.py
       markdown.py
   schemas/               # JSON Schema artifacts
+  sensor/                # Phase G/H: SensorState + advisory scout layer
+    models.py            # SensorState parallel to CodeState (CSCI-45)
+    delta.py             # canonical_id-keyed security delta (CSCI-45)
+    advisory.py          # deterministic one-run re-projection (CSCI-51b, verdict-isolated)
   ssp/                   # Semantic Security Protocol v0.1 (Brief 7)
     models.py            # Pydantic v2 models (SensorOutput, Finding, SSPDelta, etc.)
     fingerprint.py       # SAST 5-element + SCA 3-element canonical fingerprint
     python_profile.py    # AST normalization for SAST normalized_text
     delta.py             # compute_delta + ordinal assignment
     verdict.py           # per-sensor + aggregate verdict
+  suite/                 # Phase G: suite evaluator (code + security delta)
+    evaluator.py         # unified verdict over code_delta + security_delta (CSCI-47)
+    security.py          # suite security policy evaluator (CSCI-48)
   test_surface/          # CSCI-9
 tests/
+  architecture/          # surface-isolation invariant tests
+  authoring/             # Brief 8 authoring surface (incl. test_canonical.py)
   cli/                   # CLI integration tests
   compiler/              # CSCI-12
   delta/                 # CSCI-11
+  discipline/            # AGENTS.md §5.5 discipline rules as CI checks
   evaluator/             # CSCI-13
+  examples/              # runnable examples gallery anti-rot tests
+  framework/             # modality-agnostic framework tests
+  module_graph/          # CSCI-8
   pipeline/              # CSCI-10
   repair/                # CSCI-14
   repair_compiler/       # Brief 5
+  sensor/                # SensorState / delta / advisory (Phase G/H)
   ssp/                   # SSP models, fingerprint, delta, verdict tests
-  discipline/            # AGENTS.md §5.5 discipline rules as CI checks
+  suite/                 # suite evaluator (Phase G)
   fixtures/              # hand-built before/after trees + expected verdicts
 docs/                    # see the Design Documents table in CLAUDE.md
 experiments/             # observation-only reproductions (out of core scope)

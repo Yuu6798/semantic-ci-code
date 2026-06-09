@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from semantic_ci_code.sensor.models import (
+    LLMSecurityFinding,
     PerSensorDelta,
     SecurityDelta,
     SecurityFinding,
@@ -29,6 +30,8 @@ def compute_security_delta(
 ) -> SecurityDelta:
     """Compute a security delta from two hand-built SensorState values."""
 
+    _reject_llm_findings(baseline)
+    _reject_llm_findings(candidate)
     effective_drift_fields = DEFAULT_DRIFT_FIELDS if drift_fields is None else drift_fields
     deltas: dict[str, PerSensorDelta] = {}
     for sensor_id in sorted(
@@ -104,6 +107,11 @@ def _per_sensor_delta(
 
 def _findings_for_sensor(state: SensorState, sensor_id: str) -> tuple[SecurityFinding, ...]:
     return tuple(finding for finding in state.findings if finding.sensor_id == sensor_id)
+
+
+def _reject_llm_findings(state: SensorState) -> None:
+    if any(isinstance(finding, LLMSecurityFinding) for finding in state.findings):
+        raise ValueError("LLM security findings are advisory-only and cannot enter verdict delta")
 
 
 def _provenance_drift_reason(

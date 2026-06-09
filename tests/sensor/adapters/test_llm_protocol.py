@@ -76,3 +76,24 @@ def test_llm_sensor_provenance_rejects_reproducible_value():
             prompt_hash="sha256:prompt",
             non_reproducible=False,
         )
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    [
+        "model_id",
+        "prompt_hash",
+    ],
+)
+def test_llm_sensor_provenance_requires_audit_fields(missing_field: str):
+    payload = {
+        "sensor_id": "llm-scout",
+        "sensor_version": "model-x",
+        "adapter_version": "llm-adapter-1",
+        "model_id": "model-x",
+        "prompt_hash": "sha256:prompt",
+    }
+    del payload[missing_field]
+
+    with pytest.raises(ValueError):
+        LLMSensorProvenance(**payload)

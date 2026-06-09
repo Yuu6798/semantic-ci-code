@@ -31,6 +31,8 @@ class LLMSensorProvenance(SensorProvenance):
     by the verdict-bearing security delta path.
     """
 
+    model_id: str = Field(min_length=1)
+    prompt_hash: str = Field(min_length=1)
     non_reproducible: Literal[True] = True
 
 

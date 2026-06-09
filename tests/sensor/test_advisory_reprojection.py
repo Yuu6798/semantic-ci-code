@@ -14,10 +14,11 @@ def _site(
     fqn: str = "src.app.handler",
     *,
     decorators: tuple[str, ...] = (),
+    kind: str = "function",
 ) -> APISurfaceEntry:
     return APISurfaceEntry(
         fqn=fqn,
-        kind="function",
+        kind=kind,
         visibility="public",
         decorators=decorators,
     )
@@ -63,6 +64,44 @@ def test_absence_guard_match_uses_decorator_leaf():
 
     assert result.added == (finding,)
     assert result.pre_existing == ()
+
+
+def test_absence_anchor_checks_enclosing_class_guard():
+    finding = llm_finding(
+        finding_class="missing-authz",
+        module_path="src/views.py",
+        qualified_name="src.views.Users.get",
+        anchor_kind="absence",
+        expected_property="requires authorization guard",
+    )
+    baseline = _code_state(
+        _site(fqn="src.views.Users", kind="class", decorators=("login_required",)),
+        _site(fqn="src.views.Users.get", decorators=()),
+    )
+
+    result = compute_advisory_reprojection((finding,), baseline)
+
+    assert result.added == (finding,)
+    assert result.pre_existing == ()
+
+
+def test_absence_anchor_without_enclosing_class_guard_is_pre_existing():
+    finding = llm_finding(
+        finding_class="missing-authz",
+        module_path="src/views.py",
+        qualified_name="src.views.Users.get",
+        anchor_kind="absence",
+        expected_property="requires authorization guard",
+    )
+    baseline = _code_state(
+        _site(fqn="src.views.Users", kind="class", decorators=()),
+        _site(fqn="src.views.Users.get", decorators=()),
+    )
+
+    result = compute_advisory_reprojection((finding,), baseline)
+
+    assert result.added == ()
+    assert result.pre_existing == (finding,)
 
 
 def test_presence_anchor_is_always_added_fallback():

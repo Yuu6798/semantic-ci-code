@@ -93,7 +93,11 @@ def _already_in_baseline(
     )
     if baseline_site is None:
         return False
-    return not _has_guard_decorator(baseline_site, guard_decorators)
+    return not _has_guard_decorator_in_scope(
+        baseline_site,
+        baseline_by_fqn=baseline_by_fqn,
+        guard_decorators=guard_decorators,
+    )
 
 
 def _resolve_baseline_site(
@@ -125,6 +129,35 @@ def _has_guard_decorator(
     guard_decorators: frozenset[str],
 ) -> bool:
     return any(_decorator_leaf(decorator) in guard_decorators for decorator in entry.decorators)
+
+
+def _has_guard_decorator_in_scope(
+    entry: APISurfaceEntry,
+    *,
+    baseline_by_fqn: Mapping[str, APISurfaceEntry],
+    guard_decorators: frozenset[str],
+) -> bool:
+    if _has_guard_decorator(entry, guard_decorators):
+        return True
+    return any(
+        _has_guard_decorator(enclosing, guard_decorators)
+        for enclosing in _enclosing_entries(entry.fqn, baseline_by_fqn=baseline_by_fqn)
+    )
+
+
+def _enclosing_entries(
+    fqn: str,
+    *,
+    baseline_by_fqn: Mapping[str, APISurfaceEntry],
+) -> tuple[APISurfaceEntry, ...]:
+    entries: list[APISurfaceEntry] = []
+    parts = fqn.split(".")
+    for index in range(len(parts) - 1, 0, -1):
+        candidate = ".".join(parts[:index])
+        entry = baseline_by_fqn.get(candidate)
+        if entry is not None:
+            entries.append(entry)
+    return tuple(entries)
 
 
 def _decorator_leaf(decorator: str) -> str:

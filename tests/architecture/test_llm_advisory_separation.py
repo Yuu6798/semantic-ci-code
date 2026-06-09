@@ -104,7 +104,7 @@ def _sensor_state(
     )
 
 
-def test_llm_findings_are_ignored_by_verdict_delta_path():
+def test_llm_findings_are_rejected_by_verdict_delta_path():
     baseline = _sensor_state(
         provenances=(
             _provenance(
@@ -129,13 +129,10 @@ def test_llm_findings_are_ignored_by_verdict_delta_path():
         findings=(_llm_finding(sensor_id="llm-scout"),),
     )
 
-    delta = compute_security_delta(baseline, candidate)
-    detail = evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
-
-    assert delta.aggregate_status == "pass"
-    assert delta.deltas_by_sensor == {}
-    assert detail.status == "pass"
-    assert detail.sensors == ()
+    with pytest.raises(ValueError, match="LLM findings are advisory-only"):
+        compute_security_delta(baseline, candidate)
+    with pytest.raises(ValueError, match="LLM findings are advisory-only"):
+        evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
 
 
 def test_llm_only_provenance_is_ignored_by_verdict_delta_path():

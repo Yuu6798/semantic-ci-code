@@ -5,11 +5,13 @@ description: Persist a session-end reflection into .claude/memory and run the me
 
 # wrap-up — session memory persistence + hygiene sweep
 
-Executes the session-end procedure defined in `CLAUDE.md` § Session Memory
-「終了時ルール (自動トリガー)」 and § Archive policy. This skill is the
-**executor**; `CLAUDE.md` is the **policy source of truth**. If this file
-and `CLAUDE.md` ever diverge, `CLAUDE.md` wins — fix this skill rather than
-acting on the stale copy.
+This skill is the **source of truth** for the end-of-session procedure. The
+full step list, archive-TTL policy, summary layout, and anti-pattern list used
+to live inline in `CLAUDE.md` § Session Memory; they were moved here so the
+always-loaded policy doc stays lean (≤ 300 lines) and the procedure is only
+loaded on demand. `CLAUDE.md` keeps a short pointer to this file. If the two
+ever diverge, **this skill wins** — fix `CLAUDE.md`'s pointer, do not re-inline
+the procedure there.
 
 Run it confirmation-free when a trigger phrase fires (that is the documented
 contract), but still surface what you changed at the end.
@@ -35,7 +37,7 @@ Write the session reflection to `.claude/memory/YYYY-MM-DD.md` (today =
 the `currentDate` from context). If the file already exists for today,
 append a new `## Session N` section instead of overwriting.
 
-Use the conventional section layout (see `CLAUDE.md` § サマリーの構成):
+Use the conventional section layout (see the Summary layout appendix below):
 **コンテキスト / 設計判断 / 成功パターン / 修正・訂正 / 工程サマリー (table) /
 成果物 / 次セッションへの引き継ぎ / メモ**.
 
@@ -89,7 +91,8 @@ an unrecognized argument and the gate error out spuriously. `python -m`
 pins the invocation to the active environment's pytest.
 
 All tests in `tests/discipline/` MUST pass before pushing. A failure means
-drift remains from steps 4–6 — fix the offending file and re-run; do NOT
+drift remains from steps 4–6 (or `CLAUDE.md` grew past its 300-line cap, see
+`test_claude_md_line_cap.py`) — fix the offending file and re-run; do NOT
 push red. Only `.claude/memory/` changes may go direct to main (the memory
 exception); everything else still needs a feature branch + PR.
 
@@ -97,3 +100,48 @@ exception); everything else still needs a feature branch + PR.
 After pushing, give the user a short summary: which memory files changed,
 any archive moves, the discipline-test result, and any 5+ round item you
 externalized or are proposing to encode.
+
+---
+
+## Appendix A — Archive policy (compaction TTL)
+
+`.claude/memory/` artifacts are archived on these TTLs (verbatim, zero info
+loss). Archive moves are allowed direct-to-main under the memory exception.
+
+| Artifact | TTL | 移送先 | 移送後の本体 source |
+|---|---|---|---|
+| dated session log `YYYY-MM-DD.md` | 30 日 | `archive/YYYY-MM/YYYY-MM-DD.md` | 原文保存 (情報損失ゼロ) |
+| `_index.md` の対応 entry | 同上 | inline → 1 行 summary + archive path 追記 | 詳細は archive file 経由で参照可 |
+| `STATUS.md ## 直近 merged` entry | 直近 5 を超えた時点 | `archive/STATUS_MERGED_LOG.md` 末尾 | 原文保存 |
+| `STATUS.md 次の発行順序` の 完走 entry | merge と同時 | `## 直近 merged` の新 entry に変換 | 完走宣言として保存 |
+| `STATUS.md ## Phase` paragraph | 上書き時 | (保存しない、 1 paragraph 厳守) | 旧 phase の history は dated session log / `_index.md` に分散保存 |
+
+Archive infrastructure: `.claude/memory/archive/` directory + `archive/INDEX.md`.
+
+## Appendix B — Summary layout (慣例フォーマット)
+
+Compose the dated reflection with these sections:
+
+- **コンテキスト** — そのセッションが何を扱ったか 1〜2 段落
+- **設計判断** — なぜその選択をしたか
+- **成功パターン** — 効いたアプローチ
+- **修正・訂正** — バグ・誤認識の記録
+- **工程サマリー** — 表形式で工程と成果
+- **成果物** — マージされた PR / 追加ファイル
+- **次セッションへの引き継ぎ** — 残課題
+- **メモ** — 雑多な気づき
+
+## Appendix C — Anti-patterns (`AGENTS.md §5.5` の対応 row 参照)
+
+- `_index.md` entry を essay 化させる (Phase 2 で 53KB → 5KB 復元の前例、
+  cell ≤ 500 chars は `test_index_md_entry_compactness.py` で enforce)。
+- 完走済 CSCI を `次の発行順序` に残置 (5/21 で ADVISORY-S1 + R17 で 2 連続
+  発生、 PR merge 直後の即時 sweep が必須)。
+- `## Phase` に新 paragraph を追加するが旧 paragraph を残置 (5/21 で Codex /
+  Claude 両方が再発させた drift)。
+- archive 移送を「後で」と先送り (30 日経過 dated entry は wrap-up 時に必ず移送)。
+- discipline test の pre-push verification を skip して memory を直 main push
+  する (step 8 違反): post-hoc 検出のみのため main red を直接引き起こす。
+- **`CLAUDE.md` を 300 行超に肥大させる** (always-loaded policy doc の固定費 +
+  指示遵守劣化。 reference detail は `docs/` / skill に逃がしポインタ化する。
+  `test_claude_md_line_cap.py` で enforce)。

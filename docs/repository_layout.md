@@ -20,6 +20,9 @@ src/semantic_ci_code/
       compile.py
       compile_repair.py  # Brief 5
       validate_plan.py   # Brief 5
+      target_doctor.py
+      target_catalog.py
+      ssp.py             # SSP sensor group (scan / from-json)
     output/              # json / human / sarif / gh-actions formatters
     output_sarif.py
     output_gh_actions.py

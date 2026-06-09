@@ -32,6 +32,8 @@ def compute_security_delta(
 
     _reject_llm_findings(baseline)
     _reject_llm_findings(candidate)
+    _reject_non_reproducible_provenance(baseline)
+    _reject_non_reproducible_provenance(candidate)
     effective_drift_fields = DEFAULT_DRIFT_FIELDS if drift_fields is None else drift_fields
     deltas: dict[str, PerSensorDelta] = {}
     for sensor_id in sorted(
@@ -112,6 +114,13 @@ def _findings_for_sensor(state: SensorState, sensor_id: str) -> tuple[SecurityFi
 def _reject_llm_findings(state: SensorState) -> None:
     if any(isinstance(finding, LLMSecurityFinding) for finding in state.findings):
         raise ValueError("LLM security findings are advisory-only and cannot enter verdict delta")
+
+
+def _reject_non_reproducible_provenance(state: SensorState) -> None:
+    if any(item.non_reproducible for item in state.provenance_by_sensor.values()):
+        raise ValueError(
+            "non-reproducible sensor provenance is advisory-only and cannot enter verdict delta"
+        )
 
 
 def _provenance_drift_reason(

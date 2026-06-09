@@ -135,6 +135,26 @@ def test_llm_findings_are_rejected_from_verdict_delta_path():
         evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
 
 
+def test_llm_only_provenance_is_rejected_from_verdict_delta_path():
+    baseline = _sensor_state(findings=())
+    candidate = _sensor_state(
+        provenances=(
+            _provenance(
+                sensor_id="llm-scout",
+                adapter_version="llm-adapter-1",
+                model_id="model-x",
+                prompt_hash="sha256:prompt",
+                non_reproducible=True,
+            ),
+        )
+    )
+
+    with pytest.raises(ValueError, match="non-reproducible sensor provenance"):
+        compute_security_delta(baseline, candidate)
+    with pytest.raises(ValueError, match="non-reproducible sensor provenance"):
+        evaluate_security_detail(None, baseline, candidate, as_of=dt.date(2026, 6, 9))
+
+
 def test_deterministic_sast_finding_still_drives_suite_fail():
     candidate = _sensor_state(findings=(_sast_finding(severity="critical"),))
 
@@ -155,7 +175,6 @@ def test_llm_provenance_fields_do_not_participate_in_drift():
             _provenance(
                 model_id="model-a",
                 prompt_hash="sha256:prompt-a",
-                non_reproducible=True,
             ),
         )
     )
@@ -164,7 +183,6 @@ def test_llm_provenance_fields_do_not_participate_in_drift():
             _provenance(
                 model_id="model-b",
                 prompt_hash="sha256:prompt-b",
-                non_reproducible=False,
             ),
         )
     )

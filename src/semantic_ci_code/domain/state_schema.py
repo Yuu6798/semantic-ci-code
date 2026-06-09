@@ -159,6 +159,11 @@ class LocDelta(FrozenModel):
     removed: int = 0
 
 
+class RenameEntry(FrozenModel):
+    old_path: str
+    new_path: str
+
+
 class CodeStateDelta(FrozenModel):
     api_surface_delta: SymbolDelta = Field(default_factory=SymbolDelta)
     decorators_delta: SymbolDelta = Field(default_factory=SymbolDelta)
@@ -171,5 +176,6 @@ class CodeStateDelta(FrozenModel):
     coverage_delta: CoverageDelta | None = None
     files_touched: int = 0
     loc_delta: LocDelta = Field(default_factory=LocDelta)
+    renames: tuple[RenameEntry, ...] = Field(default_factory=tuple)
     python_specific: JsonMapping | None = None
     typescript_specific: JsonMapping | None = None

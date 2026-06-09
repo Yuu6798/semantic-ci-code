@@ -117,6 +117,10 @@ preserves the normalized dotted source name, while `decorator_leaf` supports
 qualified-insensitive policy matching. These fields do not require a verdict
 envelope schema bump because they are nested CodeState / CodeStateDelta
 expansions with empty defaults and are absent from top-level envelope routing.
+`CodeStateDelta` also includes additive `renames: [{old_path, new_path}]`
+records populated only by the `check` git overlay when `git diff -M` reports a
+rename. The pure engine leaves `renames` empty, matching `files_touched` and
+`loc_delta` as CLI-derived metadata.
 
 Extractor exclude config changes cache identity but not the JSON envelope shape.
 `check` includes the effective exclude key in its internal CodeState cache key;

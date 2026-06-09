@@ -42,8 +42,9 @@ Delta rules:
   ``python_specific.test_surface_changes`` because the first-class schema has
   no changed slot.
 - ``coverage_delta`` is always ``None`` in P1.
-- ``files_touched`` and ``loc_delta`` always stay at defaults in CSCI-11. They
-  are git-diff-derived and belong to CLI overlay via ``model_copy(update=...)``.
+- ``files_touched``, ``loc_delta``, and ``renames`` always stay at defaults in
+  the pure engine. They are git-diff-derived and belong to CLI overlay via
+  ``model_copy(update=...)``.
 - ``typescript_specific`` is always ``None`` in this Python P1 slice.
 
 ``python_specific`` stores schema extension details in a deterministic dict.
@@ -93,8 +94,8 @@ def compute_code_state_delta(
     """Compute a deterministic ``CodeStateDelta`` from two ``CodeState`` values.
 
     Pure function: no I/O, no time, no random. Total: schema-valid inputs never
-    raise. ``files_touched`` and ``loc_delta`` are always defaults; the CLI
-    layer overlays them in Brief 4 via ``model_copy(update=...)``.
+    raise. ``files_touched``, ``loc_delta``, and ``renames`` are always
+    defaults; the CLI layer overlays them via ``model_copy(update=...)``.
     """
     return CodeStateDelta(
         api_surface_delta=_api_surface_delta(baseline.api_surface, candidate.api_surface),

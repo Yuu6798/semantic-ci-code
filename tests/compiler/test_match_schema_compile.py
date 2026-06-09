@@ -162,6 +162,39 @@ def test_decorator_bare_string_desugars_to_decorator_key():
     assert constraint.expected == ({"decorator": "login_required"},)
 
 
+def test_rename_record_partial_match_compiles_for_renames():
+    constraint = _compile_constraint(
+        target="renames",
+        expected="""
+      - old_path: mod.py
+        new_path: renamed.py""",
+    )
+
+    assert constraint.expected == ({"new_path": "renamed.py", "old_path": "mod.py"},)
+
+
+def test_rename_record_can_match_by_new_path():
+    constraint = _compile_constraint(
+        target="renames",
+        expected="""
+      - new_path: renamed.py""",
+    )
+
+    assert constraint.expected == ({"new_path": "renamed.py"},)
+
+
+def test_rename_record_unknown_key_is_rejected():
+    with pytest.raises(CompileError) as exc_info:
+        _compile_constraint(
+            target="renames",
+            expected="""
+      - from_path: mod.py""",
+        )
+
+    assert "unknown match key 'from_path'" in exc_info.value.message
+    assert "Allowed keys: new_path, old_path" in exc_info.value.message
+
+
 def test_import_symbols_key_is_forbidden():
     with pytest.raises(CompileError) as exc_info:
         _compile_constraint(

@@ -116,6 +116,25 @@
       "title": "LocDelta",
       "type": "object"
     },
+    "RenameEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "new_path": {
+          "title": "New Path",
+          "type": "string"
+        },
+        "old_path": {
+          "title": "Old Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "old_path",
+        "new_path"
+      ],
+      "title": "RenameEntry",
+      "type": "object"
+    },
     "SymbolDelta": {
       "additionalProperties": false,
       "properties": {
@@ -218,6 +237,13 @@
       ],
       "default": null,
       "title": "Python Specific"
+    },
+    "renames": {
+      "items": {
+        "$ref": "#/$defs/RenameEntry"
+      },
+      "title": "Renames",
+      "type": "array"
     },
     "test_surface_delta": {
       "$ref": "#/$defs/TestSurfaceDelta"

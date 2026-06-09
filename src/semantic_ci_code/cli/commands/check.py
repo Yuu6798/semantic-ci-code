@@ -32,7 +32,11 @@ from semantic_ci_code.cli.command_support import (
     _usage_error,
     _write_output,
 )
-from semantic_ci_code.cli.delta_overlay import overlay_delta, summarize_numstat
+from semantic_ci_code.cli.delta_overlay import (
+    overlay_delta,
+    renames_from_numstat,
+    summarize_numstat,
+)
 from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, FAIL, SUCCESS
 from semantic_ci_code.cli.extract_config_runtime import (
     load_extract_config_for_cli,
@@ -237,7 +241,13 @@ def run_check(args: Namespace) -> int:
             candidate_ref=candidate_ref,
         )
         files_touched, loc_delta = summarize_numstat(entries)
-        delta = overlay_delta(delta, files_touched=files_touched, loc_delta=loc_delta)
+        renames = renames_from_numstat(entries)
+        delta = overlay_delta(
+            delta,
+            files_touched=files_touched,
+            loc_delta=loc_delta,
+            renames=renames,
+        )
         verdict = evaluate_constraints(
             compiled,
             delta,

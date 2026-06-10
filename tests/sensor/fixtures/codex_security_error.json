@@ -1,0 +1,18 @@
+{
+  "sensor_version": "codex-security-fixture-v1",
+  "model_id": "gpt-5-codex-security",
+  "prompt_hash": "sha256:prompt-fixture",
+  "status": "error",
+  "error_message": "recorded Codex Security run failed",
+  "findings": [
+    {
+      "finding_class": "missing-authz",
+      "module_path": "src/app.py",
+      "qualified_name": "src.app.open_endpoint",
+      "anchor_kind": "absence",
+      "expected_property": "requires authorization guard",
+      "severity": "high",
+      "message": "This finding must be ignored for non-complete payloads."
+    }
+  ]
+}

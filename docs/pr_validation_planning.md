@@ -63,12 +63,22 @@
   ならない。マージ済み PR ではレビュー時 SHA が既に現在の main の祖先になって
   いるため、`git merge-base current-main <review-sha>` が **review SHA 自身を
   返し、空 diff / 逆向き diff で配管が誤って成立**しうる。`baseline-rev` は
-  **レビュー時点の base を再構築**して固定する: 例えば
-  `git rev-list -1 --before=<review_timestamp> <base-branch>` でレビュー時点の
-  base tip を取り、その commit と review SHA の merge-base を採る。さらに
-  sanity guard を必須化: `baseline-rev != candidate-rev` かつ diff 非空で
-  あること (空なら当該 PR を収集エラーとして記録し、黙って通さない)。この
-  配管検証は pilot (§2.1) の主要対象。
+  **レビュー時点の base を再構築**して固定する。
+- **再構築は first-parent 限定で行う**: 素朴な
+  `git rev-list -1 --before=<ts> <base-branch>` も**不可** — rev-list は base
+  branch から到達可能な**全** commit を歩くため、マージ済み PR では PR 自身の
+  commit (定義上レビュー前の日付) が拾われ得て、続く merge-base が candidate を
+  返し、正当なサンプルが空 diff として誤破棄される。正しくは base branch の
+  **first-parent 連鎖のみ**を歩く:
+  `git rev-list -1 --first-parent --before=<review_timestamp> <base-branch>`
+  (merge-commit workflow なら main の直接 commit / merge commit だけが対象に
+  なり、レビュー時点の base tip 近似が得られる)。これで取れない場合の fallback
+  は GitHub timeline / ref 履歴 (base ref の force-push event 等) からの復元と
+  し、復元方法を PR ごとに記録する。得られた base tip と review SHA の
+  merge-base を `baseline-rev` とする。さらに sanity guard を必須化:
+  `baseline-rev != candidate-rev` かつ diff 非空であること (空なら当該 PR を
+  収集エラーとして記録し、黙って通さない)。この配管検証は pilot (§2.1) の
+  主要対象。
 - 「最初の実質レビュー」の定義: state が `APPROVED` または `CHANGES_REQUESTED`
   を持つ **最初の** review event。純粋な `COMMENTED` (ask なし) は実質レビュー
   に数えない。最初が approve なら pass、最初が CR なら fail (後で approve に

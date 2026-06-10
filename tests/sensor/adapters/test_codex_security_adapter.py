@@ -203,6 +203,35 @@ def test_codex_security_respects_explicit_ordinals():
     assert tuple(finding.ordinal for finding in adapter.scan_candidate(CodeState())) == (7,)
 
 
+def test_codex_security_assigns_implicit_ordinal_after_reserved_explicit_ordinal():
+    payload = _payload()
+    payload["findings"] = [
+        {
+            "finding_class": "missing-authz",
+            "module_path": "src/app.py",
+            "qualified_name": "src.app.handler",
+            "anchor_kind": "absence",
+            "expected_property": "requires authorization guard",
+            "severity": "high",
+            "message": "explicit first",
+            "ordinal": 0,
+        },
+        {
+            "finding_class": "missing-authz",
+            "module_path": "src/app.py",
+            "qualified_name": "src.app.handler",
+            "anchor_kind": "absence",
+            "expected_property": "requires authorization guard",
+            "severity": "high",
+            "message": "implicit second",
+        },
+    ]
+
+    adapter = CodexSecurityAdapter(payload)
+
+    assert tuple(finding.ordinal for finding in adapter.scan_candidate(CodeState())) == (0, 1)
+
+
 def test_codex_security_rejects_duplicate_explicit_ordinals():
     payload = _payload()
     payload["findings"] = [

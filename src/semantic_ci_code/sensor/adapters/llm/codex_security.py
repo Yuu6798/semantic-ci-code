@@ -175,18 +175,46 @@ def _parse_payload(
 def _raw_findings(findings_payload: list[Any]) -> tuple[RawLLMFinding, ...]:
     next_ordinal_by_group: dict[tuple[str, str, str, str, str], int] = {}
     seen_ordinals_by_group: dict[tuple[str, str, str, str, str], set[int]] = {}
+    _reserve_explicit_ordinals(findings_payload, seen_ordinals_by_group)
     raw_findings: list[RawLLMFinding] = []
     for index, item in enumerate(findings_payload):
         if not isinstance(item, Mapping):
             raise ValueError(f"Codex Security finding #{index} must be a JSON object")
         finding_payload = dict(item)
-        if "ordinal" not in finding_payload:
+        ordinal_was_implicit = "ordinal" not in finding_payload
+        if ordinal_was_implicit:
             group = _group_from_mapping(finding_payload, index=index)
-            ordinal = next_ordinal_by_group.get(group, 0)
+            reserved = seen_ordinals_by_group.get(group, set())
+            ordinal = _next_free_ordinal(
+                next_ordinal_by_group.get(group, 0),
+                reserved=reserved,
+            )
             next_ordinal_by_group[group] = ordinal + 1
             finding_payload["ordinal"] = ordinal
 
         raw = RawLLMFinding.model_validate(finding_payload)
+        group = _group_from_raw(raw)
+        seen_ordinals = seen_ordinals_by_group.setdefault(group, set())
+        if ordinal_was_implicit:
+            seen_ordinals.add(raw.ordinal)
+        elif raw.ordinal not in seen_ordinals:
+            raise ValueError(
+                f"internal Codex Security ordinal reservation failed for {raw.ordinal}"
+            )
+        raw_findings.append(raw)
+    return tuple(raw_findings)
+
+
+def _reserve_explicit_ordinals(
+    findings_payload: list[Any],
+    seen_ordinals_by_group: dict[tuple[str, str, str, str, str], set[int]],
+) -> None:
+    for item in findings_payload:
+        if not isinstance(item, Mapping):
+            continue
+        if "ordinal" not in item:
+            continue
+        raw = RawLLMFinding.model_validate(dict(item))
         group = _group_from_raw(raw)
         seen_ordinals = seen_ordinals_by_group.setdefault(group, set())
         if raw.ordinal in seen_ordinals:
@@ -194,8 +222,13 @@ def _raw_findings(findings_payload: list[Any]) -> tuple[RawLLMFinding, ...]:
                 f"duplicate Codex Security ordinal {raw.ordinal} in finding group {group!r}"
             )
         seen_ordinals.add(raw.ordinal)
-        raw_findings.append(raw)
-    return tuple(raw_findings)
+
+
+def _next_free_ordinal(start: int, *, reserved: set[int]) -> int:
+    ordinal = start
+    while ordinal in reserved:
+        ordinal += 1
+    return ordinal
 
 
 def _group_from_mapping(

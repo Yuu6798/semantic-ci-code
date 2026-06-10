@@ -28,6 +28,27 @@ Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc r
 
 ## 直近 merged
 
+### 2026-06-10 — セキュリティ hardening 緊急パッチ (PR #149、Fable タスク能力判定兼ねる)
+
+repo 全体のセキュリティ診断 (脅威モデル = CI で動く本ツールが信頼できない入力・git ref
+を処理する際の攻撃) から、防御強化 2 件を緊急パッチとして Claude exception で実装。
+診断結果は High/Critical なし (eval/pickle なし・yaml.safe_load 全箇所・list-arg
+subprocess・sha256 cache key)、検出は defense-in-depth レベルのみ。
+
+- **PR #149**: (1) git ref argument-injection ガード = `ensure_safe_ref()` を
+  全 chokepoint (`ref_exists`/`tree_object_id`/`resolve_baseline`/`resolve_candidate`/
+  `materialize_ref`/`check._resolve_baseline_ref`) に挿入、空文字 or `-` 始まり ref
+  (例 `--upload-pack=...`) を subprocess 起動前に拒否。`GitRefError(ValueError,
+  GitError)` の二重継承で check/observe=exit2・target-doctor=exit3 の既存 routing
+  を不変保持。(2) `pull_request_target` 不変条件 (PR checkout 禁止 / `${{ }}` の run
+  補間禁止 / read-only 権限) を workflow コメント + `tests/discipline/
+  test_workflow_pull_request_target.py` で構造 enforce。
+- **review/CI**: Codex P2 1 件 (空 `--candidate-rev=` が truthiness で HEAD silent
+  fallback → `is not None` 化で修正) を消化。CI 失敗 1 件 (test の絶対 import
+  `tests.cli` が bare pytest で `No module named 'tests'` → 相対 import に修正)。
+  最終 1717 test 緑で merge。SECURITY.md 新設は scope 拡大ゆえ見送り (脅威モデルは
+  test に encode)。
+
 ### 2026-06-10 — Phase H H-5: クロスモデル明示集約 + 昇格経路 doc で Phase H 完走 (PR #148)
 
 H-5/CSCI-54 を 1 PR で landing。**Phase H (CSCI-50〜54) 全完走**。
@@ -125,48 +146,6 @@ H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concre
 2. **移設ツリーが数世代 stale** (Codex P2 ×3): commands 6/10・authoring/sensor/suite
    欠落・nested subpackage 全欠落を filesystem diff が空になるまで補完。本 PR が解こうと
    した「always-loaded doc に詳細を抱えると腐る」問題の実例 (4 commit で消化、全 thread resolved)。
-
-### 2026-06-09 — Phase H 始動: LLM security scout layer H-1〜H-2b (PR #142 + #143 + #144)
-
-Phase G-5 完走で gate 解除された **Phase H (LLM security scout layer)** が始動。
-「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを
-Phase G の sensor 機構へ **advisory-only** (verdict 非参与) で接続する 3 スライス
-を landing。本 session の主眼は H-2b の設計確定 + PR #144 review。
-
-- **PR #142** (CSCI-50 / H-1): LLM advisory finding protocol。`LLMSecurityFinding`
-  (9 要素 identity) + `project_to_canonical(finding, *, sensor_id)` +
-  `LLMSensorProvenance` (model_id/prompt_hash 必須・`non_reproducible=Literal[True]`)
-  + `compute_security_delta` の LLM finding reject guard。
-- **PR #143** (CSCI-51 / H-2a): `CodeStateDelta.renames` + `RenameEntry` を git
-  numstat から CLI overlay で露出 (rename re-projection の前提データ)。
-- **PR #144** (CSCI-51b / H-2b): `sensor/advisory.py` =
-  `compute_advisory_reprojection(candidate_findings, baseline_code, *, renames)`
-  + `AdvisoryReprojection`。**baseline は `CodeState` のみ ingest** (2-run LLM diff
-  を型で不可能化、D4)。absence anchor は固定表 (`missing-authz` →
-  decorator allowlist) で baseline guard 有無を判定、presence / 未知 class /
-  site 解決不能は **D7 fallback で added** (recall-first)。verdict から型
-  (`AdvisoryReprojection` ≠ `SecurityDelta`) + import (suite 非 import の
-  transitive-closure test) の二重隔離。merge 直前に Codex 4 follow-up
-  (enclosing-class guard / package-root rename / `sensor/__init__.py` export 撤回
-  / dup API 保持)。
-
-**設計判断のハイライト**:
-
-1. **述語深さ A=decorator-based を AskUserQuestion で先に確定** + ガードレール
-   (固定表は小さく / advisory 専用 / heuristic・recall-first を docs/test 明記)
-   を AC に encode → PR #144 review バグ 0。
-2. **review 深掘り 2 点を自力裏取り**: (a) `_decorator_leaf` recall 方向 →
-   `python_api_extractor.py:302-303` が `ast.Call` を `node.func` に unwrap して
-   call args を捨てる事を確認 (decorator-with-args 取りこぼし無し)。(b)
-   `compute_security_delta` の raise が CLI graceful か → `check.py:300` の
-   `except ValueError → _usage_error` (exit 2) で着地。
-
-**修正・訂正**:
-
-1. `compute_security_delta` が LLM finding を silent filter → `ValueError` raise
-   に変更 (fail-closed 強化、brief OUT-scope を技術的に跨ぐが受容)。
-   `--candidate-sensor` 経由の silent-pass→usage-error 化は H-4 の CLI 配線時に
-   `docs/exit_codes.md`/`cli_usage.md` へ 1 行 doc 化して回収。
 
 ### 古い merged entry (2026-06-08 以前) — archive 参照
 

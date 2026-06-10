@@ -1253,3 +1253,46 @@ discipline test 追加 (commit `fcd5b82` → `fed1b87`、user が PR 化 → mer
    不統一に出る (added/removed 保持・changed group strip)。全経路 strip 推奨を
    コードブロックで提示済 (全緑のため verdict バグではない)。
 
+
+### 2026-06-09 — Phase H 始動: LLM security scout layer H-1〜H-2b (PR #142 + #143 + #144)
+
+Phase G-5 完走で gate 解除された **Phase H (LLM security scout layer)** が始動。
+「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを
+Phase G の sensor 機構へ **advisory-only** (verdict 非参与) で接続する 3 スライス
+を landing。本 session の主眼は H-2b の設計確定 + PR #144 review。
+
+- **PR #142** (CSCI-50 / H-1): LLM advisory finding protocol。`LLMSecurityFinding`
+  (9 要素 identity) + `project_to_canonical(finding, *, sensor_id)` +
+  `LLMSensorProvenance` (model_id/prompt_hash 必須・`non_reproducible=Literal[True]`)
+  + `compute_security_delta` の LLM finding reject guard。
+- **PR #143** (CSCI-51 / H-2a): `CodeStateDelta.renames` + `RenameEntry` を git
+  numstat から CLI overlay で露出 (rename re-projection の前提データ)。
+- **PR #144** (CSCI-51b / H-2b): `sensor/advisory.py` =
+  `compute_advisory_reprojection(candidate_findings, baseline_code, *, renames)`
+  + `AdvisoryReprojection`。**baseline は `CodeState` のみ ingest** (2-run LLM diff
+  を型で不可能化、D4)。absence anchor は固定表 (`missing-authz` →
+  decorator allowlist) で baseline guard 有無を判定、presence / 未知 class /
+  site 解決不能は **D7 fallback で added** (recall-first)。verdict から型
+  (`AdvisoryReprojection` ≠ `SecurityDelta`) + import (suite 非 import の
+  transitive-closure test) の二重隔離。merge 直前に Codex 4 follow-up
+  (enclosing-class guard / package-root rename / `sensor/__init__.py` export 撤回
+  / dup API 保持)。
+
+**設計判断のハイライト**:
+
+1. **述語深さ A=decorator-based を AskUserQuestion で先に確定** + ガードレール
+   (固定表は小さく / advisory 専用 / heuristic・recall-first を docs/test 明記)
+   を AC に encode → PR #144 review バグ 0。
+2. **review 深掘り 2 点を自力裏取り**: (a) `_decorator_leaf` recall 方向 →
+   `python_api_extractor.py:302-303` が `ast.Call` を `node.func` に unwrap して
+   call args を捨てる事を確認 (decorator-with-args 取りこぼし無し)。(b)
+   `compute_security_delta` の raise が CLI graceful か → `check.py:300` の
+   `except ValueError → _usage_error` (exit 2) で着地。
+
+**修正・訂正**:
+
+1. `compute_security_delta` が LLM finding を silent filter → `ValueError` raise
+   に変更 (fail-closed 強化、brief OUT-scope を技術的に跨ぐが受容)。
+   `--candidate-sensor` 経由の silent-pass→usage-error 化は H-4 の CLI 配線時に
+   `docs/exit_codes.md`/`cli_usage.md` へ 1 行 doc 化して回収。
+

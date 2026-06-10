@@ -1,5 +1,10 @@
 # LLM Security Sensor Planning — Non-Deterministic Scout Layer (Phase H candidate)
 
+> **Status update (CSCI-54 landed): Phase H H-1 through H-5 are complete.**
+> The LLM scout layer remains advisory-only: recorded scout payloads may be
+> ingested singly or aggregated into `llm-ensemble`, but verdict ownership still
+> moves only through deterministic `target.yaml` authoring freeze.
+
 > Phase G (SSP core integration, G-1〜G-4b merged / G-5 残) が用意した
 > SensorState・canonical_id・suite evaluator・suppression の機構の上に、
 > **非決定論センサー (LLM セキュリティオラクル)** を 1 種類の sensor adapter
@@ -466,6 +471,13 @@ do not alter verdicts or exit codes.
   されない
 
 ### H-5: target.yaml 昇格経路ドキュメント + クロスモデル集約 (CSCI-54)
+**Implementation note (H-5 landed):** Q4 is resolved as an explicit
+pre-SensorState aggregation step. Multiple recorded LLM scout states are
+normalized into a single advisory `llm-ensemble` state while member provenance is
+kept for audit. The aggregated scout output remains advisory-only; promotion to
+verdict ownership still requires authoring freeze into deterministic
+`target.yaml` constraints.
+
 - scout → authoring freeze → 制約化の経路を `docs/` に明文化 (D8)
 - 複数 LLM adapter のクロスモデル集約を **明示ステップ**として実装 (§1.5 / Q4):
   (a) pre-SensorState dedup/集約、または (b) ensemble sensor identity
@@ -501,6 +513,9 @@ do not alter verdicts or exit codes.
 
 ## 6. Open Questions
 
+- **Q4 resolved (CSCI-54)**: cross-model provenance is aggregated by an explicit
+  pre-SensorState step into a single `llm-ensemble` sensor identity, with member
+  provenance preserved in advisory output for audit.
 - **Q1**: LLM finding は `SASTSecurityFinding` 相乗りか `LLMSecurityFinding`
   新 category か (§2.2)。不在 anchor `(site, property)` の表現しやすさで判断
 - **Q2**: re-projection の「anchor が baseline コードに存在するか」の決定論的

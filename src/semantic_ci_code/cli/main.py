@@ -115,7 +115,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         metavar="ADAPTER=PATH",
-        help=("recorded advisory sensor payload; currently supports codex-security=<json-path>"),
+        help=(
+            "recorded advisory sensor payload; repeatable; "
+            "currently supports codex-security=<json-path>"
+        ),
     )
     check.add_argument(
         "--advisory-mutes",

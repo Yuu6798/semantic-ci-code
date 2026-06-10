@@ -94,7 +94,7 @@ bump beyond the current CLI schema version.
 | `verdict` | `pass`, `repair`, `fail`, or `null` for `observe`. |
 | `security` | Optional `check` security verdict object present only when `--sensor-baseline` / `--sensor-candidate` are supplied. It includes aggregate `verdict`, `as_of`, `global_count_violated`, and `sensors[]` detail. Each sensor entry has `sensor_id`, `status`, `added`, `removed`, `suppressed`, `drift_reason`, `provenance_changed`, and `unchanged_count`; finding arrays contain `SecurityFinding.model_dump(mode="json")` objects with `category` (`sast` or `sca`) and their canonical identity fields. |
 | `suite_verdict` | Optional final suite verdict present only when `security` is present. Values: `pass`, `repair`, `fail`, or `unknown`; computed from code and security using `unknown > fail > repair > pass`. |
-| `advisory` | Optional `check` LLM scout advisory object present only when `--advisory-sensor` is supplied. It never affects `verdict`, `suite_verdict`, or exit code. Shape: `{adapter_id, sensor, surfaced, pre_existing, muted, counts, mutes_path}`. `sensor` records `{sensor_id, sensor_version, model_id, prompt_hash, non_reproducible, status, error_message}`. `surfaced` and `pre_existing` contain `LLMSecurityFinding.model_dump(mode="json")` objects; `muted` contains `{canonical_id, reason, owner, expires}` audit records; `counts` records `scouted`, `surfaced`, `pre_existing`, and `muted`. |
+| `advisory` | Optional `check` LLM scout advisory object present only when `--advisory-sensor` is supplied. It never affects `verdict`, `suite_verdict`, or exit code. Shape: `{adapter_id, sensor, surfaced, pre_existing, muted, counts, mutes_path}` plus optional `members` for ensemble runs. `sensor` records `{sensor_id, sensor_version, model_id, prompt_hash, non_reproducible, status, error_message}`. `members[]`, when present, uses the same provenance shape for each input scout member. `surfaced` and `pre_existing` contain `LLMSecurityFinding.model_dump(mode="json")` objects; `muted` contains `{canonical_id, reason, owner, expires}` audit records; `counts` records `scouted`, `surfaced`, `pre_existing`, and `muted`. |
 | `intent` | Target intent, or `null` for `observe`. |
 | `primary_kind` | Target primary change kind, or `null` for `observe`. |
 | `allowed_secondary_kinds` | Target secondary change kinds. Empty for `observe`. |
@@ -472,6 +472,11 @@ bump the envelope version.
   readers that ignore it keep the same code verdict and exit-code semantics.
   The schema version stays `"6"` following the same additive diagnostic
   compatibility rule used for `security` / `suite_verdict`.
+- CSCI-54 lets `check` accept multiple `--advisory-sensor` values. Multiple
+  values are aggregated into `adapter_id: "llm-ensemble"` and may add
+  `advisory.members[]` member provenance. Single-adapter advisory output is
+  unchanged. The schema version remains `"6"` because `members` is an additive
+  optional field under the optional advisory diagnostic object.
 - G-5 adds `CodeState.api_surface[].decorators` and
   `CodeStateDelta.decorators_delta` for syntactic public API decorator tracking.
   The verdict envelope schema version stays `"6"` because these are additive

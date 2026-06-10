@@ -40,6 +40,8 @@ including `critical` findings and non-complete advisory sensor runs, never
 change the code verdict, `suite_verdict`, or exit code. Bad advisory flags,
 bad JSON, invalid mute ledgers, unknown adapter ids, and unsupported output
 formats are usage errors (exit 2).
+Multiple `--advisory-sensor` values are accepted and aggregated into the
+advisory-only `llm-ensemble` sensor; this also leaves exit behavior unchanged.
 
 Constraints with `severity: info` violate as advisory only: they appear in
 output as `category: info` instructions but never change the verdict or the

@@ -210,11 +210,15 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 - **E-3. Phase X-2. HA-style validation cross-domain 移植** (中長期 phase):
   text domain (`ugh-audit-core`) の HA48/HA63 (n=63) validation pattern
   を code / music / image+video の 3 domain に展開する **ecosystem 統合
-  の core work**。 着手前に `ugh-audit-core/docs/validation.md` を確認
-  して dataset 構造を理解、 その後 code domain 版 = 公開 LLM 生成 PR
-  を N=48 集めて semantic-ci verdict と reviewer 判断の Spearman ρ を
-  計算する experiment plan を起草する。 完走 criteria は「各 domain で
-  N≥48 の external validation 蓄積」、 期間は数週間〜数ヶ月
+  の core work**。 **code domain 版 experiment plan は起草済 =
+  `docs/pr_validation_planning.md`** (2026-06-10、PLANNING)。Y = review 結果
+  (changes-requested=fail/approve=pass、merge/reject 不採用)、評価 diff = 最初の
+  実質レビュー時点 SHA、target A(generic)+B(PR メタ自動生成・leakage 禁止)、
+  主指標 = AUROC/MCC/F1/混同行列+bootstrap CI (ρ は補助)、pre-registration で
+  X を見る前に凍結、pilot 5 件は配管確認のみ。着手は外部 repo 収集ゆえ別 session +
+  `experiments/pr_validation/`。着手前に `ugh-audit-core/docs/validation.md` で
+  dataset 構造を確認。 完走 criteria は「各 domain で N≥48 の external validation
+  蓄積」、 期間は数週間〜数ヶ月
 
 ### Sequencing decisions
 

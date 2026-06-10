@@ -144,9 +144,12 @@
 - **目的**: GitHub からの review event 取得 / **レビュー時点 SHA の固定** /
   ラベル・diff 統計抽出 / target A・B 生成 / `semantic-ci check
   --baseline-rev --candidate-rev` 実行 / 集計、の **配管の穴出し**。
-- **可能なら Pilot も Y=B で取る** (A=generic は target 経路のみ、Y 代理には
-  使わない)。理由: 5 件時点で「review event 取得・レビュー時点 SHA 固定・ラベル
-  抽出」の穴を見つけないと本番 48 件で手戻りする。Y を merge/reject で代理しない。
+- **Pilot の Y は本番と同一 = review-state ベース (§1.2 の D1)** を使う。
+  formal review (approve / changes-requested) が付いた PR を 5 件探し、最初の
+  実質レビュー時点 SHA (§1.3) で評価する。理由: 5 件時点で「review event 取得・
+  レビュー時点 SHA 固定・ラベル抽出」の穴を見つけないと本番 48 件で手戻りする。
+  **Y を merge/reject で代理しない。target トラック (§1.4 の A/B) は X 生成
+  経路であって、いかなる場合も Y (正解ラベル) の代わりにならない。**
 - **禁止**: pilot の数字で相関・性能を語ること。pilot は煙試験 (smoke test)。
 
 ### 2.2 本番 (N≥48)

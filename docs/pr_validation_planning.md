@@ -74,34 +74,55 @@
   に数えない。最初が approve なら pass、最初が CR なら fail (後で approve に
   転じても **最初を取る**)。
 
-### 1.4 D3: target.yaml = A (generic) + B (PR メタ自動生成) の二本立て
+### 1.4 D3: target.yaml = A (generic) + B (intent-only 自動生成) の二本立て
 
 **決定: 一次実験で A と B を並走させる。C (盲目手書き) は一次指標に入れない。**
 
 | target | 生成方法 | 測れるもの | 役割 |
 |---|---|---|---|
 | **A: generic** | 制約ほぼゼロ | 宣言なし時の下限性能 + **vacuous PASS 率** | authoring バイアス 0 のベースライン |
-| **B: PR メタ自動生成** | PR タイトル/本文/ラベル/変更ファイル/diff 統計/テスト有無/公開 CI から **固定ルール**で生成 | 実運用 (authoring ゼロ経路) に近い性能 | 主指標の中心 |
+| **B: intent-only 自動生成** | PR タイトル/本文/ラベル (= 人間が宣言した intent) のみから **固定ルール**で生成 | 実運用 (authoring ゼロ経路) に近い性能 | 主指標の中心 |
 
-- A+B を並べることで「**宣言がないとどれだけ無力か (A)**」「**PR メタから自動
-  生成すればどれだけ回復するか (B−A)**」が同時に測れる。後者がプロダクトの
-  positioning (推奨2 = authoring ゼロ経路) の直接の証拠。
+- A+B を並べることで「**宣言がないとどれだけ無力か (A)**」「**宣言された intent
+  (prose) から自動生成すればどれだけ回復するか (B−A)**」が同時に測れる。後者が
+  プロダクトの positioning (推奨2 = authoring ゼロ経路) の直接の証拠。
+- **B は candidate-independent (§1.5 の tautology 禁止)**: 変更ファイル一覧 /
+  diff 統計 / テスト有無など **candidate が実際にやったこと**を B の入力に
+  使わない。これらから expectation を導くと、宣言 intent 下の drift 検出ではなく
+  「target generator が candidate の事実をどれだけ写したか」を測ることになり、
+  **Y leakage が無くても B−A が水増しされる** (§1.5 D4)。代償として B は弱い
+  信号 (prose のみ) になるが、「intent prose だけでどこまで回復するか」自体が
+  本実験の知見。
 - **B は固定ルールにする** (甘い生成ルールは fail すべき PR を pass に寄せる =
   recall を自ら毀損)。生成ルールは事前凍結し、誤判定タグ (§1.7) と構造ゲートで
   後から分解可能にしておく。high-recall 化が「それっぽい一致」を拾う
   trade-off は ecosystem の z-gate 実験でも確認済みで、ここでも同型。
 
-### 1.5 D4: leakage 禁止 (B 生成の入力制約)
+### 1.5 D4: B 生成の入力制約 — 2 つの独立した汚染軸
 
-**決定: target B 生成が使ってよいのは「レビュー前に存在した情報」のみ。**
+**決定: target B が使ってよいのは「レビュー前に存在し、かつ candidate 由来で
+ない」情報のみ。汚染軸は 2 つあり、両方を同時に塞ぐ。**
 
-- 使ってよい: PR タイトル / 本文 / ラベル / 変更ファイル一覧 / diff 統計 /
-  テストファイルの有無 / レビュー時点までに公開された CI 結果。
-- **使ってはいけない (= leakage)**: reviewer の指摘内容 / 最終 merge・reject /
-  修正後 commit / revert 情報。これらは Y (正解) に近い情報なので、入力に
-  混ぜると性能が実力より高く見える。
+**軸1 — Y leakage 禁止 (正解ラベル方向)**:
+- **使ってはいけない**: reviewer の指摘内容 / 最終 merge・reject / 修正後
+  commit / revert 情報。これらは Y (正解) に近い情報なので、入力に混ぜると
+  性能が実力より高く見える。
 - 注: leakage = 正解ラベルに近い情報が入力側に混ざり、見かけの性能が実力を
-  超える現象。本実験の最大の無効化要因。
+  超える現象。
+
+**軸2 — candidate tautology 禁止 (`§F` / `candidate_code_used: false`)**:
+- **使ってはいけない**: 変更ファイル一覧 / diff 統計 / テスト有無など
+  **candidate が実際にやったこと**。`docs/target_authoring_surface.md §F` が
+  「candidate-derived expectation は tautology で vacuous PASS を生む」と既に
+  凍結済みの契約。これを B の入力に混ぜると、drift 検出ではなく「target が
+  candidate の事実を写した度合い」を測り、**Y leakage が無くても B−A が
+  水増し**される。
+- 注: この軸は軸1 と独立。Y を一切見なくても candidate を見れば tautology に
+  なる。両軸を塞いで初めて「独立に宣言された intent 下での drift 検出」を測れる。
+
+**使ってよい (両軸を満たす)**: PR タイトル / 本文 / ラベル のみ (= 人間が
+candidate と独立に宣言した intent prose)。レビュー時点までの公開 CI 結果は
+軸1 は満たすが candidate 実行結果なので軸2 に抵触 → **使わない**。
 
 ### 1.6 D5: サンプリング (凍結ルール + class balance)
 
@@ -207,7 +228,8 @@
 
 ## 6. Open Questions
 
-- **Q1**: target B の固定ルールの具体形 (どの PR メタ → どの制約。pilot で較正)。
+- **Q1**: intent-only target B の固定ルールの具体形 (PR タイトル/本文/ラベルの
+  どの語彙 → どの制約。candidate 由来入力は §1.5 軸2 で禁止。pilot で較正)。
 - **Q2**: `repair` verdict の二値化 (positive 寄せか中間か。pre-reg で固定)。
 - **Q3**: C-lite タグの単独タグ付けの主観をどう担保するか (2 名困難時の代替)。
 - **Q4**: ecosystem の text domain 実験 (HA-style) と指標を揃えるか

@@ -170,7 +170,7 @@ def resolve_baseline(
     repo_root: Path,
     no_fetch: bool,
 ) -> str:
-    if explicit:
+    if explicit is not None:
         return ensure_safe_ref(explicit)
 
     tried = ("origin/main", "main", "master")
@@ -198,7 +198,7 @@ def resolve_baseline(
 
 
 def resolve_candidate(explicit: str | None) -> str:
-    if explicit:
+    if explicit is not None:
         return ensure_safe_ref(explicit)
     return "HEAD"
 

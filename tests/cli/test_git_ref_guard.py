@@ -46,6 +46,31 @@ def test_ensure_safe_ref_rejects_empty_ref():
         ensure_safe_ref("")
 
 
+def test_resolve_helpers_reject_explicit_empty_ref(tmp_path: Path):
+    # `--candidate-rev=` delivers "", which must be a usage error rather than
+    # silently falling back to the default ref (Codex P2 on PR #149).
+    with pytest.raises(GitRefError):
+        resolve_candidate("")
+    with pytest.raises(GitRefError):
+        resolve_baseline("", repo_root=tmp_path, no_fetch=True)
+    assert resolve_candidate(None) == "HEAD"
+
+
+def test_check_rejects_explicit_empty_candidate_rev_as_usage_error(tmp_path: Path):
+    repo = init_repo(tmp_path)
+
+    result = run_semantic_ci_inproc(
+        repo,
+        "check",
+        "--no-fetch",
+        "--no-cache",
+        "--candidate-rev=",
+    )
+
+    assert result.returncode == 2
+    assert "invalid git ref" in result.stderr
+
+
 @pytest.mark.parametrize("ref", ["HEAD", "origin/main", "main", "v1.0.0", "abc123", "HEAD~1"])
 def test_ensure_safe_ref_accepts_normal_refs(ref: str):
     assert ensure_safe_ref(ref) == ref

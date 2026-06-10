@@ -437,6 +437,16 @@ stays `added`. None of this participates in verdict computation.
 - **AC**: Codex Security 出力 (or fixture) が SensorState に正規化される、
   LLM 不在でも fixture 経路で CI 成立
 
+**Implementation note (H-3 landed):** `codex-security` is implemented as a
+fixture-mode ingest adapter. Its recorded-output envelope is defined by
+`sensor/adapters/llm/codex_security.py` and includes sensor version, model id,
+prompt hash, run status, error message, and RawLLMFinding-shaped findings. The
+adapter performs no network, subprocess, or live LLM execution in-repo; complete
+payloads are projected through the shared deterministic LLM canonicalizer, while
+non-complete payloads normalize to error/timeout/skipped provenance with empty
+findings. The resulting SensorState remains advisory-only and is rejected by the
+verdict-bearing security delta path.
+
 ### H-4: advisory surface + mute ledger + informed-consent provenance (CSCI-53)
 - scout 候補を Advisor チャネルに出力 (止めない、D1/D7)
 - advisory mute ledger (§2.4)

@@ -34,6 +34,7 @@ def format_human(payload: dict[str, Any], *, use_color: bool) -> str:
     lines.append("")
     lines.append(_verdict_line(payload, use_color=use_color))
     lines.extend(_suite_lines(payload, use_color=use_color))
+    lines.extend(_advisory_lines(payload))
 
     instructions = payload.get("repair_plan", {}).get("instructions", [])
     for category in _CATEGORY_ORDER:
@@ -114,6 +115,47 @@ def _suite_lines(payload: dict[str, Any], *, use_color: bool) -> list[str]:
     for sensor in security.get("sensors", []):
         lines.extend(_security_sensor_lines(sensor, use_color=use_color))
     return lines
+
+
+def _advisory_lines(payload: dict[str, Any]) -> list[str]:
+    advisory = payload.get("advisory")
+    if advisory is None:
+        return []
+    counts = advisory.get("counts", {})
+    sensor = advisory.get("sensor", {})
+    lines = [
+        "",
+        "Advisory scout: "
+        f"{advisory.get('adapter_id')} "
+        f"status={sensor.get('status')} "
+        f"scouted={counts.get('scouted', 0)} "
+        f"surfaced={counts.get('surfaced', 0)} "
+        f"pre_existing={counts.get('pre_existing', 0)} "
+        f"muted={counts.get('muted', 0)}",
+        "Advisory scout findings do not affect verdict or exit code.",
+    ]
+    error_message = sensor.get("error_message")
+    if error_message:
+        lines.append(f"  error: {error_message}")
+    for finding in advisory.get("surfaced", []):
+        lines.append("  + " + _advisory_finding_summary(finding))
+    if advisory.get("pre_existing"):
+        lines.append(f"  pre-existing: {len(advisory['pre_existing'])}")
+    if advisory.get("muted"):
+        lines.append(f"  muted: {len(advisory['muted'])}")
+    return lines
+
+
+def _advisory_finding_summary(finding: dict[str, Any]) -> str:
+    location = finding.get("module_path") or "-"
+    source_span = finding.get("source_span") or {}
+    if source_span.get("start_line") is not None:
+        location = f"{location}:{source_span['start_line']}"
+    finding_class = finding.get("finding_class") or finding.get("canonical_id")
+    return (
+        f"{finding_class} [{finding.get('severity')}] at {location} "
+        f"({finding.get('anchor_kind')}) - {finding.get('message') or '-'}"
+    )
 
 
 def _security_sensor_lines(sensor: dict[str, Any], *, use_color: bool) -> list[str]:

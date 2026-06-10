@@ -353,6 +353,8 @@ semantic-ci check [--baseline-rev <ref>] [--candidate-rev <ref>]
                   [--cache-max-bytes <int>] [--extractor-timeout <seconds>]
                   [--sensor-baseline <sensor-state.json>]
                   [--sensor-candidate <sensor-state.json>]
+                  [--advisory-sensor codex-security=<recorded-output.json>]
+                  [--advisory-mutes <advisory-mutes.yaml>]
                   [--as-of YYYY-MM-DD]
 ```
 
@@ -448,6 +450,58 @@ finding severity maps only to a SARIF note, SARIF also emits a
 `--format gh-actions` remains deferred to a later G-4 slice. Without sensor
 flags, the payload and exit behavior are unchanged.
 
+`check` can also surface recorded LLM scout output as an advisory-only channel:
+
+```bash
+semantic-ci check \
+  --advisory-sensor codex-security=codex-security-output.json \
+  --advisory-mutes .semantic-ci/advisory_mutes.yaml \
+  --as-of 2026-09-01 \
+  --format json
+```
+
+The only registered advisory adapter in this slice is `codex-security`, and the
+input is the recorded JSON payload accepted by the Codex Security fixture-mode
+adapter. `check` does not run a live LLM, does not call a network service, and
+does not treat LLM findings as verdict-bearing security findings. Advisory
+findings are re-projected against the baseline `CodeState`, optionally filtered
+by active mutes, and emitted under top-level `advisory`. They never change
+`verdict`, `suite_verdict`, repair output, or exit code, even when the advisory
+finding severity is `critical`. Advisory output currently supports only
+`--format json` and `--format human`; SARIF and GitHub Actions output are
+deferred.
+
+`--advisory-mutes` is valid only together with `--advisory-sensor`. The ledger
+is explicit; Semantic CI does not auto-discover it. The recommended location is
+`.semantic-ci/advisory_mutes.yaml`:
+
+```yaml
+mutes:
+  - canonical_id: "v1:0123456789abcdef"
+    identity_components:
+      - v1
+      - llm
+      - codex-security
+      - missing-authz
+      - src/app.py
+      - src.app.handler
+      - absence
+      - requires authorization guard
+      - "0"
+    reason: accepted for this migration window
+    expires: 2026-09-01
+    owner: security-team
+```
+
+Mute expiry uses the same `--as-of` date as security suppressions:
+`expires >= as_of` is active. Expired mutes no longer filter the advisory
+finding, so the candidate is surfaced again. JSON advisory output includes
+`counts.scouted`, `counts.surfaced`, `counts.pre_existing`, and `counts.muted`,
+plus `sensor.model_id` and `sensor.prompt_hash` to preserve informed-consent
+provenance. `--sensor-baseline` / `--sensor-candidate` and `--advisory-sensor`
+can be used together; the deterministic security verdict and advisory scout
+surface remain separate.
+
 **Migrated in Phase 3b**: `semantic-ci pre-commit [...]` became
 `semantic-ci check --candidate-source=staged-index [...]`. The evaluation
 semantics are identical for the hook use case: the baseline is the `HEAD`
@@ -496,6 +550,7 @@ semantic-ci check --baseline-source working-tree --candidate-source staged-index
 semantic-ci check --mode smoke
 semantic-ci check --extractor-timeout 2.5 --format json
 semantic-ci check --sensor-baseline baseline.security.json --sensor-candidate candidate.security.json
+semantic-ci check --advisory-sensor codex-security=codex-security-output.json --format json
 semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600
 semantic-ci check --format sarif --output semantic-ci.sarif

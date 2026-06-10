@@ -1,3 +1,15 @@
+# SECURITY INVARIANTS — enforced by
+# tests/discipline/test_workflow_pull_request_target.py.
+#
+# This workflow runs on `pull_request_target`, so it executes with base-repo
+# permissions on events from untrusted forks. Any workflow using this trigger
+# MUST keep all three invariants:
+#   1. Never check out PR head code (no checkout step for the PR ref).
+#   2. Never interpolate event data into shell via `${{ ... }}` inside `run:`
+#      blocks — read it from $GITHUB_EVENT_PATH instead, as done below.
+#   3. Declare read-only permissions (`permissions: contents: read`).
+# Violating any of these can turn untrusted PR content into code execution
+# with repository secrets.
 name: PR body discipline
 
 on:

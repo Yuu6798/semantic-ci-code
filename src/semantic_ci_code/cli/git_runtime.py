@@ -58,6 +58,30 @@ class GitConfigError(GitError):
         super().__init__(message)
 
 
+class GitRefError(GitError, ValueError):
+    """A user-supplied git ref is empty or option-like.
+
+    Subclasses ValueError so commands that route ValueError to a usage error
+    (exit 2) keep that mapping, while GitError-only handlers (target-doctor's
+    documented exit-3 git path) also stay correct.
+    """
+
+
+def ensure_safe_ref(ref: str) -> str:
+    """Reject refs that git would parse as command-line options.
+
+    Refs are passed to git as positional argv elements, so a leading-dash
+    value (e.g. ``--upload-pack=...``) would be consumed as a flag instead of
+    a revision. Refuse such values before any subprocess is spawned.
+    """
+
+    if not ref or ref.startswith("-"):
+        raise GitRefError(
+            f"invalid git ref {ref!r}: refs must be non-empty and must not begin with '-'"
+        )
+    return ref
+
+
 def is_git_available() -> bool:
     return shutil.which("git") is not None
 
@@ -105,6 +129,7 @@ def run_git(
 
 
 def ref_exists(ref: str, *, cwd: Path) -> bool:
+    ensure_safe_ref(ref)
     try:
         run_git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], cwd=cwd, check=True)
     except GitCommandError:
@@ -118,6 +143,7 @@ def repo_root(cwd: Path) -> Path:
 
 
 def tree_object_id(ref: str, subpath: str, *, cwd: Path) -> str:
+    ensure_safe_ref(ref)
     spec = f"{ref}^{{tree}}" if subpath == "." else f"{ref}:{subpath}"
     output = run_git(["rev-parse", "--verify", spec], cwd=cwd)
     lines = tuple(line for line in output.splitlines() if line)
@@ -144,8 +170,8 @@ def resolve_baseline(
     repo_root: Path,
     no_fetch: bool,
 ) -> str:
-    if explicit:
-        return explicit
+    if explicit is not None:
+        return ensure_safe_ref(explicit)
 
     tried = ("origin/main", "main", "master")
     if not no_fetch:
@@ -172,7 +198,9 @@ def resolve_baseline(
 
 
 def resolve_candidate(explicit: str | None) -> str:
-    return explicit or "HEAD"
+    if explicit is not None:
+        return ensure_safe_ref(explicit)
+    return "HEAD"
 
 
 def _record_command(args: list[str], *, cwd: Path) -> None:

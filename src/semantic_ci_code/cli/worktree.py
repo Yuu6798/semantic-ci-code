@@ -6,11 +6,12 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from semantic_ci_code.cli.git_runtime import GitCommandError, run_git
+from semantic_ci_code.cli.git_runtime import GitCommandError, ensure_safe_ref, run_git
 
 
 @contextmanager
 def materialize_ref(repo_root: Path, ref: str, *, prefix: str) -> Iterator[Path]:
+    ensure_safe_ref(ref)
     with tempfile.TemporaryDirectory(prefix=prefix) as temp_dir:
         worktree_path = Path(temp_dir)
         run_git(

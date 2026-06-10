@@ -24,9 +24,28 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer) 始動**。Phase G は SSP v0.1 を core の縦接続に再構築 (CodeState と並列の SensorState、suite evaluator で code+security 統合 verdict、SAST finding を FQN 空間に canonical_id 化、per-sensor provenance で drift 検出)、最終 G-5/CSCI-49 は config-free `decorators_delta` + `security:preserve-auth-guards` recipe で realize 済。2026-06-09 に **Phase H が gate 解除後始動**: 「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構に advisory-only で接続する設計を 3 スライス landing — H-1/CSCI-50 (PR #142、`LLMSecurityFinding` + `project_to_canonical` + `LLMSensorProvenance` + `compute_security_delta` の verdict reject guard) / H-2a/CSCI-51 (PR #143、`CodeStateDelta.renames` + `RenameEntry` CLI overlay) / H-2b/CSCI-51b (PR #144、`sensor/advisory.py` = baseline `CodeState` のみ ingest する deterministic one-run re-projection、absence anchor は固定表 decorator 判定・presence/未知 class/site 解決不能は D7 fallback で added、`AdvisoryReprojection` を verdict から型+import 二重隔離)。Phase H 残は H-3 (Codex Security concrete adapter + fixture mode) / H-4 (advisory surface + mute ledger + CLI 配線 + informed-consent) / H-5。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。次は Phase H 継続 (H-3 着手) / D-class closure (D6/D7/D8、exit criteria 前進) / Phase X (ecosystem cross-repo、別 session) のいずれか。
+Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer) 始動**。Phase G は SSP v0.1 を core の縦接続に再構築 (CodeState と並列の SensorState、suite evaluator で code+security 統合 verdict、SAST finding を FQN 空間に canonical_id 化、per-sensor provenance で drift 検出)、最終 G-5/CSCI-49 は config-free `decorators_delta` + `security:preserve-auth-guards` recipe で realize 済。2026-06-09 に **Phase H が gate 解除後始動**: 「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構に advisory-only で接続する設計を 3 スライス landing — H-1/CSCI-50 (PR #142、`LLMSecurityFinding` + `project_to_canonical` + `LLMSensorProvenance` + `compute_security_delta` の verdict reject guard) / H-2a/CSCI-51 (PR #143、`CodeStateDelta.renames` + `RenameEntry` CLI overlay) / H-2b/CSCI-51b (PR #144、`sensor/advisory.py` = baseline `CodeState` のみ ingest する deterministic one-run re-projection、absence anchor は固定表 decorator 判定・presence/未知 class/site 解決不能は D7 fallback で added、`AdvisoryReprojection` を verdict から型+import 二重隔離)。2026-06-10 に H-3/CSCI-52 (PR #146、`sensor/adapters/llm/codex_security.py` = fixture-mode ingest の first concrete adapter、recorded envelope → `RawLLMFinding` → 共有 `project_to_canonical` → advisory-only `SensorState`、no-network architecture test 込み) が merge され、Phase H 残は H-4 (advisory surface + mute ledger + CLI 配線 + informed-consent、silent-pass→usage-error の doc 化回収もここ) / H-5 (昇格経路 doc + クロスモデル集約)。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。次は Phase H 継続 (H-4 着手) / D-class closure (D6/D7/D8、exit criteria 前進) / Phase X (ecosystem cross-repo、別 session) のいずれか。
 
 ## 直近 merged
+
+### 2026-06-10 — Phase H H-3: Codex Security reference adapter (PR #146)
+
+H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concrete。
+
+- **PR #146**: `sensor/adapters/llm/codex_security.py` = fixture-mode ingest
+  adapter (`codex-security`)。recorded envelope (sensor_version / model_id /
+  prompt_hash / status / error_message / findings) → `RawLLMFinding` 経由パース →
+  共有 `project_to_canonical` で射影 (独自 identity 組み立て禁止を test で grep
+  固定) → advisory-only `SensorState`。model_id / prompt_hash 欠落は status を
+  問わず ValueError (fail-closed)、non-complete payload は findings 空 +
+  error_message 必須 (semgrep adapter ミラー)。ordinal は group 内出現順
+  auto-assign + 明示値尊重 + 重複 reject。no-network/subprocess architecture
+  test (`tests/architecture/test_llm_adapter_no_network.py`) で fixture-only
+  実行経路を構造化。export は `sensor/adapters/llm/__init__.py` のみ。
+- **brief 設計判断**: live LLM 呼び出しは in-repo 経路に置かない (CLAUDE.md
+  no-LLM/no-network 規約、D1 on-demand は「呼ばれない限り走らない」構造で充足)。
+- **review**: AC 10 件全充足で chat 内 APPROVE、P3 指摘 2 件 (dummy CodeState の
+  型 narrow / 混在 ordinal) は follow-up commit で消化済 (`75c8d24` / `1a232f5`)。
 
 ### 2026-06-09 (Session 2) — CLAUDE.md 圧縮 + 300 行 cap を discipline test 化 (PR #145)
 
@@ -232,10 +251,10 @@ Security」(2026-03 の AI セキュリティエージェント、コーディ�
 ## 次の発行順序
 
 ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G (CSCI-45〜49) 全完走** +
-**Phase H 始動 (H-1/H-2a/H-2b = CSCI-50/51/51b merged)**。active な実装軸は
-**Phase H 継続 (H-3/CSCI-52 = Codex Security concrete adapter + fixture mode →
-H-4/CSCI-53 = advisory surface + mute ledger + CLI 配線 + informed-consent →
-H-5/CSCI-54、`docs/llm_sensor_adapter_planning.md` §3)**。残る軸は **E (Phase X、
+**Phase H 進行中 (H-1/H-2a/H-2b/H-3 = CSCI-50/51/51b/52 merged)**。active な
+実装軸は **Phase H 継続 (H-4/CSCI-53 = advisory surface + mute ledger + CLI
+配線 + informed-consent → H-5/CSCI-54 = 昇格経路 doc + クロスモデル集約、
+`docs/llm_sensor_adapter_planning.md` §3)**。残る軸は **E (Phase X、
 ecosystem cross-repo、別 Claude Code session 委譲)** と repo-internal の
 **D-class closure (D6/D7/D8、ROADMAP v0.1.0 exit criteria を前進)**。
 
@@ -282,8 +301,8 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 - **A/B/C/D/F/G 全完走**: Brief 1〜8 + ResultStatus split + source-selection
   redesign + Brief 7 (SSP v0.1) + Phase G (CSCI-45〜49) 全 merged
 - **Phase H active** (CSCI-50〜54): G-5 完走で gate 解除し 2026-06-09 始動。
-  H-1/H-2a/H-2b (CSCI-50/51/51b) merged、次は H-3 (CSCI-52)。LLM security
-  scout layer、advisory-only で verdict 非参与
+  H-1/H-2a/H-2b/H-3 (CSCI-50/51/51b/52) merged、次は H-4 (CSCI-53)。LLM
+  security scout layer、advisory-only で verdict 非参与
 - **E (Phase X) active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
   は ecosystem cross-repo work で別 Claude Code session 委譲、E-3 (X-2
   validation 移植) は中長期 phase
@@ -292,10 +311,9 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 
 ### 直近最短経路
 
-- **Phase H 継続 (H-3/CSCI-52)**: Codex Security concrete adapter + fixture
-  mode (記録済み出力 ingest)。LLM-general Adapter Protocol の first concrete、
-  on-demand 実行。続く H-4 で advisory surface + CLI 配線 (silent-pass→
-  usage-error の doc 化を回収)
+- **Phase H 継続 (H-4/CSCI-53)**: advisory surface + mute ledger + CLI 配線 +
+  informed-consent provenance。H-2b/H-3 申し送りの silent-pass→usage-error
+  doc 化 (`docs/exit_codes.md` / `cli_usage.md`) をここで回収
 - **D-class closure (D6/D7/D8)**: repo-internal、bounded、exit criteria 前進
   (D6=nested-function vacuous PASS、D7=extract-method authoring advice、
   D8=SCA auto-discovery gap = fixable defect)

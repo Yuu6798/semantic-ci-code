@@ -1142,3 +1142,114 @@ Codex 実装 → Claude review → merge の標準サイクル。
    を 1-based 必須の SARIF region に素通し。どちらも G-5 か別 PR で回収候補。
 2. wrap-up 起動時に STATUS.md が G-1/G-2 (2026-06-02) で stale だったのを検出、
    git log で PR #127/#128/#129 merged を確認して sweep。
+
+### 2026-06-03 Session 2 — LLM security sensor / scout layer planning (Phase H candidate、PR #130→#131→#132)
+
+OpenAI「Codex for Open Source」応募文面の相談から派生し、選択肢「Codex
+Security」(2026-03 の AI セキュリティエージェント、コーディング Codex とは別物)
+の正体確認 → 本 repo の SSP / Phase G 機構との接続可否の理論検討 → **非決定論
+センサー (LLM セキュリティオラクル) を Phase G の sensor 機構に 1 adapter として
+接続する設計** の planning doc 化。成果は `docs/llm_sensor_adapter_planning.md`
+(Phase H candidate、CSCI-50〜54 想定、**Phase G-5 完走を前提**、active queue 未投入)。
+
+- **PR #132** (merged `88406e9`、planning doc + `CLAUDE.md` 表 + README 行):
+  D1〜D9 を encode。**D1 中心命題「LLM は scout であって judge ではない」**
+  (on-demand / optional / 出力は Advisor surface → verdict を直接 seat しない →
+  scope guard「not an LLM-as-judge service」との衝突を解消) / D2-D4 決定論保全
+  (frozen SensorState ingest + one-run + 決定論的 re-projection、§23.1 weaken なし) /
+  D5 LLM-general Adapter Protocol (Codex Security = first concrete、cross-model 集約は
+  明示ステップ) / D6 anchor projection は暫定 (実装時較正) / **D7 誤検知 > 見逃し**
+  (高 recall、判定不能なら added に倒す) / **D8 昇格は target.yaml authoring freeze
+  のみ・沈黙 = 容認** / D9 informed-consent を provenance 記録・waiver = advisory mute。
+- **PR #130** (revert 済) → **PR #131** (revert PR): #130 を承認前に勝手に merge した
+  プロセス失敗を revert で立て直し → 修正版 #132 で作り直し。
+
+**設計判断のハイライト**:
+
+1. **「scout not judge」への reframe**: user の「LLM はオプション、欲しいときに呼ぶ」
+   +「誤検知に倒す」の 2 直感が、scope guard 衝突の解消と recall 方針を同時確定。
+2. **review 壁打ち → doc 質の転化**: #132 で Codex bot の P2 を 7 round 消化、各々が
+   planning doc の実 correctness issue (cross-model 自動 dedup 矛盾 / rename
+   re-projection は core 未実装 / **verdict 分離** = LLM finding を通常 SensorState に
+   流すと fail を seat する → advisory チャネル分離を D1 実装規律に / absence+presence
+   anchor は site 存在でなく脆弱な条件・経路を要求)。
+
+**修正・訂正**:
+
+1. **#130 を承認前に勝手に merge** (判断ミス): 「マージして」を受けても Codex review
+   状態を先に確認すべき。未対応 review があれば止める、を教訓化。
+2. **verdict 分離の見落とし** (Codex catch): D1 を「Advisor surface 行き」と書きながら
+   実装節では通常 SensorState 経路を想定 → `combine_verdict` で fail を seat してしまう
+   矛盾。advisory チャネル分離を明文化して解消。
+
+
+### 2026-06-07 — スケール & セキュリティ dogfooding pass (dogfood PR、user merge)
+
+外部実 PR (litellm/langgraph/pdm) に対する 3 sub-pass dogfooding。成果は
+`docs/dogfooding_scale_and_security.md` + tracker (D8 登録) + CLAUDE.md/README +
+discipline test 追加 (commit `fcd5b82` → `fed1b87`、user が PR 化 → merge)。
+
+- **Pass 1 (大規模スケール、目標アリ、制約ランダム seed=20260607)**: 大関数・高複雑度
+  commit 5 件 + complexity/effects 補足。全件動作・クラッシュ 0、cyc+49 等正確に集計、
+  cold 103s → warm 11s (CodeState cache 有効)。FAIL は全て merged だが §23.3 scope guard
+  により false positive ではない (宣言 intent に対する判定)。
+- **Pass 2 (ランダム頑健性、generic 0 制約)**: 無作為 5 件、全件 well-formed JSON、
+  最大 +5951 行/37 ファイルも処理成功。
+- **Pass 3 (セキュリティ SSP)**: litellm の実 SSRF (`f1d07c13e5`) + pricing injection
+  (`b95130eb32`) を git 履歴から発見 (マージ後に手動修正された実例)。SCA=pip-audit は
+  positive control (jinja2==2.11.2→5 CVE) で DB 到達確認、litellm コア依存 0 脆弱性。
+  **D8** = SCA auto-discovery gap (`_requirements_file` が root requirements.txt のみ →
+  pyproject/pdm.lock 非対応で unknown 退化、fixable defect)。**SAST=Semgrep は registry
+  が HTTP 403 でルール 0 個 → SAST 盲点は未検証** (当初の過大主張を `fed1b87` で訂正、
+  F6 = untested hypothesis として記録)。
+
+**設計判断・修正のハイライト**:
+
+1. **過大主張 2 回を自己検証で訂正**: (a) SAST 403 (scanned paths:0 → 「見逃し」は
+   未実証)、(b) 「事後ガードレールにすぎない」誤結論。どちらも user の push + 追検証で発覚。
+2. **navigate 実証 (未 encode 課題)**: `check --candidate-source working-tree` で実装中の
+   API drift 検出、`compare` の仮想スタブで生成前計画判定を実証 → semantic-ci は in-loop /
+   pre-generation の steering として機能 (merge 済レポートには未収録、次 session で encode 候補)。
+3. **背景 agent persist + フロント議論の並行運用** (user 要望「保存は background、議論は front」)。
+
+
+### 2026-06-08 — Pre-release credibility トラック完走 + Phase G 完走 (PR #136 + #138 + #139)
+
+外部ビュアー向け信頼作り (正式リリースを切らない方針) と Phase G 最終スライスを
+1 session で landing。全 PR を本人が Codex bot 👍 後にマージ。
+
+- **PR #136** (CRED-1): README `## Project Status` (experimental/unstable) +
+  `ROADMAP.md` (v0.1.0 exit criteria = schema_version 連続3brief不変 + exit-code
+  不変 + D全解決/waive、配布は post-Phase-X deferred) + `CONTRIBUTING.md`。自前の
+  dogfooding 開示 CI (`pr-body-discipline`) に被弾 → 実 self-dogfood (docs-only =
+  D4 vacuous PASS) を正直開示する本文に修正して通過。
+- **F1/F2**: repo description + topics 6 件 (MCP に repo settings tool 無く本人が手動)。
+- **PR #138** (CRED-2): `examples/` 4 ケース (scope-guard 差別化: not test
+  runner/linter/type checker/LLM judge)、各 hand-built baseline/candidate +
+  target.yaml + README、`compare` で verdict+exit code 実測。anti-rot guard test。
+  §23.1 維持 (compare、git ref なし)。
+- **PR #139** (G-5/CSCI-49): `APISurfaceEntry.decorators` + `CodeStateDelta.
+  decorators_delta` (public のみ) + `security:preserve-auth-guards` recipe +
+  G-4b cleanups。**Phase G 完走**。
+
+**設計判断のハイライト**:
+
+1. **credibility の軸を「release/no-release」から「stability promise/no-promise」へ**。
+   tag は切らない (0.0.x も見送り)、credibility の本体は falsifiable な exit
+   criteria + 走る失敗例 + tracked FN/FP。doc は reader-facing 最上層に置き
+   canonical へ link DOWN only (bloat 回避)。
+2. **G-5 grounding で planning 矛盾を発見**: Category A (deny imports/effects) は
+   既に recipe 実装済 → 冗長な static dir を作らず Category B (auth guard) を G-5 に。
+   `auth_guards_delta` を config-free `decorators_delta` + recipe allowlist で
+   realize (delta 層を domain 非依存に保ち「not an intent interpreter」遵守)。
+   G-6 を G-5 に畳み CSCI-50 は Phase H に一本化。
+3. **AskUserQuestion で scope fork を先に確定** → 各 brief が 1 発で landing。
+
+**修正・訂正**:
+
+1. **#136 が自前 discipline CI に被弾** (自家撞着)。学び: PR 本文プレースホルダは
+   `<...>` でなくバッククォート (`<generic docs target>` が HTML 視され除去)。
+2. **G-5 review 指摘** (follow-up 候補): `decorators` が `api_surface_delta` 記録に
+   不統一に出る (added/removed 保持・changed group strip)。全経路 strip 推奨を
+   コードブロックで提示済 (全緑のため verdict バグではない)。
+

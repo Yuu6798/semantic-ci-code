@@ -47,6 +47,7 @@ def build_payload(
     timed_out_dimensions: frozenset[str] | tuple[str, ...] | list[str] | None = None,
     security_detail: Any | None = None,
     suite_verdict: str | None = None,
+    advisory_detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     engine = _engine_payload(
         baseline_source=baseline_source,
@@ -65,6 +66,8 @@ def build_payload(
         payload["security"] = _serialize_security_detail(security_detail)
     if suite_verdict is not None:
         payload["suite_verdict"] = suite_verdict
+    if advisory_detail is not None:
+        payload["advisory"] = advisory_detail
     payload.update(
         {
             "intent": compiled.intent if compiled is not None else None,

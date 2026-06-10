@@ -34,6 +34,13 @@ exit 0, suite `repair` to exit 0 (or 1 with `--strict-repair`), suite `fail` to
 exit 1, and suite `unknown` to exit 3. Without sensor flags, `check` keeps the
 code-only exit behavior above.
 
+When `check` is run with `--advisory-sensor codex-security=<json>`, it surfaces
+recorded LLM scout findings in the advisory channel only. Advisory findings,
+including `critical` findings and non-complete advisory sensor runs, never
+change the code verdict, `suite_verdict`, or exit code. Bad advisory flags,
+bad JSON, invalid mute ledgers, unknown adapter ids, and unsupported output
+formats are usage errors (exit 2).
+
 Constraints with `severity: info` violate as advisory only: they appear in
 output as `category: info` instructions but never change the verdict or the
 exit code, even with `--strict-repair`. This is the Advisor channel defined
@@ -111,9 +118,14 @@ go to stderr.
 | `check --baseline-source <volatile> --candidate-source <same volatile>` | 0/1 | Warning: verdict will report no drift by construction. |
 | `check --sensor-baseline <file>` without `--sensor-candidate` | 2 | `--sensor-baseline and --sensor-candidate must be provided together` |
 | `check --sensor-baseline <invalid-json> --sensor-candidate <file>` | 2 | `--sensor-baseline must be a valid SensorState JSON file...` |
+| `check --sensor-candidate <LLM SensorState>` | 2 | `LLM findings are advisory-only and cannot enter verdict security delta` |
 | `check --sensor-baseline <file> --sensor-candidate <file> --as-of bad` | 2 | `--as-of must be a valid YYYY-MM-DD date` |
 | `check --sensor-baseline <file> --sensor-candidate <file> --format gh-actions` | 2 | `sensor-enabled check supports json, human, or sarif output...` |
 | `check` with sensor provenance drift / incomplete security signal | 3 | JSON, human, or SARIF output is still written with `security.verdict: unknown` and `suite_verdict: unknown`. |
+| `check --advisory-sensor <bad-value>` | 2 | `--advisory-sensor must use ADAPTER=PATH` or `unknown advisory sensor adapter...` |
+| `check --advisory-mutes <file>` without `--advisory-sensor` | 2 | `--advisory-mutes is only valid with --advisory-sensor` |
+| `check --advisory-sensor codex-security=<file> --format sarif` | 2 | `advisory-enabled check supports json or human output...` |
+| `check --advisory-sensor codex-security=<error-payload>` | unchanged | Advisory sensor error details are reported under `advisory.sensor`; the code verdict exit code is unchanged. |
 | `ssp scan --sensor semgrep` without `--config` | 2 | `--config is required when --sensor=semgrep` |
 | `ssp from-json` with a sensor error fixture | 3 | SSP envelope is still written with `aggregate_verdict: unknown`. |
 | Internal bug | 4 | `internal error: <one-line>; rerun with --verbose for traceback` |

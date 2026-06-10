@@ -448,6 +448,17 @@ findings. The resulting SensorState remains advisory-only and is rejected by the
 verdict-bearing security delta path.
 
 ### H-4: advisory surface + mute ledger + informed-consent provenance (CSCI-53)
+**Implementation note (H-4 landed):** `semantic-ci check` accepts
+`--advisory-sensor codex-security=<recorded-json>` and optional
+`--advisory-mutes <yaml>`. Q3 is resolved as a separate ledger file, not a
+target.yaml namespace, so advisory mutes remain verdict-non-participating and
+distinct from Phase G security suppressions. The CLI reuses the baseline
+CodeState and `CodeStateDelta.renames` to compute advisory re-projection,
+filters active mutes with `expires >= as_of`, and emits JSON / human advisory
+detail including surfaced, pre-existing, muted counts, model id, prompt hash,
+and non-reproducible provenance. Advisory sensor errors and surfaced findings
+do not alter verdicts or exit codes.
+
 - scout 候補を Advisor チャネルに出力 (止めない、D1/D7)
 - advisory mute ledger (§2.4)
 - provenance に「炙り出し / 宣言 / 容認」記録 (D9)

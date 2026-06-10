@@ -8,7 +8,10 @@ from pathlib import Path
 PROJECT_PREFIX = "semantic_ci_code"
 SUITE_PACKAGE = "semantic_ci_code.suite"
 SUITE_FORBIDDEN_IMPORTS = ("semantic_ci_code.cli",)
-SUITE_ADVISORY_IMPORT = "semantic_ci_code.sensor.advisory"
+SUITE_ADVISORY_IMPORTS = (
+    "semantic_ci_code.sensor.advisory",
+    "semantic_ci_code.sensor.mutes",
+)
 
 
 def _module_to_path(module_name: str) -> Path | None:
@@ -105,7 +108,10 @@ def test_suite_package_does_not_import_llm_advisory_channel():
         leaks = sorted(
             item
             for item in closure
-            if item == SUITE_ADVISORY_IMPORT or item.startswith(SUITE_ADVISORY_IMPORT + ".")
+            if any(
+                item == advisory_import or item.startswith(advisory_import + ".")
+                for advisory_import in SUITE_ADVISORY_IMPORTS
+            )
         )
         if leaks:
             failures[module] = leaks
@@ -114,8 +120,9 @@ def test_suite_package_does_not_import_llm_advisory_channel():
 
 
 def test_suite_runtime_import_does_not_load_llm_advisory_channel():
-    sys.modules.pop(SUITE_ADVISORY_IMPORT, None)
+    for advisory_import in SUITE_ADVISORY_IMPORTS:
+        sys.modules.pop(advisory_import, None)
 
     import semantic_ci_code.suite.security  # noqa: F401
 
-    assert SUITE_ADVISORY_IMPORT not in sys.modules
+    assert all(advisory_import not in sys.modules for advisory_import in SUITE_ADVISORY_IMPORTS)

@@ -111,6 +111,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="YYYY-MM-DD date used for security suppression expiry; defaults to today",
     )
     check.add_argument(
+        "--advisory-sensor",
+        action="append",
+        default=None,
+        metavar="ADAPTER=PATH",
+        help=("recorded advisory sensor payload; currently supports codex-security=<json-path>"),
+    )
+    check.add_argument(
+        "--advisory-mutes",
+        default=None,
+        help="YAML advisory mute ledger; valid only with --advisory-sensor",
+    )
+    check.add_argument(
         "--baseline-source",
         choices=("commit", "working-tree", "staged-index"),
         default="commit",

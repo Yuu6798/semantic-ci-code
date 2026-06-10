@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import math
 from argparse import Namespace
 from contextlib import AbstractContextManager, ExitStack, nullcontext
 from pathlib import Path
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -67,6 +69,7 @@ from semantic_ci_code.cli.target_loader import (
 from semantic_ci_code.cli.worktree import materialize_ref
 from semantic_ci_code.compiler import CompileError
 from semantic_ci_code.delta import compute_code_state_delta
+from semantic_ci_code.domain.state_schema import CodeState, RenameEntry
 from semantic_ci_code.evaluator import evaluate_constraints
 from semantic_ci_code.framework.extract_config import ExtractConfig, ExtractConfigError
 from semantic_ci_code.pipeline import (
@@ -75,7 +78,13 @@ from semantic_ci_code.pipeline import (
     extract_python_code_state_result,
 )
 from semantic_ci_code.repair import emit_repair_plan
-from semantic_ci_code.sensor.models import SensorState
+from semantic_ci_code.sensor.adapters.llm import (
+    CODEX_SECURITY_SENSOR_ID,
+    sensor_state_from_codex_security_json,
+)
+from semantic_ci_code.sensor.advisory import compute_advisory_reprojection
+from semantic_ci_code.sensor.models import LLMSecurityFinding, SensorProvenance, SensorState
+from semantic_ci_code.sensor.mutes import AdvisoryMute, load_advisory_mutes
 from semantic_ci_code.suite.evaluator import SuiteResult, combine_verdict
 from semantic_ci_code.suite.security import evaluate_security_detail
 
@@ -101,9 +110,19 @@ def run_check(args: Namespace) -> int:
             explicit_rev=candidate_rev_explicit,
         )
         sensor_enabled = _sensor_flags_enabled(args)
+        advisory_spec = _advisory_sensor_spec(args)
+        advisory_enabled = advisory_spec is not None
+        if args.advisory_mutes is not None and not advisory_enabled:
+            raise ValueError("--advisory-mutes is only valid with --advisory-sensor")
         if sensor_enabled:
             _reject_unsupported_sensor_output_format(args.format)
-        as_of = _as_of_date(args.as_of) if args.as_of is not None or sensor_enabled else None
+        if advisory_enabled:
+            _reject_unsupported_advisory_output_format(args.format)
+        as_of = (
+            _as_of_date(args.as_of)
+            if args.as_of is not None or sensor_enabled or advisory_enabled
+            else None
+        )
         baseline_sensor = (
             _load_sensor_state(args.sensor_baseline, flag="--sensor-baseline")
             if sensor_enabled
@@ -113,6 +132,12 @@ def run_check(args: Namespace) -> int:
             _load_sensor_state(args.sensor_candidate, flag="--sensor-candidate")
             if sensor_enabled
             else None
+        )
+        advisory_state = (
+            _load_advisory_sensor_state(advisory_spec) if advisory_spec is not None else None
+        )
+        advisory_mutes = (
+            load_advisory_mutes(args.advisory_mutes) if args.advisory_mutes is not None else ()
         )
 
         if not is_git_available():
@@ -269,6 +294,19 @@ def run_check(args: Namespace) -> int:
                 as_of=as_of,
             )
             suite = combine_verdict(verdict.result, security_detail.status)
+        advisory_detail = None
+        if advisory_enabled:
+            if advisory_state is None or as_of is None or advisory_spec is None:
+                raise AssertionError("advisory inputs must be loaded when enabled")
+            advisory_detail = _build_advisory_detail(
+                advisory_spec,
+                advisory_state,
+                baseline_code=baseline,
+                renames=delta.renames,
+                mutes=advisory_mutes,
+                as_of=as_of,
+                mutes_path=args.advisory_mutes,
+            )
         repair_plan = emit_repair_plan(verdict)
         payload = build_payload(
             "check",
@@ -286,6 +324,7 @@ def run_check(args: Namespace) -> int:
             timed_out_dimensions=timed_out_dimensions,
             security_detail=security_detail,
             suite_verdict=suite.final.value if suite is not None else None,
+            advisory_detail=advisory_detail,
         )
         output_status = _write_output(
             _render_payload(payload, args, subcommand="check"), args.output
@@ -359,11 +398,39 @@ def _sensor_flags_enabled(args: Namespace) -> bool:
     return has_baseline and has_candidate
 
 
+def _advisory_sensor_spec(args: Namespace) -> tuple[str, Path, str] | None:
+    values = args.advisory_sensor or ()
+    if len(values) > 1:
+        raise ValueError(
+            "multiple --advisory-sensor values are not supported; "
+            "cross-model aggregation is H-5 scope"
+        )
+    if not values:
+        return None
+    raw = values[0]
+    if "=" not in raw:
+        raise ValueError("--advisory-sensor must use ADAPTER=PATH, e.g. codex-security=run.json")
+    adapter_id, raw_path = raw.split("=", 1)
+    if not adapter_id or not raw_path:
+        raise ValueError("--advisory-sensor must use non-empty ADAPTER=PATH")
+    if adapter_id != CODEX_SECURITY_SENSOR_ID:
+        raise ValueError(f"unknown advisory sensor adapter: {adapter_id}")
+    return adapter_id, Path(raw_path), raw_path
+
+
 def _reject_unsupported_sensor_output_format(output_format: str | None) -> None:
     if output_format == "gh-actions":
         raise ValueError(
             "sensor-enabled check supports json, human, or sarif output; "
             f"--format {output_format} is deferred to a later G-4 slice"
+        )
+
+
+def _reject_unsupported_advisory_output_format(output_format: str | None) -> None:
+    if output_format in {"sarif", "gh-actions"}:
+        raise ValueError(
+            "advisory-enabled check supports json or human output; "
+            f"--format {output_format} advisory output is deferred to a later H-4 slice"
         )
 
 
@@ -388,6 +455,115 @@ def _load_sensor_state(raw_path: str, *, flag: str) -> SensorState:
         ) from exc
     except ValueError as exc:
         raise ValueError(f"{flag} must be a valid SensorState JSON file") from exc
+
+
+def _load_advisory_sensor_state(spec: tuple[str, Path, str]) -> SensorState:
+    adapter_id, path, _raw_path = spec
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"--advisory-sensor payload could not be read: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError("--advisory-sensor payload must be valid JSON") from exc
+
+    if adapter_id == CODEX_SECURITY_SENSOR_ID:
+        try:
+            return sensor_state_from_codex_security_json(payload)
+        except ValidationError as exc:
+            raise ValueError(
+                f"--advisory-sensor codex-security payload is invalid: {exc.errors()[0]['msg']}"
+            ) from exc
+        except ValueError as exc:
+            raise ValueError(f"--advisory-sensor codex-security payload is invalid: {exc}") from exc
+    raise AssertionError(f"unhandled advisory adapter: {adapter_id}")
+
+
+def _build_advisory_detail(
+    spec: tuple[str, Path, str],
+    state: SensorState,
+    *,
+    baseline_code: CodeState,
+    renames: tuple[RenameEntry, ...],
+    mutes: tuple[AdvisoryMute, ...],
+    as_of: dt.date,
+    mutes_path: str | None,
+) -> dict[str, Any]:
+    adapter_id, _path, _raw_path = spec
+    findings = _llm_findings(state)
+    provenance = _advisory_provenance(state, adapter_id=adapter_id)
+    if provenance.status == "complete":
+        reprojection = compute_advisory_reprojection(
+            findings,
+            baseline_code,
+            renames=renames,
+        )
+        added = reprojection.added
+        pre_existing = reprojection.pre_existing
+    else:
+        added = ()
+        pre_existing = ()
+
+    active_mutes = {mute.canonical_id: mute for mute in mutes if mute.is_active(as_of=as_of)}
+    surfaced = tuple(finding for finding in added if finding.canonical_id not in active_mutes)
+    visible_pre_existing = tuple(
+        finding for finding in pre_existing if finding.canonical_id not in active_mutes
+    )
+    muted_findings = tuple(
+        finding for finding in (*added, *pre_existing) if finding.canonical_id in active_mutes
+    )
+    return {
+        "adapter_id": adapter_id,
+        "sensor": _serialize_advisory_provenance(provenance),
+        "surfaced": [_serialize_llm_finding(finding) for finding in surfaced],
+        "pre_existing": [_serialize_llm_finding(finding) for finding in visible_pre_existing],
+        "muted": [
+            _serialize_advisory_mute(active_mutes[finding.canonical_id])
+            for finding in muted_findings
+        ],
+        "counts": {
+            "scouted": len(findings),
+            "surfaced": len(surfaced),
+            "pre_existing": len(visible_pre_existing),
+            "muted": len(muted_findings),
+        },
+        "mutes_path": mutes_path,
+    }
+
+
+def _llm_findings(state: SensorState) -> tuple[LLMSecurityFinding, ...]:
+    return tuple(finding for finding in state.findings if isinstance(finding, LLMSecurityFinding))
+
+
+def _advisory_provenance(state: SensorState, *, adapter_id: str) -> SensorProvenance:
+    try:
+        return state.provenance_by_sensor[adapter_id]
+    except KeyError as exc:
+        raise ValueError(f"advisory SensorState missing provenance for {adapter_id}") from exc
+
+
+def _serialize_advisory_provenance(provenance: SensorProvenance) -> dict[str, Any]:
+    return {
+        "sensor_id": provenance.sensor_id,
+        "sensor_version": provenance.sensor_version,
+        "model_id": provenance.model_id,
+        "prompt_hash": provenance.prompt_hash,
+        "non_reproducible": provenance.non_reproducible,
+        "status": provenance.status,
+        "error_message": provenance.error_message,
+    }
+
+
+def _serialize_llm_finding(finding: LLMSecurityFinding) -> dict[str, Any]:
+    return finding.model_dump(mode="json")
+
+
+def _serialize_advisory_mute(mute: AdvisoryMute) -> dict[str, Any]:
+    return {
+        "canonical_id": mute.canonical_id,
+        "reason": mute.reason,
+        "owner": mute.owner,
+        "expires": mute.expires.isoformat(),
+    }
 
 
 def _exit_code_for_suite(final: SuiteResult, *, strict_repair: bool) -> int:

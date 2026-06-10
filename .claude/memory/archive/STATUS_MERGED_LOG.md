@@ -1296,3 +1296,35 @@ Phase G の sensor 機構へ **advisory-only** (verdict 非参与) で接続す�
    `--candidate-sensor` 経由の silent-pass→usage-error 化は H-4 の CLI 配線時に
    `docs/exit_codes.md`/`cli_usage.md` へ 1 行 doc 化して回収。
 
+
+### 2026-06-09 (Session 2) — CLAUDE.md 圧縮 + 300 行 cap を discipline test 化 (PR #145)
+
+記事 (とんのかつ氏「2 層メモリ + 自己改善ループ」) と本 repo 機構の機能比較から
+派生し、「CLAUDE.md が肥大化原則を超過 (483 行) している実害」を repo 自身の記録で
+実証 → user 指示で 2 修正を実装・merge。phase 進行には非影響の infra 改善。
+
+- **圧縮**: CLAUDE.md 483 → 290 行 (ルール削除ゼロ)。src/tests ツリー →
+  `docs/repository_layout.md` 新設、125 行 Session Memory 手順 → wrap-up skill
+  (source-of-truth を CLAUDE.md から skill へ反転、archive-TTL/summary/anti-pattern
+  を Appendix 化で情報損失ゼロ)。重複参照ブロックも圧縮。
+- **discipline test**: `tests/discipline/test_claude_md_line_cap.py` (CLAUDE.md ≤ 300、
+  超過検出の負例込み)。`tests/discipline/` 配置で wrap-up step 8 gate に自動編入 →
+  終了プロトコルが cap 超過で fail するように。
+
+**設計判断のハイライト**:
+
+1. **実害は repo 自己記録で実証**: `doc_refactor_planning.md` の ≤200 目標 (起案 320)
+   に対し CLAUDE.md だけが 483 にリグレッション。トークン固定費は 1M Opus で誤差だが、
+   遵守劣化は documented recurring failure mode + 散文ルールの test 強制格上げ履歴で裏づけ。
+2. **閾値は CLAUDE.md のみ ≤300** (AskUserQuestion 確定): STATUS.md 336 行ゆえ一律不可。
+3. **layout doc を「構造マップ・filesystem 正典」に再定義**: 「Full per-module tree」の
+   過剰約束が「hidden module X」型 review を無限誘発した根本原因を断つ。
+
+**修正・訂正**:
+
+1. **divergence 修正方向の論理矛盾** (Codex P2、私の混入バグ): 「skill wins」直後に
+   「fix the skill」→ 正典上書き指示。「fix this pointer/summary」に訂正。
+2. **移設ツリーが数世代 stale** (Codex P2 ×3): commands 6/10・authoring/sensor/suite
+   欠落・nested subpackage 全欠落を filesystem diff が空になるまで補完。本 PR が解こうと
+   した「always-loaded doc に詳細を抱えると腐る」問題の実例 (4 commit で消化、全 thread resolved)。
+

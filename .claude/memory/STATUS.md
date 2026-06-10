@@ -24,9 +24,32 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer、CSCI-50〜54) 全完走** (2026-06-09〜06-10、PR #142〜#144 + #146〜#148)。Phase H は「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構へ **advisory-only** (verdict / exit code 非参与、不変条件 test 固定) で縦接続: H-1 = LLM advisory finding protocol + verdict reject guard / H-2a = `CodeStateDelta.renames` overlay / H-2b = `sensor/advisory.py` deterministic one-run re-projection (baseline `CodeState` のみ ingest、D7 recall-first fallback) / H-3 = Codex Security fixture-mode reference adapter (live LLM 経路なし、no-network architecture test) / H-4 = `check --advisory-sensor` + `--advisory-mutes` (Q3 = 別ファイル ledger、`AdvisoryMute` は llm category 専用で `Suppression` と別物、envelope に additive `advisory` object) / H-5 = `aggregate_advisory_states` 明示クロスモデル集約 (Q4 = (a) 束ね役関数、固定 `llm-ensemble` 名義 + member provenance 外出し) + `docs/llm_scout_usage.md` 昇格経路 doc (D8 沈黙=容認)。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。次は **D-class closure (D6/D7/D8、ROADMAP v0.1.0 exit criteria 前進)** / **Phase X (ecosystem cross-repo、別 session 委譲)** / H-5 review 申し送り 3 件 (P3) のいずれか。
+Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer、CSCI-50〜54) 全完走** (2026-06-09〜06-10、PR #142〜#144 + #146〜#148)。Phase H は「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構へ **advisory-only** (verdict / exit code 非参与、不変条件 test 固定) で縦接続: H-1 = LLM advisory finding protocol + verdict reject guard / H-2a = `CodeStateDelta.renames` overlay / H-2b = `sensor/advisory.py` deterministic one-run re-projection (baseline `CodeState` のみ ingest、D7 recall-first fallback) / H-3 = Codex Security fixture-mode reference adapter (live LLM 経路なし、no-network architecture test) / H-4 = `check --advisory-sensor` + `--advisory-mutes` (Q3 = 別ファイル ledger、`AdvisoryMute` は llm category 専用で `Suppression` と別物、envelope に additive `advisory` object) / H-5 = `aggregate_advisory_states` 明示クロスモデル集約 (Q4 = (a) 束ね役関数、固定 `llm-ensemble` 名義 + member provenance 外出し) + `docs/llm_scout_usage.md` 昇格経路 doc (D8 沈黙=容認)。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。2026-06-10 にはセキュリティ hardening (PR #149) と **Phase X-2 (code domain) PR validation 実験 planning 凍結 (PR #150、`docs/pr_validation_planning.md`)** も landing — 中核仮説 (「効くか」) の falsification 実験が着手可能になった。次は **Phase X-2 実験実行 (pilot 5 件、別 session 委譲)** / **D-class closure (D6/D7/D8、ROADMAP v0.1.0 exit criteria 前進)** / H-5 review 申し送り 3 件 (P3) のいずれか。
 
 ## 直近 merged
+
+### 2026-06-10 — Phase X-2 (code domain) PR validation 実験 planning 凍結 (PR #150)
+
+Fable による repo 評価レビュー (「技術 A / 中核仮説は外部未検証」) から派生し、
+§E-3 が呼ぶ外部検証実験の planning を起草・凍結。「動くか」(既存 dogfooding) と
+「効くか」(本実験) を分離し、中核仮説を falsifiable にした。
+
+- **PR #150**: `docs/pr_validation_planning.md` 新設 (PLANNING)。公開 PR N≥48 で
+  semantic-ci verdict と human reviewer 判断の一致を測る。**Y = review 結果**
+  (changes-requested=fail / approve=pass、merge/reject は Y ノイズで不採用 —
+  user の統計的指摘で確定)、**評価 diff = 最初の実質レビュー時点 SHA**、
+  **baseline はレビュー時点 base を first-parent walk で再構築** + 空 diff
+  sanity guard、**target = A (generic) + B (intent-only = PR タイトル/本文/
+  ラベルのみ)**、汚染 2 軸 (Y leakage / candidate tautology §F) を独立に禁止、
+  **主指標 = AUROC/MCC/F1/混同行列 + bootstrap CI** (ρ は補助)、pre-registration
+  で X を見る前に凍結、pilot 5 件は配管確認のみ。
+- **review**: Codex P2 ×4 を 4 round で消化 — ① pilot Y の表記曖昧 (Y=B 誤読) /
+  ② baseline 時点ズレ (merged PR で merge-base が candidate を返す) / ③
+  candidate tautology (B の入力から変更ファイル/diff統計を除外、user 判断で
+  intent-only 確定) / ④ 再構築レシピの first-parent 限定 (rev-list が PR 自身の
+  commit を拾う穴)。いずれも「実験が静かに無効化される」類で、凍結前に全部閉じた。
+- **着手は別 session** (外部 repo 収集が GitHub MCP scope 外) +
+  `experiments/pr_validation/`。
 
 ### 2026-06-10 — セキュリティ hardening 緊急パッチ (PR #149、Fable タスク能力判定兼ねる)
 
@@ -116,40 +139,9 @@ H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concre
 - **review**: AC 10 件全充足で chat 内 APPROVE、P3 指摘 2 件 (dummy CodeState の
   型 narrow / 混在 ordinal) は follow-up commit で消化済 (`75c8d24` / `1a232f5`)。
 
-### 2026-06-09 (Session 2) — CLAUDE.md 圧縮 + 300 行 cap を discipline test 化 (PR #145)
+### 古い merged entry (2026-06-09 以前) — archive 参照
 
-記事 (とんのかつ氏「2 層メモリ + 自己改善ループ」) と本 repo 機構の機能比較から
-派生し、「CLAUDE.md が肥大化原則を超過 (483 行) している実害」を repo 自身の記録で
-実証 → user 指示で 2 修正を実装・merge。phase 進行には非影響の infra 改善。
-
-- **圧縮**: CLAUDE.md 483 → 290 行 (ルール削除ゼロ)。src/tests ツリー →
-  `docs/repository_layout.md` 新設、125 行 Session Memory 手順 → wrap-up skill
-  (source-of-truth を CLAUDE.md から skill へ反転、archive-TTL/summary/anti-pattern
-  を Appendix 化で情報損失ゼロ)。重複参照ブロックも圧縮。
-- **discipline test**: `tests/discipline/test_claude_md_line_cap.py` (CLAUDE.md ≤ 300、
-  超過検出の負例込み)。`tests/discipline/` 配置で wrap-up step 8 gate に自動編入 →
-  終了プロトコルが cap 超過で fail するように。
-
-**設計判断のハイライト**:
-
-1. **実害は repo 自己記録で実証**: `doc_refactor_planning.md` の ≤200 目標 (起案 320)
-   に対し CLAUDE.md だけが 483 にリグレッション。トークン固定費は 1M Opus で誤差だが、
-   遵守劣化は documented recurring failure mode + 散文ルールの test 強制格上げ履歴で裏づけ。
-2. **閾値は CLAUDE.md のみ ≤300** (AskUserQuestion 確定): STATUS.md 336 行ゆえ一律不可。
-3. **layout doc を「構造マップ・filesystem 正典」に再定義**: 「Full per-module tree」の
-   過剰約束が「hidden module X」型 review を無限誘発した根本原因を断つ。
-
-**修正・訂正**:
-
-1. **divergence 修正方向の論理矛盾** (Codex P2、私の混入バグ): 「skill wins」直後に
-   「fix the skill」→ 正典上書き指示。「fix this pointer/summary」に訂正。
-2. **移設ツリーが数世代 stale** (Codex P2 ×3): commands 6/10・authoring/sensor/suite
-   欠落・nested subpackage 全欠落を filesystem diff が空になるまで補完。本 PR が解こうと
-   した「always-loaded doc に詳細を抱えると腐る」問題の実例 (4 commit で消化、全 thread resolved)。
-
-### 古い merged entry (2026-06-08 以前) — archive 参照
-
-27 entry (2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
+28 entry (2026-06-09 S2 (#145) / 2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
 2026-06-03 (#127/#128/#129) / 2026-06-02 (#124/#125/#126) / 2026-05-29 S2 (#120/#121) / 2026-05-28 S2 /
 2026-05-27 / 2026-05-26 / 2026-05-22 /
 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
@@ -167,6 +159,7 @@ H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concre
 + 2026-06-03 S2 wrap-up (5/28 S2 移送) + 2026-06-08 wrap-up (5/29 S2 移送)
 + 2026-06-09 wrap-up (6/02 移送) + 2026-06-09 S2 wrap-up (6/03 移送)
 + 2026-06-10 wrap-up (6/03 S2 + 6/07 + 6/08 移送)
++ 2026-06-10 #150 sweep (6/09 S2 移送)
 で compaction が実施された。
 
 ## 次の発行順序
@@ -235,11 +228,16 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 
 ### 直近最短経路
 
+- **E-3 実行. Phase X-2 (code domain) pilot 5 件**: planning は PR #150 で凍結済
+  (`docs/pr_validation_planning.md`)。次の一歩は pilot = 配管煙試験 (review
+  event 取得 / レビュー時点 SHA 固定 / first-parent baseline 再構築 / 空 diff
+  guard / intent-only target B 生成)。外部 repo 収集ゆえ**別 session 委譲** +
+  `experiments/pr_validation/`。Fable 評価レビューの推奨 1 = 「上物より中核
+  仮説の falsification を先に」の実行
 - **D-class closure (D6/D7/D8)**: repo-internal、bounded、exit criteria 前進
   (D6=nested-function vacuous PASS、D7=extract-method authoring advice、
-  D8=SCA auto-discovery gap = fixable defect)。Phase H 完走後の最有力候補
+  D8=SCA auto-discovery gap = fixable defect)
 - **E-1/E-2. Phase X cross-ref / umbrella docs** (別 session 委譲)
-- **E-3. Phase X-2. HA-style validation cross-domain 移植** (中長期)
 
 ## Frozen / Deferred
 

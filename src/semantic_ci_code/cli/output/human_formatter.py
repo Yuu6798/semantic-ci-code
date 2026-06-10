@@ -137,6 +137,8 @@ def _advisory_lines(payload: dict[str, Any]) -> list[str]:
     error_message = sensor.get("error_message")
     if error_message:
         lines.append(f"  error: {error_message}")
+    if advisory.get("members"):
+        lines.append(f"  members: {len(advisory['members'])}")
     for finding in advisory.get("surfaced", []):
         lines.append("  + " + _advisory_finding_summary(finding))
     if advisory.get("pre_existing"):

@@ -471,6 +471,24 @@ finding severity is `critical`. Advisory output currently supports only
 `--format json` and `--format human`; SARIF and GitHub Actions output are
 deferred.
 
+You may pass `--advisory-sensor` more than once. Multiple recorded scout
+payloads are first aggregated into an explicit `llm-ensemble` advisory state:
+
+```bash
+semantic-ci check \
+  --advisory-sensor codex-security=codex-a.json \
+  --advisory-sensor codex-security=codex-b.json \
+  --format json
+```
+
+Single-adapter output keeps the H-4 envelope shape (`adapter_id:
+"codex-security"` and no `members` key). Multi-adapter output uses
+`adapter_id: "llm-ensemble"`, `advisory.sensor` for ensemble provenance, and an
+additive `advisory.members[]` array with per-member provenance. Mutes in
+ensemble mode must use the ensemble canonical id; a mute authored for a single
+`codex-security` finding will not match `llm-ensemble` because `sensor_id` is
+part of the LLM identity tuple.
+
 `--advisory-mutes` is valid only together with `--advisory-sensor`. The ledger
 is explicit; Semantic CI does not auto-discover it. The recommended location is
 `.semantic-ci/advisory_mutes.yaml`:
@@ -551,6 +569,7 @@ semantic-ci check --mode smoke
 semantic-ci check --extractor-timeout 2.5 --format json
 semantic-ci check --sensor-baseline baseline.security.json --sensor-candidate candidate.security.json
 semantic-ci check --advisory-sensor codex-security=codex-security-output.json --format json
+semantic-ci check --advisory-sensor codex-security=codex-a.json --advisory-sensor codex-security=codex-b.json --format json
 semantic-ci check --cache-dir .semantic-ci/cache
 semantic-ci check --cache-max-bytes 104857600
 semantic-ci check --format sarif --output semantic-ci.sarif

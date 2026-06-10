@@ -80,6 +80,8 @@ from semantic_ci_code.pipeline import (
 from semantic_ci_code.repair import emit_repair_plan
 from semantic_ci_code.sensor.adapters.llm import (
     CODEX_SECURITY_SENSOR_ID,
+    LLM_ENSEMBLE_SENSOR_ID,
+    aggregate_advisory_states,
     sensor_state_from_codex_security_json,
 )
 from semantic_ci_code.sensor.advisory import compute_advisory_reprojection
@@ -110,8 +112,8 @@ def run_check(args: Namespace) -> int:
             explicit_rev=candidate_rev_explicit,
         )
         sensor_enabled = _sensor_flags_enabled(args)
-        advisory_spec = _advisory_sensor_spec(args)
-        advisory_enabled = advisory_spec is not None
+        advisory_specs = _advisory_sensor_specs(args)
+        advisory_enabled = bool(advisory_specs)
         if args.advisory_mutes is not None and not advisory_enabled:
             raise ValueError("--advisory-mutes is only valid with --advisory-sensor")
         if sensor_enabled:
@@ -133,9 +135,7 @@ def run_check(args: Namespace) -> int:
             if sensor_enabled
             else None
         )
-        advisory_state = (
-            _load_advisory_sensor_state(advisory_spec) if advisory_spec is not None else None
-        )
+        advisory_states = tuple(_load_advisory_sensor_state(spec) for spec in advisory_specs)
         advisory_mutes = (
             load_advisory_mutes(args.advisory_mutes) if args.advisory_mutes is not None else ()
         )
@@ -296,16 +296,21 @@ def run_check(args: Namespace) -> int:
             suite = combine_verdict(verdict.result, security_detail.status)
         advisory_detail = None
         if advisory_enabled:
-            if advisory_state is None or as_of is None or advisory_spec is None:
+            if as_of is None:
                 raise AssertionError("advisory inputs must be loaded when enabled")
+            advisory_id, advisory_state, advisory_members = _advisory_runtime(
+                advisory_specs,
+                advisory_states,
+            )
             advisory_detail = _build_advisory_detail(
-                advisory_spec,
+                advisory_id,
                 advisory_state,
                 baseline_code=baseline,
                 renames=delta.renames,
                 mutes=advisory_mutes,
                 as_of=as_of,
                 mutes_path=args.advisory_mutes,
+                members=advisory_members,
             )
         repair_plan = emit_repair_plan(verdict)
         payload = build_payload(
@@ -398,24 +403,23 @@ def _sensor_flags_enabled(args: Namespace) -> bool:
     return has_baseline and has_candidate
 
 
-def _advisory_sensor_spec(args: Namespace) -> tuple[str, Path, str] | None:
+def _advisory_sensor_specs(args: Namespace) -> tuple[tuple[str, Path, str], ...]:
     values = args.advisory_sensor or ()
-    if len(values) > 1:
-        raise ValueError(
-            "multiple --advisory-sensor values are not supported; "
-            "cross-model aggregation is H-5 scope"
-        )
     if not values:
-        return None
-    raw = values[0]
-    if "=" not in raw:
-        raise ValueError("--advisory-sensor must use ADAPTER=PATH, e.g. codex-security=run.json")
-    adapter_id, raw_path = raw.split("=", 1)
-    if not adapter_id or not raw_path:
-        raise ValueError("--advisory-sensor must use non-empty ADAPTER=PATH")
-    if adapter_id != CODEX_SECURITY_SENSOR_ID:
-        raise ValueError(f"unknown advisory sensor adapter: {adapter_id}")
-    return adapter_id, Path(raw_path), raw_path
+        return ()
+    specs: list[tuple[str, Path, str]] = []
+    for raw in values:
+        if "=" not in raw:
+            raise ValueError(
+                "--advisory-sensor must use ADAPTER=PATH, e.g. codex-security=run.json"
+            )
+        adapter_id, raw_path = raw.split("=", 1)
+        if not adapter_id or not raw_path:
+            raise ValueError("--advisory-sensor must use non-empty ADAPTER=PATH")
+        if adapter_id != CODEX_SECURITY_SENSOR_ID:
+            raise ValueError(f"unknown advisory sensor adapter: {adapter_id}")
+        specs.append((adapter_id, Path(raw_path), raw_path))
+    return tuple(specs)
 
 
 def _reject_unsupported_sensor_output_format(output_format: str | None) -> None:
@@ -478,8 +482,18 @@ def _load_advisory_sensor_state(spec: tuple[str, Path, str]) -> SensorState:
     raise AssertionError(f"unhandled advisory adapter: {adapter_id}")
 
 
+def _advisory_runtime(
+    specs: tuple[tuple[str, Path, str], ...],
+    states: tuple[SensorState, ...],
+) -> tuple[str, SensorState, tuple[SensorProvenance, ...]]:
+    if len(specs) == 1:
+        return specs[0][0], states[0], ()
+    aggregation = aggregate_advisory_states(states)
+    return LLM_ENSEMBLE_SENSOR_ID, aggregation.state, aggregation.members
+
+
 def _build_advisory_detail(
-    spec: tuple[str, Path, str],
+    adapter_id: str,
     state: SensorState,
     *,
     baseline_code: CodeState,
@@ -487,8 +501,8 @@ def _build_advisory_detail(
     mutes: tuple[AdvisoryMute, ...],
     as_of: dt.date,
     mutes_path: str | None,
+    members: tuple[SensorProvenance, ...] = (),
 ) -> dict[str, Any]:
-    adapter_id, _path, _raw_path = spec
     findings = _llm_findings(state)
     provenance = _advisory_provenance(state, adapter_id=adapter_id)
     if provenance.status == "complete":
@@ -511,7 +525,7 @@ def _build_advisory_detail(
     muted_findings = tuple(
         finding for finding in (*added, *pre_existing) if finding.canonical_id in active_mutes
     )
-    return {
+    detail: dict[str, Any] = {
         "adapter_id": adapter_id,
         "sensor": _serialize_advisory_provenance(provenance),
         "surfaced": [_serialize_llm_finding(finding) for finding in surfaced],
@@ -528,6 +542,9 @@ def _build_advisory_detail(
         },
         "mutes_path": mutes_path,
     }
+    if members:
+        detail["members"] = [_serialize_advisory_provenance(member) for member in members]
+    return detail
 
 
 def _llm_findings(state: SensorState) -> tuple[LLMSecurityFinding, ...]:

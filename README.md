@@ -112,6 +112,8 @@ Start here:
 
 Active references (current behavior):
 
+- [LLM Scout Usage](docs/llm_scout_usage.md) — advisory-only recorded LLM scout usage, cross-model ensemble aggregation, mute ledger authoring, and promotion into deterministic `target.yaml` constraints
+
 - [CLI Usage](docs/cli_usage.md) — all 10 subcommands (incl. the `ssp` sensor group), flags, target discovery, output formats, severity routing
 - [Exit Codes](docs/exit_codes.md) — CI-facing exit code contract
 - [JSON Output Schema](docs/json_schema.md) — verdict / compile envelopes (`schema_version="6"`) + compile-repair (`"1"`) / validate-plan (`"2"`) envelopes (independent versions)

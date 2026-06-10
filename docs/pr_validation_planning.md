@@ -57,8 +57,18 @@
 - 理由: `CHANGES_REQUESTED` を受けた PR は通常その後修正されて merge される。
   最終 diff で X を取ると「修正後の綺麗なコード」を「過去の changes-requested」
   で fail 扱いし、**Y が壊れる** (時点不一致)。
-- 実装: 各 PR で Y を確定した review の `commit_id` を `candidate-rev` に、その
-  時点の base (PR の `base.sha` か merge-base) を `baseline-rev` にする。
+- 実装: 各 PR で Y を確定した review の `commit_id` を `candidate-rev` にする。
+- **baseline 側の罠 (candidate と同格に重要)**: 収集時点の PR object の
+  `base.sha` や「現在の base branch に対する naive な merge-base」を使っては
+  ならない。マージ済み PR ではレビュー時 SHA が既に現在の main の祖先になって
+  いるため、`git merge-base current-main <review-sha>` が **review SHA 自身を
+  返し、空 diff / 逆向き diff で配管が誤って成立**しうる。`baseline-rev` は
+  **レビュー時点の base を再構築**して固定する: 例えば
+  `git rev-list -1 --before=<review_timestamp> <base-branch>` でレビュー時点の
+  base tip を取り、その commit と review SHA の merge-base を採る。さらに
+  sanity guard を必須化: `baseline-rev != candidate-rev` かつ diff 非空で
+  あること (空なら当該 PR を収集エラーとして記録し、黙って通さない)。この
+  配管検証は pilot (§2.1) の主要対象。
 - 「最初の実質レビュー」の定義: state が `APPROVED` または `CHANGES_REQUESTED`
   を持つ **最初の** review event。純粋な `COMMENTED` (ask なし) は実質レビュー
   に数えない。最初が approve なら pass、最初が CR なら fail (後で approve に
@@ -147,7 +157,8 @@
 - **Pilot の Y は本番と同一 = review-state ベース (§1.2 の D1)** を使う。
   formal review (approve / changes-requested) が付いた PR を 5 件探し、最初の
   実質レビュー時点 SHA (§1.3) で評価する。理由: 5 件時点で「review event 取得・
-  レビュー時点 SHA 固定・ラベル抽出」の穴を見つけないと本番 48 件で手戻りする。
+  レビュー時点 SHA 固定・**レビュー時点 baseline 再構築 (§1.3 の罠) + 空 diff
+  sanity guard**・ラベル抽出」の穴を見つけないと本番 48 件で手戻りする。
   **Y を merge/reject で代理しない。target トラック (§1.4 の A/B) は X 生成
   経路であって、いかなる場合も Y (正解ラベル) の代わりにならない。**
 - **禁止**: pilot の数字で相関・性能を語ること。pilot は煙試験 (smoke test)。

@@ -23,8 +23,9 @@ from semantic_ci_code.cli.git_runtime import (
     tree_object_id,
 )
 from semantic_ci_code.cli.worktree import materialize_ref
-from tests.cli.git_helpers import init_repo
-from tests.cli.helpers import run_semantic_ci_inproc
+
+from .git_helpers import init_repo
+from .helpers import run_semantic_ci_inproc
 
 OPTION_LIKE_REFS = (
     "-foo",

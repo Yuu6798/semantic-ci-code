@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import ast
+import importlib
 import importlib.util
+import sys
 from pathlib import Path
 
 PROJECT_PREFIX = "semantic_ci_code"
 LLM_ADAPTER_PACKAGE = "semantic_ci_code.sensor.adapters.llm"
+LLM_PUBLIC_IMPORT_ROOTS = (
+    "semantic_ci_code.sensor.adapters",
+    "semantic_ci_code.sensor.adapters.llm",
+)
+NON_LLM_ADAPTER_MODULES = (
+    "semantic_ci_code.sensor.adapters.pip_audit_adapter",
+    "semantic_ci_code.sensor.adapters.semgrep_adapter",
+    "semantic_ci_code.ssp.adapters.pip_audit",
+    "semantic_ci_code.ssp.adapters.semgrep",
+)
 FORBIDDEN_NETWORK_IMPORTS = (
     "aiohttp",
     "http",
@@ -97,7 +109,8 @@ def _forbidden_root(module_name: str) -> str | None:
 
 def test_llm_adapter_package_has_no_network_or_subprocess_imports():
     failures: dict[str, list[str]] = {}
-    for module in _discover_package_modules(LLM_ADAPTER_PACKAGE):
+    modules = sorted({*LLM_PUBLIC_IMPORT_ROOTS, *_discover_package_modules(LLM_ADAPTER_PACKAGE)})
+    for module in modules:
         leaks = sorted(
             imported
             for imported in _transitive_imports(module)
@@ -107,3 +120,17 @@ def test_llm_adapter_package_has_no_network_or_subprocess_imports():
             failures[module] = leaks
 
     assert not failures, f"LLM adapter package imported network/subprocess modules: {failures}"
+
+
+def test_public_llm_adapter_import_does_not_eagerly_load_live_tool_adapters():
+    for module in (
+        *NON_LLM_ADAPTER_MODULES,
+        "semantic_ci_code.sensor.adapters.llm",
+        "semantic_ci_code.sensor.adapters",
+    ):
+        sys.modules.pop(module, None)
+
+    importlib.import_module("semantic_ci_code.sensor.adapters.llm")
+
+    loaded = sorted(module for module in NON_LLM_ADAPTER_MODULES if module in sys.modules)
+    assert loaded == []

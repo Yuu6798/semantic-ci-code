@@ -117,6 +117,7 @@ go to stderr.
 | `check --candidate-source staged-index --candidate-rev <ref>` | 2 | `error: --candidate-source=staged-index is incompatible with --candidate-rev` |
 | `check --baseline-source working-tree --baseline-rev <ref>` | 2 | `error: --baseline-source=working-tree is incompatible with --baseline-rev` |
 | `check --baseline-source staged-index --baseline-rev <ref>` | 2 | `error: --baseline-source=staged-index is incompatible with --baseline-rev` |
+| `check --baseline-rev=<option-like>` / `--candidate-rev=<option-like>` (empty or `-`-prefixed) | 2 | `invalid git ref '<value>': refs must be non-empty and must not begin with '-'` |
 | `check --baseline-source <volatile> --candidate-source <same volatile>` | 0/1 | Warning: verdict will report no drift by construction. |
 | `check --sensor-baseline <file>` without `--sensor-candidate` | 2 | `--sensor-baseline and --sensor-candidate must be provided together` |
 | `check --sensor-baseline <invalid-json> --sensor-candidate <file>` | 2 | `--sensor-baseline must be a valid SensorState JSON file...` |

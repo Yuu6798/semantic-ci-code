@@ -50,6 +50,7 @@ from semantic_ci_code.cli.git_runtime import (
     GitConfigError,
     GitError,
     GitNotFoundError,
+    ensure_safe_ref,
     is_dirty,
     is_git_available,
     repo_root,
@@ -595,7 +596,7 @@ def _exit_code_for_suite(final: SuiteResult, *, strict_repair: bool) -> int:
 
 def _resolve_baseline_ref(args: Namespace, *, repo_root: Path) -> str:
     if args.baseline_rev is not None:
-        return args.baseline_rev
+        return ensure_safe_ref(args.baseline_rev)
     if args.baseline_source == "commit" and args.candidate_source == "staged-index":
         return "HEAD"
     if args.baseline_source == "commit":

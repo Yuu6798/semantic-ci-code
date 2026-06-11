@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from semantic_ci_code.ssp.adapters.dependency_sources import (
@@ -681,12 +682,13 @@ marker = "python_version ~= '999.0'"
 
 
 def test_lock_translation_respects_arbitrary_equality_marker_operator(tmp_path: Path):
+    current_python = f"{sys.version_info.major}.{sys.version_info.minor}"
     (tmp_path / "pdm.lock").write_text(
-        """
+        f"""
 [[package]]
 name = "included"
 version = "1.0.0"
-marker = "python_version === '3.11'"
+marker = "python_version === '{current_python}'"
 
 [[package]]
 name = "excluded"

@@ -156,6 +156,22 @@ marker = "unknown_marker_name == 'x'"
         raise AssertionError("expected DependencySourceError")
 
 
+def test_lock_translation_prerelease_marker_comparison_does_not_crash(tmp_path: Path):
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "django"
+version = "3.2.0"
+marker = "python_full_version >= '3.0.0a0'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0",)
+
+
 def test_pyproject_static_dependencies_are_used(tmp_path: Path):
     (tmp_path / "pyproject.toml").write_text(
         """

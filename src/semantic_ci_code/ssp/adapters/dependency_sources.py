@@ -328,10 +328,11 @@ def _marker_environment() -> dict[str, str]:
     }
 
 
-def _versionish(value: str) -> tuple[int | str, ...]:
-    parts: list[int | str] = []
-    for part in re.split(r"[.\-+_]", value):
-        if not part:
-            continue
-        parts.append(int(part) if part.isdigit() else part)
-    return tuple(parts) or (value,)
+def _versionish(value: str) -> tuple[tuple[int, int | str], ...]:
+    tokens: list[tuple[int, int | str]] = []
+    for part in re.findall(r"\d+|[A-Za-z]+", value):
+        if part.isdigit():
+            tokens.append((0, int(part)))
+        else:
+            tokens.append((1, part.lower()))
+    return tuple(tokens) or ((1, value),)

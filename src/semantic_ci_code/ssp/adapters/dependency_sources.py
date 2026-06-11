@@ -237,6 +237,13 @@ def _excluded_lock_package_names(
                 context="dependency-groups",
             )
         )
+        dev_roots.update(
+            _dependency_names_from_object(
+                package.get("optional-dependencies"),
+                source_name=source_name,
+                context="optional-dependencies",
+            )
+        )
 
     default_closure = _dependency_closure(default_roots, package_by_name, source_name=source_name)
     dev_closure = _dependency_closure(dev_roots, package_by_name, source_name=source_name)

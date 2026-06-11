@@ -209,7 +209,7 @@ def _excluded_lock_package_names(
     if not isinstance(packages, Sequence) or isinstance(packages, (str, bytes)):
         return frozenset()
 
-    package_by_name = _lock_package_by_name(packages, source_name=source_name)
+    packages_by_name = _lock_packages_by_name(packages, source_name=source_name)
     default_roots: set[_DependencyEdge] = set()
     non_default_roots: set[_DependencyEdge] = set()
     for package in packages:
@@ -251,35 +251,37 @@ def _excluded_lock_package_names(
             )
         )
 
-    default_closure = _dependency_closure(default_roots, package_by_name, source_name=source_name)
+    default_closure = _dependency_closure(default_roots, packages_by_name, source_name=source_name)
     if project_name is not None:
-        return frozenset(package_by_name.keys() - default_closure - {_normalize_name(project_name)})
+        return frozenset(
+            packages_by_name.keys() - default_closure - {_normalize_name(project_name)}
+        )
     non_default_closure = _dependency_closure(
         non_default_roots,
-        package_by_name,
+        packages_by_name,
         source_name=source_name,
     )
     return frozenset(non_default_closure - default_closure)
 
 
-def _lock_package_by_name(
+def _lock_packages_by_name(
     packages: Sequence[object],
     *,
     source_name: str,
-) -> Mapping[str, Mapping[str, Any]]:
-    package_by_name: dict[str, Mapping[str, Any]] = {}
+) -> Mapping[str, tuple[Mapping[str, Any], ...]]:
+    packages_by_name: dict[str, list[Mapping[str, Any]]] = {}
     for index, package in enumerate(packages):
         if not isinstance(package, Mapping):
             raise DependencySourceError(f"{source_name}: package entry {index} must be a table")
         raw_name = package.get("name")
         if isinstance(raw_name, str) and raw_name:
-            package_by_name[_normalize_name(raw_name)] = package
-    return package_by_name
+            packages_by_name.setdefault(_normalize_name(raw_name), []).append(package)
+    return {name: tuple(variants) for name, variants in packages_by_name.items()}
 
 
 def _dependency_closure(
     roots: set[_DependencyEdge],
-    packages: Mapping[str, Mapping[str, Any]],
+    packages: Mapping[str, tuple[Mapping[str, Any], ...]],
     *,
     source_name: str,
 ) -> set[str]:
@@ -289,29 +291,51 @@ def _dependency_closure(
     while stack:
         edge = stack.pop()
         name = edge.name
-        included.add(name)
         if edge in processed:
             continue
         processed.add(edge)
-        package = packages.get(name)
-        if package is None:
-            continue
-        for dependency in _dependency_edges_from_object(
-            package.get("dependencies"),
+        active_variants = _active_lock_package_variants(
+            packages,
+            name,
             source_name=source_name,
-            context=f"package {name} dependencies",
-        ):
-            if dependency not in processed:
-                stack.append(dependency)
-        for dependency in _optional_dependency_edges(
+        )
+        if not active_variants:
+            continue
+        included.add(name)
+        for package in active_variants:
+            for dependency in _dependency_edges_from_object(
+                package.get("dependencies"),
+                source_name=source_name,
+                context=f"package {name} dependencies",
+            ):
+                if dependency not in processed:
+                    stack.append(dependency)
+            for dependency in _optional_dependency_edges(
+                package,
+                extras=edge.extras,
+                source_name=source_name,
+                package_name=name,
+            ):
+                if dependency not in processed:
+                    stack.append(dependency)
+    return included
+
+
+def _active_lock_package_variants(
+    packages: Mapping[str, tuple[Mapping[str, Any], ...]],
+    name: str,
+    *,
+    source_name: str,
+) -> tuple[Mapping[str, Any], ...]:
+    active: list[Mapping[str, Any]] = []
+    for package in packages.get(name, ()):
+        if _marker_allows_current_environment(
             package,
-            extras=edge.extras,
             source_name=source_name,
             package_name=name,
         ):
-            if dependency not in processed:
-                stack.append(dependency)
-    return included
+            active.append(package)
+    return tuple(active)
 
 
 def _project_name(root: Path) -> str | None:

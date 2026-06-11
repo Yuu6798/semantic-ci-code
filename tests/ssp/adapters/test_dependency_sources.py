@@ -464,6 +464,48 @@ version = "1.0.0"
     assert generated.lines == ("fast-helper==2.0.0", "lib==1.0.0", "shared==1.0.0")
 
 
+def test_uv_lock_translation_keeps_resolution_variants_separate_for_closure(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example-app"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "example-app"
+version = "0.1.0"
+dependencies = [
+  { name = "lib", extra = ["speed"] },
+]
+
+[[package]]
+name = "lib"
+version = "1.0.0"
+resolution-markers = ["python_version == '3.*'"]
+
+[package.optional-dependencies]
+speed = [{ name = "fast-helper" }]
+
+[[package]]
+name = "lib"
+version = "9.0.0"
+resolution-markers = ["python_version == '999.*'"]
+
+[[package]]
+name = "fast-helper"
+version = "2.0.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("fast-helper==2.0.0", "lib==1.0.0")
+
+
 def test_uv_lock_translation_processes_later_requested_extra_for_seen_package(tmp_path: Path):
     (tmp_path / "pyproject.toml").write_text(
         """

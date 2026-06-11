@@ -332,9 +332,9 @@ def _eval_marker_value(node: ast.AST) -> str:
 
 def _compare_marker_values(left: str, op: ast.cmpop, right: str) -> bool:
     if isinstance(op, ast.Eq):
-        return left == right
+        return _marker_values_equal(left, right)
     if isinstance(op, ast.NotEq):
-        return left != right
+        return not _marker_values_equal(left, right)
     if isinstance(op, ast.In):
         return left in right
     if isinstance(op, ast.NotIn):
@@ -384,3 +384,18 @@ def _versionish(value: str) -> tuple[tuple[int, int | str], ...]:
         else:
             tokens.append((1, part.lower()))
     return tuple(tokens) or ((1, value),)
+
+
+def _marker_values_equal(left: str, right: str) -> bool:
+    return (
+        left == right
+        or _version_wildcard_matches(pattern=left, value=right)
+        or _version_wildcard_matches(pattern=right, value=left)
+    )
+
+
+def _version_wildcard_matches(*, pattern: str, value: str) -> bool:
+    if not re.fullmatch(r"\d+(?:\.\d+)*\.\*", pattern):
+        return False
+    prefix = pattern.removesuffix(".*")
+    return value == prefix or value.startswith(f"{prefix}.")

@@ -282,6 +282,53 @@ marker = "python_full_version >= '3.0.0a0'"
     assert generated.lines == ("django==3.2.0",)
 
 
+def test_lock_translation_respects_wildcard_version_marker_equality(tmp_path: Path):
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "included"
+version = "1.0.0"
+marker = "python_version == '3.*'"
+
+[[package]]
+name = "also-included"
+version = "1.0.0"
+marker = "'3.*' == python_version"
+
+[[package]]
+name = "excluded"
+version = "1.0.0"
+marker = "python_version == '999.*'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("also-included==1.0.0", "included==1.0.0")
+
+
+def test_lock_translation_respects_wildcard_version_marker_inequality(tmp_path: Path):
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "included"
+version = "1.0.0"
+marker = "python_version != '999.*'"
+
+[[package]]
+name = "excluded"
+version = "1.0.0"
+marker = "python_version != '3.*'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("included==1.0.0",)
+
+
 def test_pyproject_static_dependencies_are_used(tmp_path: Path):
     (tmp_path / "pyproject.toml").write_text(
         """

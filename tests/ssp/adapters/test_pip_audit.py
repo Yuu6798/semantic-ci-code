@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from semantic_ci_code.ssp.adapters.dependency_sources import discover_dependency_source
 from semantic_ci_code.ssp.adapters.pip_audit import PipAuditAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -86,7 +87,7 @@ def test_pip_audit_scan_invokes_json_output_and_detects_version(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = PipAuditAdapter().scan(requirements=requirements, repo_root=tmp_path)
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
 
     assert calls[0] == ["pip-audit", "--version"]
     assert calls[1] == [
@@ -123,7 +124,7 @@ def test_pip_audit_scan_without_requirements_audits_project_path(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = PipAuditAdapter().scan(requirements=None, repo_root=tmp_path)
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
 
     assert calls[0] == ["pip-audit", "--version"]
     assert calls[1] == [
@@ -158,7 +159,7 @@ def test_pip_audit_project_path_uses_locked_when_version_supports_it(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = PipAuditAdapter().scan(requirements=None, repo_root=tmp_path)
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
 
     assert calls[0] == ["pip-audit", "--version"]
     assert calls[1] == [
@@ -169,6 +170,215 @@ def test_pip_audit_project_path_uses_locked_when_version_supports_it(
         str(tmp_path.resolve()),
     ]
     assert result.output.status == "complete"
+
+
+@pytest.mark.parametrize(
+    ("filename", "kind"),
+    [
+        ("uv.lock", "uv-lock"),
+        ("pdm.lock", "pdm-lock"),
+        ("poetry.lock", "poetry-lock"),
+    ],
+)
+def test_pip_audit_lock_sources_generate_pinned_requirements_with_no_deps(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    filename: str,
+    kind: str,
+):
+    calls: list[list[str]] = []
+    (tmp_path / filename).write_text(
+        """
+[[package]]
+name = "django"
+version = "3.2.0"
+
+[[package]]
+name = "requests"
+version = "2.32.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, capture_output, text, check
+        calls.append(command)
+        if command == ["pip-audit", "--version"]:
+            return subprocess.CompletedProcess(command, 0, "pip-audit 2.9.0\n", "")
+        requirement_path = Path(command[command.index("--requirement") + 1])
+        assert requirement_path.read_text(encoding="utf-8") == ("django==3.2.0\nrequests==2.32.0\n")
+        return subprocess.CompletedProcess(command, 0, "[]", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    source = discover_dependency_source(tmp_path)
+    result = PipAuditAdapter().scan(source=source, repo_root=tmp_path)
+
+    assert source.kind == kind
+    assert calls[1][:4] == [
+        "pip-audit",
+        "--format=json",
+        "--desc",
+        "--requirement",
+    ]
+    assert calls[1][-1] == "--no-deps"
+    assert result.output.status == "complete"
+
+
+def test_pip_audit_pyproject_static_dependencies_generate_requirements_without_no_deps(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    calls: list[list[str]] = []
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example"
+dependencies = [
+  "django>=3.2",
+  "requests==2.32.0",
+]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, capture_output, text, check
+        calls.append(command)
+        if command == ["pip-audit", "--version"]:
+            return subprocess.CompletedProcess(command, 0, "pip-audit 2.9.0\n", "")
+        requirement_path = Path(command[command.index("--requirement") + 1])
+        assert requirement_path.read_text(encoding="utf-8") == ("django>=3.2\nrequests==2.32.0\n")
+        return subprocess.CompletedProcess(command, 0, "[]", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
+
+    assert calls[1][:4] == [
+        "pip-audit",
+        "--format=json",
+        "--desc",
+        "--requirement",
+    ]
+    assert "--no-deps" not in calls[1]
+    assert result.output.status == "complete"
+
+
+def test_pip_audit_pylock_source_uses_locked_project_scan(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    calls: list[list[str]] = []
+    (tmp_path / "pylock.toml").write_text("[packages]\n", encoding="utf-8")
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, capture_output, text, check
+        calls.append(command)
+        if command == ["pip-audit", "--version"]:
+            return subprocess.CompletedProcess(command, 0, "pip-audit 2.9.0\n", "")
+        return subprocess.CompletedProcess(command, 0, "[]", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
+
+    assert calls[1] == [
+        "pip-audit",
+        "--format=json",
+        "--desc",
+        "--locked",
+        str(tmp_path.resolve()),
+    ]
+    assert result.output.status == "complete"
+
+
+def test_pip_audit_pylock_source_requires_locked_support(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    calls: list[list[str]] = []
+    (tmp_path / "pylock.toml").write_text("[packages]\n", encoding="utf-8")
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, capture_output, text, check
+        calls.append(command)
+        if command == ["pip-audit", "--version"]:
+            return subprocess.CompletedProcess(command, 0, "pip-audit 2.8.0\n", "")
+        raise AssertionError("pylock source must fail closed instead of scanning fallback")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
+
+    assert calls == [["pip-audit", "--version"]]
+    assert result.output.status == "error"
+    assert "pylock.toml" in result.output.error_message
+    assert "pip-audit >= 2.9" in result.output.error_message
+
+
+def test_pip_audit_malformed_recognized_source_returns_error_without_silent_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    calls: list[list[str]] = []
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "django"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, capture_output, text, check
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "pip-audit 2.9.0\n", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
+
+    assert calls[0] == ["pip-audit", "--version"]
+    assert len(calls) == 1
+    assert result.output.status == "error"
+    assert "pdm.lock" in (result.output.error_message or "")
+    assert "missing version" in (result.output.error_message or "")
 
 
 @pytest.mark.parametrize(
@@ -267,7 +477,7 @@ def test_pip_audit_non_normal_exit_returns_error(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = PipAuditAdapter().scan(requirements=None, repo_root=tmp_path)
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
 
     assert result.output.status == "error"
     assert result.output.findings == ()
@@ -283,7 +493,7 @@ def test_pip_audit_invalid_json_returns_error(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = PipAuditAdapter().scan(requirements=None, repo_root=tmp_path)
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
 
     assert result.output.status == "error"
     assert "invalid JSON" in (result.output.error_message or "")
@@ -298,7 +508,7 @@ def test_pip_audit_missing_binary_returns_error(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = PipAuditAdapter().scan(requirements=None, repo_root=tmp_path)
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
 
     assert result.output.status == "error"
     assert "not found" in (result.output.error_message or "")

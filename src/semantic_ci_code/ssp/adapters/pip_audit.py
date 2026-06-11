@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from semantic_ci_code.ssp.adapters.dependency_sources import (
+    DependencySource,
+    DependencySourceError,
+    generated_requirements_for_source,
+)
 from semantic_ci_code.ssp.models import SCAFinding, SensorOutput, SensorSpec, Severity
 
 _PIP_AUDIT_COMMAND = "pip-audit"
@@ -33,34 +39,31 @@ class PipAuditAdapter:
     def scan(
         self,
         *,
-        requirements: Path | None,
+        source: DependencySource,
         repo_root: Path,
     ) -> PipAuditScanResult:
         """Invoke pip-audit and return deterministic SSP sensor output."""
 
         resolved_repo_root = repo_root.resolve()
-        resolved_requirements = (
-            None
-            if requirements is None
-            else _resolve_against(requirements, base=resolved_repo_root)
-        )
+        resolved_requirements = source.path if source.kind == "requirements" else None
         version = _detect_version(cwd=resolved_repo_root)
-        command = [_PIP_AUDIT_COMMAND, "--format=json", "--desc"]
-        if requirements is not None:
-            command.extend(("--requirement", str(requirements)))
-        elif _supports_locked_project_scan(version):
-            command.extend(("--locked", str(resolved_repo_root)))
-        else:
-            command.append(str(resolved_repo_root))
+        try:
+            command, temp_dir = _command_for_source(source, version=version)
+        except DependencySourceError as exc:
+            return self._error_result(str(exc), version=version)
 
         try:
-            completed = subprocess.run(
-                command,
-                cwd=resolved_repo_root,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=resolved_repo_root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            finally:
+                if temp_dir is not None:
+                    temp_dir.cleanup()
         except FileNotFoundError as exc:
             return self._error_result("pip-audit executable not found", error=exc)
 
@@ -191,8 +194,54 @@ def _supports_locked_project_scan(version: str) -> bool:
     return major > 2 or (major == 2 and minor >= 9)
 
 
-def _resolve_against(path: Path, *, base: Path) -> Path:
-    return path if path.is_absolute() else base / path
+def _command_for_source(
+    source: DependencySource,
+    *,
+    version: str,
+) -> tuple[list[str], tempfile.TemporaryDirectory[str] | None]:
+    command = [_PIP_AUDIT_COMMAND, "--format=json", "--desc"]
+    if source.kind == "error":
+        raise DependencySourceError(source.error_message or "dependency source parse failed")
+    if source.kind == "requirements":
+        if source.path is None:
+            raise DependencySourceError("requirements source missing path")
+        command.extend(("--requirement", str(source.path)))
+        return command, None
+    if source.kind == "pylock":
+        if not _supports_locked_project_scan(version):
+            raise DependencySourceError(
+                f"{source.path.name if source.path else 'pylock.toml'} requires "
+                "pip-audit >= 2.9 for --locked scans"
+            )
+        command.extend(("--locked", str(source.root)))
+        return command, None
+    if source.kind == "fallback":
+        if _supports_locked_project_scan(version):
+            command.extend(("--locked", str(source.root)))
+        else:
+            command.append(str(source.root))
+        return command, None
+    if source.kind in {"uv-lock", "pdm-lock", "poetry-lock", "pyproject"}:
+        return _command_for_generated_requirements(command, source)
+    raise DependencySourceError(f"unsupported dependency source kind: {source.kind}")
+
+
+def _command_for_generated_requirements(
+    command: list[str],
+    source: DependencySource,
+) -> tuple[list[str], tempfile.TemporaryDirectory[str]]:
+    generated = generated_requirements_for_source(source)
+    temp_dir = tempfile.TemporaryDirectory()
+    requirements = Path(temp_dir.name) / "requirements.txt"
+    requirements.write_text(_requirements_text(generated.lines), encoding="utf-8")
+    command.extend(("--requirement", str(requirements)))
+    if generated.no_deps:
+        command.append("--no-deps")
+    return command, temp_dir
+
+
+def _requirements_text(lines: tuple[str, ...]) -> str:
+    return "".join(f"{line}\n" for line in lines)
 
 
 def _package_items(payload: Any) -> tuple[Mapping[str, Any], ...]:

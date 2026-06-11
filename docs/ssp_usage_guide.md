@@ -50,10 +50,27 @@ semantic-ci ssp scan \
   --candidate-dir /tmp/candidate
 ```
 
-If `requirements.txt` exists in a directory, it is passed to pip-audit
-via `--requirement`. Otherwise pip-audit audits the project directory
-directly (using `--locked` when supported, or the directory path as
-fallback).
+Dependency source discovery is deterministic and independent for the baseline
+and candidate directories:
+
+| Priority | Root file | Handling | pip-audit argv |
+|---:|---|---|---|
+| 1 | `requirements.txt` | Existing behavior. | `--requirement <path>` |
+| 2 | `pylock.toml` / `pylock.*.toml` | Locked project scan. | `--locked <dir>` when supported, otherwise `<dir>` |
+| 3 | `uv.lock` | Translate pinned packages to a temporary requirements file. | `--requirement <tmp>` + `--no-deps` |
+| 4 | `pdm.lock` | Translate pinned packages to a temporary requirements file. | `--requirement <tmp>` + `--no-deps` |
+| 5 | `poetry.lock` | Translate pinned packages to a temporary requirements file. | `--requirement <tmp>` + `--no-deps` |
+| 6 | `pyproject.toml` with static `[project].dependencies` | Copy dependency specifiers into a temporary requirements file. | `--requirement <tmp>` |
+| 7 | No recognized source | Preserve fallback behavior. | `--locked <dir>` when supported, otherwise `<dir>` |
+
+Malformed recognized dependency sources fail closed as a pip-audit sensor error,
+which produces SSP `unknown` rather than silently falling back to a lower
+priority source. Lockfile translation skips optional packages and packages whose
+environment markers do not apply to the current scan environment. It also keeps
+only default/main dependency groups when lock metadata exposes package groups, so
+docs/test/dev-only packages are not audited as production dependencies.
+Unsupported markers or malformed group metadata fail closed instead of being
+guessed.
 
 ### 3. Fixture mode (no scanner required)
 

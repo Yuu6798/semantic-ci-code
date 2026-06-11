@@ -15,6 +15,7 @@ from semantic_ci_code.cli.command_support import (
 )
 from semantic_ci_code.cli.exit_codes import ENGINE_ERROR, FAIL, SUCCESS
 from semantic_ci_code.cli.output.json_formatter import dump_json
+from semantic_ci_code.ssp.adapters.dependency_sources import discover_dependency_source
 from semantic_ci_code.ssp.adapters.pip_audit import PipAuditAdapter
 from semantic_ci_code.ssp.adapters.semgrep import SemgrepAdapter
 from semantic_ci_code.ssp.delta import compute_delta
@@ -69,11 +70,11 @@ def _scan_envelope(args: Namespace) -> SSPEnvelope:
         )
     elif sensor == "pip-audit":
         baseline_result = PipAuditAdapter().scan(
-            requirements=_requirements_file(baseline_dir),
+            source=discover_dependency_source(baseline_dir),
             repo_root=baseline_dir,
         )
         candidate_result = PipAuditAdapter().scan(
-            requirements=_requirements_file(candidate_dir),
+            source=discover_dependency_source(candidate_dir),
             repo_root=candidate_dir,
         )
     else:
@@ -169,8 +170,3 @@ def _existing_file(path: Path, *, label: str) -> Path:
 def _resolve_package_root(root: Path, package_root: Path) -> Path:
     candidate = package_root if package_root.is_absolute() else root / package_root
     return _existing_dir(candidate, label="--package-root")
-
-
-def _requirements_file(root: Path) -> Path | None:
-    path = root / "requirements.txt"
-    return path if path.exists() else None

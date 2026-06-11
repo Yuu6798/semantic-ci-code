@@ -155,6 +155,11 @@ def _pinned_lines_from_lock(path: Path, *, root: Path) -> tuple[str, ...]:
         raise DependencySourceError(f"{path.name}: package entries must be a list")
 
     self_name = _project_name(root)
+    excluded_names = _excluded_lock_package_names(
+        payload,
+        source_name=path.name,
+        project_name=self_name,
+    )
     pinned: set[tuple[str, str]] = set()
     for index, package in enumerate(packages):
         if not isinstance(package, Mapping):
@@ -165,6 +170,8 @@ def _pinned_lines_from_lock(path: Path, *, root: Path) -> tuple[str, ...]:
             raise DependencySourceError(f"{path.name}: package entry {index} is missing name")
         if not isinstance(version, str) or not version:
             raise DependencySourceError(f"{path.name}: package {name} is missing version")
+        if _normalize_name(name) in excluded_names:
+            continue
         if _is_optional_package(package):
             continue
         if not _is_selected_dependency_group(
@@ -181,6 +188,47 @@ def _pinned_lines_from_lock(path: Path, *, root: Path) -> tuple[str, ...]:
             continue
         pinned.add((name, version))
     return tuple(f"{name}=={version}" for name, version in sorted(pinned))
+
+
+def _excluded_lock_package_names(
+    payload: Mapping[str, Any],
+    *,
+    source_name: str,
+    project_name: str | None,
+) -> frozenset[str]:
+    if source_name != "uv.lock":
+        return frozenset()
+
+    packages = payload.get("package")
+    if not isinstance(packages, Sequence) or isinstance(packages, (str, bytes)):
+        return frozenset()
+
+    excluded: set[str] = set()
+    for package in packages:
+        if not isinstance(package, Mapping):
+            continue
+        package_name = package.get("name")
+        if (
+            project_name is not None
+            and isinstance(package_name, str)
+            and _normalize_name(package_name) != _normalize_name(project_name)
+        ):
+            continue
+        excluded.update(
+            _dependency_names_from_object(
+                package.get("dev-dependencies"),
+                source_name=source_name,
+                context="dev-dependencies",
+            )
+        )
+        excluded.update(
+            _dependency_names_from_object(
+                package.get("dependency-groups"),
+                source_name=source_name,
+                context="dependency-groups",
+            )
+        )
+    return frozenset(excluded)
 
 
 def _project_name(root: Path) -> str | None:
@@ -229,6 +277,60 @@ def _normalize_name(value: str) -> str:
 
 def _is_optional_package(package: Mapping[str, Any]) -> bool:
     return package.get("optional") is True
+
+
+def _dependency_names_from_object(
+    value: object,
+    *,
+    source_name: str,
+    context: str,
+) -> frozenset[str]:
+    if value is None:
+        return frozenset()
+    if isinstance(value, Mapping):
+        names: set[str] = set()
+        for group_name, dependencies in value.items():
+            if not isinstance(group_name, str) or not group_name:
+                raise DependencySourceError(f"{source_name}: invalid {context} group")
+            names.update(
+                _dependency_names_from_object(
+                    dependencies,
+                    source_name=source_name,
+                    context=f"{context}.{group_name}",
+                )
+            )
+        return frozenset(names)
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        names = set()
+        for item in value:
+            names.add(_dependency_name_from_item(item, source_name=source_name, context=context))
+        return frozenset(names)
+    raise DependencySourceError(f"{source_name}: invalid {context}")
+
+
+def _dependency_name_from_item(
+    item: object,
+    *,
+    source_name: str,
+    context: str,
+) -> str:
+    if isinstance(item, str):
+        name = _requirement_name(item)
+    elif isinstance(item, Mapping):
+        raw = item.get("name")
+        if not isinstance(raw, str):
+            raise DependencySourceError(f"{source_name}: invalid {context} dependency")
+        name = raw
+    else:
+        raise DependencySourceError(f"{source_name}: invalid {context} dependency")
+    if not name:
+        raise DependencySourceError(f"{source_name}: invalid {context} dependency")
+    return _normalize_name(name)
+
+
+def _requirement_name(value: str) -> str:
+    match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", value)
+    return match.group(1) if match else ""
 
 
 def _is_selected_dependency_group(

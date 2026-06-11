@@ -170,6 +170,82 @@ groups = ["test"]
     assert generated.lines == ("django==3.2.0", "requests==2.32.0")
 
 
+def test_uv_lock_translation_excludes_root_dev_dependencies(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example-app"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "example-app"
+version = "0.1.0"
+dev-dependencies = [
+  { name = "pytest" },
+  { name = "ruff" },
+]
+
+[[package]]
+name = "django"
+version = "3.2.0"
+
+[[package]]
+name = "pytest"
+version = "8.3.0"
+
+[[package]]
+name = "ruff"
+version = "0.9.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0",)
+
+
+def test_uv_lock_translation_excludes_root_dependency_groups(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example-app"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "example-app"
+version = "0.1.0"
+
+[package.dependency-groups]
+docs = ["mkdocs>=1.6"]
+test = [{ name = "pytest" }]
+
+[[package]]
+name = "django"
+version = "3.2.0"
+
+[[package]]
+name = "mkdocs"
+version = "1.6.0"
+
+[[package]]
+name = "pytest"
+version = "8.3.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0",)
+
+
 def test_lock_translation_respects_legacy_group_and_category_fields(tmp_path: Path):
     (tmp_path / "pdm.lock").write_text(
         """

@@ -314,6 +314,37 @@ def test_pip_audit_pylock_source_uses_locked_project_scan(
     assert result.output.status == "complete"
 
 
+def test_pip_audit_pylock_source_requires_locked_support(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    calls: list[list[str]] = []
+    (tmp_path / "pylock.toml").write_text("[packages]\n", encoding="utf-8")
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, capture_output, text, check
+        calls.append(command)
+        if command == ["pip-audit", "--version"]:
+            return subprocess.CompletedProcess(command, 0, "pip-audit 2.8.0\n", "")
+        raise AssertionError("pylock source must fail closed instead of scanning fallback")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = PipAuditAdapter().scan(source=discover_dependency_source(tmp_path), repo_root=tmp_path)
+
+    assert calls == [["pip-audit", "--version"]]
+    assert result.output.status == "error"
+    assert "pylock.toml" in result.output.error_message
+    assert "pip-audit >= 2.9" in result.output.error_message
+
+
 def test_pip_audit_malformed_recognized_source_returns_error_without_silent_fallback(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

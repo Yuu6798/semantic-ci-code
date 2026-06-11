@@ -207,7 +207,15 @@ def _command_for_source(
             raise DependencySourceError("requirements source missing path")
         command.extend(("--requirement", str(source.path)))
         return command, None
-    if source.kind in {"pylock", "fallback"}:
+    if source.kind == "pylock":
+        if not _supports_locked_project_scan(version):
+            raise DependencySourceError(
+                f"{source.path.name if source.path else 'pylock.toml'} requires "
+                "pip-audit >= 2.9 for --locked scans"
+            )
+        command.extend(("--locked", str(source.root)))
+        return command, None
+    if source.kind == "fallback":
         if _supports_locked_project_scan(version):
             command.extend(("--locked", str(source.root)))
         else:

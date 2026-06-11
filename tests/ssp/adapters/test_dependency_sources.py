@@ -246,6 +246,48 @@ version = "8.3.0"
     assert generated.lines == ("django==3.2.0",)
 
 
+def test_uv_lock_translation_excludes_dev_dependency_closure(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example-app"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "example-app"
+version = "0.1.0"
+dependencies = [{ name = "django" }]
+dev-dependencies = [{ name = "pytest" }]
+
+[[package]]
+name = "django"
+version = "3.2.0"
+dependencies = [{ name = "shared" }]
+
+[[package]]
+name = "pytest"
+version = "8.3.0"
+dependencies = [{ name = "pluggy" }, { name = "shared" }]
+
+[[package]]
+name = "pluggy"
+version = "1.5.0"
+
+[[package]]
+name = "shared"
+version = "1.0.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0", "shared==1.0.0")
+
+
 def test_lock_translation_respects_legacy_group_and_category_fields(tmp_path: Path):
     (tmp_path / "pdm.lock").write_text(
         """

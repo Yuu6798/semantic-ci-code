@@ -203,7 +203,9 @@ def _excluded_lock_package_names(
     if not isinstance(packages, Sequence) or isinstance(packages, (str, bytes)):
         return frozenset()
 
-    excluded: set[str] = set()
+    package_by_name = _lock_package_by_name(packages, source_name=source_name)
+    default_roots: set[str] = set()
+    dev_roots: set[str] = set()
     for package in packages:
         if not isinstance(package, Mapping):
             continue
@@ -214,21 +216,72 @@ def _excluded_lock_package_names(
             and _normalize_name(package_name) != _normalize_name(project_name)
         ):
             continue
-        excluded.update(
+        default_roots.update(
+            _dependency_names_from_object(
+                package.get("dependencies"),
+                source_name=source_name,
+                context="dependencies",
+            )
+        )
+        dev_roots.update(
             _dependency_names_from_object(
                 package.get("dev-dependencies"),
                 source_name=source_name,
                 context="dev-dependencies",
             )
         )
-        excluded.update(
+        dev_roots.update(
             _dependency_names_from_object(
                 package.get("dependency-groups"),
                 source_name=source_name,
                 context="dependency-groups",
             )
         )
-    return frozenset(excluded)
+
+    default_closure = _dependency_closure(default_roots, package_by_name, source_name=source_name)
+    dev_closure = _dependency_closure(dev_roots, package_by_name, source_name=source_name)
+    return frozenset(dev_closure - default_closure)
+
+
+def _lock_package_by_name(
+    packages: Sequence[object],
+    *,
+    source_name: str,
+) -> Mapping[str, Mapping[str, Any]]:
+    package_by_name: dict[str, Mapping[str, Any]] = {}
+    for index, package in enumerate(packages):
+        if not isinstance(package, Mapping):
+            raise DependencySourceError(f"{source_name}: package entry {index} must be a table")
+        raw_name = package.get("name")
+        if isinstance(raw_name, str) and raw_name:
+            package_by_name[_normalize_name(raw_name)] = package
+    return package_by_name
+
+
+def _dependency_closure(
+    roots: set[str],
+    packages: Mapping[str, Mapping[str, Any]],
+    *,
+    source_name: str,
+) -> set[str]:
+    seen: set[str] = set()
+    stack = list(roots)
+    while stack:
+        name = stack.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        package = packages.get(name)
+        if package is None:
+            continue
+        for dependency in _dependency_names_from_object(
+            package.get("dependencies"),
+            source_name=source_name,
+            context=f"package {name} dependencies",
+        ):
+            if dependency not in seen:
+                stack.append(dependency)
+    return seen
 
 
 def _project_name(root: Path) -> str | None:

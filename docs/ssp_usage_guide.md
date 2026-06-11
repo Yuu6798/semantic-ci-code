@@ -56,7 +56,7 @@ and candidate directories:
 | Priority | Root file | Handling | pip-audit argv |
 |---:|---|---|---|
 | 1 | `requirements.txt` | Existing behavior. | `--requirement <path>` |
-| 2 | `pylock.toml` | Locked project scan. | `--locked <dir>` when supported, otherwise `<dir>` |
+| 2 | `pylock.toml` / `pylock.*.toml` | Locked project scan. | `--locked <dir>` when supported, otherwise `<dir>` |
 | 3 | `uv.lock` | Translate pinned packages to a temporary requirements file. | `--requirement <tmp>` + `--no-deps` |
 | 4 | `pdm.lock` | Translate pinned packages to a temporary requirements file. | `--requirement <tmp>` + `--no-deps` |
 | 5 | `poetry.lock` | Translate pinned packages to a temporary requirements file. | `--requirement <tmp>` + `--no-deps` |

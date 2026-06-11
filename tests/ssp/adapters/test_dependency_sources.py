@@ -42,6 +42,32 @@ dependencies = ["requests==2.32.0"]
     assert source.path == tmp_path.resolve() / "uv.lock"
 
 
+def test_discovery_selects_named_pylock_before_pyproject(tmp_path: Path):
+    (tmp_path / "pylock.prod.toml").write_text("[packages]\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+dependencies = ["requests==2.32.0"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    source = discover_dependency_source(tmp_path)
+
+    assert source.kind == "pylock"
+    assert source.path == tmp_path.resolve() / "pylock.prod.toml"
+
+
+def test_discovery_prefers_default_pylock_over_named_pylock(tmp_path: Path):
+    (tmp_path / "pylock.z.toml").write_text("[packages]\n", encoding="utf-8")
+    (tmp_path / "pylock.toml").write_text("[packages]\n", encoding="utf-8")
+
+    source = discover_dependency_source(tmp_path)
+
+    assert source.kind == "pylock"
+    assert source.path == tmp_path.resolve() / "pylock.toml"
+
+
 def test_baseline_and_candidate_discovery_are_independent(tmp_path: Path):
     baseline = tmp_path / "baseline"
     candidate = tmp_path / "candidate"

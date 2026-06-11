@@ -61,8 +61,8 @@ def discover_dependency_source(root: Path) -> DependencySource:
     if requirements.exists():
         return DependencySource(kind="requirements", root=resolved_root, path=requirements)
 
-    pylock = resolved_root / "pylock.toml"
-    if pylock.exists():
+    pylock = _pylock_source(resolved_root)
+    if pylock is not None:
         return DependencySource(kind="pylock", root=resolved_root, path=pylock)
 
     for filename, kind in _LOCK_SOURCE_FILES:
@@ -75,6 +75,14 @@ def discover_dependency_source(root: Path) -> DependencySource:
         return _discover_pyproject(resolved_root, pyproject)
 
     return DependencySource(kind="fallback", root=resolved_root, path=None)
+
+
+def _pylock_source(root: Path) -> Path | None:
+    pylock = root / "pylock.toml"
+    if pylock.exists():
+        return pylock
+    named = sorted(path for path in root.glob("pylock.*.toml") if path.is_file())
+    return named[0] if named else None
 
 
 def generated_requirements_for_source(source: DependencySource) -> GeneratedRequirements:

@@ -78,6 +78,41 @@ name = "example-app"
     assert generated.lines == ("django==3.2.0", "zlib-ng==1.0.0")
 
 
+def test_lock_translation_respects_optional_packages_and_environment_markers(tmp_path: Path):
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "django"
+version = "3.2.0"
+
+[[package]]
+name = "current"
+version = "1.0.0"
+marker = "sys_platform != '__semantic_ci_never__'"
+
+[[package]]
+name = "windows-only"
+version = "1.0.0"
+marker = "sys_platform == '__semantic_ci_never__'"
+
+[[package]]
+name = "extra-only"
+version = "1.0.0"
+marker = "extra == 'speedups'"
+
+[[package]]
+name = "optional-pkg"
+version = "1.0.0"
+optional = true
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("current==1.0.0", "django==3.2.0")
+
+
 def test_lock_translation_missing_version_is_fail_closed(tmp_path: Path):
     (tmp_path / "poetry.lock").write_text(
         """
@@ -95,6 +130,28 @@ name = "django"
     except DependencySourceError as exc:
         assert "poetry.lock" in str(exc)
         assert "missing version" in str(exc)
+    else:  # pragma: no cover - assertion guard
+        raise AssertionError("expected DependencySourceError")
+
+
+def test_lock_translation_unsupported_marker_is_fail_closed(tmp_path: Path):
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "django"
+version = "3.2.0"
+marker = "unknown_marker_name == 'x'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    source = discover_dependency_source(tmp_path)
+
+    try:
+        generated_requirements_for_source(source)
+    except DependencySourceError as exc:
+        assert "pdm.lock" in str(exc)
+        assert "unsupported marker" in str(exc)
     else:  # pragma: no cover - assertion guard
         raise AssertionError("expected DependencySourceError")
 

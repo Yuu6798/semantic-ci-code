@@ -65,7 +65,9 @@ and candidate directories:
 
 Malformed recognized dependency sources fail closed as a pip-audit sensor error,
 which produces SSP `unknown` rather than silently falling back to a lower
-priority source.
+priority source. Lockfile translation skips optional packages and packages whose
+environment markers do not apply to the current scan environment; unsupported
+markers also fail closed instead of being guessed.
 
 ### 3. Fixture mode (no scanner required)
 

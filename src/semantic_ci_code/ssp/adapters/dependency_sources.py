@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import ast
+import os
+import platform
 import re
+import sys
 import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -153,6 +157,12 @@ def _pinned_lines_from_lock(path: Path, *, root: Path) -> tuple[str, ...]:
             raise DependencySourceError(f"{path.name}: package entry {index} is missing name")
         if not isinstance(version, str) or not version:
             raise DependencySourceError(f"{path.name}: package {name} is missing version")
+        if _is_optional_package(package):
+            continue
+        if not _marker_allows_current_environment(
+            package, source_name=path.name, package_name=name
+        ):
+            continue
         if self_name is not None and _normalize_name(name) == _normalize_name(self_name):
             continue
         pinned.add((name, version))
@@ -201,3 +211,127 @@ def _is_string_sequence(value: object) -> bool:
 
 def _normalize_name(value: str) -> str:
     return re.sub(r"[-_.]+", "-", value).lower()
+
+
+def _is_optional_package(package: Mapping[str, Any]) -> bool:
+    return package.get("optional") is True
+
+
+def _marker_allows_current_environment(
+    package: Mapping[str, Any],
+    *,
+    source_name: str,
+    package_name: str,
+) -> bool:
+    markers = _marker_values(package)
+    for marker in markers:
+        try:
+            if not _evaluate_marker(marker):
+                return False
+        except (SyntaxError, ValueError) as exc:
+            raise DependencySourceError(
+                f"{source_name}: package {package_name} has unsupported marker: {marker}"
+            ) from exc
+    return True
+
+
+def _marker_values(package: Mapping[str, Any]) -> tuple[str, ...]:
+    values: list[str] = []
+    for key in ("marker", "markers"):
+        raw = package.get(key)
+        if isinstance(raw, str) and raw.strip():
+            values.append(raw.strip())
+        elif isinstance(raw, Sequence) and not isinstance(raw, (str, bytes)):
+            for item in raw:
+                if isinstance(item, str) and item.strip():
+                    values.append(item.strip())
+    return tuple(values)
+
+
+def _evaluate_marker(marker: str) -> bool:
+    tree = ast.parse(marker, mode="eval")
+    return _eval_marker_node(tree.body)
+
+
+def _eval_marker_node(node: ast.AST) -> bool:
+    if isinstance(node, ast.BoolOp):
+        values = [_eval_marker_node(value) for value in node.values]
+        if isinstance(node.op, ast.And):
+            return all(values)
+        if isinstance(node.op, ast.Or):
+            return any(values)
+    if isinstance(node, ast.Compare):
+        left = _eval_marker_value(node.left)
+        for op, comparator in zip(node.ops, node.comparators, strict=True):
+            right = _eval_marker_value(comparator)
+            if not _compare_marker_values(left, op, right):
+                return False
+            left = right
+        return True
+    raise ValueError(f"unsupported marker expression: {ast.dump(node)}")
+
+
+def _eval_marker_value(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        env = _marker_environment()
+        if node.id not in env:
+            raise ValueError(f"unsupported marker variable: {node.id}")
+        return env[node.id]
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    raise ValueError(f"unsupported marker value: {ast.dump(node)}")
+
+
+def _compare_marker_values(left: str, op: ast.cmpop, right: str) -> bool:
+    if isinstance(op, ast.Eq):
+        return left == right
+    if isinstance(op, ast.NotEq):
+        return left != right
+    if isinstance(op, ast.In):
+        return left in right
+    if isinstance(op, ast.NotIn):
+        return left not in right
+    if isinstance(op, ast.Lt):
+        return _versionish(left) < _versionish(right)
+    if isinstance(op, ast.LtE):
+        return _versionish(left) <= _versionish(right)
+    if isinstance(op, ast.Gt):
+        return _versionish(left) > _versionish(right)
+    if isinstance(op, ast.GtE):
+        return _versionish(left) >= _versionish(right)
+    raise ValueError(f"unsupported marker operator: {op.__class__.__name__}")
+
+
+def _marker_environment() -> dict[str, str]:
+    version = sys.version_info
+    implementation_version = getattr(sys.implementation, "version", version)
+    return {
+        "os_name": os.name,
+        "sys_platform": sys.platform,
+        "platform_machine": platform.machine(),
+        "platform_python_implementation": platform.python_implementation(),
+        "platform_release": platform.release(),
+        "platform_system": platform.system(),
+        "platform_version": platform.version(),
+        "python_version": f"{version.major}.{version.minor}",
+        "python_full_version": platform.python_version(),
+        "implementation_name": sys.implementation.name,
+        "implementation_version": ".".join(
+            str(part)
+            for part in (
+                implementation_version.major,
+                implementation_version.minor,
+                implementation_version.micro,
+            )
+        ),
+        "extra": "",
+    }
+
+
+def _versionish(value: str) -> tuple[int | str, ...]:
+    parts: list[int | str] = []
+    for part in re.split(r"[.\-+_]", value):
+        if not part:
+            continue
+        parts.append(int(part) if part.isdigit() else part)
+    return tuple(parts) or (value,)

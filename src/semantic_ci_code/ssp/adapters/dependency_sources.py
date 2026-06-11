@@ -647,13 +647,13 @@ def _compare_marker_values(left: str, op: ast.cmpop, right: str) -> bool:
     if isinstance(op, ast.NotIn):
         return left not in right
     if isinstance(op, ast.Lt):
-        return _versionish(left) < _versionish(right)
+        return _compare_marker_versions(left, right) < 0
     if isinstance(op, ast.LtE):
-        return _versionish(left) <= _versionish(right)
+        return _compare_marker_versions(left, right) <= 0
     if isinstance(op, ast.Gt):
-        return _versionish(left) > _versionish(right)
+        return _compare_marker_versions(left, right) > 0
     if isinstance(op, ast.GtE):
-        return _versionish(left) >= _versionish(right)
+        return _compare_marker_versions(left, right) >= 0
     raise ValueError(f"unsupported marker operator: {op.__class__.__name__}")
 
 
@@ -683,14 +683,53 @@ def _marker_environment() -> dict[str, str]:
     }
 
 
-def _versionish(value: str) -> tuple[tuple[int, int | str], ...]:
-    tokens: list[tuple[int, int | str]] = []
-    for part in re.findall(r"\d+|[A-Za-z]+", value):
-        if part.isdigit():
-            tokens.append((0, int(part)))
-        else:
-            tokens.append((1, part.lower()))
-    return tuple(tokens) or ((1, value),)
+def _compare_marker_versions(left: str, right: str) -> int:
+    left_version = _pep440ish_version(left)
+    right_version = _pep440ish_version(right)
+    if left_version is None or right_version is None:
+        return (left > right) - (left < right)
+
+    left_release, left_phase = left_version
+    right_release, right_phase = right_version
+    width = max(len(left_release), len(right_release))
+    padded_left = left_release + (0,) * (width - len(left_release))
+    padded_right = right_release + (0,) * (width - len(right_release))
+    if padded_left != padded_right:
+        return (padded_left > padded_right) - (padded_left < padded_right)
+    return (left_phase > right_phase) - (left_phase < right_phase)
+
+
+def _pep440ish_version(value: str) -> tuple[tuple[int, ...], tuple[int, int, int]] | None:
+    match = re.match(
+        r"^\s*v?(?P<release>\d+(?:\.\d+)*)"
+        r"(?:(?P<pre>a|alpha|b|beta|rc|c|pre|preview)(?P<pre_n>\d*))?"
+        r"(?:(?:\.?post)(?P<post_n>\d+))?"
+        r"(?:(?:\.?dev)(?P<dev_n>\d+))?",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+
+    release = tuple(int(part) for part in match.group("release").split("."))
+    if match.group("dev_n") is not None and match.group("pre") is None:
+        return release, (-1, 0, int(match.group("dev_n") or 0))
+    if match.group("pre") is not None:
+        pre = match.group("pre").lower()
+        pre_rank = {
+            "a": 0,
+            "alpha": 0,
+            "b": 1,
+            "beta": 1,
+            "rc": 2,
+            "c": 2,
+            "pre": 2,
+            "preview": 2,
+        }[pre]
+        return release, (0, pre_rank, int(match.group("pre_n") or 0))
+    if match.group("post_n") is not None:
+        return release, (2, 0, int(match.group("post_n") or 0))
+    return release, (1, 0, 0)
 
 
 def _marker_values_equal(left: str, right: str) -> bool:

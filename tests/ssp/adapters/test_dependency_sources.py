@@ -613,6 +613,47 @@ marker = "python_full_version >= '3.0.0a0'"
     assert generated.lines == ("django==3.2.0",)
 
 
+def test_lock_translation_orders_final_release_after_matching_prerelease(
+    tmp_path: Path,
+):
+    current_python = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    (tmp_path / "pdm.lock").write_text(
+        f"""
+[[package]]
+name = "included"
+version = "1.0.0"
+marker = "python_full_version >= '{current_python}a0'"
+
+[[package]]
+name = "excluded"
+version = "1.0.0"
+marker = "python_full_version < '{current_python}a0'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("included==1.0.0",)
+
+
+def test_lock_translation_treats_release_segments_as_zero_padded(tmp_path: Path):
+    current_python = f"{sys.version_info.major}.{sys.version_info.minor}"
+    (tmp_path / "pdm.lock").write_text(
+        f"""
+[[package]]
+name = "included"
+version = "1.0.0"
+marker = "python_version >= '{current_python}.0'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("included==1.0.0",)
+
+
 def test_lock_translation_respects_wildcard_version_marker_equality(tmp_path: Path):
     (tmp_path / "pdm.lock").write_text(
         """

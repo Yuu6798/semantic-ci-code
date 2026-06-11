@@ -183,6 +183,7 @@ name = "example-app"
 [[package]]
 name = "example-app"
 version = "0.1.0"
+dependencies = [{ name = "django" }]
 dev-dependencies = [
   { name = "pytest" },
   { name = "ruff" },
@@ -221,6 +222,7 @@ name = "example-app"
 [[package]]
 name = "example-app"
 version = "0.1.0"
+dependencies = [{ name = "django" }]
 
 [package.dependency-groups]
 docs = ["mkdocs>=1.6"]
@@ -330,6 +332,84 @@ version = "1.0.0"
     generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
 
     assert generated.lines == ("django==3.2.0", "shared==1.0.0")
+
+
+def test_uv_lock_translation_honors_markers_on_default_dependency_edges(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example-app"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "example-app"
+version = "0.1.0"
+dependencies = [
+  { name = "django" },
+  { name = "colorama", marker = "sys_platform == '__semantic_ci_never__'" },
+]
+
+[[package]]
+name = "django"
+version = "3.2.0"
+
+[[package]]
+name = "colorama"
+version = "0.4.6"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0",)
+
+
+def test_uv_lock_translation_honors_markers_on_optional_dependency_edges(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example-app"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "example-app"
+version = "0.1.0"
+dependencies = [
+  { name = "django" },
+  { name = "shared-extra-helper" },
+]
+
+[package.optional-dependencies]
+speedups = [
+  { name = "orjson", marker = "sys_platform == '__semantic_ci_never__'" },
+  { name = "shared-extra-helper", marker = "sys_platform != '__semantic_ci_never__'" },
+]
+
+[[package]]
+name = "django"
+version = "3.2.0"
+
+[[package]]
+name = "orjson"
+version = "3.10.0"
+
+[[package]]
+name = "shared-extra-helper"
+version = "1.0.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0", "shared-extra-helper==1.0.0")
 
 
 def test_lock_translation_respects_legacy_group_and_category_fields(tmp_path: Path):

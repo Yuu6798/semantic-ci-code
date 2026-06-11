@@ -205,7 +205,7 @@ def _excluded_lock_package_names(
 
     package_by_name = _lock_package_by_name(packages, source_name=source_name)
     default_roots: set[str] = set()
-    dev_roots: set[str] = set()
+    non_default_roots: set[str] = set()
     for package in packages:
         if not isinstance(package, Mapping):
             continue
@@ -223,21 +223,21 @@ def _excluded_lock_package_names(
                 context="dependencies",
             )
         )
-        dev_roots.update(
+        non_default_roots.update(
             _dependency_names_from_object(
                 package.get("dev-dependencies"),
                 source_name=source_name,
                 context="dev-dependencies",
             )
         )
-        dev_roots.update(
+        non_default_roots.update(
             _dependency_names_from_object(
                 package.get("dependency-groups"),
                 source_name=source_name,
                 context="dependency-groups",
             )
         )
-        dev_roots.update(
+        non_default_roots.update(
             _dependency_names_from_object(
                 package.get("optional-dependencies"),
                 source_name=source_name,
@@ -246,8 +246,14 @@ def _excluded_lock_package_names(
         )
 
     default_closure = _dependency_closure(default_roots, package_by_name, source_name=source_name)
-    dev_closure = _dependency_closure(dev_roots, package_by_name, source_name=source_name)
-    return frozenset(dev_closure - default_closure)
+    if project_name is not None:
+        return frozenset(package_by_name.keys() - default_closure - {_normalize_name(project_name)})
+    non_default_closure = _dependency_closure(
+        non_default_roots,
+        package_by_name,
+        source_name=source_name,
+    )
+    return frozenset(non_default_closure - default_closure)
 
 
 def _lock_package_by_name(
@@ -363,7 +369,13 @@ def _dependency_names_from_object(
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         names = set()
         for item in value:
-            names.add(_dependency_name_from_item(item, source_name=source_name, context=context))
+            name = _dependency_name_from_item(
+                item,
+                source_name=source_name,
+                context=context,
+            )
+            if name:
+                names.add(name)
         return frozenset(names)
     raise DependencySourceError(f"{source_name}: invalid {context}")
 
@@ -380,6 +392,12 @@ def _dependency_name_from_item(
         raw = item.get("name")
         if not isinstance(raw, str):
             raise DependencySourceError(f"{source_name}: invalid {context} dependency")
+        if not _marker_allows_current_environment(
+            item,
+            source_name=source_name,
+            package_name=raw,
+        ):
+            return ""
         name = raw
     else:
         raise DependencySourceError(f"{source_name}: invalid {context} dependency")

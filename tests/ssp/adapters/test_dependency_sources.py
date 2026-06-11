@@ -349,12 +349,17 @@ name = "example-app"
 version = "0.1.0"
 dependencies = [
   { name = "django" },
+  { name = "compatible", marker = "python_version ~= '3.0'" },
   { name = "colorama", marker = "sys_platform == '__semantic_ci_never__'" },
 ]
 
 [[package]]
 name = "django"
 version = "3.2.0"
+
+[[package]]
+name = "compatible"
+version = "1.0.0"
 
 [[package]]
 name = "colorama"
@@ -365,7 +370,7 @@ version = "0.4.6"
 
     generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
 
-    assert generated.lines == ("django==3.2.0",)
+    assert generated.lines == ("compatible==1.0.0", "django==3.2.0")
 
 
 def test_uv_lock_translation_honors_markers_on_optional_dependency_edges(tmp_path: Path):
@@ -562,6 +567,48 @@ marker = "python_version != '999.*'"
 name = "excluded"
 version = "1.0.0"
 marker = "python_version != '3.*'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("included==1.0.0",)
+
+
+def test_lock_translation_respects_compatible_release_marker_operator(tmp_path: Path):
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "included"
+version = "1.0.0"
+marker = "python_version ~= '3.0'"
+
+[[package]]
+name = "excluded"
+version = "1.0.0"
+marker = "python_version ~= '999.0'"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("included==1.0.0",)
+
+
+def test_lock_translation_respects_arbitrary_equality_marker_operator(tmp_path: Path):
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "included"
+version = "1.0.0"
+marker = "python_version === '3.11'"
+
+[[package]]
+name = "excluded"
+version = "1.0.0"
+marker = "python_version === '999.0'"
 """.lstrip(),
         encoding="utf-8",
     )

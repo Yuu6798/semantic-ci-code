@@ -477,8 +477,33 @@ def _marker_values(package: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _evaluate_marker(marker: str) -> bool:
+    marker = _normalize_pep508_marker_syntax(marker)
     tree = ast.parse(marker, mode="eval")
     return _eval_marker_node(tree.body)
+
+
+def _normalize_pep508_marker_syntax(marker: str) -> str:
+    marker = re.sub(r"\s+===\s+", " == ", marker)
+    return re.sub(
+        r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*~=\s*(?P<quote>['\"])(?P<version>[^'\"]+)(?P=quote)",
+        _compatible_release_replacement,
+        marker,
+    )
+
+
+def _compatible_release_replacement(match: re.Match[str]) -> str:
+    name = match.group("name")
+    quote = match.group("quote")
+    version = match.group("version")
+    wildcard = _compatible_release_wildcard(version)
+    return f"({name} >= {quote}{version}{quote} and {name} == {quote}{wildcard}{quote})"
+
+
+def _compatible_release_wildcard(version: str) -> str:
+    parts = version.split(".")
+    if len(parts) <= 2:
+        return f"{parts[0]}.*"
+    return f"{'.'.join(parts[:-1])}.*"
 
 
 def _eval_marker_node(node: ast.AST) -> bool:

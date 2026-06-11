@@ -29,6 +29,19 @@ _LOCK_SOURCE_FILES: tuple[tuple[str, DependencySourceKind], ...] = (
     ("pdm.lock", "pdm-lock"),
     ("poetry.lock", "poetry-lock"),
 )
+_LOCAL_SOURCE_KEYS = frozenset(
+    {
+        "directory",
+        "editable",
+        "file",
+        "git",
+        "path",
+        "url",
+        "virtual",
+        "workspace",
+    }
+)
+_LOCAL_SOURCE_TYPES = frozenset({"directory", "file", "git", "path", "url"})
 
 
 class DependencySourceError(ValueError):
@@ -176,6 +189,10 @@ def _pinned_lines_from_lock(path: Path, *, root: Path) -> tuple[str, ...]:
             raise DependencySourceError(f"{path.name}: package entry {index} is missing name")
         if not isinstance(version, str) or not version:
             raise DependencySourceError(f"{path.name}: package {name} is missing version")
+        if self_name is not None and _normalize_name(name) == _normalize_name(self_name):
+            continue
+        if _is_local_lock_package(package):
+            continue
         if _normalize_name(name) in excluded_names:
             continue
         if _is_optional_package(package):
@@ -189,8 +206,6 @@ def _pinned_lines_from_lock(path: Path, *, root: Path) -> tuple[str, ...]:
         if not _marker_allows_current_environment(
             package, source_name=path.name, package_name=name
         ):
-            continue
-        if self_name is not None and _normalize_name(name) == _normalize_name(self_name):
             continue
         pinned.add((name, version))
     return tuple(f"{name}=={version}" for name, version in sorted(pinned))
@@ -384,6 +399,16 @@ def _normalize_name(value: str) -> str:
 
 def _is_optional_package(package: Mapping[str, Any]) -> bool:
     return package.get("optional") is True
+
+
+def _is_local_lock_package(package: Mapping[str, Any]) -> bool:
+    source = package.get("source")
+    if isinstance(source, Mapping):
+        if any(key in source for key in _LOCAL_SOURCE_KEYS):
+            return True
+        source_type = source.get("type")
+        return isinstance(source_type, str) and source_type.strip().lower() in _LOCAL_SOURCE_TYPES
+    return any(package.get(key) for key in ("editable", "develop"))
 
 
 def _dependency_edges_from_object(

@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 from semantic_ci_code.ssp.adapters.dependency_sources import (
     DependencySourceError,
     discover_dependency_source,
@@ -504,6 +506,52 @@ version = "2.0.0"
     generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
 
     assert generated.lines == ("fast-helper==2.0.0", "lib==1.0.0")
+
+
+@pytest.mark.parametrize(
+    "source_table",
+    [
+        'source = { path = "../internal-lib" }',
+        'source = { editable = "../internal-lib" }',
+        "source = { workspace = true }",
+    ],
+)
+def test_uv_lock_translation_skips_local_packages_but_keeps_their_dependencies(
+    tmp_path: Path,
+    source_table: str,
+):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example-app"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        f"""
+[[package]]
+name = "example-app"
+version = "0.1.0"
+dependencies = [
+  {{ name = "internal-lib" }},
+]
+
+[[package]]
+name = "internal-lib"
+version = "0.1.0"
+{source_table}
+dependencies = [{{ name = "requests" }}]
+
+[[package]]
+name = "requests"
+version = "2.32.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("requests==2.32.0",)
 
 
 def test_uv_lock_translation_processes_later_requested_extra_for_seen_package(tmp_path: Path):

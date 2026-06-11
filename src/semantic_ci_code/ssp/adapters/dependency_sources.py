@@ -53,6 +53,12 @@ class GeneratedRequirements:
     no_deps: bool
 
 
+@dataclass(frozen=True)
+class _DependencyEdge:
+    name: str
+    extras: frozenset[str] = frozenset()
+
+
 def discover_dependency_source(root: Path) -> DependencySource:
     """Discover the highest-precedence dependency source for a scan directory."""
 
@@ -204,8 +210,8 @@ def _excluded_lock_package_names(
         return frozenset()
 
     package_by_name = _lock_package_by_name(packages, source_name=source_name)
-    default_roots: set[str] = set()
-    non_default_roots: set[str] = set()
+    default_roots: set[_DependencyEdge] = set()
+    non_default_roots: set[_DependencyEdge] = set()
     for package in packages:
         if not isinstance(package, Mapping):
             continue
@@ -217,28 +223,28 @@ def _excluded_lock_package_names(
         ):
             continue
         default_roots.update(
-            _dependency_names_from_object(
+            _dependency_edges_from_object(
                 package.get("dependencies"),
                 source_name=source_name,
                 context="dependencies",
             )
         )
         non_default_roots.update(
-            _dependency_names_from_object(
+            _dependency_edges_from_object(
                 package.get("dev-dependencies"),
                 source_name=source_name,
                 context="dev-dependencies",
             )
         )
         non_default_roots.update(
-            _dependency_names_from_object(
+            _dependency_edges_from_object(
                 package.get("dependency-groups"),
                 source_name=source_name,
                 context="dependency-groups",
             )
         )
         non_default_roots.update(
-            _dependency_names_from_object(
+            _dependency_edges_from_object(
                 package.get("optional-dependencies"),
                 source_name=source_name,
                 context="optional-dependencies",
@@ -272,29 +278,40 @@ def _lock_package_by_name(
 
 
 def _dependency_closure(
-    roots: set[str],
+    roots: set[_DependencyEdge],
     packages: Mapping[str, Mapping[str, Any]],
     *,
     source_name: str,
 ) -> set[str]:
-    seen: set[str] = set()
+    included: set[str] = set()
+    processed: set[_DependencyEdge] = set()
     stack = list(roots)
     while stack:
-        name = stack.pop()
-        if name in seen:
+        edge = stack.pop()
+        name = edge.name
+        included.add(name)
+        if edge in processed:
             continue
-        seen.add(name)
+        processed.add(edge)
         package = packages.get(name)
         if package is None:
             continue
-        for dependency in _dependency_names_from_object(
+        for dependency in _dependency_edges_from_object(
             package.get("dependencies"),
             source_name=source_name,
             context=f"package {name} dependencies",
         ):
-            if dependency not in seen:
+            if dependency not in processed:
                 stack.append(dependency)
-    return seen
+        for dependency in _optional_dependency_edges(
+            package,
+            extras=edge.extras,
+            source_name=source_name,
+            package_name=name,
+        ):
+            if dependency not in processed:
+                stack.append(dependency)
+    return included
 
 
 def _project_name(root: Path) -> str | None:
@@ -345,49 +362,50 @@ def _is_optional_package(package: Mapping[str, Any]) -> bool:
     return package.get("optional") is True
 
 
-def _dependency_names_from_object(
+def _dependency_edges_from_object(
     value: object,
     *,
     source_name: str,
     context: str,
-) -> frozenset[str]:
+) -> frozenset[_DependencyEdge]:
     if value is None:
         return frozenset()
     if isinstance(value, Mapping):
-        names: set[str] = set()
+        edges: set[_DependencyEdge] = set()
         for group_name, dependencies in value.items():
             if not isinstance(group_name, str) or not group_name:
                 raise DependencySourceError(f"{source_name}: invalid {context} group")
-            names.update(
-                _dependency_names_from_object(
+            edges.update(
+                _dependency_edges_from_object(
                     dependencies,
                     source_name=source_name,
                     context=f"{context}.{group_name}",
                 )
             )
-        return frozenset(names)
+        return frozenset(edges)
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        names = set()
+        edges = set()
         for item in value:
-            name = _dependency_name_from_item(
+            edge = _dependency_edge_from_item(
                 item,
                 source_name=source_name,
                 context=context,
             )
-            if name:
-                names.add(name)
-        return frozenset(names)
+            if edge is not None:
+                edges.add(edge)
+        return frozenset(edges)
     raise DependencySourceError(f"{source_name}: invalid {context}")
 
 
-def _dependency_name_from_item(
+def _dependency_edge_from_item(
     item: object,
     *,
     source_name: str,
     context: str,
-) -> str:
+) -> _DependencyEdge | None:
     if isinstance(item, str):
         name = _requirement_name(item)
+        extras = frozenset()
     elif isinstance(item, Mapping):
         raw = item.get("name")
         if not isinstance(raw, str):
@@ -397,13 +415,79 @@ def _dependency_name_from_item(
             source_name=source_name,
             package_name=raw,
         ):
-            return ""
+            return None
         name = raw
+        extras = _requested_extras(item, source_name=source_name, context=context)
     else:
         raise DependencySourceError(f"{source_name}: invalid {context} dependency")
     if not name:
         raise DependencySourceError(f"{source_name}: invalid {context} dependency")
-    return _normalize_name(name)
+    return _DependencyEdge(name=_normalize_name(name), extras=extras)
+
+
+def _requested_extras(
+    item: Mapping[str, Any],
+    *,
+    source_name: str,
+    context: str,
+) -> frozenset[str]:
+    extras: set[str] = set()
+    for key in ("extra", "extras"):
+        raw = item.get(key)
+        if raw is None:
+            continue
+        if isinstance(raw, str):
+            if not raw:
+                raise DependencySourceError(f"{source_name}: invalid {context} extra")
+            extras.add(_normalize_name(raw))
+            continue
+        if isinstance(raw, Sequence) and not isinstance(raw, (str, bytes)):
+            for value in raw:
+                if not isinstance(value, str) or not value:
+                    raise DependencySourceError(f"{source_name}: invalid {context} extra")
+                extras.add(_normalize_name(value))
+            continue
+        raise DependencySourceError(f"{source_name}: invalid {context} extra")
+    return frozenset(extras)
+
+
+def _optional_dependency_edges(
+    package: Mapping[str, Any],
+    *,
+    extras: frozenset[str],
+    source_name: str,
+    package_name: str,
+) -> frozenset[_DependencyEdge]:
+    if not extras:
+        return frozenset()
+    optional = package.get("optional-dependencies")
+    if optional is None:
+        return frozenset()
+    if not isinstance(optional, Mapping):
+        raise DependencySourceError(
+            f"{source_name}: package {package_name} has invalid optional-dependencies"
+        )
+
+    edges: set[_DependencyEdge] = set()
+    optional_by_extra: dict[str, object] = {}
+    for raw_extra, dependencies in optional.items():
+        if not isinstance(raw_extra, str) or not raw_extra:
+            raise DependencySourceError(
+                f"{source_name}: package {package_name} has invalid optional-dependencies"
+            )
+        optional_by_extra[_normalize_name(raw_extra)] = dependencies
+    for extra in extras:
+        dependencies = optional_by_extra.get(extra)
+        if dependencies is None:
+            continue
+        edges.update(
+            _dependency_edges_from_object(
+                dependencies,
+                source_name=source_name,
+                context=f"package {package_name} optional-dependencies.{extra}",
+            )
+        )
+    return frozenset(edges)
 
 
 def _requirement_name(value: str) -> str:

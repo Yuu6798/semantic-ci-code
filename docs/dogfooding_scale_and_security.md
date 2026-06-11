@@ -201,7 +201,8 @@ a real usability gap (registered as a D# below).
 lookup with deterministic dependency-source discovery for `requirements.txt`,
 `pylock.toml`, `uv.lock`, `pdm.lock`, `poetry.lock`, and static PEP 621
 `[project].dependencies`. Lock sources are converted to pinned temporary
-requirements and malformed recognized sources fail closed to SSP `unknown`.
+requirements, optional/non-default-group/marker-inactive packages are filtered,
+and malformed recognized sources fail closed to SSP `unknown`.
 
 ## Headline / conclusion
 
@@ -380,8 +381,9 @@ prior passes is consolidated in
 
 - **D8** (SCA auto-discovery gap, resolved by CSCI-55) — SSP SCA now recognises
   PEP 621 pyproject / `uv.lock` / `poetry.lock` / `pdm.lock` dependency sources,
-  translating lockfiles to deterministic pinned temporary requirements and
-  keeping malformed recognized sources fail-closed as `unknown`.
+  translating lockfiles to deterministic pinned temporary requirements, filtering
+  optional/non-default-group/marker-inactive packages, and keeping malformed
+  recognized sources fail-closed as `unknown`.
 - **F6** (SAST logic-vuln blindspot) — **UNTESTED HYPOTHESIS in this
   pass**, not a demonstrated observation: the Semgrep registry rulesets
   returned HTTP 403, so Semgrep never ran with real rules (0 rules / 0

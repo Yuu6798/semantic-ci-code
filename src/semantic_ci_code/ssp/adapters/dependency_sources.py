@@ -167,6 +167,12 @@ def _pinned_lines_from_lock(path: Path, *, root: Path) -> tuple[str, ...]:
             raise DependencySourceError(f"{path.name}: package {name} is missing version")
         if _is_optional_package(package):
             continue
+        if not _is_selected_dependency_group(
+            package,
+            source_name=path.name,
+            package_name=name,
+        ):
+            continue
         if not _marker_allows_current_environment(
             package, source_name=path.name, package_name=name
         ):
@@ -223,6 +229,40 @@ def _normalize_name(value: str) -> str:
 
 def _is_optional_package(package: Mapping[str, Any]) -> bool:
     return package.get("optional") is True
+
+
+def _is_selected_dependency_group(
+    package: Mapping[str, Any],
+    *,
+    source_name: str,
+    package_name: str,
+) -> bool:
+    selected = {"default", "main"}
+
+    groups = package.get("groups")
+    if groups is not None:
+        if not isinstance(groups, Sequence) or isinstance(groups, (str, bytes)):
+            raise DependencySourceError(f"{source_name}: package {package_name} has invalid groups")
+        normalized = {_normalize_group(group) for group in groups}
+        if not all(normalized):
+            raise DependencySourceError(f"{source_name}: package {package_name} has invalid groups")
+        return bool(normalized & selected)
+
+    for key in ("group", "category"):
+        raw = package.get(key)
+        if raw is None:
+            continue
+        if not isinstance(raw, str) or not raw:
+            raise DependencySourceError(f"{source_name}: package {package_name} has invalid {key}")
+        return _normalize_group(raw) in selected
+
+    return True
+
+
+def _normalize_group(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip().lower()
 
 
 def _marker_allows_current_environment(

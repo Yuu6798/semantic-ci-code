@@ -139,6 +139,90 @@ optional = true
     assert generated.lines == ("current==1.0.0", "django==3.2.0")
 
 
+def test_lock_translation_respects_selected_dependency_groups(tmp_path: Path):
+    (tmp_path / "poetry.lock").write_text(
+        """
+[[package]]
+name = "django"
+version = "3.2.0"
+groups = ["main"]
+
+[[package]]
+name = "requests"
+version = "2.32.0"
+groups = ["default"]
+
+[[package]]
+name = "mkdocs"
+version = "1.6.0"
+groups = ["docs"]
+
+[[package]]
+name = "pytest"
+version = "8.3.0"
+groups = ["test"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0", "requests==2.32.0")
+
+
+def test_lock_translation_respects_legacy_group_and_category_fields(tmp_path: Path):
+    (tmp_path / "pdm.lock").write_text(
+        """
+[[package]]
+name = "django"
+version = "3.2.0"
+group = "default"
+
+[[package]]
+name = "requests"
+version = "2.32.0"
+category = "main"
+
+[[package]]
+name = "sphinx"
+version = "8.1.0"
+group = "docs"
+
+[[package]]
+name = "pytest"
+version = "8.3.0"
+category = "dev"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("django==3.2.0", "requests==2.32.0")
+
+
+def test_lock_translation_invalid_group_metadata_is_fail_closed(tmp_path: Path):
+    (tmp_path / "poetry.lock").write_text(
+        """
+[[package]]
+name = "django"
+version = "3.2.0"
+groups = "main"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    source = discover_dependency_source(tmp_path)
+
+    try:
+        generated_requirements_for_source(source)
+    except DependencySourceError as exc:
+        assert "poetry.lock" in str(exc)
+        assert "invalid groups" in str(exc)
+    else:  # pragma: no cover - assertion guard
+        raise AssertionError("expected DependencySourceError")
+
+
 def test_lock_translation_missing_version_is_fail_closed(tmp_path: Path):
     (tmp_path / "poetry.lock").write_text(
         """

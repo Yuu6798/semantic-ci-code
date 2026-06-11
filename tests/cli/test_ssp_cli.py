@@ -204,11 +204,11 @@ def test_ssp_scan_pip_audit_uses_requirements_when_present(
     for root in (baseline, candidate):
         root.mkdir()
         (root / "requirements.txt").write_text("django==3.2.0\n", encoding="utf-8")
-    calls: list[tuple[Path | None, Path]] = []
+    calls: list[tuple[str, Path | None, Path]] = []
 
-    def fake_scan(self, *, requirements: Path | None, repo_root: Path) -> PipAuditScanResult:
+    def fake_scan(self, *, source, repo_root: Path) -> PipAuditScanResult:
         del self
-        calls.append((requirements, repo_root))
+        calls.append((source.kind, source.path, repo_root))
         finding = ()
         if repo_root == candidate.resolve():
             finding = (
@@ -241,8 +241,110 @@ def test_ssp_scan_pip_audit_uses_requirements_when_present(
 
     assert result.returncode == 1, result.stderr
     assert calls == [
-        (baseline.resolve() / "requirements.txt", baseline.resolve()),
-        (candidate.resolve() / "requirements.txt", candidate.resolve()),
+        ("requirements", baseline.resolve() / "requirements.txt", baseline.resolve()),
+        ("requirements", candidate.resolve() / "requirements.txt", candidate.resolve()),
     ]
     payload = parse_json(result.stdout)
     assert payload["deltas_by_sensor"]["pip-audit"]["added"][0]["advisory_id"] == "PYSEC-1"
+
+
+def test_ssp_scan_pip_audit_discovers_pdm_lock_source(
+    monkeypatch,
+    tmp_path: Path,
+):
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    for root in (baseline, candidate):
+        root.mkdir()
+        (root / "pdm.lock").write_text(
+            """
+[[package]]
+name = "django"
+version = "3.2.0"
+""".lstrip(),
+            encoding="utf-8",
+        )
+    calls: list[tuple[str, Path | None, Path]] = []
+
+    def fake_scan(self, *, source, repo_root: Path) -> PipAuditScanResult:
+        del self
+        calls.append((source.kind, source.path, repo_root))
+        finding = ()
+        if repo_root == candidate.resolve():
+            finding = (
+                SCAFinding(
+                    package_name="django",
+                    installed_version="3.2.0",
+                    advisory_id="PYSEC-1",
+                    severity="high",
+                    message="new vuln",
+                ),
+            )
+        return PipAuditScanResult(
+            output=SensorOutput(sensor_id="pip-audit", sensor_version="2.9.0", findings=finding),
+            sensor_spec=SensorSpec(id="pip-audit", version="2.9.0", advisory_db_hash=None),
+        )
+
+    monkeypatch.setattr(ssp_command.PipAuditAdapter, "scan", fake_scan)
+
+    result = run_semantic_ci(
+        tmp_path,
+        "ssp",
+        "scan",
+        "--sensor",
+        "pip-audit",
+        "--baseline-dir",
+        str(baseline),
+        "--candidate-dir",
+        str(candidate),
+    )
+
+    assert result.returncode == 1, result.stderr
+    assert calls == [
+        ("pdm-lock", baseline.resolve() / "pdm.lock", baseline.resolve()),
+        ("pdm-lock", candidate.resolve() / "pdm.lock", candidate.resolve()),
+    ]
+    payload = parse_json(result.stdout)
+    assert payload["aggregate_verdict"] == "fail"
+
+
+def test_ssp_scan_pip_audit_fallback_unknown_exit_is_preserved(
+    monkeypatch,
+    tmp_path: Path,
+):
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    baseline.mkdir()
+    candidate.mkdir()
+
+    def fake_scan(self, *, source, repo_root: Path) -> PipAuditScanResult:
+        del self, repo_root
+        assert source.kind == "fallback"
+        return PipAuditScanResult(
+            output=SensorOutput(
+                sensor_id="pip-audit",
+                sensor_version="2.9.0",
+                status="error",
+                findings=(),
+                error_message="no recognized dependency source",
+            ),
+            sensor_spec=SensorSpec(id="pip-audit", version="2.9.0", advisory_db_hash=None),
+        )
+
+    monkeypatch.setattr(ssp_command.PipAuditAdapter, "scan", fake_scan)
+
+    result = run_semantic_ci(
+        tmp_path,
+        "ssp",
+        "scan",
+        "--sensor",
+        "pip-audit",
+        "--baseline-dir",
+        str(baseline),
+        "--candidate-dir",
+        str(candidate),
+    )
+
+    assert result.returncode == 3
+    payload = parse_json(result.stdout)
+    assert payload["aggregate_verdict"] == "unknown"

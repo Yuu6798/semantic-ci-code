@@ -1328,3 +1328,22 @@ Phase G の sensor 機構へ **advisory-only** (verdict 非参与) で接続す�
    欠落・nested subpackage 全欠落を filesystem diff が空になるまで補完。本 PR が解こうと
    した「always-loaded doc に詳細を抱えると腐る」問題の実例 (4 commit で消化、全 thread resolved)。
 
+
+### 2026-06-10 — Phase H H-3: Codex Security reference adapter (PR #146)
+
+H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concrete。
+
+- **PR #146**: `sensor/adapters/llm/codex_security.py` = fixture-mode ingest
+  adapter (`codex-security`)。recorded envelope (sensor_version / model_id /
+  prompt_hash / status / error_message / findings) → `RawLLMFinding` 経由パース →
+  共有 `project_to_canonical` で射影 (独自 identity 組み立て禁止を test で grep
+  固定) → advisory-only `SensorState`。model_id / prompt_hash 欠落は status を
+  問わず ValueError (fail-closed)、non-complete payload は findings 空 +
+  error_message 必須 (semgrep adapter ミラー)。ordinal は group 内出現順
+  auto-assign + 明示値尊重 + 重複 reject。no-network/subprocess architecture
+  test (`tests/architecture/test_llm_adapter_no_network.py`) で fixture-only
+  実行経路を構造化。export は `sensor/adapters/llm/__init__.py` のみ。
+- **brief 設計判断**: live LLM 呼び出しは in-repo 経路に置かない (CLAUDE.md
+  no-LLM/no-network 規約、D1 on-demand は「呼ばれない限り走らない」構造で充足)。
+- **review**: AC 10 件全充足で chat 内 APPROVE、P3 指摘 2 件 (dummy CodeState の
+  型 narrow / 混在 ordinal) は follow-up commit で消化済 (`75c8d24` / `1a232f5`)。

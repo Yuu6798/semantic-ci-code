@@ -24,9 +24,34 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer、CSCI-50〜54) 全完走** (2026-06-09〜06-10、PR #142〜#144 + #146〜#148)。Phase H は「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構へ **advisory-only** (verdict / exit code 非参与、不変条件 test 固定) で縦接続: H-1 = LLM advisory finding protocol + verdict reject guard / H-2a = `CodeStateDelta.renames` overlay / H-2b = `sensor/advisory.py` deterministic one-run re-projection (baseline `CodeState` のみ ingest、D7 recall-first fallback) / H-3 = Codex Security fixture-mode reference adapter (live LLM 経路なし、no-network architecture test) / H-4 = `check --advisory-sensor` + `--advisory-mutes` (Q3 = 別ファイル ledger、`AdvisoryMute` は llm category 専用で `Suppression` と別物、envelope に additive `advisory` object) / H-5 = `aggregate_advisory_states` 明示クロスモデル集約 (Q4 = (a) 束ね役関数、固定 `llm-ensemble` 名義 + member provenance 外出し) + `docs/llm_scout_usage.md` 昇格経路 doc (D8 沈黙=容認)。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。2026-06-10 にはセキュリティ hardening (PR #149) と **Phase X-2 (code domain) PR validation 実験 planning 凍結 (PR #150、`docs/pr_validation_planning.md`)** も landing — 中核仮説 (「効くか」) の falsification 実験が着手可能になった。次は **Phase X-2 実験実行 (pilot 5 件、別 session 委譲)** / **D-class closure (D6/D7/D8、ROADMAP v0.1.0 exit criteria 前進)** / H-5 review 申し送り 3 件 (P3) のいずれか。
+Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer、CSCI-50〜54) 全完走** (2026-06-09〜06-10、PR #142〜#144 + #146〜#148)。Phase H は「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構へ **advisory-only** (verdict / exit code 非参与、不変条件 test 固定) で縦接続: H-1 = LLM advisory finding protocol + verdict reject guard / H-2a = `CodeStateDelta.renames` overlay / H-2b = `sensor/advisory.py` deterministic one-run re-projection (baseline `CodeState` のみ ingest、D7 recall-first fallback) / H-3 = Codex Security fixture-mode reference adapter (live LLM 経路なし、no-network architecture test) / H-4 = `check --advisory-sensor` + `--advisory-mutes` (Q3 = 別ファイル ledger、`AdvisoryMute` は llm category 専用で `Suppression` と別物、envelope に additive `advisory` object) / H-5 = `aggregate_advisory_states` 明示クロスモデル集約 (Q4 = (a) 束ね役関数、固定 `llm-ensemble` 名義 + member provenance 外出し) + `docs/llm_scout_usage.md` 昇格経路 doc (D8 沈黙=容認)。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。2026-06-10 にはセキュリティ hardening (PR #149) と **Phase X-2 (code domain) PR validation 実験 planning 凍結 (PR #150、`docs/pr_validation_planning.md`)** も landing — 中核仮説 (「効くか」) の falsification 実験が着手可能になった。2026-06-11 に **D8 (SCA auto-discovery gap) を CSCI-55 / PR #151 で解決** — D-class は 6/8 解決 (残 D6/D7)。次は **Phase X-2 実験実行 (pilot 5 件、別 session 委譲)** / **D-class closure 残 (D6/D7、ROADMAP v0.1.0 exit criteria 前進)** / H-5 review 申し送り 3 件 (P3) のいずれか。
 
 ## 直近 merged
+
+### 2026-06-11 — D8 closure: SCA dependency-source discovery (CSCI-55、PR #151)
+
+D-class closure 着手第 1 弾。`docs/dogfooding_findings_tracker.md` D8 (2026-06-07
+scale + security dogfood 由来の fixable defect) を 1 brief / 1 PR で解決。
+D-class は **6/8 解決** (残 D6/D7)。
+
+- **PR #151**: `ssp scan --sensor pip-audit` の依存ソース発見を 7-row precedence
+  (requirements.txt / pylock(.\*.)toml / uv.lock / pdm.lock / poetry.lock /
+  PEP 621 static `[project].dependencies` / fallback) に拡張。lock は pinned
+  temp requirements + `--no-deps` へ決定論翻訳、malformed 認識 source は
+  fail-closed (下位 source への silent fallback 禁止 → unknown/exit 3)。
+  envelope ssp-1 不変 / `check --sensor-*` 経路無改修 / `from_json` signature
+  凍結 (Phase G adapter 依存) / 新規依存ゼロ (stdlib tomllib)。
+- **review**: new-brief skill (§15 gate) で起草、AC 9 件全充足で chat 内
+  APPROVE。その後 merge までに lockfile resolution semantics の follow-up
+  **17 commit** (PEP 508 markers / wildcard / PEP 440 prerelease / dev・
+  optional group 除外 / uv extras closure / local package skip / `pylock.*.toml`
+  named variant / pylock × 旧 pip-audit fail-closed) — brief の「uv.lock 追加は
+  増分ほぼゼロ」が誤算で、外部 format の翻訳 semantics が spec 本体だった。
+  全 fix は commit 単位で test encode 済。
+- **申し送り**: tracker D8 行に PR 番号未記載 (1 行 docs PR 候補) /
+  `docs/brief_8_planning.md §15.1` への「外部 format 翻訳は resolution
+  semantics まで grounding」bullet 追加提案 / lock file OSError → exit 2
+  edge (P3 観測)。詳細 `2026-06-11.md`。
 
 ### 2026-06-10 — Phase X-2 (code domain) PR validation 実験 planning 凍結 (PR #150)
 
@@ -120,28 +145,9 @@ H-4/CSCI-53 を 1 PR で landing。LLM scout 出力が初めて CLI から見え
 - **review**: AC 15 件全充足で chat 内 APPROVE、cosmetic P2 件のみ
   (error message の "later H-4 slice" 表現 / 未消費 tuple 要素)。
 
-### 2026-06-10 — Phase H H-3: Codex Security reference adapter (PR #146)
+### 古い merged entry (2026-06-10 以前) — archive 参照
 
-H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concrete。
-
-- **PR #146**: `sensor/adapters/llm/codex_security.py` = fixture-mode ingest
-  adapter (`codex-security`)。recorded envelope (sensor_version / model_id /
-  prompt_hash / status / error_message / findings) → `RawLLMFinding` 経由パース →
-  共有 `project_to_canonical` で射影 (独自 identity 組み立て禁止を test で grep
-  固定) → advisory-only `SensorState`。model_id / prompt_hash 欠落は status を
-  問わず ValueError (fail-closed)、non-complete payload は findings 空 +
-  error_message 必須 (semgrep adapter ミラー)。ordinal は group 内出現順
-  auto-assign + 明示値尊重 + 重複 reject。no-network/subprocess architecture
-  test (`tests/architecture/test_llm_adapter_no_network.py`) で fixture-only
-  実行経路を構造化。export は `sensor/adapters/llm/__init__.py` のみ。
-- **brief 設計判断**: live LLM 呼び出しは in-repo 経路に置かない (CLAUDE.md
-  no-LLM/no-network 規約、D1 on-demand は「呼ばれない限り走らない」構造で充足)。
-- **review**: AC 10 件全充足で chat 内 APPROVE、P3 指摘 2 件 (dummy CodeState の
-  型 narrow / 混在 ordinal) は follow-up commit で消化済 (`75c8d24` / `1a232f5`)。
-
-### 古い merged entry (2026-06-09 以前) — archive 参照
-
-28 entry (2026-06-09 S2 (#145) / 2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
+29 entry (2026-06-10 H-3 (#146) / 2026-06-09 S2 (#145) / 2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
 2026-06-03 (#127/#128/#129) / 2026-06-02 (#124/#125/#126) / 2026-05-29 S2 (#120/#121) / 2026-05-28 S2 /
 2026-05-27 / 2026-05-26 / 2026-05-22 /
 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
@@ -160,16 +166,16 @@ H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concre
 + 2026-06-09 wrap-up (6/02 移送) + 2026-06-09 S2 wrap-up (6/03 移送)
 + 2026-06-10 wrap-up (6/03 S2 + 6/07 + 6/08 移送)
 + 2026-06-10 #150 sweep (6/09 S2 移送)
++ 2026-06-11 wrap-up (6/10 H-3 #146 移送)
 で compaction が実施された。
 
 ## 次の発行順序
 
 ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G (CSCI-45〜49) 全完走** +
-**Phase H (CSCI-50〜54) 全完走**。active な実装軸は **D-class closure
-(D6/D7/D8、ROADMAP v0.1.0 exit criteria を直接前進させる repo-internal の
-bounded 候補)**。残る軸は **E (Phase X、
-ecosystem cross-repo、別 Claude Code session 委譲)** と repo-internal の
-**D-class closure (D6/D7/D8、ROADMAP v0.1.0 exit criteria を前進)**。
+**Phase H (CSCI-50〜54) 全完走** + **D8 解決 (CSCI-55 / PR #151)**。active な
+実装軸は **D-class closure 残 (D6/D7、ROADMAP v0.1.0 exit criteria を直接
+前進させる repo-internal の bounded 候補)**。残る軸は **E (Phase X、
+ecosystem cross-repo、別 Claude Code session 委譲)**。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
@@ -223,8 +229,9 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 - **E (Phase X) active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
   は ecosystem cross-repo work で別 Claude Code session 委譲、E-3 (X-2
   validation 移植) は中長期 phase
-- **D-class closure** (D6/D7/D8): repo-internal の bounded 候補、ROADMAP の
-  v0.1.0 exit criteria (D 全解決/waive) を直接前進
+- **D-class closure** (残 D6/D7): repo-internal の bounded 候補、ROADMAP の
+  v0.1.0 exit criteria (D 全解決/waive) を直接前進。D8 は CSCI-55 / PR #151
+  (2026-06-11) で解決済
 
 ### 直近最短経路
 
@@ -234,9 +241,10 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
   guard / intent-only target B 生成)。外部 repo 収集ゆえ**別 session 委譲** +
   `experiments/pr_validation/`。Fable 評価レビューの推奨 1 = 「上物より中核
   仮説の falsification を先に」の実行
-- **D-class closure (D6/D7/D8)**: repo-internal、bounded、exit criteria 前進
+- **D-class closure (残 D6/D7)**: repo-internal、bounded、exit criteria 前進
   (D6=nested-function vacuous PASS、D7=extract-method authoring advice、
-  D8=SCA auto-discovery gap = fixable defect)
+  低優先)。tracker D8 行への PR #151 番号追記 + `§15.1` 外部 format
+  grounding bullet 追加の 1 行 docs PR も小粒候補 (`2026-06-11.md` 参照)
 - **E-1/E-2. Phase X cross-ref / umbrella docs** (別 session 委譲)
 
 ## Frozen / Deferred

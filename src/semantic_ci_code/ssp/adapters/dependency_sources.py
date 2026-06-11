@@ -460,12 +460,30 @@ def _marker_allows_current_environment(
             raise DependencySourceError(
                 f"{source_name}: package {package_name} has unsupported marker: {marker}"
             ) from exc
+    resolution_markers = _marker_values_for_keys(package, ("resolution-markers",))
+    if resolution_markers:
+        for marker in resolution_markers:
+            try:
+                if _evaluate_marker(marker):
+                    return True
+            except (SyntaxError, ValueError) as exc:
+                raise DependencySourceError(
+                    f"{source_name}: package {package_name} has unsupported marker: {marker}"
+                ) from exc
+        return False
     return True
 
 
 def _marker_values(package: Mapping[str, Any]) -> tuple[str, ...]:
+    return _marker_values_for_keys(package, ("marker", "markers"))
+
+
+def _marker_values_for_keys(
+    package: Mapping[str, Any],
+    keys: tuple[str, ...],
+) -> tuple[str, ...]:
     values: list[str] = []
-    for key in ("marker", "markers"):
+    for key in keys:
         raw = package.get(key)
         if isinstance(raw, str) and raw.strip():
             values.append(raw.strip())

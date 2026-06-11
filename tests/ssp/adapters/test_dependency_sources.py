@@ -618,6 +618,46 @@ marker = "python_version === '999.0'"
     assert generated.lines == ("included==1.0.0",)
 
 
+def test_lock_translation_respects_uv_resolution_markers(tmp_path: Path):
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "active"
+version = "1.0.0"
+resolution-markers = ["python_version == '3.*'"]
+
+[[package]]
+name = "inactive"
+version = "2.0.0"
+resolution-markers = ["python_version == '999.*'"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("active==1.0.0",)
+
+
+def test_lock_translation_resolution_markers_are_or_semantics(tmp_path: Path):
+    (tmp_path / "uv.lock").write_text(
+        """
+[[package]]
+name = "active"
+version = "1.0.0"
+resolution-markers = [
+  "python_version == '999.*'",
+  "python_version == '3.*'",
+]
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    generated = generated_requirements_for_source(discover_dependency_source(tmp_path))
+
+    assert generated.lines == ("active==1.0.0",)
+
+
 def test_pyproject_static_dependencies_are_used(tmp_path: Path):
     (tmp_path / "pyproject.toml").write_text(
         """

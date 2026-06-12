@@ -38,20 +38,14 @@ def test_method_of_class_inside_function_counts():
     # Neither the class nor its method is extractor-visible
     # (api_surface parity: only module-level classes' direct methods).
     source = (
-        "def outer():\n"
-        "    class Local:\n"
-        "        def method(self): return 1\n"
-        "    return Local\n"
+        "def outer():\n    class Local:\n        def method(self): return 1\n    return Local\n"
     )
     assert count_nested_defs(source) == 1
 
 
 def test_def_inside_method_counts():
     source = (
-        "class A:\n"
-        "    def method(self):\n"
-        "        def helper(): return 1\n"
-        "        return helper()\n"
+        "class A:\n    def method(self):\n        def helper(): return 1\n        return helper()\n"
     )
     assert count_nested_defs(source) == 1
 

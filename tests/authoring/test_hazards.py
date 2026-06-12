@@ -386,8 +386,9 @@ def test_detect_d7_reports_net_growth_with_partial_shrinkage():
 
 def test_detect_d7_silent_when_tolerance_budgets_the_increase():
     """Codex review P2: the evaluator applies `tolerance` to numeric
-    comparisons (`<= 0, tolerance: 1` allows +1), so a target that
-    already budgets the extracted helper must not warn."""
+    comparisons (`<= 0, tolerance: 1` allows +1), so a target whose
+    budget covers the actual net helper count must not warn."""
+    one_helper = (_visible_growth(baseline=1, candidate=2),)
     for operator, expected, tolerance in (
         ("less_than_or_equal", "0", "1"),
         ("within_range", "[-5, 0]", "1"),
@@ -397,10 +398,41 @@ def test_detect_d7_silent_when_tolerance_budgets_the_increase():
             _cyclomatic_refactor_target(operator, expected) + f"    tolerance: {tolerance}\n"
         )
         target = _compile_target(yaml_text)
-        advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+        advisories = detect_advisories(target, visible_def_growth=one_helper)
         assert "ADVISORY-D7" not in [advisory.code for advisory in advisories], (
-            f"{operator} {expected} tolerance={tolerance} should stay silent"
+            f"{operator} {expected} tolerance={tolerance} should stay silent for +1"
         )
+
+
+def test_detect_d7_fires_when_budget_is_smaller_than_helper_count():
+    """Codex review P2: `<= 0, tolerance: 1` budgets one helper, but a
+    faithful two-helper extraction adds +2 — the lock still structurally
+    FAILs, so the advisory must compare the allowance against the actual
+    net growth, not just +1."""
+    yaml_text = _cyclomatic_refactor_target() + "    tolerance: 1\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(_visible_growth(baseline=1, candidate=3),),
+    )
+    d7 = [advisory for advisory in advisories if advisory.code == "ADVISORY-D7"]
+
+    assert len(d7) == 1
+    assert d7[0].evidence["visible_defs_added"] == 2
+
+
+def test_detect_d7_silent_when_equals_matches_net_growth():
+    # `equals 2` demands exactly the +2 a two-helper extraction
+    # produces — the lock budgets the extraction, no false-FAIL trap.
+    target = _compile_target(_cyclomatic_refactor_target("equals", "2"))
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(_visible_growth(baseline=1, candidate=3),),
+    )
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
 
 
 def test_detect_d7_fires_when_tolerance_does_not_reach_plus_one():

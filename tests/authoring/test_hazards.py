@@ -346,3 +346,78 @@ def test_advisory_order_d7_between_d6_and_i1():
     assert "ADVISORY-D7" in codes
     assert "ADVISORY-I1" in codes
     assert codes.index("ADVISORY-D6") < codes.index("ADVISORY-D7") < codes.index("ADVISORY-I1")
+
+
+def test_detect_d7_silent_on_net_zero_relocation():
+    """Codex review P2: relocating a function between files (+1 / -1)
+    cancels in the summed cyclomatic delta — the lock can still pass, so
+    per-file growth alone must not warn."""
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(
+            _visible_growth(path="src/dst.py", baseline=1, candidate=2),
+            _visible_growth(path="src/src.py", baseline=2, candidate=1),
+        ),
+    )
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_reports_net_growth_with_partial_shrinkage():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(
+            _visible_growth(path="src/dst.py", baseline=1, candidate=3),
+            _visible_growth(path="src/src.py", baseline=2, candidate=1),
+        ),
+    )
+    d7 = [advisory for advisory in advisories if advisory.code == "ADVISORY-D7"]
+
+    assert len(d7) == 1
+    assert d7[0].evidence["visible_defs_added"] == 1
+    assert d7[0].evidence["files"] == [
+        {"path": "src/dst.py", "baseline_visible_defs": 1, "candidate_visible_defs": 3}
+    ]
+
+
+def test_detect_d7_silent_when_tolerance_budgets_the_increase():
+    """Codex review P2: the evaluator applies `tolerance` to numeric
+    comparisons (`<= 0, tolerance: 1` allows +1), so a target that
+    already budgets the extracted helper must not warn."""
+    for operator, expected, tolerance in (
+        ("less_than_or_equal", "0", "1"),
+        ("within_range", "[-5, 0]", "1"),
+        ("less_than", "1", "0.5"),
+    ):
+        yaml_text = (
+            _cyclomatic_refactor_target(operator, expected) + f"    tolerance: {tolerance}\n"
+        )
+        target = _compile_target(yaml_text)
+        advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+        assert "ADVISORY-D7" not in [advisory.code for advisory in advisories], (
+            f"{operator} {expected} tolerance={tolerance} should stay silent"
+        )
+
+
+def test_detect_d7_fires_when_tolerance_does_not_reach_plus_one():
+    yaml_text = _cyclomatic_refactor_target() + "    tolerance: 0.5\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_equals_ignores_tolerance():
+    # The evaluator's EQUALS dispatch never applies tolerance, so
+    # `equals 0, tolerance: 1` still rejects every increase.
+    yaml_text = _cyclomatic_refactor_target("equals", "0") + "    tolerance: 1\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" in [advisory.code for advisory in advisories]

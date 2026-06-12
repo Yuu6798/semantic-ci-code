@@ -316,12 +316,17 @@ def detect_d7(
 
     The detector fires when the target is a refactor, declares a
     verdict-participating `complexity_delta.cyclomatic` constraint whose
-    shape forbids any increase, AND the candidate diff grows the
-    extractor-visible def count in an in-scope Python file (the
-    extract-method shape). Growth is a heuristic shape signal, not
-    proof — the advisory recommends a metric, it never seats the
-    verdict. `None` (inapplicable, git unavailable) is filtered out by
-    the caller, mirroring D4 / D6.
+    shape rejects every positive observed delta (tolerance included —
+    see `_forbids_cyclomatic_increase`), AND the candidate diff grows
+    the extractor-visible def count **net across the in-scope diff**
+    (the extract-method shape). The net comparison matters because the
+    cyclomatic delta is summed over the whole extracted state: a
+    refactor that merely relocates a function between files (+1 in one
+    file, -1 in another) cancels out and cannot trip the lock, so
+    per-file growth alone must not warn (Codex review P2). Growth is a
+    heuristic shape signal, not proof — the advisory recommends a
+    metric, it never seats the verdict. `None` (inapplicable, git
+    unavailable) is filtered out by the caller, mirroring D4 / D6.
     """
     if target.primary_kind is not ChangeKind.REFACTOR:
         return ()
@@ -334,10 +339,12 @@ def detect_d7(
     )
     if not cyclomatic_locks:
         return ()
+    net_added = sum(g.candidate_count - g.baseline_count for g in visible_def_growth)
+    if net_added <= 0:
+        return ()
     grown = tuple(g for g in visible_def_growth if g.candidate_count > g.baseline_count)
     if not grown:
         return ()
-    total_added = sum(g.candidate_count - g.baseline_count for g in grown)
     constraint_ids = ", ".join(repr(c.id) for c in cyclomatic_locks)
     return (
         Advisory(
@@ -345,8 +352,8 @@ def detect_d7(
             message=(
                 f"primary_kind=refactor locks complexity_delta.cyclomatic against "
                 f"any increase ({constraint_ids}), and the candidate diff adds "
-                f"{total_added} extractor-visible function definition(s) across "
-                f"{len(grown)} file(s) — the extract-method shape. The cyclomatic "
+                f"{net_added} extractor-visible function definition(s) net across "
+                f"the in-scope diff — the extract-method shape. The cyclomatic "
                 f"delta is summed over functions and each function starts at base "
                 f"1, so a faithful extract-method refactor is mathematically "
                 f"guaranteed to micro-increase it; this lock can FAIL on exactly "
@@ -357,7 +364,7 @@ def detect_d7(
             ),
             evidence={
                 "constraint_ids": [c.id for c in cyclomatic_locks],
-                "visible_defs_added": total_added,
+                "visible_defs_added": net_added,
                 "grown_files_count": len(grown),
                 "files": [
                     {
@@ -857,20 +864,31 @@ def _is_cyclomatic_leaf_target(path: str) -> bool:
 def _forbids_cyclomatic_increase(constraint: CompiledConstraint) -> bool:
     """True if the constraint shape rejects every positive observed delta.
 
-    Only shapes that forbid *any* increase are flagged — `<= 3` tolerates
-    a few extracted helpers and is not the D7 false-FAIL trap:
+    Mirrors the evaluator's tolerance semantics
+    (`evaluator.operators._numeric_compare` / `_within_range`): `lt` /
+    `le` satisfy when observed `<` / `<=` `expected + tolerance`,
+    `within_range` widens to `high + tolerance`, and `equals` matches
+    exactly with tolerance NOT applied. The observed
+    `complexity_delta.cyclomatic` is an integer, so "rejects every
+    increase" reduces to "+1 violates" (Codex review P2 — a declared
+    `tolerance` that already budgets the extracted helper must not
+    warn):
 
-    - `less_than_or_equal N` with N <= 0
-    - `less_than N` with N <= 1 (observed must be <= 0)
-    - `equals N` with N <= 0
-    - `within_range [low, high]` with high <= 0
+    - `less_than_or_equal N`: N + tolerance < 1
+    - `less_than N`: N + tolerance <= 1
+    - `equals N`: N <= 0 (tolerance unused by the evaluator)
+    - `within_range [low, high]`: high + tolerance < 1
+
+    Shapes that tolerate at least one extracted helper (`<= 3`,
+    `<= 0, tolerance: 1`, ...) are not the D7 false-FAIL trap.
     """
     operator = constraint.operator
     expected = constraint.expected
+    tolerance = constraint.tolerance or 0.0
     if operator is Operator.LESS_THAN_OR_EQUAL:
-        return _is_scalar_number(expected) and expected <= 0
+        return _is_scalar_number(expected) and expected + tolerance < 1
     if operator is Operator.LESS_THAN:
-        return _is_scalar_number(expected) and expected <= 1
+        return _is_scalar_number(expected) and expected + tolerance <= 1
     if operator is Operator.EQUALS:
         return _is_scalar_number(expected) and expected <= 0
     if (
@@ -879,7 +897,7 @@ def _forbids_cyclomatic_increase(constraint: CompiledConstraint) -> bool:
         and len(expected) == 2
         and all(_is_scalar_number(item) for item in expected)
     ):
-        return expected[1] <= 0
+        return expected[1] + tolerance < 1
     return False
 
 

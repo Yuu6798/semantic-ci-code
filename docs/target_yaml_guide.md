@@ -345,8 +345,11 @@ the nesting penalty disappears and `BoolOp` / branch costs redistribute.
 
 `semantic-ci target-doctor` detects this hazard as `ADVISORY-D7` when
 `--baseline-rev` / `--candidate-rev` are given: it fires when a refactor
-target locks `complexity_delta.cyclomatic` against any increase and the
-candidate diff adds extractor-visible function definitions. Hazards 4
+target locks `complexity_delta.cyclomatic` against any increase (a
+declared `tolerance` that already budgets the helpers is honoured) and
+the candidate diff adds extractor-visible function definitions **net**
+across the in-scope diff (pure relocation between files cancels out and
+does not warn). Hazards 4
 and 5 are complementary: D6 warns that a green cyclomatic verdict may be
 hollow, D7 warns that a red one may be noise — both resolve by pairing
 the right metric with the refactor shape.

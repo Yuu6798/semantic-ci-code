@@ -281,6 +281,41 @@ non-Python artifacts (see `design.md §13` on out-of-scope items). It is
 `semantic-ci target-doctor` (Brief 8 / CSCI-43) detects this hazard as
 `ADVISORY-D4` once it lands.
 
+## Hazard 4 — Nested functions are invisible to complexity numbers (D6)
+
+`python_complexity_extractor` only emits entries for the `api_surface`
+parity subset: module-level functions and direct methods of module-level
+classes. When it walks a function body it **stops descent at nested
+`def` boundaries** — a nested helper contributes 0 to the enclosing
+function's cyclomatic/cognitive number, and the helper itself is never
+emitted as its own entry.
+
+The consequence for `complexity_delta` constraints is the D6 sibling of
+Hazard 3's vacuous PASS (observed on a real PR in
+`docs/dogfooding_real_pr_complexity.md` FINDING-F1): a refactor that moves
+an outer function's body into function-nested helpers reports a large
+complexity *drop* while the real complexity is unchanged — it has only
+been displaced below the extractor's horizon. A lock like
+`complexity_delta.cyclomatic less_than_or_equal 0` passes, and the verdict
+silently endorses the displacement.
+
+**What this means for authors:**
+
+- A green complexity verdict on a refactor that introduced nested helpers
+  is weaker evidence than the number suggests. Check whether the helpers
+  should be **module-level functions** (possibly `_`-prefixed) — those are
+  extracted, complexity-counted, and constrained.
+- This is the extractor behaving as specified (`api_surface` emission
+  parity, `design.md` CSCI-8), not a counting bug. The blind spot is the
+  declared trade-off for a deterministic, owned formula.
+
+`semantic-ci target-doctor` detects this hazard as `ADVISORY-D6` when
+`--baseline-rev` / `--candidate-rev` are given: it fires when the target
+declares a verdict-participating `complexity_delta` constraint and the
+candidate diff grows the nested-def count in an in-scope Python file.
+Growth is a heuristic displacement signal, not proof — review the diff
+rather than treating the advisory as a verdict.
+
 ## Constraint Authoring Tips
 
 ### Pick `kind` deliberately

@@ -142,6 +142,20 @@ def repo_root(cwd: Path) -> Path:
     return Path(output.strip()).resolve()
 
 
+def blob_text(ref: str, path: str, *, cwd: Path) -> str | None:
+    """Return the file content at `ref:path`, or None when absent.
+
+    `path` must be repo-relative posix form. The ref is validated; a
+    missing path at the ref (added/deleted file on one diff side) is the
+    expected miss and maps to None rather than an error.
+    """
+    ensure_safe_ref(ref)
+    try:
+        return run_git(["show", f"{ref}:{path}"], cwd=cwd)
+    except GitCommandError:
+        return None
+
+
 def tree_object_id(ref: str, subpath: str, *, cwd: Path) -> str:
     ensure_safe_ref(ref)
     spec = f"{ref}^{{tree}}" if subpath == "." else f"{ref}:{subpath}"

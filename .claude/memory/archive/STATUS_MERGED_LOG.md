@@ -1347,3 +1347,29 @@ H-3/CSCI-52 を 1 PR で landing。LLM-general Adapter Protocol の first concre
   no-LLM/no-network 規約、D1 on-demand は「呼ばれない限り走らない」構造で充足)。
 - **review**: AC 10 件全充足で chat 内 APPROVE、P3 指摘 2 件 (dummy CodeState の
   型 narrow / 混在 ordinal) は follow-up commit で消化済 (`75c8d24` / `1a232f5`)。
+
+### 2026-06-10 — Phase H H-4: advisory surface + mute ledger + check CLI 配線 (PR #147)
+
+H-4/CSCI-53 を 1 PR で landing。LLM scout 出力が初めて CLI から見える形に。
+
+- **PR #147**: `check --advisory-sensor codex-security=<recorded.json>` (単一回
+  のみ、複数回は H-5 scope の usage error) + `--advisory-mutes <yaml>` (明示
+  flag のみ、auto-discovery なし)。pipeline = recorded payload → H-3 adapter →
+  `compute_advisory_reprojection` (check 既算の baseline CodeState +
+  `delta.renames` 再利用) → active mute filter → envelope 追加 top-level
+  `advisory` object (adapter_id / sensor provenance / surfaced / pre_existing /
+  muted / counts / mutes_path、schema_version "6" 据え置きの additive)。
+  `sensor/mutes.py` = `AdvisoryMute` + `load_advisory_mutes` (llm category 9
+  要素 identity 専用 — 既存 `Suppression` は sast/sca のみ受理のため新設、
+  verdict 非参照)。AC11 不変条件 (advisory あり/なしで verdict / repair_plan /
+  summary + exit code 一致、strict-repair 込み) + suite 隔離拡張
+  (`sensor.mutes` 追加) を test 固定。
+- **設計判断**: Q3 (ledger 置き場) = 別ファイル `.semantic-ci/advisory_mutes.yaml`
+  で確定 (declared intent と既読メモの構造分離)。informed-consent (D9) は
+  counts (scouted/surfaced/pre_existing/muted) + muted audit 記録で realize、
+  finding 単位の「宣言」マッチングは H-5 送り。
+- **申し送り回収**: H-2b/H-3 の silent-pass→usage-error
+  (`--sensor-candidate` に LLM finding 入り SensorState → exit 2) を
+  `docs/exit_codes.md` Error Streams 表に doc 化。
+- **review**: AC 15 件全充足で chat 内 APPROVE、cosmetic P2 件のみ
+  (error message の "later H-4 slice" 表現 / 未消費 tuple 要素)。

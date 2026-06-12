@@ -24,9 +24,33 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (SSP core integration、CSCI-45〜49) 全完走** + **Phase H (LLM security scout layer、CSCI-50〜54) 全完走** (2026-06-09〜06-10、PR #142〜#144 + #146〜#148)。Phase H は「LLM は scout であって judge ではない」(D1) を中心に、非決定論 LLM センサーを Phase G の sensor 機構へ **advisory-only** (verdict / exit code 非参与、不変条件 test 固定) で縦接続: H-1 = LLM advisory finding protocol + verdict reject guard / H-2a = `CodeStateDelta.renames` overlay / H-2b = `sensor/advisory.py` deterministic one-run re-projection (baseline `CodeState` のみ ingest、D7 recall-first fallback) / H-3 = Codex Security fixture-mode reference adapter (live LLM 経路なし、no-network architecture test) / H-4 = `check --advisory-sensor` + `--advisory-mutes` (Q3 = 別ファイル ledger、`AdvisoryMute` は llm category 専用で `Suppression` と別物、envelope に additive `advisory` object) / H-5 = `aggregate_advisory_states` 明示クロスモデル集約 (Q4 = (a) 束ね役関数、固定 `llm-ensemble` 名義 + member provenance 外出し) + `docs/llm_scout_usage.md` 昇格経路 doc (D8 沈黙=容認)。並行して 2026-06-08 に pre-release credibility トラック (PR #136/#138 + repo desc/topics) 完走、tag は切らず experimental 明示の方針。2026-06-10 にはセキュリティ hardening (PR #149) と **Phase X-2 (code domain) PR validation 実験 planning 凍結 (PR #150、`docs/pr_validation_planning.md`)** も landing — 中核仮説 (「効くか」) の falsification 実験が着手可能になった。2026-06-11 に **D8 (SCA auto-discovery gap) を CSCI-55 / PR #151 で解決** — D-class は 6/8 解決 (残 D6/D7)。次は **Phase X-2 実験実行 (pilot 5 件、別 session 委譲)** / **D-class closure 残 (D6/D7、ROADMAP v0.1.0 exit criteria 前進)** / H-5 review 申し送り 3 件 (P3) のいずれか。
+Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (CSCI-45〜49) / Phase H (CSCI-50〜54) 全完走** + pre-release credibility トラック (tag は切らず experimental 明示) + **D-class findings 8/8 全解決 (2026-06-12、ROADMAP v0.1.0 exit criterion「D 全解決/waive」充足)**。直近の landing: 2026-06-10 セキュリティ hardening (PR #149) + Phase X-2 planning 凍結 (PR #150、`docs/pr_validation_planning.md`)、2026-06-11 D8 解決 (CSCI-55 / PR #151)、2026-06-12 D6 解決 (ADVISORY-D6 / PR #152) + D7 解決 (ADVISORY-D7 + advisory envelope advisory-2 bump / PR #153) — complexity 制約の authoring 面が D6 (nested 変位の vacuous PASS) / D7 (extract-method の構造的 false-FAIL) の相補ペアで完成、`target-doctor` は 9 advisory 体制。次は **Phase X-2 実験実行 (pilot 5 件、別 session 委譲)** / **E-1/E-2 (ecosystem cross-repo、別 session)** / H-5 review 申し送り 3 件 (P3) / `§15.1` grounding bullet 追加の小粒 docs のいずれか。
 
 ## 直近 merged
+
+### 2026-06-12 — D-class closure 完了: D6 + D7 (PR #152 / #153)
+
+D-class closure 第 2・3 弾で **8/8 全解決** (v0.1.0 exit criterion 充足)。
+Fable が設計→実装→dogfood→レビュー対応→merge を完走、PR は
+`subscribe_pr_activity` で event-driven に babysit。
+
+- **PR #152 (D6)**: `authoring/nested_defs.py::count_nested_defs` +
+  `hazards.py::detect_d6` + guide Hazard 4。nested helper への複雑度変位で
+  complexity lock が vacuous PASS する盲点を、diff の nested-def 増加 ×
+  verdict 参加 complexity_delta 制約で警告。D4 鏡像の diff-aware 契約
+  (CLI が context 計算 / rev なしは silent skip)。Codex P2 = package-root
+  跨ぎ rename は out-of-scope 側 0 で計数。
+- **PR #153 (D7)**: `count_visible_defs` (extractor 委譲で parity drift 排除)
+  + `detect_d7` + guide Hazard 5 (refactor パターン別 metric 選択表)。
+  extract-method は +1 base/helper で総和 cyclomatic が必ず微増 → refactor
+  target の「+net を reject する」cyclomatic lock を警告し cognitive を推奨。
+  Codex P2 ×3 = net growth 比較 / evaluator tolerance semantics の逐語
+  mirror / allowance を実 net helper 数と比較。advisory envelope は
+  **advisory-2** に bump (使用中 enum への D6/D7 追加、compatibility policy)。
+- **dogfood**: D6 = PASS(騙し)+ADVISORY、D7 = FAIL(構造的)+ADVISORY +
+  cognitive 化で PASS — fail+pass 両方実演。最終 1817 テスト緑。
+- **申し送り**: D6 growth は per-file のまま (総和への算術寄与なしのため
+  aggregate 化根拠が D7 と別)。consumer は advisory-2 を前提に。
 
 ### 2026-06-11 — D8 closure: SCA dependency-source discovery (CSCI-55、PR #151)
 
@@ -119,35 +143,9 @@ H-5/CSCI-54 を 1 PR で landing。**Phase H (CSCI-50〜54) 全完走**。
   (非 LLM 入力の silent skip → ValueError 化案 / severity と message の出所
   member 分離 / ensemble の scouted = dedup 後件数の doc 化)。
 
-### 2026-06-10 — Phase H H-4: advisory surface + mute ledger + check CLI 配線 (PR #147)
-
-H-4/CSCI-53 を 1 PR で landing。LLM scout 出力が初めて CLI から見える形に。
-
-- **PR #147**: `check --advisory-sensor codex-security=<recorded.json>` (単一回
-  のみ、複数回は H-5 scope の usage error) + `--advisory-mutes <yaml>` (明示
-  flag のみ、auto-discovery なし)。pipeline = recorded payload → H-3 adapter →
-  `compute_advisory_reprojection` (check 既算の baseline CodeState +
-  `delta.renames` 再利用) → active mute filter → envelope 追加 top-level
-  `advisory` object (adapter_id / sensor provenance / surfaced / pre_existing /
-  muted / counts / mutes_path、schema_version "6" 据え置きの additive)。
-  `sensor/mutes.py` = `AdvisoryMute` + `load_advisory_mutes` (llm category 9
-  要素 identity 専用 — 既存 `Suppression` は sast/sca のみ受理のため新設、
-  verdict 非参照)。AC11 不変条件 (advisory あり/なしで verdict / repair_plan /
-  summary + exit code 一致、strict-repair 込み) + suite 隔離拡張
-  (`sensor.mutes` 追加) を test 固定。
-- **設計判断**: Q3 (ledger 置き場) = 別ファイル `.semantic-ci/advisory_mutes.yaml`
-  で確定 (declared intent と既読メモの構造分離)。informed-consent (D9) は
-  counts (scouted/surfaced/pre_existing/muted) + muted audit 記録で realize、
-  finding 単位の「宣言」マッチングは H-5 送り。
-- **申し送り回収**: H-2b/H-3 の silent-pass→usage-error
-  (`--sensor-candidate` に LLM finding 入り SensorState → exit 2) を
-  `docs/exit_codes.md` Error Streams 表に doc 化。
-- **review**: AC 15 件全充足で chat 内 APPROVE、cosmetic P2 件のみ
-  (error message の "later H-4 slice" 表現 / 未消費 tuple 要素)。
-
 ### 古い merged entry (2026-06-10 以前) — archive 参照
 
-29 entry (2026-06-10 H-3 (#146) / 2026-06-09 S2 (#145) / 2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
+30 entry (2026-06-10 H-4 (#147) / 2026-06-10 H-3 (#146) / 2026-06-09 S2 (#145) / 2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
 2026-06-03 (#127/#128/#129) / 2026-06-02 (#124/#125/#126) / 2026-05-29 S2 (#120/#121) / 2026-05-28 S2 /
 2026-05-27 / 2026-05-26 / 2026-05-22 /
 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
@@ -167,15 +165,16 @@ H-4/CSCI-53 を 1 PR で landing。LLM scout 出力が初めて CLI から見え
 + 2026-06-10 wrap-up (6/03 S2 + 6/07 + 6/08 移送)
 + 2026-06-10 #150 sweep (6/09 S2 移送)
 + 2026-06-11 wrap-up (6/10 H-3 #146 移送)
++ 2026-06-12 wrap-up (6/10 H-4 #147 移送)
 で compaction が実施された。
 
 ## 次の発行順序
 
-ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G (CSCI-45〜49) 全完走** +
-**Phase H (CSCI-50〜54) 全完走** + **D8 解決 (CSCI-55 / PR #151)**。active な
-実装軸は **D-class closure 残 (D6/D7、ROADMAP v0.1.0 exit criteria を直接
-前進させる repo-internal の bounded 候補)**。残る軸は **E (Phase X、
-ecosystem cross-repo、別 Claude Code session 委譲)**。
+ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G / Phase H 全完走** +
+**D-class closure 全完走 (D8 = PR #151、D6 = PR #152、D7 = PR #153)**。
+repo-internal の active queue は小粒のみ (H-5 申し送り P3 / `§15.1`
+grounding bullet)。残る主軸は **E (Phase X、ecosystem cross-repo、別
+Claude Code session 委譲)** — 中でも E-3 (X-2 pilot 実行) が次の本命。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
@@ -229,9 +228,9 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
 - **E (Phase X) active**: E-1 (X-3 cross-ref) と E-2 (X-1 umbrella docs)
   は ecosystem cross-repo work で別 Claude Code session 委譲、E-3 (X-2
   validation 移植) は中長期 phase
-- **D-class closure** (残 D6/D7): repo-internal の bounded 候補、ROADMAP の
-  v0.1.0 exit criteria (D 全解決/waive) を直接前進。D8 は CSCI-55 / PR #151
-  (2026-06-11) で解決済
+- **D-class closure 全完走**: D8 = CSCI-55 / PR #151 (2026-06-11)、D6 =
+  PR #152、D7 = PR #153 (2026-06-12) で 8/8 解決。ROADMAP v0.1.0 exit
+  criteria (D 全解決/waive) 充足
 
 ### 直近最短経路
 
@@ -241,10 +240,9 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
   guard / intent-only target B 生成)。外部 repo 収集ゆえ**別 session 委譲** +
   `experiments/pr_validation/`。Fable 評価レビューの推奨 1 = 「上物より中核
   仮説の falsification を先に」の実行
-- **D-class closure (残 D6/D7)**: repo-internal、bounded、exit criteria 前進
-  (D6=nested-function vacuous PASS、D7=extract-method authoring advice、
-  低優先)。tracker D8 行への PR #151 番号追記 + `§15.1` 外部 format
-  grounding bullet 追加の 1 行 docs PR も小粒候補 (`2026-06-11.md` 参照)
+- **小粒 docs 候補**: `docs/brief_8_planning.md §15.1` への「外部 format
+  翻訳は resolution semantics まで grounding」bullet 追加 (`2026-06-11.md`
+  申し送りの未消化分。tracker D8 行への PR 番号追記は PR #152 で消化済)
 - **E-1/E-2. Phase X cross-ref / umbrella docs** (別 session 委譲)
 
 ## Frozen / Deferred

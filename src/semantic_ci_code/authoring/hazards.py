@@ -1,10 +1,11 @@
 """Authoring hazard detectors for `semantic-ci target-doctor`.
 
 Each `detect_*` function inspects a `CompiledTarget` (and optional
-package-root or files-touched context) and returns zero or one `Advisory`.
-The combined entrypoint `detect_advisories` returns a deterministically
-ordered tuple. All detectors are pure: no network, no LLM, no I/O outside
-of reading `package_root` for D1.
+package-root, files-touched, or nested-def-growth context) and returns zero
+or one `Advisory`. The combined entrypoint `detect_advisories` returns a
+deterministically ordered tuple. All detectors are pure: no network, no
+LLM, no I/O outside of reading `package_root` for D1 — diff-derived
+context (D4 / D6) is computed by the CLI layer and passed in.
 
 The advisor surface never participates in the verdict
 (`docs/code_semantic_ci_design.md §23.3.1`); detection or non-detection
@@ -17,6 +18,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from semantic_ci_code.authoring.advisory import Advisory
+from semantic_ci_code.authoring.nested_defs import NestedDefGrowth
 from semantic_ci_code.compiler.target_compiler import (
     CompiledConstraint,
     CompiledTarget,
@@ -35,6 +37,7 @@ _ADVISORY_ORDER = (
     "ADVISORY-D1",
     "ADVISORY-D3",
     "ADVISORY-D4",
+    "ADVISORY-D6",
     "ADVISORY-I1",
     "ADVISORY-P1",
     "ADVISORY-P2",
@@ -95,12 +98,14 @@ def detect_advisories(
     *,
     package_root: Path | None = None,
     files_touched: tuple[Path, ...] | None = None,
+    nested_def_growth: tuple[NestedDefGrowth, ...] | None = None,
 ) -> tuple[Advisory, ...]:
     """Run every detector and return the advisories in canonical order.
 
     `package_root` is required for D1; when omitted the detector is
-    skipped silently. `files_touched` is required for D4; when omitted
-    (e.g. git not available) the detector is skipped.
+    skipped silently. `files_touched` is required for D4 and
+    `nested_def_growth` for D6; when omitted (e.g. git not available)
+    the corresponding detector is skipped.
     """
     advisories: list[Advisory] = []
     if package_root is not None:
@@ -108,6 +113,8 @@ def detect_advisories(
     advisories.extend(detect_d3(target))
     if files_touched is not None:
         advisories.extend(detect_d4(target, files_touched=files_touched))
+    if nested_def_growth is not None:
+        advisories.extend(detect_d6(target, nested_def_growth=nested_def_growth))
     advisories.extend(detect_i1(target))
     advisories.extend(detect_p1(target))
     advisories.extend(detect_p2(target))
@@ -215,6 +222,72 @@ def detect_d4(
                 "primary_kind": target.primary_kind.value,
                 "files_touched_count": len(files_touched),
                 "sample_files": [str(p) for p in files_touched[:5]],
+            },
+        ),
+    )
+
+
+def detect_d6(
+    target: CompiledTarget,
+    *,
+    nested_def_growth: tuple[NestedDefGrowth, ...],
+) -> tuple[Advisory, ...]:
+    """Complexity constraint + nested-def growth = displaced complexity.
+
+    `python_complexity_extractor` stops descent at nested def boundaries
+    (`api_surface` emission parity), so a refactor that moves an outer
+    function's body into function-nested helpers reports a large
+    cyclomatic/cognitive drop while the real complexity is unchanged —
+    the lock passes and the verdict silently endorses the displacement
+    (D6, sibling of D4's vacuous PASS). The detector fires when the
+    target declares a verdict-participating `complexity_delta` constraint
+    AND the candidate diff grows the nested-def count in at least one
+    in-scope Python file. Growth is a heuristic displacement signal, not
+    proof — the advisory asks for review, never seats the verdict.
+
+    An empty `nested_def_growth` tuple means "diff inspected, no Python
+    files with parseable content on both sides"; `None` (inapplicable,
+    git unavailable) is filtered out by the caller before reaching this
+    detector — mirroring D4's `files_touched` contract.
+    """
+    complexity_constraints = tuple(
+        c
+        for c in target.constraints
+        if _is_complexity_delta_target(c.target) and _participates_in_verdict(c)
+    )
+    if not complexity_constraints:
+        return ()
+    grown = tuple(g for g in nested_def_growth if g.candidate_count > g.baseline_count)
+    if not grown:
+        return ()
+    total_added = sum(g.candidate_count - g.baseline_count for g in grown)
+    constraint_ids = ", ".join(repr(c.id) for c in complexity_constraints)
+    return (
+        Advisory(
+            code="ADVISORY-D6",
+            message=(
+                f"the candidate diff adds {total_added} nested function "
+                f"definition(s) across {len(grown)} file(s), and the target "
+                f"declares complexity_delta constraint(s) ({constraint_ids}). "
+                f"The complexity extractor does not descend into nested "
+                f"functions, so complexity moved into nested helpers vanishes "
+                f"from cyclomatic/cognitive numbers — a reported decrease may "
+                f"be displacement, not simplification. Review whether the new "
+                f"nested helpers should be module-level functions (which are "
+                f"extracted and constrained) instead."
+            ),
+            evidence={
+                "constraint_ids": [c.id for c in complexity_constraints],
+                "nested_defs_added": total_added,
+                "grown_files_count": len(grown),
+                "files": [
+                    {
+                        "path": g.path,
+                        "baseline_nested_defs": g.baseline_count,
+                        "candidate_nested_defs": g.candidate_count,
+                    }
+                    for g in grown[:5]
+                ],
             },
         ),
     )
@@ -679,6 +752,17 @@ def _targets_added_dimension(path: str) -> bool:
 def _is_open_path(path: str) -> bool:
     head = path.split(".", 1)[0]
     return head in _OPEN_PATH_PREFIXES
+
+
+def _is_complexity_delta_target(path: str) -> bool:
+    """Match `complexity_delta` and any `complexity_delta.<sub>` path.
+
+    Both whole-delta and leaf (`.cyclomatic` / `.cognitive`) targets are
+    deceived equally when complexity is displaced into nested functions,
+    so D6 scopes on the path head alone.
+    """
+    head = path.split(".", 1)[0]
+    return head == "complexity_delta"
 
 
 def _targets_new_test_cases(constraint: CompiledConstraint) -> bool:

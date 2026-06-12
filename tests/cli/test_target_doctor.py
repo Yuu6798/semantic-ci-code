@@ -1,6 +1,6 @@
 """CSCI-43: `semantic-ci target-doctor` (Advisor surface).
 
-Covers all six advisories (D1 / D3 / D4 / P1 / P2 / S1) with both a
+Covers the advisories (D1 / D3 / D4 / D6 / I1 / P1 / P2 / S1) with both a
 detection fixture and a false-positive prevention fixture, the JSON
 envelope schema, the exit-code contract from `docs/exit_codes.md` and
 `docs/brief_8_planning.md §6.3.3`, and the determinism + argparse spec
@@ -1575,3 +1575,212 @@ def test_d4_cli_silent_when_python_diff_present(tmp_path: Path):
     assert result.returncode == 0
     payload = parse_json(result.stdout)
     assert "ADVISORY-D4" not in [a["code"] for a in payload["advisories"]]
+
+
+# ---------------------------------------------------------------------------
+# CLI integration with git for D6 (covers nested_def_growth resolution path)
+# ---------------------------------------------------------------------------
+
+_TARGET_COMPLEXITY_LOCK = (
+    "intent: simplify hot path\n"
+    "change:\n"
+    "  primary_kind: refactor\n"
+    "constraints:\n"
+    "  - id: cc_lock\n"
+    "    kind: delta\n"
+    "    target: complexity_delta.cyclomatic\n"
+    "    operator: less_than_or_equal\n"
+    "    expected: 0\n"
+)
+
+_FLAT_FUNCTION = (
+    "def process(items):\n"
+    "    out = []\n"
+    "    for item in items:\n"
+    "        if item:\n"
+    "            out.append(item)\n"
+    "    return out\n"
+)
+
+# Same behaviour, body displaced into a nested helper: the extractor's
+# cyclomatic for `process` drops while real complexity is unchanged.
+_NESTED_REFACTOR = (
+    "def process(items):\n"
+    "    def _collect():\n"
+    "        out = []\n"
+    "        for item in items:\n"
+    "            if item:\n"
+    "                out.append(item)\n"
+    "        return out\n"
+    "    return _collect()\n"
+)
+
+
+def _d6_repo(tmp_path: Path, *, candidate_source: str, target_yaml: str) -> tuple[Path, str]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "src").mkdir()
+    (repo / "src" / "mod.py").write_text(_FLAT_FUNCTION, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = _git_head(repo)
+    _git(repo, "checkout", "-b", "feature")
+    (repo / "src" / "mod.py").write_text(candidate_source, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "refactor")
+    _write_target(repo / "target.yaml", target_yaml)
+    return repo, baseline_sha
+
+
+def _run_doctor_json(repo: Path, baseline_sha: str) -> dict:
+    result = run_semantic_ci(
+        repo,
+        "target-doctor",
+        "--target",
+        str(repo / "target.yaml"),
+        "--package-root",
+        "src",
+        "--baseline-rev",
+        baseline_sha,
+        "--candidate-rev",
+        "HEAD",
+        "--format",
+        "json",
+    )
+    assert result.returncode == 0, result.stderr
+    return parse_json(result.stdout)
+
+
+def test_d6_cli_fires_on_nested_def_displacement(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=_NESTED_REFACTOR,
+        target_yaml=_TARGET_COMPLEXITY_LOCK,
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+    jsonschema.validate(payload, DOCTOR_SCHEMA)
+    d6 = [a for a in payload["advisories"] if a["code"] == "ADVISORY-D6"]
+
+    assert len(d6) == 1
+    assert d6[0]["evidence"]["constraint_ids"] == ["cc_lock"]
+    assert d6[0]["evidence"]["nested_defs_added"] == 1
+    assert d6[0]["evidence"]["files"] == [
+        {"path": "src/mod.py", "baseline_nested_defs": 0, "candidate_nested_defs": 1}
+    ]
+
+
+def test_d6_cli_silent_without_complexity_constraint(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=_NESTED_REFACTOR,
+        target_yaml="intent: refactor\nchange:\n  primary_kind: refactor\nconstraints: []\n",
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+    codes = [a["code"] for a in payload["advisories"]]
+
+    assert "ADVISORY-D6" not in codes
+    # The diff touches a Python file, so D4 must stay silent too.
+    assert "ADVISORY-D4" not in codes
+
+
+def test_d6_cli_silent_without_nested_growth(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=_FLAT_FUNCTION.replace("if item:", "if item is not None:"),
+        target_yaml=_TARGET_COMPLEXITY_LOCK,
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+
+    assert "ADVISORY-D6" not in [a["code"] for a in payload["advisories"]]
+
+
+def test_d6_cli_skips_unparseable_candidate_file(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source="def broken(:\n",
+        target_yaml=_TARGET_COMPLEXITY_LOCK,
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+
+    assert "ADVISORY-D6" not in [a["code"] for a in payload["advisories"]]
+
+
+def test_d6_cli_counts_new_file_from_zero_baseline(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=_FLAT_FUNCTION + "\n# touched\n",
+        target_yaml=_TARGET_COMPLEXITY_LOCK,
+    )
+    (repo / "src" / "helpers.py").write_text(_NESTED_REFACTOR, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "add helper module with nested def")
+
+    payload = _run_doctor_json(repo, baseline_sha)
+    d6 = [a for a in payload["advisories"] if a["code"] == "ADVISORY-D6"]
+
+    assert len(d6) == 1
+    assert d6[0]["evidence"]["files"] == [
+        {"path": "src/helpers.py", "baseline_nested_defs": 0, "candidate_nested_defs": 1}
+    ]
+
+
+def test_d6_cli_fires_on_rename_into_package_root_scope(tmp_path: Path):
+    """Codex review P2: a rename across the --package-root boundary must
+    count the out-of-scope side as 0 (the extractor never observed it).
+    `lib/helpers.py` (1 nested def) renamed to `src/helpers.py` is 0 -> 1
+    for the src slice, not 1 -> 1, so D6 must fire."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "src").mkdir()
+    (repo / "lib").mkdir()
+    (repo / "src" / "mod.py").write_text(_FLAT_FUNCTION, encoding="utf-8")
+    (repo / "lib" / "helpers.py").write_text(_NESTED_REFACTOR, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = _git_head(repo)
+    _git(repo, "checkout", "-b", "feature")
+    _git(repo, "mv", "lib/helpers.py", "src/helpers.py")
+    _git(repo, "commit", "-m", "move helpers into package root")
+    _write_target(repo / "target.yaml", _TARGET_COMPLEXITY_LOCK)
+
+    payload = _run_doctor_json(repo, baseline_sha)
+    d6 = [a for a in payload["advisories"] if a["code"] == "ADVISORY-D6"]
+
+    assert len(d6) == 1
+    assert d6[0]["evidence"]["files"] == [
+        {"path": "src/helpers.py", "baseline_nested_defs": 0, "candidate_nested_defs": 1}
+    ]
+
+
+def test_d6_cli_silent_on_rename_out_of_package_root_scope(tmp_path: Path):
+    """Mirror case: moving a nested-def file out of the package root is a
+    0-growth event for the src slice (candidate side counts 0)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "src").mkdir()
+    (repo / "src" / "helpers.py").write_text(_NESTED_REFACTOR, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = _git_head(repo)
+    _git(repo, "checkout", "-b", "feature")
+    (repo / "lib").mkdir()
+    _git(repo, "mv", "src/helpers.py", "lib/helpers.py")
+    _git(repo, "commit", "-m", "move helpers out of package root")
+    _write_target(repo / "target.yaml", _TARGET_COMPLEXITY_LOCK)
+
+    payload = _run_doctor_json(repo, baseline_sha)
+
+    assert "ADVISORY-D6" not in [a["code"] for a in payload["advisories"]]

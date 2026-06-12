@@ -338,12 +338,12 @@ def build_parser() -> argparse.ArgumentParser:
     target_doctor.add_argument(
         "--baseline-rev",
         default=None,
-        help="baseline git ref for ADVISORY-D4 (config-only diff vacuous PASS)",
+        help="baseline git ref for ADVISORY-D4 / D6 (diff-aware hazards)",
     )
     target_doctor.add_argument(
         "--candidate-rev",
         default=None,
-        help="candidate git ref for ADVISORY-D4; defaults to HEAD",
+        help="candidate git ref for ADVISORY-D4 / D6; defaults to HEAD",
     )
     target_doctor.add_argument(
         "--format",

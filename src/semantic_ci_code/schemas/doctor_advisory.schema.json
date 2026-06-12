@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "subcommand", "advisories"],
   "properties": {
-    "schema_version": {"const": "advisory-1"},
+    "schema_version": {"const": "advisory-2"},
     "subcommand": {"const": "target-doctor"},
     "advisories": {
       "type": "array",

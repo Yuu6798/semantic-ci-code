@@ -4,7 +4,7 @@ from typing import Any
 
 from semantic_ci_code.authoring.advisory import Advisory
 
-DOCTOR_ADVISORY_SCHEMA_VERSION = "advisory-1"
+DOCTOR_ADVISORY_SCHEMA_VERSION = "advisory-2"
 
 
 def build_doctor_payload(advisories: tuple[Advisory, ...]) -> dict[str, Any]:

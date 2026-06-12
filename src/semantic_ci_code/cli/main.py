@@ -349,7 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("human", "json"),
         default="human",
-        help="output format; advisor envelope schema_version='advisory-1' (json)",
+        help="output format; advisor envelope schema_version='advisory-2' (json)",
     )
     target_doctor.add_argument(
         "--output",

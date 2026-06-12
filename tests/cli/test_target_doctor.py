@@ -965,7 +965,7 @@ def test_json_format_returns_advisory1_envelope(tmp_path: Path):
     )
     assert result.returncode == 0
     payload = parse_json(result.stdout)
-    assert payload["schema_version"] == "advisory-1"
+    assert payload["schema_version"] == "advisory-2"
     assert payload["subcommand"] == "target-doctor"
     assert any(a["code"] == "ADVISORY-P1" for a in payload["advisories"])
     jsonschema.validate(payload, DOCTOR_SCHEMA)

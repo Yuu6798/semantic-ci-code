@@ -754,7 +754,7 @@ verdict and does not change the exit code (`docs/exit_codes.md`).
 | `ADVISORY-P2` | `primary_kind: bugfix` has no `test_surface_delta.new_cases` expectation. |
 | `ADVISORY-S1` | A user constraint has `severity: info` paired with `unknown_policy in {fail, repair}`. After Brief D1-4 the warning scope narrows to extraction-cause / open_runtime UNKNOWN. |
 
-`--format json` emits the `advisory-1` envelope
+`--format json` emits the `advisory-2` envelope
 ([`docs/json_schema.md`](./json_schema.md)). There is no `--strict-advice`
 flag — CI that wants to gate on advisory presence should consume the JSON
 output and apply a workflow-level policy.

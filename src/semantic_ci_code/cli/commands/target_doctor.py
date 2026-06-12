@@ -175,15 +175,23 @@ def _resolve_diff_context(
 
         # D6 signal: nested-def counts on both sides of every in-scope
         # Python entry. A file absent at one rev (added / deleted)
-        # contributes 0 on that side; a side that fails to parse skips
-        # the entry entirely so a syntax error cannot fabricate or
-        # suppress a growth signal.
+        # contributes 0 on that side, and so does an out-of-scope side:
+        # `semantic-ci check --package-root` never observed it, so a
+        # rename across the package-root boundary must count as 0 → N
+        # (newly in-scope nested defs) rather than N → N (Codex review
+        # P2 — matching counts would mask the displacement). A side that
+        # fails to parse skips the entry entirely so a syntax error
+        # cannot fabricate or suppress a growth signal.
         if candidate_path.suffix.lower() != ".py" and baseline_path.suffix.lower() != ".py":
             continue
         if not (in_scope(candidate_path) or in_scope(baseline_path)):
             continue
-        baseline_count = _nested_defs_at(root, baseline_ref, baseline_path)
-        candidate_count = _nested_defs_at(root, candidate_ref, candidate_path)
+        baseline_count = (
+            _nested_defs_at(root, baseline_ref, baseline_path) if in_scope(baseline_path) else 0
+        )
+        candidate_count = (
+            _nested_defs_at(root, candidate_ref, candidate_path) if in_scope(candidate_path) else 0
+        )
         if baseline_count is None or candidate_count is None:
             continue
         growth.append(

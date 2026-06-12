@@ -1729,3 +1729,58 @@ def test_d6_cli_counts_new_file_from_zero_baseline(tmp_path: Path):
     assert d6[0]["evidence"]["files"] == [
         {"path": "src/helpers.py", "baseline_nested_defs": 0, "candidate_nested_defs": 1}
     ]
+
+
+def test_d6_cli_fires_on_rename_into_package_root_scope(tmp_path: Path):
+    """Codex review P2: a rename across the --package-root boundary must
+    count the out-of-scope side as 0 (the extractor never observed it).
+    `lib/helpers.py` (1 nested def) renamed to `src/helpers.py` is 0 -> 1
+    for the src slice, not 1 -> 1, so D6 must fire."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "src").mkdir()
+    (repo / "lib").mkdir()
+    (repo / "src" / "mod.py").write_text(_FLAT_FUNCTION, encoding="utf-8")
+    (repo / "lib" / "helpers.py").write_text(_NESTED_REFACTOR, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = _git_head(repo)
+    _git(repo, "checkout", "-b", "feature")
+    _git(repo, "mv", "lib/helpers.py", "src/helpers.py")
+    _git(repo, "commit", "-m", "move helpers into package root")
+    _write_target(repo / "target.yaml", _TARGET_COMPLEXITY_LOCK)
+
+    payload = _run_doctor_json(repo, baseline_sha)
+    d6 = [a for a in payload["advisories"] if a["code"] == "ADVISORY-D6"]
+
+    assert len(d6) == 1
+    assert d6[0]["evidence"]["files"] == [
+        {"path": "src/helpers.py", "baseline_nested_defs": 0, "candidate_nested_defs": 1}
+    ]
+
+
+def test_d6_cli_silent_on_rename_out_of_package_root_scope(tmp_path: Path):
+    """Mirror case: moving a nested-def file out of the package root is a
+    0-growth event for the src slice (candidate side counts 0)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "tester")
+    _git(repo, "config", "user.email", "t@t")
+    (repo / "src").mkdir()
+    (repo / "src" / "helpers.py").write_text(_NESTED_REFACTOR, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "baseline")
+    baseline_sha = _git_head(repo)
+    _git(repo, "checkout", "-b", "feature")
+    (repo / "lib").mkdir()
+    _git(repo, "mv", "src/helpers.py", "lib/helpers.py")
+    _git(repo, "commit", "-m", "move helpers out of package root")
+    _write_target(repo / "target.yaml", _TARGET_COMPLEXITY_LOCK)
+
+    payload = _run_doctor_json(repo, baseline_sha)
+
+    assert "ADVISORY-D6" not in [a["code"] for a in payload["advisories"]]

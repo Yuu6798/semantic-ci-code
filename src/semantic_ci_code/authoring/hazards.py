@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from semantic_ci_code.authoring.advisory import Advisory
-from semantic_ci_code.authoring.nested_defs import NestedDefGrowth
+from semantic_ci_code.authoring.nested_defs import NestedDefGrowth, VisibleDefGrowth
 from semantic_ci_code.compiler.target_compiler import (
     CompiledConstraint,
     CompiledTarget,
@@ -38,6 +38,7 @@ _ADVISORY_ORDER = (
     "ADVISORY-D3",
     "ADVISORY-D4",
     "ADVISORY-D6",
+    "ADVISORY-D7",
     "ADVISORY-I1",
     "ADVISORY-P1",
     "ADVISORY-P2",
@@ -99,13 +100,15 @@ def detect_advisories(
     package_root: Path | None = None,
     files_touched: tuple[Path, ...] | None = None,
     nested_def_growth: tuple[NestedDefGrowth, ...] | None = None,
+    visible_def_growth: tuple[VisibleDefGrowth, ...] | None = None,
 ) -> tuple[Advisory, ...]:
     """Run every detector and return the advisories in canonical order.
 
     `package_root` is required for D1; when omitted the detector is
-    skipped silently. `files_touched` is required for D4 and
-    `nested_def_growth` for D6; when omitted (e.g. git not available)
-    the corresponding detector is skipped.
+    skipped silently. `files_touched` is required for D4,
+    `nested_def_growth` for D6, and `visible_def_growth` for D7; when
+    omitted (e.g. git not available) the corresponding detector is
+    skipped.
     """
     advisories: list[Advisory] = []
     if package_root is not None:
@@ -115,6 +118,8 @@ def detect_advisories(
         advisories.extend(detect_d4(target, files_touched=files_touched))
     if nested_def_growth is not None:
         advisories.extend(detect_d6(target, nested_def_growth=nested_def_growth))
+    if visible_def_growth is not None:
+        advisories.extend(detect_d7(target, visible_def_growth=visible_def_growth))
     advisories.extend(detect_i1(target))
     advisories.extend(detect_p1(target))
     advisories.extend(detect_p2(target))
@@ -285,6 +290,92 @@ def detect_d6(
                         "path": g.path,
                         "baseline_nested_defs": g.baseline_count,
                         "candidate_nested_defs": g.candidate_count,
+                    }
+                    for g in grown[:5]
+                ],
+            },
+        ),
+    )
+
+
+def detect_d7(
+    target: CompiledTarget,
+    *,
+    visible_def_growth: tuple[VisibleDefGrowth, ...],
+) -> tuple[Advisory, ...]:
+    """Refactor + cyclomatic no-increase lock + extract-method shape.
+
+    `complexity_delta.cyclomatic` is the **summed** cyclomatic delta over
+    extractor-visible functions, and every function starts at base 1. An
+    extract-method refactor therefore micro-increases the sum by +1 per
+    extracted helper even when every branch is preserved — a
+    `primary_kind: refactor` target locking `cyclomatic <= 0` is
+    structurally guaranteed to FAIL on exactly the refactor it means to
+    endorse (D7, `docs/dogfooding_findings_tracker.md`). Cognitive is the
+    metric that drops under extraction.
+
+    The detector fires when the target is a refactor, the candidate diff
+    grows the extractor-visible def count **net across the in-scope
+    diff** (the extract-method shape), AND a verdict-participating
+    `complexity_delta.cyclomatic` constraint rejects that guaranteed
+    `+net` observed delta (tolerance included — see
+    `_rejects_cyclomatic_delta`). Both refinements come from Codex
+    review P2s: the net comparison matters because the cyclomatic delta
+    is summed over the whole extracted state — a refactor that merely
+    relocates a function between files (+1 in one file, -1 in another)
+    cancels out and cannot trip the lock — and the allowance must be
+    compared against the actual `+net` (a `<= 0, tolerance: 1` lock
+    budgets one helper but still structurally FAILs a two-helper
+    extraction). Growth is a heuristic shape signal, not proof — the
+    advisory recommends a metric, it never seats the verdict. `None`
+    (inapplicable, git unavailable) is filtered out by the caller,
+    mirroring D4 / D6.
+    """
+    if target.primary_kind is not ChangeKind.REFACTOR:
+        return ()
+    net_added = sum(g.candidate_count - g.baseline_count for g in visible_def_growth)
+    if net_added <= 0:
+        return ()
+    cyclomatic_locks = tuple(
+        c
+        for c in target.constraints
+        if _is_cyclomatic_leaf_target(c.target)
+        and _participates_in_verdict(c)
+        and _rejects_cyclomatic_delta(c, net_added)
+    )
+    if not cyclomatic_locks:
+        return ()
+    grown = tuple(g for g in visible_def_growth if g.candidate_count > g.baseline_count)
+    if not grown:
+        return ()
+    constraint_ids = ", ".join(repr(c.id) for c in cyclomatic_locks)
+    return (
+        Advisory(
+            code="ADVISORY-D7",
+            message=(
+                f"primary_kind=refactor declares cyclomatic constraint(s) "
+                f"({constraint_ids}) that reject a +{net_added} delta, and the "
+                f"candidate diff adds {net_added} extractor-visible function "
+                f"definition(s) net across the in-scope diff — the "
+                f"extract-method shape. The cyclomatic delta is summed over "
+                f"functions and each function starts at base 1, so a faithful "
+                f"extract-method refactor is mathematically guaranteed to "
+                f"micro-increase it by +1 per extracted helper; this lock can "
+                f"FAIL on exactly the refactor it means to endorse. If the "
+                f"intent is 'no complexity growth', constrain "
+                f"complexity_delta.cognitive instead (it drops under "
+                f"extraction), or widen the cyclomatic allowance to cover the "
+                f"number of extracted helpers."
+            ),
+            evidence={
+                "constraint_ids": [c.id for c in cyclomatic_locks],
+                "visible_defs_added": net_added,
+                "grown_files_count": len(grown),
+                "files": [
+                    {
+                        "path": g.path,
+                        "baseline_visible_defs": g.baseline_count,
+                        "candidate_visible_defs": g.candidate_count,
                     }
                     for g in grown[:5]
                 ],
@@ -763,6 +854,51 @@ def _is_complexity_delta_target(path: str) -> bool:
     """
     head = path.split(".", 1)[0]
     return head == "complexity_delta"
+
+
+def _is_cyclomatic_leaf_target(path: str) -> bool:
+    """Match the `complexity_delta.cyclomatic` scalar leaf only.
+
+    D7 is cyclomatic-specific: cognitive is the recommended alternative
+    (it drops under extraction), so cognitive locks are out of scope, and
+    whole-mapping `complexity_delta` locks are D6 territory.
+    """
+    return path == "complexity_delta.cyclomatic"
+
+
+def _rejects_cyclomatic_delta(constraint: CompiledConstraint, delta: int) -> bool:
+    """True if the constraint rejects an observed cyclomatic delta of
+    `+delta` (the micro-increase a faithful extraction of `delta`
+    helpers mathematically guarantees).
+
+    Mirrors the evaluator's tolerance semantics
+    (`evaluator.operators._numeric_compare` / `_within_range`): `lt` /
+    `le` satisfy when observed `<` / `<=` `expected + tolerance`,
+    `within_range` widens both bounds by `tolerance`, and `equals`
+    matches exactly with tolerance NOT applied. Comparing against the
+    actual `+delta` (not just `+1`) covers both Codex review P2s: a
+    `tolerance` that budgets the extracted helpers must not warn, and a
+    budget smaller than the helper count (`<= 0, tolerance: 1` vs a
+    two-helper extraction) must still warn.
+    """
+    operator = constraint.operator
+    expected = constraint.expected
+    tolerance = constraint.tolerance or 0.0
+    if operator is Operator.LESS_THAN_OR_EQUAL:
+        return _is_scalar_number(expected) and not delta <= expected + tolerance
+    if operator is Operator.LESS_THAN:
+        return _is_scalar_number(expected) and not delta < expected + tolerance
+    if operator is Operator.EQUALS:
+        return _is_scalar_number(expected) and expected != delta
+    if (
+        operator is Operator.WITHIN_RANGE
+        and isinstance(expected, list | tuple)
+        and len(expected) == 2
+        and all(_is_scalar_number(item) for item in expected)
+    ):
+        low, high = expected
+        return not (low - tolerance <= delta <= high + tolerance)
+    return False
 
 
 def _targets_new_test_cases(constraint: CompiledConstraint) -> bool:

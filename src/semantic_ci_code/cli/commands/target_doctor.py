@@ -1,7 +1,7 @@
 """`semantic-ci target-doctor` — Advisor surface command.
 
-Renders authoring hazards (D1 / D3 / D4 / D6 / I1 / P1 / P2 / S1) detected
-on a `target.yaml`. Advisor surface (`docs/code_semantic_ci_design.md
+Renders authoring hazards (D1 / D3 / D4 / D6 / D7 / I1 / P1 / P2 / S1)
+detected on a `target.yaml`. Advisor surface (`docs/code_semantic_ci_design.md
 §23.3.1`): the verdict is not computed and advisory presence does not change
 the exit code. Usage / configuration errors return 2; engine / git failures
 return 3; unhandled exceptions return 4 (`docs/exit_codes.md`).
@@ -15,7 +15,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from semantic_ci_code.authoring import detect_advisories
-from semantic_ci_code.authoring.nested_defs import NestedDefGrowth, count_nested_defs
+from semantic_ci_code.authoring.nested_defs import (
+    NestedDefGrowth,
+    VisibleDefGrowth,
+    count_nested_defs,
+    count_visible_defs,
+)
 from semantic_ci_code.cli.command_support import (
     engine_error,
     internal_bug,
@@ -54,6 +59,7 @@ def run_target_doctor(args: Namespace) -> int:
             package_root=package_root,
             files_touched=diff_context.files_touched if diff_context else None,
             nested_def_growth=diff_context.nested_def_growth if diff_context else None,
+            visible_def_growth=diff_context.visible_def_growth if diff_context else None,
         )
         payload = build_doctor_payload(advisories)
         if args.format == "json":
@@ -81,12 +87,15 @@ class _DiffContext:
 
     `files_touched` feeds D4 (vacuous PASS on non-Python diffs);
     `nested_def_growth` feeds D6 (complexity displaced into nested
-    functions). Both are derived from the same numstat pass so the two
-    detectors always describe the same baseline ↔ candidate range.
+    functions); `visible_def_growth` feeds D7 (extract-method shape vs a
+    cyclomatic no-increase lock). All are derived from the same numstat
+    pass so the detectors always describe the same baseline ↔ candidate
+    range.
     """
 
     files_touched: tuple[Path, ...]
     nested_def_growth: tuple[NestedDefGrowth, ...]
+    visible_def_growth: tuple[VisibleDefGrowth, ...]
 
 
 def _resolve_diff_context(
@@ -94,15 +103,15 @@ def _resolve_diff_context(
     *,
     package_root: Path,
 ) -> _DiffContext | None:
-    """Resolve the candidate diff for D4 / D6, filtered to the
+    """Resolve the candidate diff for D4 / D6 / D7, filtered to the
     `--package-root` slice.
 
     `semantic-ci check` extracts only inside `--package-root`, so D4's
     "vacuous PASS" hazard applies whenever the in-scope slice has no
     Python diff — even if other parts of the repo do. We filter the
     repo-wide numstat to paths under `package_root` before
-    classification. D6 reads the in-scope Python entries' content at
-    both revs to compute the nested-def growth signal.
+    classification. D6 / D7 read the in-scope Python entries' content at
+    both revs to compute the nested-def / visible-def growth signals.
 
     When the user passes `--baseline-rev` or `--candidate-rev`, git
     failures surface as exit 3. When neither is passed and git is
@@ -165,6 +174,7 @@ def _resolve_diff_context(
     # (api_surface_delta.removed_public on the old name).
     files_touched: list[Path] = []
     growth: list[NestedDefGrowth] = []
+    visible_growth: list[VisibleDefGrowth] = []
     for entry in entries:
         candidate_path = entry.path
         baseline_path = entry.old_path if entry.old_path is not None else entry.path
@@ -173,43 +183,65 @@ def _resolve_diff_context(
         if entry.old_path is not None and in_scope(entry.old_path):
             files_touched.append(entry.old_path)
 
-        # D6 signal: nested-def counts on both sides of every in-scope
-        # Python entry. A file absent at one rev (added / deleted)
-        # contributes 0 on that side, and so does an out-of-scope side:
-        # `semantic-ci check --package-root` never observed it, so a
-        # rename across the package-root boundary must count as 0 → N
-        # (newly in-scope nested defs) rather than N → N (Codex review
-        # P2 — matching counts would mask the displacement). A side that
-        # fails to parse skips the entry entirely so a syntax error
-        # cannot fabricate or suppress a growth signal.
+        # D6 / D7 signal: nested-def and extractor-visible-def counts on
+        # both sides of every in-scope Python entry. A file absent at one
+        # rev (added / deleted) contributes 0 on that side, and so does
+        # an out-of-scope side: `semantic-ci check --package-root` never
+        # observed it, so a rename across the package-root boundary must
+        # count as 0 → N (newly in-scope defs) rather than N → N (Codex
+        # review P2 — matching counts would mask the displacement). A
+        # side that fails to parse skips the entry entirely so a syntax
+        # error cannot fabricate or suppress a growth signal.
         if candidate_path.suffix.lower() != ".py" and baseline_path.suffix.lower() != ".py":
             continue
         if not (in_scope(candidate_path) or in_scope(baseline_path)):
             continue
-        baseline_count = (
-            _nested_defs_at(root, baseline_ref, baseline_path) if in_scope(baseline_path) else 0
+        baseline_counts = (
+            _def_counts_at(root, baseline_ref, baseline_path) if in_scope(baseline_path) else (0, 0)
         )
-        candidate_count = (
-            _nested_defs_at(root, candidate_ref, candidate_path) if in_scope(candidate_path) else 0
+        candidate_counts = (
+            _def_counts_at(root, candidate_ref, candidate_path)
+            if in_scope(candidate_path)
+            else (0, 0)
         )
-        if baseline_count is None or candidate_count is None:
+        if baseline_counts is None or candidate_counts is None:
             continue
+        path_posix = candidate_path.as_posix()
         growth.append(
             NestedDefGrowth(
-                path=candidate_path.as_posix(),
-                baseline_count=baseline_count,
-                candidate_count=candidate_count,
+                path=path_posix,
+                baseline_count=baseline_counts[0],
+                candidate_count=candidate_counts[0],
             )
         )
-    return _DiffContext(files_touched=tuple(files_touched), nested_def_growth=tuple(growth))
+        visible_growth.append(
+            VisibleDefGrowth(
+                path=path_posix,
+                baseline_count=baseline_counts[1],
+                candidate_count=candidate_counts[1],
+            )
+        )
+    return _DiffContext(
+        files_touched=tuple(files_touched),
+        nested_def_growth=tuple(growth),
+        visible_def_growth=tuple(visible_growth),
+    )
 
 
-def _nested_defs_at(root: Path, ref: str, path: Path) -> int | None:
-    """Nested-def count for `path` at `ref`; 0 when absent, None on
-    syntax error (caller skips the entry)."""
+def _def_counts_at(root: Path, ref: str, path: Path) -> tuple[int, int] | None:
+    """`(nested, visible)` def counts for `path` at `ref`.
+
+    `(0, 0)` when absent or not a Python file, None on syntax error
+    (caller skips the entry for both signals). The blob is fetched once
+    and fed to both counters.
+    """
     if path.suffix.lower() != ".py":
-        return 0
+        return (0, 0)
     source = blob_text(ref, path.as_posix(), cwd=root)
     if source is None:
-        return 0
-    return count_nested_defs(source)
+        return (0, 0)
+    nested = count_nested_defs(source)
+    visible = count_visible_defs(source)
+    if nested is None or visible is None:
+        return None
+    return (nested, visible)

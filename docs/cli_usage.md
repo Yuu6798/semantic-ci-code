@@ -738,7 +738,7 @@ semantic-ci target-doctor [--target <yaml>] [--package-root <dir>]
                           [--format {human,json}] [--output <file>]
 ```
 
-Audits a `target.yaml` for eight authoring hazards and renders them as
+Audits a `target.yaml` for nine authoring hazards and renders them as
 advisories. Advisor surface — advisory presence does not change the
 verdict and does not change the exit code (`docs/exit_codes.md`).
 
@@ -748,12 +748,13 @@ verdict and does not change the exit code (`docs/exit_codes.md`).
 | `ADVISORY-D3` | A user constraint duplicates a template-expanded constraint (same kind/target/operator/expected). |
 | `ADVISORY-D4` | The target is lock-only and the candidate diff (`--baseline-rev` ↔ `--candidate-rev`) touches no Python files; the verdict would be a vacuous PASS. Skipped silently when neither rev is given and git is unavailable. |
 | `ADVISORY-D6` | The target declares a `complexity_delta` constraint and the candidate diff (`--baseline-rev` ↔ `--candidate-rev`) grows the nested-function count in an in-scope Python file. The complexity extractor does not descend into nested defs, so a reported cyclomatic/cognitive decrease may be displacement, not simplification. Skipped silently when neither rev is given and git is unavailable. |
+| `ADVISORY-D7` | The candidate diff adds N extractor-visible function definitions net across the in-scope diff (the extract-method shape), and a `primary_kind: refactor` target declares a `complexity_delta.cyclomatic` constraint that rejects a `+N` delta (declared `tolerance` honoured — a budget covering the helper count stays silent). The summed cyclomatic is mathematically guaranteed to micro-increase (+1 base per extracted helper), so the lock can FAIL on a faithful refactor — prefer `complexity_delta.cognitive`. Skipped silently when neither rev is given and git is unavailable. |
 | `ADVISORY-I1` | `intent` is the empty string. Repair adapters and `validate-plan` produce better guidance when intent describes the change purpose; use `init --intent` or edit `target.yaml`. |
 | `ADVISORY-P1` | `primary_kind: feature` has no positive addition constraint. |
 | `ADVISORY-P2` | `primary_kind: bugfix` has no `test_surface_delta.new_cases` expectation. |
 | `ADVISORY-S1` | A user constraint has `severity: info` paired with `unknown_policy in {fail, repair}`. After Brief D1-4 the warning scope narrows to extraction-cause / open_runtime UNKNOWN. |
 
-`--format json` emits the `advisory-1` envelope
+`--format json` emits the `advisory-2` envelope
 ([`docs/json_schema.md`](./json_schema.md)). There is no `--strict-advice`
 flag — CI that wants to gate on advisory presence should consume the JSON
 output and apply a workflow-level policy.

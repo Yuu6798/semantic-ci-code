@@ -301,7 +301,7 @@ compile-repair, or validate-plan envelopes. The shape is pinned by
 
 ```jsonc
 {
-  "schema_version": "advisory-1",
+  "schema_version": "advisory-2",
   "subcommand": "target-doctor",
   "advisories": [
     {
@@ -316,14 +316,14 @@ compile-repair, or validate-plan envelopes. The shape is pinned by
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | Always `"advisory-1"`. |
+| `schema_version` | Always `"advisory-2"`. |
 | `subcommand` | Always `"target-doctor"`. |
-| `advisories[].code` | One of `ADVISORY-D1`, `ADVISORY-D3`, `ADVISORY-D4`, `ADVISORY-D6`, `ADVISORY-I1`, `ADVISORY-P1`, `ADVISORY-P2`, `ADVISORY-S1`. |
+| `advisories[].code` | One of `ADVISORY-D1`, `ADVISORY-D3`, `ADVISORY-D4`, `ADVISORY-D6`, `ADVISORY-D7`, `ADVISORY-I1`, `ADVISORY-P1`, `ADVISORY-P2`, `ADVISORY-S1`. |
 | `advisories[].severity` | Always `"info"` — the Advisor surface never participates in the verdict (`docs/code_semantic_ci_design.md §23.3.1`). |
 | `advisories[].message` | Human-readable explanation of the hazard. |
 | `advisories[].evidence` | Per-advisory diagnostic fields (e.g. `constraint_id`, `target`, `package_root`, `files_touched_count`). |
 
-Advisories are emitted in canonical order (D1 → D3 → D4 → D6 → I1 → P1 → P2 → S1)
+Advisories are emitted in canonical order (D1 → D3 → D4 → D6 → D7 → I1 → P1 → P2 → S1)
 with `constraint_id` as the within-code tiebreak so output is byte-identical
 across runs. Advisory presence does not change the exit code — see
 `docs/exit_codes.md`.
@@ -399,6 +399,7 @@ bump the envelope version.
 | `1` | validate-plan | Initial Brief 5 pre-generation validation envelope with `risk_summary`. |
 | `2` | validate-plan | Brief D3: added `risk_summary.authoring_errors` as a sibling list (positioned first). Adapter rendering surfaces a two-step "fix authoring first, then implement" instruction. |
 | `advisory-1` | target-doctor | Brief 8 / CSCI-43: initial advisory envelope. Independent schema; not tied to verdict / compile / compile-repair / validate-plan versions. |
+| `advisory-2` | target-doctor | D-class closure: added `ADVISORY-D6` (nested-function complexity displacement) and `ADVISORY-D7` (extract-method cyclomatic false-FAIL) to the `advisories[].code` enum. Enum extension on an in-use envelope requires a bump per the compatibility policy (D6 briefly shipped inside `advisory-1` on unreleased main; folded into this bump). |
 | `catalog-1` | target-catalog | Brief 8 / CSCI-44: initial catalog envelope. Independent schema; mirrors runtime registries via INV-5 parity. |
 
 ## v2 to v3 Diff

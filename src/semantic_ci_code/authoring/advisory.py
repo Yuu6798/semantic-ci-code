@@ -8,6 +8,7 @@ ADVISORY_CODES = (
     "ADVISORY-D3",
     "ADVISORY-D4",
     "ADVISORY-D6",
+    "ADVISORY-D7",
     "ADVISORY-I1",
     "ADVISORY-P1",
     "ADVISORY-P2",

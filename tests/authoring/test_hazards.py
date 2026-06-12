@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from semantic_ci_code.authoring.hazards import detect_advisories
-from semantic_ci_code.authoring.nested_defs import NestedDefGrowth
+from semantic_ci_code.authoring.nested_defs import NestedDefGrowth, VisibleDefGrowth
 from semantic_ci_code.compiler.target_compiler import compile_target_svp
 
 
@@ -209,3 +209,247 @@ def test_advisory_order_d6_between_d4_and_i1():
     assert "ADVISORY-D6" in codes
     assert "ADVISORY-I1" in codes
     assert codes.index("ADVISORY-D4") < codes.index("ADVISORY-D6") < codes.index("ADVISORY-I1")
+
+
+# ---------------------------------------------------------------------------
+# ADVISORY-D7 — refactor + cyclomatic no-increase lock + extract-method shape
+# ---------------------------------------------------------------------------
+
+
+def _cyclomatic_refactor_target(operator: str = "less_than_or_equal", expected: str = "0") -> str:
+    return (
+        "intent: extract helpers\n"
+        "change:\n"
+        "  primary_kind: refactor\n"
+        "constraints:\n"
+        "  - id: cc_no_increase\n"
+        "    kind: delta\n"
+        "    target: complexity_delta.cyclomatic\n"
+        f"    operator: {operator}\n"
+        f"    expected: {expected}\n"
+    )
+
+
+def _visible_growth(
+    path: str = "src/mod.py", baseline: int = 1, candidate: int = 3
+) -> VisibleDefGrowth:
+    return VisibleDefGrowth(path=path, baseline_count=baseline, candidate_count=candidate)
+
+
+def test_detect_d7_fires_on_refactor_cyclomatic_lock_with_extraction():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+    d7 = [advisory for advisory in advisories if advisory.code == "ADVISORY-D7"]
+
+    assert len(d7) == 1
+    assert "cognitive" in d7[0].message
+    assert d7[0].evidence["constraint_ids"] == ["cc_no_increase"]
+    assert d7[0].evidence["visible_defs_added"] == 2
+    assert d7[0].evidence["files"] == [
+        {"path": "src/mod.py", "baseline_visible_defs": 1, "candidate_visible_defs": 3}
+    ]
+
+
+def test_detect_d7_fires_on_equals_zero_and_within_range_shapes():
+    for operator, expected in (("equals", "0"), ("within_range", "[-5, 0]"), ("less_than", "1")):
+        target = _compile_target(_cyclomatic_refactor_target(operator, expected))
+        advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+        codes = [advisory.code for advisory in advisories]
+        assert "ADVISORY-D7" in codes, f"{operator} {expected} should fire"
+
+
+def test_detect_d7_silent_when_allowance_tolerates_increase():
+    for operator, expected in (("less_than_or_equal", "3"), ("within_range", "[-5, 2]")):
+        target = _compile_target(_cyclomatic_refactor_target(operator, expected))
+        advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+        assert "ADVISORY-D7" not in [advisory.code for advisory in advisories], (
+            f"{operator} {expected} should stay silent"
+        )
+
+
+def test_detect_d7_silent_for_non_refactor_kind():
+    yaml_text = _cyclomatic_refactor_target().replace(
+        "primary_kind: refactor", "primary_kind: feature"
+    )
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_silent_for_cognitive_target():
+    yaml_text = _cyclomatic_refactor_target().replace(
+        "complexity_delta.cyclomatic", "complexity_delta.cognitive"
+    )
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_silent_without_visible_growth():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(
+            _visible_growth(baseline=3, candidate=3),
+            _visible_growth(path="src/other.py", baseline=4, candidate=2),
+        ),
+    )
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_skipped_when_context_is_none():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(target, visible_def_growth=None)
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_ignores_non_verdict_participating_constraint():
+    yaml_text = _cyclomatic_refactor_target() + "    severity: info\n    unknown_policy: ignore\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_advisory_order_d7_between_d6_and_i1():
+    yaml_text = (
+        'intent: ""\n'
+        "change:\n"
+        "  primary_kind: refactor\n"
+        "constraints:\n"
+        "  - id: cc_no_increase\n"
+        "    kind: delta\n"
+        "    target: complexity_delta.cyclomatic\n"
+        "    operator: less_than_or_equal\n"
+        "    expected: 0\n"
+    )
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(
+        target,
+        nested_def_growth=(_growth(),),
+        visible_def_growth=(_visible_growth(),),
+    )
+    codes = [advisory.code for advisory in advisories]
+
+    assert "ADVISORY-D6" in codes
+    assert "ADVISORY-D7" in codes
+    assert "ADVISORY-I1" in codes
+    assert codes.index("ADVISORY-D6") < codes.index("ADVISORY-D7") < codes.index("ADVISORY-I1")
+
+
+def test_detect_d7_silent_on_net_zero_relocation():
+    """Codex review P2: relocating a function between files (+1 / -1)
+    cancels in the summed cyclomatic delta — the lock can still pass, so
+    per-file growth alone must not warn."""
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(
+            _visible_growth(path="src/dst.py", baseline=1, candidate=2),
+            _visible_growth(path="src/src.py", baseline=2, candidate=1),
+        ),
+    )
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_reports_net_growth_with_partial_shrinkage():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(
+            _visible_growth(path="src/dst.py", baseline=1, candidate=3),
+            _visible_growth(path="src/src.py", baseline=2, candidate=1),
+        ),
+    )
+    d7 = [advisory for advisory in advisories if advisory.code == "ADVISORY-D7"]
+
+    assert len(d7) == 1
+    assert d7[0].evidence["visible_defs_added"] == 1
+    assert d7[0].evidence["files"] == [
+        {"path": "src/dst.py", "baseline_visible_defs": 1, "candidate_visible_defs": 3}
+    ]
+
+
+def test_detect_d7_silent_when_tolerance_budgets_the_increase():
+    """Codex review P2: the evaluator applies `tolerance` to numeric
+    comparisons (`<= 0, tolerance: 1` allows +1), so a target whose
+    budget covers the actual net helper count must not warn."""
+    one_helper = (_visible_growth(baseline=1, candidate=2),)
+    for operator, expected, tolerance in (
+        ("less_than_or_equal", "0", "1"),
+        ("within_range", "[-5, 0]", "1"),
+        ("less_than", "1", "0.5"),
+    ):
+        yaml_text = (
+            _cyclomatic_refactor_target(operator, expected) + f"    tolerance: {tolerance}\n"
+        )
+        target = _compile_target(yaml_text)
+        advisories = detect_advisories(target, visible_def_growth=one_helper)
+        assert "ADVISORY-D7" not in [advisory.code for advisory in advisories], (
+            f"{operator} {expected} tolerance={tolerance} should stay silent for +1"
+        )
+
+
+def test_detect_d7_fires_when_budget_is_smaller_than_helper_count():
+    """Codex review P2: `<= 0, tolerance: 1` budgets one helper, but a
+    faithful two-helper extraction adds +2 — the lock still structurally
+    FAILs, so the advisory must compare the allowance against the actual
+    net growth, not just +1."""
+    yaml_text = _cyclomatic_refactor_target() + "    tolerance: 1\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(_visible_growth(baseline=1, candidate=3),),
+    )
+    d7 = [advisory for advisory in advisories if advisory.code == "ADVISORY-D7"]
+
+    assert len(d7) == 1
+    assert d7[0].evidence["visible_defs_added"] == 2
+
+
+def test_detect_d7_silent_when_equals_matches_net_growth():
+    # `equals 2` demands exactly the +2 a two-helper extraction
+    # produces — the lock budgets the extraction, no false-FAIL trap.
+    target = _compile_target(_cyclomatic_refactor_target("equals", "2"))
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(_visible_growth(baseline=1, candidate=3),),
+    )
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_fires_when_tolerance_does_not_reach_plus_one():
+    yaml_text = _cyclomatic_refactor_target() + "    tolerance: 0.5\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_equals_ignores_tolerance():
+    # The evaluator's EQUALS dispatch never applies tolerance, so
+    # `equals 0, tolerance: 1` still rejects every increase.
+    yaml_text = _cyclomatic_refactor_target("equals", "0") + "    tolerance: 1\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" in [advisory.code for advisory in advisories]

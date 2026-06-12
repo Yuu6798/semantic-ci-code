@@ -161,4 +161,4 @@ sentinel, not a switch.
 - `docs/exit_codes.md` — `target-doctor` exit code policy
   (advisory presence does not change the verdict; usage / engine errors
   still use the global 2 / 3 / 4 policy)
-- `docs/json_schema.md` — `advisory-1` and `catalog-1` envelopes
+- `docs/json_schema.md` — `advisory-2` and `catalog-1` envelopes

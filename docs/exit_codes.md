@@ -78,8 +78,8 @@ git errors (`CompileError` on `target.yaml`, git revision resolution
 failure when `--baseline-rev` / `--candidate-rev` is given, git
 unavailable when explicitly required) exit 3. Internal bugs exit 4. When
 neither `--baseline-rev` nor `--candidate-rev` is given and git is
-unavailable or no baseline can be resolved, ADVISORY-D4 and ADVISORY-D6
-are silently skipped rather than failing. There is no `--strict-advice` flag; CI that
+unavailable or no baseline can be resolved, the diff-aware advisories
+(ADVISORY-D4 / D6 / D7) are silently skipped rather than failing. There is no `--strict-advice` flag; CI that
 wants to gate on advisory presence should consume `--format json` and
 apply a workflow-level policy. Silent success on bad input is forbidden —
 the advisor surface only suppresses the verdict step, not the input

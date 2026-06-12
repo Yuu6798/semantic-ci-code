@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from semantic_ci_code.authoring.nested_defs import NestedDefGrowth, count_nested_defs
+from semantic_ci_code.authoring.nested_defs import (
+    NestedDefGrowth,
+    count_nested_defs,
+    count_visible_defs,
+)
 
 
 def test_module_level_defs_are_not_nested():
@@ -73,3 +77,39 @@ def test_empty_source_counts_zero():
 def test_growth_record_is_frozen_and_comparable():
     growth = NestedDefGrowth(path="src/mod.py", baseline_count=0, candidate_count=2)
     assert growth.candidate_count > growth.baseline_count
+
+
+# ---------------------------------------------------------------------------
+# count_visible_defs — extractor-parity visible def counting (D7 signal)
+# ---------------------------------------------------------------------------
+
+
+def test_visible_counts_module_level_defs():
+    source = "def foo(): return 1\n\nasync def bar(): return 2\n"
+    assert count_visible_defs(source) == 2
+
+
+def test_visible_counts_methods_of_module_level_class():
+    source = "class A:\n    def method(self): return 1\n"
+    assert count_visible_defs(source) == 1
+
+
+def test_visible_excludes_nested_defs():
+    source = "def outer():\n    def helper(): return 1\n    return helper()\n"
+    assert count_visible_defs(source) == 1
+
+
+def test_visible_counts_defs_in_module_scope_compound_statements():
+    # Extractor parity: definitions inside module-scope compound
+    # statements are emitted.
+    source = "if True:\n    def foo(): return 1\n"
+    assert count_visible_defs(source) == 1
+
+
+def test_visible_excludes_nested_class_methods():
+    source = "class A:\n    class B:\n        def method(self): return 1\n"
+    assert count_visible_defs(source) == 0
+
+
+def test_visible_syntax_error_returns_none():
+    assert count_visible_defs("def broken(:\n") is None

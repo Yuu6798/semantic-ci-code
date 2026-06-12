@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from semantic_ci_code.authoring.hazards import detect_advisories
-from semantic_ci_code.authoring.nested_defs import NestedDefGrowth
+from semantic_ci_code.authoring.nested_defs import NestedDefGrowth, VisibleDefGrowth
 from semantic_ci_code.compiler.target_compiler import compile_target_svp
 
 
@@ -209,3 +209,140 @@ def test_advisory_order_d6_between_d4_and_i1():
     assert "ADVISORY-D6" in codes
     assert "ADVISORY-I1" in codes
     assert codes.index("ADVISORY-D4") < codes.index("ADVISORY-D6") < codes.index("ADVISORY-I1")
+
+
+# ---------------------------------------------------------------------------
+# ADVISORY-D7 — refactor + cyclomatic no-increase lock + extract-method shape
+# ---------------------------------------------------------------------------
+
+
+def _cyclomatic_refactor_target(operator: str = "less_than_or_equal", expected: str = "0") -> str:
+    return (
+        "intent: extract helpers\n"
+        "change:\n"
+        "  primary_kind: refactor\n"
+        "constraints:\n"
+        "  - id: cc_no_increase\n"
+        "    kind: delta\n"
+        "    target: complexity_delta.cyclomatic\n"
+        f"    operator: {operator}\n"
+        f"    expected: {expected}\n"
+    )
+
+
+def _visible_growth(
+    path: str = "src/mod.py", baseline: int = 1, candidate: int = 3
+) -> VisibleDefGrowth:
+    return VisibleDefGrowth(path=path, baseline_count=baseline, candidate_count=candidate)
+
+
+def test_detect_d7_fires_on_refactor_cyclomatic_lock_with_extraction():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+    d7 = [advisory for advisory in advisories if advisory.code == "ADVISORY-D7"]
+
+    assert len(d7) == 1
+    assert "cognitive" in d7[0].message
+    assert d7[0].evidence["constraint_ids"] == ["cc_no_increase"]
+    assert d7[0].evidence["visible_defs_added"] == 2
+    assert d7[0].evidence["files"] == [
+        {"path": "src/mod.py", "baseline_visible_defs": 1, "candidate_visible_defs": 3}
+    ]
+
+
+def test_detect_d7_fires_on_equals_zero_and_within_range_shapes():
+    for operator, expected in (("equals", "0"), ("within_range", "[-5, 0]"), ("less_than", "1")):
+        target = _compile_target(_cyclomatic_refactor_target(operator, expected))
+        advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+        codes = [advisory.code for advisory in advisories]
+        assert "ADVISORY-D7" in codes, f"{operator} {expected} should fire"
+
+
+def test_detect_d7_silent_when_allowance_tolerates_increase():
+    for operator, expected in (("less_than_or_equal", "3"), ("within_range", "[-5, 2]")):
+        target = _compile_target(_cyclomatic_refactor_target(operator, expected))
+        advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+        assert "ADVISORY-D7" not in [advisory.code for advisory in advisories], (
+            f"{operator} {expected} should stay silent"
+        )
+
+
+def test_detect_d7_silent_for_non_refactor_kind():
+    yaml_text = _cyclomatic_refactor_target().replace(
+        "primary_kind: refactor", "primary_kind: feature"
+    )
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_silent_for_cognitive_target():
+    yaml_text = _cyclomatic_refactor_target().replace(
+        "complexity_delta.cyclomatic", "complexity_delta.cognitive"
+    )
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_silent_without_visible_growth():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(
+        target,
+        visible_def_growth=(
+            _visible_growth(baseline=3, candidate=3),
+            _visible_growth(path="src/other.py", baseline=4, candidate=2),
+        ),
+    )
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_skipped_when_context_is_none():
+    target = _compile_target(_cyclomatic_refactor_target())
+
+    advisories = detect_advisories(target, visible_def_growth=None)
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_detect_d7_ignores_non_verdict_participating_constraint():
+    yaml_text = _cyclomatic_refactor_target() + "    severity: info\n    unknown_policy: ignore\n"
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(target, visible_def_growth=(_visible_growth(),))
+
+    assert "ADVISORY-D7" not in [advisory.code for advisory in advisories]
+
+
+def test_advisory_order_d7_between_d6_and_i1():
+    yaml_text = (
+        'intent: ""\n'
+        "change:\n"
+        "  primary_kind: refactor\n"
+        "constraints:\n"
+        "  - id: cc_no_increase\n"
+        "    kind: delta\n"
+        "    target: complexity_delta.cyclomatic\n"
+        "    operator: less_than_or_equal\n"
+        "    expected: 0\n"
+    )
+    target = _compile_target(yaml_text)
+
+    advisories = detect_advisories(
+        target,
+        nested_def_growth=(_growth(),),
+        visible_def_growth=(_visible_growth(),),
+    )
+    codes = [advisory.code for advisory in advisories]
+
+    assert "ADVISORY-D6" in codes
+    assert "ADVISORY-D7" in codes
+    assert "ADVISORY-I1" in codes
+    assert codes.index("ADVISORY-D6") < codes.index("ADVISORY-D7") < codes.index("ADVISORY-I1")

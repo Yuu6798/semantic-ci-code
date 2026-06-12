@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from semantic_ci_code.authoring.advisory import Advisory
-from semantic_ci_code.authoring.nested_defs import NestedDefGrowth
+from semantic_ci_code.authoring.nested_defs import NestedDefGrowth, VisibleDefGrowth
 from semantic_ci_code.compiler.target_compiler import (
     CompiledConstraint,
     CompiledTarget,
@@ -38,6 +38,7 @@ _ADVISORY_ORDER = (
     "ADVISORY-D3",
     "ADVISORY-D4",
     "ADVISORY-D6",
+    "ADVISORY-D7",
     "ADVISORY-I1",
     "ADVISORY-P1",
     "ADVISORY-P2",
@@ -99,13 +100,15 @@ def detect_advisories(
     package_root: Path | None = None,
     files_touched: tuple[Path, ...] | None = None,
     nested_def_growth: tuple[NestedDefGrowth, ...] | None = None,
+    visible_def_growth: tuple[VisibleDefGrowth, ...] | None = None,
 ) -> tuple[Advisory, ...]:
     """Run every detector and return the advisories in canonical order.
 
     `package_root` is required for D1; when omitted the detector is
-    skipped silently. `files_touched` is required for D4 and
-    `nested_def_growth` for D6; when omitted (e.g. git not available)
-    the corresponding detector is skipped.
+    skipped silently. `files_touched` is required for D4,
+    `nested_def_growth` for D6, and `visible_def_growth` for D7; when
+    omitted (e.g. git not available) the corresponding detector is
+    skipped.
     """
     advisories: list[Advisory] = []
     if package_root is not None:
@@ -115,6 +118,8 @@ def detect_advisories(
         advisories.extend(detect_d4(target, files_touched=files_touched))
     if nested_def_growth is not None:
         advisories.extend(detect_d6(target, nested_def_growth=nested_def_growth))
+    if visible_def_growth is not None:
+        advisories.extend(detect_d7(target, visible_def_growth=visible_def_growth))
     advisories.extend(detect_i1(target))
     advisories.extend(detect_p1(target))
     advisories.extend(detect_p2(target))
@@ -285,6 +290,80 @@ def detect_d6(
                         "path": g.path,
                         "baseline_nested_defs": g.baseline_count,
                         "candidate_nested_defs": g.candidate_count,
+                    }
+                    for g in grown[:5]
+                ],
+            },
+        ),
+    )
+
+
+def detect_d7(
+    target: CompiledTarget,
+    *,
+    visible_def_growth: tuple[VisibleDefGrowth, ...],
+) -> tuple[Advisory, ...]:
+    """Refactor + cyclomatic no-increase lock + extract-method shape.
+
+    `complexity_delta.cyclomatic` is the **summed** cyclomatic delta over
+    extractor-visible functions, and every function starts at base 1. An
+    extract-method refactor therefore micro-increases the sum by +1 per
+    extracted helper even when every branch is preserved — a
+    `primary_kind: refactor` target locking `cyclomatic <= 0` is
+    structurally guaranteed to FAIL on exactly the refactor it means to
+    endorse (D7, `docs/dogfooding_findings_tracker.md`). Cognitive is the
+    metric that drops under extraction.
+
+    The detector fires when the target is a refactor, declares a
+    verdict-participating `complexity_delta.cyclomatic` constraint whose
+    shape forbids any increase, AND the candidate diff grows the
+    extractor-visible def count in an in-scope Python file (the
+    extract-method shape). Growth is a heuristic shape signal, not
+    proof — the advisory recommends a metric, it never seats the
+    verdict. `None` (inapplicable, git unavailable) is filtered out by
+    the caller, mirroring D4 / D6.
+    """
+    if target.primary_kind is not ChangeKind.REFACTOR:
+        return ()
+    cyclomatic_locks = tuple(
+        c
+        for c in target.constraints
+        if _is_cyclomatic_leaf_target(c.target)
+        and _participates_in_verdict(c)
+        and _forbids_cyclomatic_increase(c)
+    )
+    if not cyclomatic_locks:
+        return ()
+    grown = tuple(g for g in visible_def_growth if g.candidate_count > g.baseline_count)
+    if not grown:
+        return ()
+    total_added = sum(g.candidate_count - g.baseline_count for g in grown)
+    constraint_ids = ", ".join(repr(c.id) for c in cyclomatic_locks)
+    return (
+        Advisory(
+            code="ADVISORY-D7",
+            message=(
+                f"primary_kind=refactor locks complexity_delta.cyclomatic against "
+                f"any increase ({constraint_ids}), and the candidate diff adds "
+                f"{total_added} extractor-visible function definition(s) across "
+                f"{len(grown)} file(s) — the extract-method shape. The cyclomatic "
+                f"delta is summed over functions and each function starts at base "
+                f"1, so a faithful extract-method refactor is mathematically "
+                f"guaranteed to micro-increase it; this lock can FAIL on exactly "
+                f"the refactor it means to endorse. If the intent is 'no "
+                f"complexity growth', constrain complexity_delta.cognitive "
+                f"instead (it drops under extraction), or widen the cyclomatic "
+                f"allowance by the number of extracted helpers."
+            ),
+            evidence={
+                "constraint_ids": [c.id for c in cyclomatic_locks],
+                "visible_defs_added": total_added,
+                "grown_files_count": len(grown),
+                "files": [
+                    {
+                        "path": g.path,
+                        "baseline_visible_defs": g.baseline_count,
+                        "candidate_visible_defs": g.candidate_count,
                     }
                     for g in grown[:5]
                 ],
@@ -763,6 +842,45 @@ def _is_complexity_delta_target(path: str) -> bool:
     """
     head = path.split(".", 1)[0]
     return head == "complexity_delta"
+
+
+def _is_cyclomatic_leaf_target(path: str) -> bool:
+    """Match the `complexity_delta.cyclomatic` scalar leaf only.
+
+    D7 is cyclomatic-specific: cognitive is the recommended alternative
+    (it drops under extraction), so cognitive locks are out of scope, and
+    whole-mapping `complexity_delta` locks are D6 territory.
+    """
+    return path == "complexity_delta.cyclomatic"
+
+
+def _forbids_cyclomatic_increase(constraint: CompiledConstraint) -> bool:
+    """True if the constraint shape rejects every positive observed delta.
+
+    Only shapes that forbid *any* increase are flagged — `<= 3` tolerates
+    a few extracted helpers and is not the D7 false-FAIL trap:
+
+    - `less_than_or_equal N` with N <= 0
+    - `less_than N` with N <= 1 (observed must be <= 0)
+    - `equals N` with N <= 0
+    - `within_range [low, high]` with high <= 0
+    """
+    operator = constraint.operator
+    expected = constraint.expected
+    if operator is Operator.LESS_THAN_OR_EQUAL:
+        return _is_scalar_number(expected) and expected <= 0
+    if operator is Operator.LESS_THAN:
+        return _is_scalar_number(expected) and expected <= 1
+    if operator is Operator.EQUALS:
+        return _is_scalar_number(expected) and expected <= 0
+    if (
+        operator is Operator.WITHIN_RANGE
+        and isinstance(expected, list | tuple)
+        and len(expected) == 2
+        and all(_is_scalar_number(item) for item in expected)
+    ):
+        return expected[1] <= 0
+    return False
 
 
 def _targets_new_test_cases(constraint: CompiledConstraint) -> bool:

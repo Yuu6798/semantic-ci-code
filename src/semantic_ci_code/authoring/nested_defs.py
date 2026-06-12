@@ -1,24 +1,37 @@
-"""Nested-function counting for ADVISORY-D6 (nested-function blind spot).
+"""Def counting for the complexity authoring advisories (D6 / D7).
 
-`python_complexity_extractor` stops descent at nested ``FunctionDef`` /
-``AsyncFunctionDef`` / ``ClassDef`` boundaries and only emits entries for
-the ``api_surface`` parity subset (module-level defs + direct methods of
-module-level classes). Complexity moved into function-nested helpers
-therefore disappears from ``complexity_delta`` numbers (D6,
-`docs/dogfooding_findings_tracker.md`). This module provides the
-deterministic per-file signal — the count of function-nested defs — that
-the CLI layer feeds to `detect_d6` as `NestedDefGrowth` records.
+`python_complexity_extractor` only emits entries for the ``api_surface``
+parity subset (module-level defs + direct methods of module-level
+classes) and stops descent at nested ``def`` boundaries. Both complexity
+hazards are shapes of that emission rule
+(`docs/dogfooding_findings_tracker.md`):
 
-Scope note: only defs nested (at any depth) inside another function are
-counted. Lambdas are not counted — they cannot contain statements, so they
-cannot absorb branch complexity the way a nested def can. Methods of
-module-level classes are extractor-visible and not counted.
+- **D6**: complexity displaced into function-nested helpers vanishes from
+  ``complexity_delta`` numbers (vacuous PASS). Signal: per-file
+  function-nested def count growth (`count_nested_defs` /
+  `NestedDefGrowth`).
+- **D7**: extract-method refactors add extractor-visible functions, each
+  starting at cyclomatic base 1, so a summed ``cyclomatic <= 0`` lock is
+  mathematically guaranteed to false-FAIL on a faithful extraction.
+  Signal: per-file extractor-visible def count growth
+  (`count_visible_defs` / `VisibleDefGrowth`).
+
+The CLI layer computes the per-file growth records from the candidate
+diff and feeds them to `detect_d6` / `detect_d7`.
+
+Scope note for `count_nested_defs`: only defs nested (at any depth)
+inside another function are counted. Lambdas are not counted — they
+cannot contain statements, so they cannot absorb branch complexity the
+way a nested def can. Methods of module-level classes are
+extractor-visible and not counted.
 """
 
 from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+
+from semantic_ci_code.complexity.python_complexity_extractor import extract_python_complexity
 
 
 @dataclass(frozen=True)
@@ -27,6 +40,18 @@ class NestedDefGrowth:
 
     `path` is the candidate-side repo-relative posix path. A file absent
     on one side contributes a count of 0 for that side.
+    """
+
+    path: str
+    baseline_count: int
+    candidate_count: int
+
+
+@dataclass(frozen=True)
+class VisibleDefGrowth:
+    """Per-file extractor-visible def counts on both diff sides.
+
+    Same path / absent-side conventions as `NestedDefGrowth`.
     """
 
     path: str
@@ -58,3 +83,18 @@ def count_nested_defs(source: str) -> int | None:
                 count += 1
             stack.append((child, inside_function or is_def))
     return count
+
+
+def count_visible_defs(source: str) -> int | None:
+    """Count extractor-visible function defs (``api_surface`` parity).
+
+    Delegates to `extract_python_complexity` so the count can never
+    drift from the real emission rule (module-level defs incl.
+    module-scope compound statements + direct methods of module-level
+    classes). Returns `None` when `source` does not parse, mirroring
+    `count_nested_defs`.
+    """
+    try:
+        return len(extract_python_complexity(source, module_fqn="_advisory_probe"))
+    except (SyntaxError, ValueError):
+        return None

@@ -1,6 +1,6 @@
 """CSCI-43: `semantic-ci target-doctor` (Advisor surface).
 
-Covers the advisories (D1 / D3 / D4 / D6 / I1 / P1 / P2 / S1) with both a
+Covers the advisories (D1 / D3 / D4 / D6 / D7 / I1 / P1 / P2 / S1) with both a
 detection fixture and a false-positive prevention fixture, the JSON
 envelope schema, the exit-code contract from `docs/exit_codes.md` and
 `docs/brief_8_planning.md §6.3.3`, and the determinism + argparse spec
@@ -1784,3 +1784,99 @@ def test_d6_cli_silent_on_rename_out_of_package_root_scope(tmp_path: Path):
     payload = _run_doctor_json(repo, baseline_sha)
 
     assert "ADVISORY-D6" not in [a["code"] for a in payload["advisories"]]
+
+
+# ---------------------------------------------------------------------------
+# CLI integration with git for D7 (covers visible_def_growth resolution path)
+# ---------------------------------------------------------------------------
+
+_TARGET_CYCLOMATIC_NO_INCREASE = (
+    "intent: extract helpers\n"
+    "change:\n"
+    "  primary_kind: refactor\n"
+    "constraints:\n"
+    "  - id: cc_no_increase\n"
+    "    kind: delta\n"
+    "    target: complexity_delta.cyclomatic\n"
+    "    operator: less_than_or_equal\n"
+    "    expected: 0\n"
+)
+
+# Faithful extract-method refactor of _FLAT_FUNCTION: every branch is
+# preserved, but the extracted module-level helper adds cyclomatic base 1
+# (summed delta +1) — the D7 structural false-FAIL shape.
+_EXTRACT_METHOD_REFACTOR = (
+    "def _keep(item):\n"
+    "    return bool(item)\n"
+    "\n"
+    "def process(items):\n"
+    "    out = []\n"
+    "    for item in items:\n"
+    "        if _keep(item):\n"
+    "            out.append(item)\n"
+    "    return out\n"
+)
+
+
+def test_d7_cli_fires_on_extract_method_with_cyclomatic_lock(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=_EXTRACT_METHOD_REFACTOR,
+        target_yaml=_TARGET_CYCLOMATIC_NO_INCREASE,
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+    jsonschema.validate(payload, DOCTOR_SCHEMA)
+    d7 = [a for a in payload["advisories"] if a["code"] == "ADVISORY-D7"]
+
+    assert len(d7) == 1
+    assert d7[0]["evidence"]["constraint_ids"] == ["cc_no_increase"]
+    assert d7[0]["evidence"]["visible_defs_added"] == 1
+    assert d7[0]["evidence"]["files"] == [
+        {"path": "src/mod.py", "baseline_visible_defs": 1, "candidate_visible_defs": 2}
+    ]
+    # The extraction added no nested defs, so D6 must stay silent.
+    assert "ADVISORY-D6" not in [a["code"] for a in payload["advisories"]]
+
+
+def test_d7_cli_silent_with_cognitive_constraint(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=_EXTRACT_METHOD_REFACTOR,
+        target_yaml=_TARGET_CYCLOMATIC_NO_INCREASE.replace(
+            "complexity_delta.cyclomatic", "complexity_delta.cognitive"
+        ),
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+
+    assert "ADVISORY-D7" not in [a["code"] for a in payload["advisories"]]
+
+
+def test_d7_cli_silent_without_extraction(tmp_path: Path):
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=_FLAT_FUNCTION.replace("if item:", "if item is not None:"),
+        target_yaml=_TARGET_CYCLOMATIC_NO_INCREASE,
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+
+    assert "ADVISORY-D7" not in [a["code"] for a in payload["advisories"]]
+
+
+def test_d6_and_d7_can_fire_together_on_nested_extraction(tmp_path: Path):
+    """A refactor that both extracts a module-level helper AND pushes
+    logic into a nested def trips both complementary advisories."""
+    candidate = _NESTED_REFACTOR + "\ndef _extra_helper(x):\n    return x\n"
+    repo, baseline_sha = _d6_repo(
+        tmp_path,
+        candidate_source=candidate,
+        target_yaml=_TARGET_CYCLOMATIC_NO_INCREASE,
+    )
+
+    payload = _run_doctor_json(repo, baseline_sha)
+    codes = [a["code"] for a in payload["advisories"]]
+
+    assert "ADVISORY-D6" in codes
+    assert "ADVISORY-D7" in codes

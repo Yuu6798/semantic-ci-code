@@ -316,6 +316,41 @@ candidate diff grows the nested-def count in an in-scope Python file.
 Growth is a heuristic displacement signal, not proof — review the diff
 rather than treating the advisory as a verdict.
 
+## Hazard 5 — Extract-method micro-increases cyclomatic (D7)
+
+The mirror image of Hazard 4 (observed on a real PR in
+`docs/dogfooding_real_pr_complexity.md` FINDING-F2). Where D6 hides
+complexity by nesting helpers *inside* a function, D7 bites when you do
+the **right** thing — extracting helpers to module level, where they are
+extracted and counted.
+
+`complexity_delta.cyclomatic` is the **sum** of per-function cyclomatic
+over extractor-visible functions, and every function starts at base 1.
+An extract-method refactor that preserves every branch therefore raises
+the sum by exactly +1 per extracted helper — it is mathematically
+impossible for a faithful extraction to keep `cyclomatic ≤ 0`. A
+`primary_kind: refactor` target declaring that lock will FAIL on exactly
+the refactor it means to endorse (a structural false-FAIL, not an engine
+bug). Cognitive complexity is the metric that *drops* under extraction:
+the nesting penalty disappears and `BoolOp` / branch costs redistribute.
+
+**Choosing a complexity metric per refactor pattern:**
+
+| Refactor pattern | Recommended constraint |
+|---|---|
+| extract-method / extract-function | `complexity_delta.cognitive less_than_or_equal 0` |
+| inline-method (merging helpers back) | `complexity_delta.cyclomatic less_than_or_equal 0` (cognitive may rise from re-nesting) |
+| pure simplification, no function count change | either metric; `cyclomatic` is stricter |
+| large decomposition (N extracted helpers) | `cyclomatic less_than_or_equal N` if you must use cyclomatic |
+
+`semantic-ci target-doctor` detects this hazard as `ADVISORY-D7` when
+`--baseline-rev` / `--candidate-rev` are given: it fires when a refactor
+target locks `complexity_delta.cyclomatic` against any increase and the
+candidate diff adds extractor-visible function definitions. Hazards 4
+and 5 are complementary: D6 warns that a green cyclomatic verdict may be
+hollow, D7 warns that a red one may be noise — both resolve by pairing
+the right metric with the refactor shape.
+
 ## Constraint Authoring Tips
 
 ### Pick `kind` deliberately

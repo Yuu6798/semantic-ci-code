@@ -96,8 +96,10 @@ orchestrator 観測応用 / F6 (SAST 盲点、untested hypothesis)。
   verdict)。determinism・auditability の flagship で ecosystem 不変条件
   (audit layer 再現性) の実装的裏付け。
 - **順序判断**: どちらも「効くか」(X-2 外部検証) の結果と相互情報を持つ
-  — 特に §19 は X-2 の C-lite 誤判定タグ分析が実データを供給する。
-  **X-2 pilot (E-3) より先に着手しない**。
+  — 特に §19 は X-2 の C-lite 誤判定タグ分析が実データを供給する。C-lite
+  タグは **N≥48 本実験**で生産される (pilot 5 件は配管確認のみ・性能数値
+  使用禁止、`pr_validation_planning.md`)。よって gate は **X-2 本実験の
+  分析完了**であり、pilot 完了では開かない。
 
 ### 2.4 見送り / 凍結維持 (declared asymmetry として doc pin)
 
@@ -134,12 +136,12 @@ orchestrator 観測応用 / F6 (SAST 盲点、untested hypothesis)。
 
 W2-a が本 survey の主産物。W2-b は独立で並走可。
 
-### Wave 3 — 本命拡張 (X-2 pilot の後、着手前に planning 増補)
+### Wave 3 — 本命拡張 (X-2 本実験の後、着手前に planning 増補)
 
 | ID | タスク | Executor | 前提 |
 |---|---|---|---|
-| **W3-a (CSCI-59〜60)** | **§19 spec quality metrics**: spec_coverage 算出 + meta-verdict (Advisor surface 固定、verdict 非参与)。2 PR 想定 (metrics 算出 / doctor・envelope 露出)。着手前に本 doc へ設計 section 増補 (X-2 の誤判定タグ実データを入力に) | **Opus** | **E-3 (X-2 pilot) 完了後** |
-| **W3-b (CSCI-61)** | **§10.3 round-trip log**: intent/state/delta/verdict の per-stage hash chain を envelope optional field で露出。schema_version bump 判定含む | **Opus** | W3-a と独立、X-2 後 |
+| **W3-a (CSCI-59〜60)** | **§19 spec quality metrics**: spec_coverage 算出 + meta-verdict (Advisor surface 固定、verdict 非参与)。2 PR 想定 (metrics 算出 / doctor・envelope 露出)。着手前に本 doc へ設計 section 増補 (X-2 の誤判定タグ実データを入力に) | **Opus** | **X-2 本実験 (N≥48 + C-lite タグ分析) 完了後** — pilot は配管確認のみで gate にならない |
+| **W3-b (CSCI-61)** | **§10.3 round-trip log**: intent/state/delta/verdict の per-stage hash chain を envelope optional field で露出。schema_version bump 判定含む | **Opus** | W3-a と独立、X-2 本実験後 (投資判断根拠は同じ) |
 | W3-c | override 機構 (Brief 3 #3) | — | §19 着地後に再評価 (据置) |
 
 ## 4. Sequencing — 既存 queue との整合

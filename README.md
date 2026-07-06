@@ -123,6 +123,7 @@ Active references (current behavior):
 - [target.yaml Authoring Guide](docs/target_yaml_guide.md) — practical authoring guide; centralises hazards D1/D3/D4 (`--package-root` scope, template/user constraint duplication, config-only vacuous PASS)
 - [Target Authoring Surface](docs/target_authoring_surface.md) — Authoring surface design contract (target.yaml generation paths, surface isolation, `candidate_code_used: false`)
 - [AGENTS.md](AGENTS.md) — Claude × Codex task handoff protocol + Experience Externalization Discipline (§5)
+- [Model Delegation Policy](docs/model_delegation_policy.md) — design / execution separation inside Claude Code sessions: Fable (design model) issues designs and review verdicts only; implementation, execution, verification, and heavy GitHub payload operations (thread fetch / reply posting) are delegated to Opus / Sonnet executors
 - [SSP v0.1 Protocol Spec](docs/ssp_protocol.md) — normative v0.1 spec: definitions, fingerprint, Python profile, delta computation, verdict, JSON Schema, Sensor Provenance Invariant
 - [SSP Usage Guide](docs/ssp_usage_guide.md) — practical guide: quick start, output formats, CI integration, hand-built fixtures, delta mechanics
 - [SSP v0.1 Forward Design Note](docs/ssp_protocol_design_note.md) — Brief 7 implementer 用 一次資料 (Phase 4 で AGENTS.md inline から分離)

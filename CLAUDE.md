@@ -123,36 +123,39 @@ surface that in the response rather than acting without it.
 - `.claude/memory/archive/` (compacted history), 30 日以上前の dated logs,
   旧 `STATUS.md ## 直近 merged` log.
 
-If the memory is stale or incomplete, surface that in the response
-rather than acting without it.
-
 ## Tech Stack
 
-- Language: Python 3.11+
-- Build: setuptools with src layout
-- Models: Pydantic v2
-- Config: PyYAML
-- Lint: ruff
-- Test: pytest
-- CI: GitHub Actions
-- License: MIT until explicitly changed
+Python 3.11+ / setuptools (src layout) / Pydantic v2 / PyYAML / ruff /
+pytest / GitHub Actions / MIT license until explicitly changed.
 
 ## Workflow
 
-This repository separates design and implementation:
+This repository separates design and implementation on two axes.
+
+Agent split (handoff protocol: `AGENTS.md`):
 
 - Claude Code: design, specification, review judgment, phase planning
 - Codex: implementation, tests, PR creation, Completion Summary
 - User: final approval and handoff trigger
 
-Default cycle:
+Default cycle: Claude issues a Task Brief (`AGENTS.md` §1) → user hands it to
+Codex → Codex implements on `codex/<topic>`, runs checks, opens a PR with a
+Completion Summary → Claude reviews and approves, requests repair, or emits
+the next brief.
 
-1. Claude issues a Task Brief using `AGENTS.md`.
-2. User gives the brief to Codex.
-3. Codex implements on `codex/<topic>`, runs checks, and prepares a PR with a
-   Completion Summary.
-4. User shares the PR back to Claude.
-5. Claude reviews and either approves, requests repair, or emits the next brief.
+Model split (within Claude Code sessions — full policy:
+`docs/model_delegation_policy.md`):
+
+- Fable (design model) is fixed to design judgment only: design,
+  specification, review verdicts, brief drafting, phase planning.
+  Implementation, execution, verification, and dogfooding are delegated to
+  Opus / Sonnet (subagents or separate sessions). Route: Fable designs →
+  Opus/Sonnet implements, executes, verifies → Fable judges the evidence.
+- Fable may call tools directly only when the whole operation is 1-2 calls
+  AND every return payload is lightweight. GitHub review-thread fetching and
+  reply posting are ALWAYS delegated regardless of call count: the measured
+  token burner is tool return payloads (full-thread refetch, echoed diffs),
+  not the fix work itself. When in doubt, delegate.
 
 ## Repository Layout
 
@@ -171,6 +174,7 @@ Status legend: **ACTIVE** (current spec/contract, AI agents should read first) /
 |---|---|---|
 | `docs/code_semantic_ci_design.md` | ACTIVE | Code Edition v0.1 design: 3-state RPE, state schema, constraints, repair loop. Single source of truth for engine semantics |
 | `docs/repository_layout.md` | ACTIVE | Full `src/` / `tests/` tree with per-module CSCI annotations. Moved out of `CLAUDE.md` so the always-loaded policy doc stays lean (read on demand) |
+| `docs/model_delegation_policy.md` | ACTIVE | Claude Code session 内の model 分担規約 (design / execution separation)。Fable は設計判断専任 (設計・仕様・レビュー判定・brief 起草)、実装・実行・検証・dogfooding は Opus/Sonnet 実行担当に委譲。Fable 直接 tool 可は「1〜2 コールかつ戻り値軽量」の AND のみ、レビュースレッド取得・返信投稿はコール数によらず常時委譲 (実測: 主燃焼源は GitHub ツール戻り値ペイロード)。操作ルール本体は `CLAUDE.md ## Workflow` Model split 節 (2026-07-06 導入) |
 | `docs/cli_usage.md` | ACTIVE | User-facing CLI contract for all 10 subcommands (`init` / `observe` / `compare` / `check` / `compile` / `compile-repair` / `validate-plan` / `target-doctor` / `target-catalog` / `ssp`, where `ssp` is a sensor group with `scan` / `from-json`), target discovery, format selection, target authorship, severity routing |
 | `docs/exit_codes.md` | ACTIVE | Stable CLI exit code policy (0 / 1 / 2 / 3 / 4) for CI integration, including `--strict-repair`, `severity: info` Advisor channel, and per-subcommand notes |
 | `docs/json_schema.md` | ACTIVE | CLI JSON envelopes — verdict / compile at `schema_version="6"`, compile-repair at independent `schema_version="1"`, validate-plan at independent `schema_version="2"`. Includes compatibility policy and v2→v3 through v5→v6 diffs (plus validate-plan v1→v2) |

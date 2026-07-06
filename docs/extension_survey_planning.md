@@ -50,7 +50,7 @@ roadmap である。作成体制は `docs/model_delegation_policy.md` 本ルー�
 | ID | Finding | 出所 |
 |---|---|---|
 | **S1** | `CodeState.type_relations` / `control_flow` / `data_flow` / `coverage` は schema・evaluator・delta に存在するが **extractor 未実装** — 実抽出経路では常に空。constraint は書けてしまう | `domain/state_schema.py` vs `pipeline/python_code_state.py` |
-| **S2** | format 非対称: `compile-repair` / `validate-plan` は text/json のみ (sarif / gh-actions なし)、`ssp` は gh-actions なし | `cli/main.py` |
+| **S2** | format 非対称: `compile-repair` / `validate-plan` は text/json のみ (sarif / gh-actions なし)、`ssp` は gh-actions なし、`check` は sensor 時 gh-actions / advisory 時 sarif・gh-actions を deferred 拒否 (G-4 / H-4 slice 申し送り) | `cli/main.py` / `cli/commands/check.py:426-438` |
 | **S3** | `compare` に sensor / suite security 経路なし (`check` のみ配線) | `cli/main.py` |
 | **S4** | suppression 二重機構: advisory mute (`sensor/mutes.py`) と verdict 側 `Suppression` (`framework/security_policy.py`) が別層・非統一 | 同左 |
 | **S5** | `init --recipe` 7 種 < catalog の全 template/operator 表面 | `authoring/` |
@@ -130,7 +130,7 @@ orchestrator 観測応用 / F6 (SAST 盲点、untested hypothesis)。
 | ID | タスク | Executor | 規模 |
 |---|---|---|---|
 | **W2-a (CSCI-57)** | **Ghost-facet advisory (S1)**: extractor 未実装 facet を target する constraint への ADVISORY-D9 (仮)。scope は state path (`type_relations` / `control_flow` / `data_flow` / `coverage`) と**対応する delta path (`type_changes` / `cfg_delta` / `coverage_delta` 等) の両方** — constraint は delta 側も target できるため片側だけの警告は穴になる。error ではなく advisory (§23.1 pin、§2.2)。未実装 facet 集合 (state↔delta 対応含む) は extractor registry + path_schema から導出し hardcode しない (extractor 追加で自動解消)。advisory enum 拡張 → `advisory-2` compatibility policy に従い bump 判定を brief で確定 | **Opus** | 1 日 / authoring + doctor + test |
-| **W2-b (CSCI-58)** | **Format parity (S2)**: `ssp scan` / `ssp from-json` に gh-actions、`compile-repair` / `validate-plan` に sarif + gh-actions。§15.1 で既存 SARIF/gh-actions renderer の実 shape を grep してから spec 化 (validate-plan の would_violate → SARIF result への写像が自然に立たない場合、その format は「対象外を宣言」に切替可 — 無理な写像を発明しない) | **Sonnet** | 1 日 / cli + test |
+| **W2-b (CSCI-58)** | **Format parity (S2)**: `ssp scan` / `ssp from-json` に gh-actions、`compile-repair` / `validate-plan` に sarif + gh-actions、**`check` の deferred 解消** = sensor × gh-actions (G-4 slice 申し送り) + advisory × sarif・gh-actions (H-4 slice 申し送り、`check.py:426-438`)。§15.1 で既存 SARIF/gh-actions renderer の実 shape を grep してから spec 化。escape hatch は全対象共通: 写像が自然に立たない format は「対象外を宣言」に切替可 (無理な写像を発明しない)。ただし宣言する場合も deferred 文言 (「later slice」) は放置せず declared exclusion に書き換え、S2 を「未決の非対称ゼロ」で閉じる | **Sonnet** | 1 日 / cli + test |
 
 W2-a が本 survey の主産物。W2-b は独立で並走可。
 

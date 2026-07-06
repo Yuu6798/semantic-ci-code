@@ -54,7 +54,7 @@ roadmap である。作成体制は `docs/model_delegation_policy.md` 本ルー�
 | **S3** | `compare` に sensor / suite security 経路なし (`check` のみ配線) | `cli/main.py` |
 | **S4** | suppression 二重機構: advisory mute (`sensor/mutes.py`) と verdict 側 `Suppression` (`framework/security_policy.py`) が別層・非統一 | 同左 |
 | **S5** | `init --recipe` 7 種 < catalog の全 template/operator 表面 | `authoring/` |
-| **S6** | `ROADMAP.md` の D-class 行が **stale** (「5 of 7 resolved; D6/D7 open」のまま。実際は 8/8 解決 2026-06-12) | ROADMAP.md |
+| **S6** | `ROADMAP.md` と `README.md` の D-class 記述が **stale** (「5 of 7 resolved; D6/D7 open」等のまま。実際は 8/8 解決 2026-06-12) | ROADMAP.md:41 / README.md:28 |
 | **S7** | `docs/doc_refactor_planning.md` の self-archive 最終 step 未了 (Phase 0-6 完了済みなのに doc が `docs/` に残存、表 status も PLANNING のまま) | 同 doc §7 |
 | **S8** | planning doc の open questions に解決の追記がない (phase_g Q1-Q5 / brief_7 R1・R4・R5 / source_selection §10 再評価 / resultstatus §1b.3) — 実装は着地済みでも doc 上 open に見える | 各 planning doc |
 
@@ -119,7 +119,7 @@ orchestrator 観測応用 / F6 (SAST 盲点、untested hypothesis)。
 
 | ID | タスク | Executor | 規模 |
 |---|---|---|---|
-| **W1-a** | docs 整合 sweep: S6 (ROADMAP 8/8 化) + S7 (doc_refactor self-archive + 表 status 更新) + S8 (open questions へ解決/据置を追記) + `brief_8_planning.md §15.1` grounding bullet 追加 + §2.4 の 3 件の declared-asymmetry pin (S3/S4/S5) | **Sonnet** | 半日 / docs のみ |
+| **W1-a** | docs 整合 sweep: S6 (ROADMAP + README の stale D-class 記述を 8/8 化。「5 of 7」等の stale 表現を repo 全体 grep で検出し、public-facing 記述の同期漏れを残さない) + S7 (doc_refactor self-archive + 表 status 更新) + S8 (open questions へ解決/据置を追記) + `brief_8_planning.md §15.1` grounding bullet 追加 + §2.4 の 3 件の declared-asymmetry pin (S3/S4/S5) | **Sonnet** | 半日 / docs のみ |
 | **W1-b (CSCI-56)** | H-5 申し送り P3 ×3: ① `aggregate_advisory_states` の非 LLM 入力を silent skip → `ValueError` (fail-closed) ② ensemble の message を max-severity member から採る (severity と出所を統一) ③ `counts.scouted` = dedup 後件数を doc 化 | **Sonnet** | 半日 / code + test |
 
 依存なし。W1-a は判定変更ゼロ (doc pin のみ)、W1-b は挙動変更 2 件を
@@ -129,7 +129,7 @@ orchestrator 観測応用 / F6 (SAST 盲点、untested hypothesis)。
 
 | ID | タスク | Executor | 規模 |
 |---|---|---|---|
-| **W2-a (CSCI-57)** | **Ghost-facet advisory (S1)**: extractor 未実装 facet (`type_relations` / `control_flow` / `data_flow` / `coverage`) を target する constraint への ADVISORY-D9 (仮)。error ではなく advisory (§23.1 pin、§2.2)。未実装 facet 集合は extractor registry から導出し hardcode しない (extractor 追加で自動解消)。advisory enum 拡張 → `advisory-2` compatibility policy に従い bump 判定を brief で確定 | **Opus** | 1 日 / authoring + doctor + test |
+| **W2-a (CSCI-57)** | **Ghost-facet advisory (S1)**: extractor 未実装 facet を target する constraint への ADVISORY-D9 (仮)。scope は state path (`type_relations` / `control_flow` / `data_flow` / `coverage`) と**対応する delta path (`type_changes` / `cfg_delta` / `coverage_delta` 等) の両方** — constraint は delta 側も target できるため片側だけの警告は穴になる。error ではなく advisory (§23.1 pin、§2.2)。未実装 facet 集合 (state↔delta 対応含む) は extractor registry + path_schema から導出し hardcode しない (extractor 追加で自動解消)。advisory enum 拡張 → `advisory-2` compatibility policy に従い bump 判定を brief で確定 | **Opus** | 1 日 / authoring + doctor + test |
 | **W2-b (CSCI-58)** | **Format parity (S2)**: `ssp scan` / `ssp from-json` に gh-actions、`compile-repair` / `validate-plan` に sarif + gh-actions。§15.1 で既存 SARIF/gh-actions renderer の実 shape を grep してから spec 化 (validate-plan の would_violate → SARIF result への写像が自然に立たない場合、その format は「対象外を宣言」に切替可 — 無理な写像を発明しない) | **Sonnet** | 1 日 / cli + test |
 
 W2-a が本 survey の主産物。W2-b は独立で並走可。

@@ -121,7 +121,7 @@ orchestrator 観測応用 / F6 (SAST 盲点、untested hypothesis)。
 
 | ID | タスク | Executor | 規模 |
 |---|---|---|---|
-| **W1-a** | docs 整合 sweep: S6 (stale D-class 記述の 8/8 化。「5 of 7」「未解決」「both open」等の stale 表現を repo 全体 grep で検出 — 確認済み残存: ROADMAP.md:41 / README.md:28・155 / `code_semantic_ci_design.md:1295` / `dogfooding_real_pr_complexity.md` ×4。原則 = D-class の現在 status 主張は tracker 単独に集約し、他 doc は cross-link + 解決 PR 番号へ置換) + S7 (doc_refactor self-archive + 表 status 更新) + S8 (open questions へ解決/据置を追記 + `CLAUDE.md` Design Documents 表・README planning list の完走済 Phase G/H 行を現状化) + `brief_8_planning.md §15.1` grounding bullet 追加 + §2.4 の 3 件の declared-asymmetry pin (S3/S4/S5) | **Sonnet** | 半日 / docs のみ |
+| **W1-a** | docs 整合 sweep: S6 (stale D-class 記述の 8/8 化。「5 of 7」「未解決」「both open」等の stale 表現を repo 全体 grep で検出 — 確認済み残存: ROADMAP.md:41 / README.md:28・155 / `code_semantic_ci_design.md:1295` / `dogfooding_real_pr_complexity.md` ×4。原則 = D-class の現在 status 主張は tracker 単独に集約し、他 doc は cross-link + 解決 PR 番号へ置換) + S7 (doc_refactor self-archive — 移送と同時に `CLAUDE.md` 表 status・README planning list の該当 link・移送先 `.claude/memory/archive/` の index を全て更新し、broken link / stale link をゼロにする) + S8 (open questions へ解決/据置を追記 + `CLAUDE.md` Design Documents 表・README planning list の完走済 Phase G/H 行を現状化) + `brief_8_planning.md §15.1` grounding bullet 追加 + §2.4 の 3 件の declared-asymmetry pin (S3/S4/S5) | **Sonnet** | 半日 / docs のみ |
 | **W1-b (CSCI-56)** | H-5 申し送り P3 ×3: ① `aggregate_advisory_states` の非 LLM 入力を silent skip → `ValueError` (fail-closed) ② ensemble の message を max-severity member から採る (severity と出所を統一) ③ `counts.scouted` = dedup 後件数を doc 化 | **Sonnet** | 半日 / code + test |
 
 依存なし。W1-a は判定変更ゼロ (doc pin のみ)、W1-b は挙動変更 2 件を

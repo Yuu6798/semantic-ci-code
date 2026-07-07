@@ -28,7 +28,7 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 - `_index.md` 1-line summary では情報不足で dated 原文が必要な時
 - archive 移送 protocol 自体の audit / drift check
 
-## Current contents (2026-06-11 時点)
+## Current contents (2026-07-07 時点)
 
 | File / Directory | 移送 cutoff | 移送元 | Migration commit |
 |---|---|---|---|
@@ -42,6 +42,17 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 | `2026-05/2026-05-08.md` | 2026-06-08 (>30 日 TTL) | `_index.md` 2026-05-08 entry | 2026-06-08 wrap-up |
 | `2026-05/2026-05-09.md` | 2026-06-09 (>30 日 TTL) | `_index.md` 2026-05-09 entry (perf brief #70/#71 + ResultStatus C+B) | 2026-06-09 wrap-up |
 | `2026-05/2026-05-12.md` | 2026-06-11 (30 日 TTL) | `_index.md` 2026-05-12 entry (ResultStatus planning 取り込み #74) | 2026-06-11 wrap-up |
+| `2026-05/2026-05-15.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-15 S1-S4 entries (ResultStatus split 完走 + Brief 8 CSCI-41/42/43) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-19.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-19 entry (canonical-form refactor #85) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-21.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-21 S1-S5 entries (doc refactor 8 phase + ecosystem framing #86-#96) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-22.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-22 entry (#98 + source_selection planning #99) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-25.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-25 entry (F+D queue 完走 #100-#105) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-26.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-26 entry (authoring UX #106/#107) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-27.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-27 entry (Brief 7 SSP 完走 #109-#112) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-28.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-28 S1+S2 entries (Phase G planning + real-PR dogfood tracker #114-#117) | 2026-07-07 wrap-up |
+| `2026-05/2026-05-29.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-05-29 S1+S2 entries (doc-refactor Phase 6 + skills/hook #118-#121) | 2026-07-07 wrap-up |
+| `2026-06/2026-06-02.md` | 2026-07-07 (>30 日 TTL、2026-06 dir 初設置) | `_index.md` 2026-06-02 entry (Phase G G-1/G-2 #124-#126) | 2026-07-07 wrap-up |
+| `2026-06/2026-06-03.md` | 2026-07-07 (>30 日 TTL) | `_index.md` 2026-06-03 S1+S2 entries (G-3〜G-4b + Phase H planning #127-#132) | 2026-07-07 wrap-up |
 
 ## 移送 protocol
 

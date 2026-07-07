@@ -1373,3 +1373,25 @@ H-4/CSCI-53 を 1 PR で landing。LLM scout 出力が初めて CLI から見え
   `docs/exit_codes.md` Error Streams 表に doc 化。
 - **review**: AC 15 件全充足で chat 内 APPROVE、cosmetic P2 件のみ
   (error message の "later H-4 slice" 表現 / 未消費 tuple 要素)。
+
+### 2026-06-10 — Phase H H-5: クロスモデル明示集約 + 昇格経路 doc で Phase H 完走 (PR #148)
+
+H-5/CSCI-54 を 1 PR で landing。**Phase H (CSCI-50〜54) 全完走**。
+
+- **PR #148**: `sensor/adapters/llm/aggregate.py` =
+  `aggregate_advisory_states(states) -> LLMEnsembleAggregation`。Q4 = (a)
+  明示的束ね役関数で確定: 異 sensor_id の同一 anchor finding を固定名義
+  `llm-ensemble` で再射影・dedup (severity は max / message は member 正規順の
+  最初の non-empty、D7 recall-first)、member provenance は `SensorState` の
+  **外** (`members`) に保持 (`_validate_state_invariants` の key=sensor_id 制約
+  により同一 adapter 複数 payload は 1 state に同居不可、という実装制約からの
+  必然形)。部分失敗は complete 続行 + members に status 保持、全滅のみ error。
+  CLI は複数 `--advisory-sensor` 解禁 (単一指定の envelope は byte 不変
+  regression 付き)、`advisory.members[]` は additive (schema_version "6"
+  据え置き)。`docs/llm_scout_usage.md` 新設 (ACTIVE): 昇格経路 (scout →
+  authoring freeze → 決定論的制約化、沈黙=容認 D8) / finding class →
+  G-5 security recipe 対応表 / mutes vs suppressions 対比 / ensemble 時の
+  mute key 注意。
+- **review**: AC 14 件全充足で chat 内 APPROVE、P3 観測 3 件を申し送り化
+  (非 LLM 入力の silent skip → ValueError 化案 / severity と message の出所
+  member 分離 / ensemble の scouted = dedup 後件数の doc 化)。

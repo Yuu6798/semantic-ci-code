@@ -24,9 +24,34 @@ historical record, see `_index.md` and `YYYY-MM-DD.md`.
 
 ## Phase
 
-Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G (CSCI-45〜49) / Phase H (CSCI-50〜54) 全完走** + pre-release credibility トラック (tag は切らず experimental 明示) + **D-class findings 8/8 全解決 (2026-06-12、ROADMAP v0.1.0 exit criterion「D 全解決/waive」充足)**。直近の landing: 2026-06-10 セキュリティ hardening (PR #149) + Phase X-2 planning 凍結 (PR #150、`docs/pr_validation_planning.md`)、2026-06-11 D8 解決 (CSCI-55 / PR #151)、2026-06-12 D6 解決 (ADVISORY-D6 / PR #152) + D7 解決 (ADVISORY-D7 + advisory envelope advisory-2 bump / PR #153) — complexity 制約の authoring 面が D6 (nested 変位の vacuous PASS) / D7 (extract-method の構造的 false-FAIL) の相補ペアで完成、`target-doctor` は 9 advisory 体制。次は **Phase X-2 実験実行 (pilot 5 件、別 session 委譲)** / **E-1/E-2 (ecosystem cross-repo、別 session)** / H-5 review 申し送り 3 件 (P3) / `§15.1` grounding bullet 追加の小粒 docs のいずれか。
+Brief 1〜8 + Brief 7 (SSP v0.1) + ResultStatus split + source-selection + doc refactor + **Phase G / Phase H 全完走** + pre-release credibility トラック (tag は切らず experimental 明示) + **D-class findings 8/8 全解決 (2026-06-12、v0.1.0 exit criterion 充足)**。2026-07-07 に開発体制を更新: **model delegation policy 恒久化 (PR #154)** — Fable は設計判断専任、実装・実行・検証・dogfooding は Opus/Sonnet 実行担当に委譲、レビュースレッド取得・返信投稿はコール数によらず常時委譲。同体制の初適用として **拡張調査 & タスクプランニング (PR #155、`docs/extension_survey_planning.md`)** を凍結: 委譲調査由来の S1〜S8 findings を Wave 1 (hygiene: W1-a docs 整合 sweep + W1-b/CSCI-56 = H-5 P3 ×3) / Wave 2 (CSCI-57 ghost-facet ADVISORY-D9 advisory-3 bump + CSCI-58 format parity) / Wave 3 (X-2 **本実験**後: §19 spec quality metrics + §10.3 round-trip log) に判定、S3/S4/S5 は declared asymmetry として見送り。次は **E-3 (Phase X-2 pilot、別 session 委譲)** が本命主軸のまま、並走で **Wave 1 が即発行可** (`/new-brief`、executor = Sonnet)。
 
 ## 直近 merged
+
+### 2026-07-07 — 開発体制ルール恒久化 + 拡張調査&タスクプランニング (PR #154 / #155)
+
+並行 repo の「PR #149 レビュー 7 巡でトークン大量消費」反省を受けた
+開発体制ルールの code domain 移植と、その体制の初適用。
+
+- **PR #154**: model delegation policy を 2 層で恒久化 — 操作ルール本体は
+  `CLAUDE.md ## Workflow` Model split 節 (297/300 行)、根拠・委譲対象表は
+  `docs/model_delegation_policy.md` (ACTIVE)。Fable = 設計判断専任、
+  実装・実行・検証・dogfooding = Opus/Sonnet 委譲。Fable 直接 tool 可は
+  「1〜2 コール AND 戻り値軽量」のみ、スレッド取得・返信投稿は常時委譲
+  (実測: 主燃焼源は GitHub ツール戻り値ペイロード)。
+- **PR #155**: `docs/extension_survey_planning.md` (PLANNING) — Sonnet ×2
+  並列委譲調査 → S1〜S8 findings → Wave 1 (W1-a docs sweep + W1-b/CSCI-56)
+  / Wave 2 (CSCI-57 ghost-facet ADVISORY-D9 + CSCI-58 format parity) /
+  Wave 3 (X-2 本実験 gate: §19 + §10.3)。S3/S4/S5 は declared asymmetry
+  見送り。Codex レビュー 8 巡 / P2 ×10 全採用 (stock refactor template の
+  ghost-facet 実害発見 / advisory-3 bump 必須化 / repo-wide inbound-link
+  sweep / X-2 pilot→本実験 gate 訂正 等)。
+- **体制の実測**: 8 巡のレビューループでスレッド取得・resolve・PR 本文
+  更新を全て実行担当に委譲、Fable への生ペイロード直撃ゼロ — #149 型
+  燃焼の再発を構造的に防いだ empirical base case。
+- **申し送り**: survey 型 planning の起草前セルフチェック 4 点 (index 層
+  staleness / template 合成後視点 / gate-evidence 整合 / inbound-link
+  grep) を `§15` checklist 追加候補として W1-a に同梱提案。
 
 ### 2026-06-12 — D-class closure 完了: D6 + D7 (PR #152 / #153)
 
@@ -121,31 +146,9 @@ subprocess・sha256 cache key)、検出は defense-in-depth レベルのみ。
   最終 1717 test 緑で merge。SECURITY.md 新設は scope 拡大ゆえ見送り (脅威モデルは
   test に encode)。
 
-### 2026-06-10 — Phase H H-5: クロスモデル明示集約 + 昇格経路 doc で Phase H 完走 (PR #148)
-
-H-5/CSCI-54 を 1 PR で landing。**Phase H (CSCI-50〜54) 全完走**。
-
-- **PR #148**: `sensor/adapters/llm/aggregate.py` =
-  `aggregate_advisory_states(states) -> LLMEnsembleAggregation`。Q4 = (a)
-  明示的束ね役関数で確定: 異 sensor_id の同一 anchor finding を固定名義
-  `llm-ensemble` で再射影・dedup (severity は max / message は member 正規順の
-  最初の non-empty、D7 recall-first)、member provenance は `SensorState` の
-  **外** (`members`) に保持 (`_validate_state_invariants` の key=sensor_id 制約
-  により同一 adapter 複数 payload は 1 state に同居不可、という実装制約からの
-  必然形)。部分失敗は complete 続行 + members に status 保持、全滅のみ error。
-  CLI は複数 `--advisory-sensor` 解禁 (単一指定の envelope は byte 不変
-  regression 付き)、`advisory.members[]` は additive (schema_version "6"
-  据え置き)。`docs/llm_scout_usage.md` 新設 (ACTIVE): 昇格経路 (scout →
-  authoring freeze → 決定論的制約化、沈黙=容認 D8) / finding class →
-  G-5 security recipe 対応表 / mutes vs suppressions 対比 / ensemble 時の
-  mute key 注意。
-- **review**: AC 14 件全充足で chat 内 APPROVE、P3 観測 3 件を申し送り化
-  (非 LLM 入力の silent skip → ValueError 化案 / severity と message の出所
-  member 分離 / ensemble の scouted = dedup 後件数の doc 化)。
-
 ### 古い merged entry (2026-06-10 以前) — archive 参照
 
-30 entry (2026-06-10 H-4 (#147) / 2026-06-10 H-3 (#146) / 2026-06-09 S2 (#145) / 2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
+31 entry (2026-06-10 H-5 (#148) / 2026-06-10 H-4 (#147) / 2026-06-10 H-3 (#146) / 2026-06-09 S2 (#145) / 2026-06-08 (#136/#138/#139) / 2026-06-07 (dogfood) / 2026-06-03 S2 (#130-#132) /
 2026-06-03 (#127/#128/#129) / 2026-06-02 (#124/#125/#126) / 2026-05-29 S2 (#120/#121) / 2026-05-28 S2 /
 2026-05-27 / 2026-05-26 / 2026-05-22 /
 2026-05-21 S5 + S3 + S2 + S1 / 2026-05-19 /
@@ -166,15 +169,18 @@ H-5/CSCI-54 を 1 PR で landing。**Phase H (CSCI-50〜54) 全完走**。
 + 2026-06-10 #150 sweep (6/09 S2 移送)
 + 2026-06-11 wrap-up (6/10 H-3 #146 移送)
 + 2026-06-12 wrap-up (6/10 H-4 #147 移送)
++ 2026-07-07 wrap-up (6/10 H-5 #148 移送 + dated log 11 file 一括 archive)
 で compaction が実施された。
 
 ## 次の発行順序
 
 ABCD-A/B + Brief 7 (SSP v0.1) + D + F + **Phase G / Phase H 全完走** +
 **D-class closure 全完走 (D8 = PR #151、D6 = PR #152、D7 = PR #153)**。
-repo-internal の active queue は小粒のみ (H-5 申し送り P3 / `§15.1`
-grounding bullet)。残る主軸は **E (Phase X、ecosystem cross-repo、別
-Claude Code session 委譲)** — 中でも E-3 (X-2 pilot 実行) が次の本命。
+repo-internal の active queue は `docs/extension_survey_planning.md` §3
+の Wave 1〜2 に形式化済み (旧 小粒 items = H-5 P3 ×3 / `§15.1` grounding
+bullet は W1-b / W1-a に包含)。残る主軸は **E (Phase X、ecosystem
+cross-repo、別 Claude Code session 委譲)** — 中でも E-3 (X-2 pilot 実行)
+が次の本命。
 
 旧 §A / §B (完走 entry) は CLAUDE.md rule 「closed CSCI は 次の発行順序
 から remove」 に従い削除済。 詳細参照は `## 直近 merged` (最新 5) +
@@ -240,9 +246,11 @@ external readiness、 2026-05-21 Session 5 で **「外部配布 mechanism」
   guard / intent-only target B 生成)。外部 repo 収集ゆえ**別 session 委譲** +
   `experiments/pr_validation/`。Fable 評価レビューの推奨 1 = 「上物より中核
   仮説の falsification を先に」の実行
-- **小粒 docs 候補**: `docs/brief_8_planning.md §15.1` への「外部 format
-  翻訳は resolution semantics まで grounding」bullet 追加 (`2026-06-11.md`
-  申し送りの未消化分。tracker D8 行への PR 番号追記は PR #152 で消化済)
+- **Wave 1 発行 (repo-internal、E-3 と並走可)**: W1-a = docs 整合 sweep
+  (S6〜S8 + `§15.1` grounding bullet + declared-asymmetry pin + survey 型
+  planning セルフチェック 4 点の §15 追加提案を同梱) / W1-b = CSCI-56
+  (H-5 P3 ×3)。`docs/extension_survey_planning.md §3` を brief source に
+  `/new-brief` で起草、executor = Sonnet
 - **E-1/E-2. Phase X cross-ref / umbrella docs** (別 session 委譲)
 
 ## Frozen / Deferred

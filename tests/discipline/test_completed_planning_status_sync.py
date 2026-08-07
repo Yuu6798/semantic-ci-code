@@ -4,9 +4,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
-CURRENT_MEMORY_FILES = (
+CURRENT_MEMORY_ENTRY_POINTS = (
     ROOT / ".claude" / "memory" / "_index.md",
     ROOT / ".claude" / "memory" / "STATUS.md",
+    ROOT / ".claude" / "memory" / "archive" / "INDEX.md",
 )
 COMPLETED_PLANNING_FILES = (
     ROOT / "docs" / "brief_7_planning.md",
@@ -18,7 +19,7 @@ COMPLETED_PLANNING_FILES = (
 def test_current_memory_uses_the_archived_doc_refactor_path():
     stale_path = "docs/doc_refactor_planning.md"
 
-    for path in CURRENT_MEMORY_FILES:
+    for path in CURRENT_MEMORY_ENTRY_POINTS:
         assert stale_path not in path.read_text(encoding="utf-8"), path
 
 

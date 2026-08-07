@@ -1,8 +1,9 @@
 # Doc Refactoring Planning (2026-05-21 起草)
 
-Status: **ARCHIVED (completed 2026-05-21)** — 全 Phase の完走後、履歴資料として
-`docs/archive/doc_refactor_planning.md` に移送済み。以下は当時の計画と実行記録であり、
-現在の作業状態は `.claude/memory/STATUS.md` を正本とする。
+Status: **ARCHIVED (completed 2026-08-08)** — 2026-05-21 の主要 Phase 着地後、
+2026-08-08 の Phase 3 最終 closeout をもって全 Phase 完走とした履歴資料。
+`docs/archive/doc_refactor_planning.md` に移送済みであり、現在の作業状態は
+`.claude/memory/STATUS.md` を正本とする。
 
 ## 0. 背景と Goal
 

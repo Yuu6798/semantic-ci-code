@@ -80,8 +80,8 @@ archive 移送は **`CLAUDE.md § Session Memory → 終了時ルール`** で�
 
 ## Self-referential drift detection
 
-archive 移送 protocol 自体の遵守は将来 `tests/discipline/` (`docs/
-doc_refactor_planning.md` Phase 6) で test 化される予定:
+archive 移送 protocol 自体の遵守は `tests/discipline/`
+(`docs/archive/doc_refactor_planning.md` Phase 6) で test 化済み:
 
 - `tests/discipline/test_status_md_phase_single_paragraph.py` — Phase
   paragraph 重複検出
@@ -96,7 +96,7 @@ move) 自体は wrap-up trigger 起動時の手作業 ritual で保持。
 
 ## 由来
 
-- Phase 1 (`docs/doc_refactor_planning.md` 2026-05-21、 commit `0db925f`)
+- Phase 1 (`docs/archive/doc_refactor_planning.md` 2026-05-21、 commit `0db925f`)
   で `STATUS_MERGED_LOG.md` 初設置 (STATUS.md 831 → 505 lines 圧縮の
   destination)
 - Phase 2 (commit `4783728`) で `_index.md` 1-line index 復元、 archive

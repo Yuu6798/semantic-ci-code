@@ -23,7 +23,7 @@ For anything authoritative:
 | `brief_4_planning.md` | REFERENCE (Brief 4 完走 2026-05-04) | Brief 4 (CLI / operational entrypoint) — CSCI-15〜19 全 PR merged で `semantic-ci` CLI 5 subcommand release 可能になった |
 | `brief_4b_planning.md` | REFERENCE (Brief 4b 完走 2026-05-05) | Brief 4b (CI integration outputs) — CSCI-28 で SARIF 2.1.0 / GitHub Actions annotation / `.pre-commit-hooks.yaml` manifest を 1 PR で完結 |
 | `brief_5_planning.md` | REFERENCE (Brief 5 完走 2026-05-07) | Brief 5 (Repair Compiler + Vibe Coding Adapters、P2.5 entry) — CSCI-31〜35 全 PR merged で `compile-repair` / `validate-plan` 2 subcommand + Claude Code / Cursor / Codex 3 adapter が release 可能 |
-| `doc_refactor_planning.md` | ARCHIVED (completed 2026-05-21) | 起動時 context compaction、archive infrastructure、discipline test 変換を完了し、self-archive 条件を充足 |
+| `doc_refactor_planning.md` | ARCHIVED (completed 2026-08-08) | 2026-05-21 に主要 Phase を着地し、Phase 3 の最終 compaction を 2026-08-08 に closeout。archive infrastructure、discipline test 変換、self-archive 条件を充足 |
 
 ## When to read these
 

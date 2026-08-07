@@ -90,9 +90,9 @@ archive 移送 protocol 自体の遵守は `tests/discipline/`
 - `tests/discipline/test_index_md_entry_compactness.py` — essay 化
   regression 検出
 
-これらが landed すると、 archive policy の 一部 (sweep + compaction
-discipline) が CI で mechanically enforce される。 archive 移送 (file 物理
-move) 自体は wrap-up trigger 起動時の手作業 ritual で保持。
+これらにより、archive policy の一部 (sweep + compaction discipline) は
+CI で mechanically enforce されている。archive 移送 (file 物理 move) 自体は
+wrap-up trigger 起動時の手作業 ritual で保持。
 
 ## 由来
 

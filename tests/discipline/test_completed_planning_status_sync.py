@@ -23,6 +23,13 @@ def test_current_memory_uses_the_archived_doc_refactor_path():
         assert stale_path not in path.read_text(encoding="utf-8"), path
 
 
+def test_archive_index_describes_landed_discipline_tests_as_current():
+    archive_index = CURRENT_MEMORY_ENTRY_POINTS[-1].read_text(encoding="utf-8")
+
+    assert "これらが landed すると" not in archive_index
+    assert "CI で mechanically enforce されている" in archive_index
+
+
 def test_completed_planning_records_do_not_claim_active_or_open_status():
     stale_markers = (
         "Live status:",

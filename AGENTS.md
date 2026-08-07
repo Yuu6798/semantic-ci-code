@@ -119,20 +119,16 @@ Codex should stop and report a blocked Completion Summary when:
 
 ## 5. Experience Externalization Discipline (経験値の外部化規律)
 
-Required reading **before drafting any new Task Brief** or **introducing
-a new architectural pattern**. Codifies the operating principle from
-2026-04 〜 2026-05 累計 28 sessions / 39 merged PRs. Compacted by
-`docs/archive/doc_refactor_planning.md` Phase 3 (was 209 lines, now ~88; ≤ 80 target
-の残 cosmetic と §5.3 merge は Phase 3 の唯一の未了項目)。
+Required reading **before drafting any new Task Brief** or **introducing a new
+architectural pattern**. Codifies 2026-04 〜 2026-05 の 28 sessions / 39 merged
+PRs and completes `docs/archive/doc_refactor_planning.md` Phase 3 (209 → ≤80 lines).
 
 ### 5.1 Principle
 
-AI 開発は session 跨ぎの暗黙知を継承しない (Claude = no long-term memory、
-Codex = PR 単位 review trail のみ、 user 壁打ち経験 = session 跨ぎで消失)。
-再現性維持の唯一の方法は経験値を **明示 artifact** (docs / tests /
-checklists / pattern catalog) に強制外部化すること。 「ベテランの感」 個人
-閉じ込めは AI 開発では機能しない。 Claude が forget する制約が逆説的に
-**強制的 externalization discipline** として働く。
+AI 開発は session 跨ぎの暗黙知を継承しない。再現性維持には経験値を
+**明示 artifact** (docs / tests / checklists / pattern catalog) に強制外部化する。
+「ベテランの感」を個人に閉じ込める形は機能せず、agent が忘れる制約が
+逆説的に **forced externalization discipline** として働く。
 
 ### 5.2 Empirical Envelope
 
@@ -144,15 +140,10 @@ checklists / pattern catalog) に強制外部化すること。 「ベテラン�
 | #86 (CSCI-44) | split | 0 | 1 日 | INV-5 cross-test + brief 規律 |
 | #87 (R17) | split | 0 | 半日 | brief hint 逐語 + bonus test |
 
-体制別 envelope: **split** = 1 日 brief で 0 round 可、 **Claude alone** =
-半日以下なら 0 round 可、 **Claude exception** = 半日以下に narrow 必須
-(1 日規模を押し込むと PR #84 の 13 round chase)。 Codex 不在時は brief
-paste 待ちで Codex 復帰を待つ方が trade-off 上有利。
-
-#82 + #84 累計 29 round の P2 を `tests/authoring/test_canonical.py` 48
-cases + `tests/architecture/` 16 tests + `docs/brief_8_planning.md §15`
-checklist に encode した結果、 後続 PR #86 / #87 が 0 round で landing
-した因果が **本 framework の empirical base case**。
+体制別 envelope: **split** = 1 日 brief で 0 round 可、 **Claude alone** /
+**Claude exception** = 半日以下に narrow 必須。#82 + #84 の 29 round 分の
+P2 を authoring 48 cases + architecture 16 tests + brief §15 checklist に
+encode 後、#86 / #87 が 0 round で landing したことが empirical base case。
 
 ### 5.3 Three-Tier Externalization (artifact type)
 
@@ -162,8 +153,8 @@ checklist に encode した結果、 後続 PR #86 / #87 が 0 round で landing
 | 2 (repo-specific) | 同 domain で再利用可 | `docs/brief_*_planning.md` / authoring guides / `tests/authoring/test_canonical.py` / case studies |
 | 3 (session-tacit) | memory 読み返しで部分継承 | `.claude/memory/STATUS.md` / `_index.md` / dated `YYYY-MM-DD.md` |
 
-CLAUDE.md `Required Reading` の Tier A/B/C/D は **読み込み load 優先度**
-(直交軸)。 artifact type と読み込み tier は parallel concept として併用。
+CLAUDE.md の Tier A/B/C/D は **読み込み load 優先度**であり直交軸。
+混同を避けるため統合せず、artifact type と並行して使う。
 
 ### 5.4 Review Round Count as Leading Quality Indicator
 
@@ -199,12 +190,10 @@ maintenance practice を遵守しないと PR #84 の状態に戻る。
 
 ### 5.6 Cross-Reference
 
-- `CLAUDE.md` § Experience Externalization (本 section への light pointer)
-  + § Required Reading (Tier A/B/C/D)
+- `CLAUDE.md` § Experience Externalization + § Required Reading (Tier A/B/C/D)
 - `docs/brief_8_planning.md §15` (brief drafting checklist、 20 round 蒸留)
 - `docs/multi_agent_audit_case.md` (parallel agent 規律不在時の failure mode)
-- `docs/archive/doc_refactor_planning.md` (本 framework 自己 refactor の dogfood
-  example、 Phase 6 完走で本 §5.5 Anti-Pattern を `tests/discipline/` に変換済)
+- `docs/archive/doc_refactor_planning.md` (自己 refactor の dogfood example)
 
 ## Forward Design Note: Brief 7 / SSP v0.1 (CSCI-36 着手時必読)
 

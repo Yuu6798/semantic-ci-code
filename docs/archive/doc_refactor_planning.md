@@ -151,6 +151,11 @@ Status: **ARCHIVED (completed 2026-05-21)** — 全 Phase の完走後、履歴�
 (Principle / Envelope (data table) / Practice (combined) /
 Anti-Pattern-to-Test-Map / Cross-Ref)。
 
+**Phase 3 closeout (2026-08-08, PR #156)**: `AGENTS.md §5` を意味を保ったまま
+80 lines 以下へ圧縮した。§5.3 の artifact type 3-tier と `CLAUDE.md` の
+読み込み優先度 Tier A/B/C/D は直交軸であるため、統合せず並行利用する判断を
+確定した。これにより「統合するか」が未決定のまま残る状態も解消した。
+
 ### Phase 4: **Forward Design Note を分離** (PR、 半日)
 
 `AGENTS.md` Forward Design Note: Brief 7 / SSP v0.1 (現 ~220 lines) は

@@ -1,8 +1,8 @@
 # Doc Refactoring Planning (2026-05-21 起草)
 
-Status: **PLANNING (open)** — 緊急タスクとして 2026-05-21 Session 2 末尾に
-起草。 完了後は本 doc 自身を `.claude/memory/archive/` 移送 (self-referential
-test: 経験値外部化 framework 自身の dogfood example)。
+Status: **ARCHIVED (completed 2026-05-21)** — 全 Phase の完走後、履歴資料として
+`docs/archive/doc_refactor_planning.md` に移送済み。以下は当時の計画と実行記録であり、
+現在の作業状態は `.claude/memory/STATUS.md` を正本とする。
 
 ## 0. 背景と Goal
 
@@ -296,12 +296,11 @@ attention 過負荷、 専用 doc に分離後の方が context 局所化でき�
 
 ## 7. Self-referential note
 
-本 plan doc は完了後に `.claude/memory/archive/` 移送される。 これは
-「経験値外部化 framework が自分自身を refactor する」 dogfood example
-として記録に値する: 規律 infrastructure が自分自身に適用される
-self-referential test の最初の case。 完了 commit で本 doc を archive 移送
-した動作 trail 自体が、 経験値外部化 discipline の「圧縮 + 保存」 ループの
-実証となる。
+本 plan doc は完了後に `docs/archive/` へ移送済み。これは「経験値外部化
+framework が自分自身を refactor する」dogfood example であり、規律
+infrastructure を自身へ適用する self-referential test の最初の case となった。
+移送の動作 trail 自体が、経験値外部化 discipline の「圧縮 + 保存」ループを
+実証している。
 
 ---
 

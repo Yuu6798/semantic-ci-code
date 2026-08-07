@@ -77,11 +77,10 @@ def aggregate_advisory_states(states: Sequence[SensorState]) -> LLMEnsembleAggre
 
 
 def _members(states: Sequence[SensorState]) -> tuple[_Member, ...]:
+    _validate_member_states(states)
     members: list[_Member] = []
     for state in states:
         for provenance in state.provenance_by_sensor.values():
-            if not provenance.non_reproducible:
-                raise ValueError("aggregate_advisory_states only accepts LLM advisory provenance")
             member = LLMSensorProvenance.model_validate(provenance.model_dump())
             non_llm_findings = tuple(
                 finding
@@ -100,6 +99,13 @@ def _members(states: Sequence[SensorState]) -> tuple[_Member, ...]:
     if not members:
         raise ValueError("aggregate_advisory_states requires LLM advisory provenance")
     return tuple(members)
+
+
+def _validate_member_states(states: Sequence[SensorState]) -> None:
+    for state in states:
+        provenances = tuple(state.provenance_by_sensor.values())
+        if not provenances or any(not item.non_reproducible for item in provenances):
+            raise ValueError("aggregate_advisory_states only accepts LLM advisory provenance")
 
 
 def _member_sort_key(member: _Member) -> tuple[str, str, str, str, str, str]:

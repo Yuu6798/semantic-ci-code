@@ -113,6 +113,17 @@ def test_aggregate_rejects_non_llm_state_instead_of_silently_skipping_it():
         aggregate_advisory_states((llm_state, deterministic_state))
 
 
+def test_aggregate_rejects_provenance_free_state_instead_of_silently_skipping_it():
+    llm_state = _state(
+        "codex-security",
+        model_id="codex",
+        finding=_finding("codex-security", severity="medium", message="codex"),
+    )
+
+    with pytest.raises(ValueError, match="only accepts LLM advisory provenance"):
+        aggregate_advisory_states((llm_state, SensorState()))
+
+
 def test_aggregate_is_input_order_invariant():
     first = _state(
         "z-sensor",

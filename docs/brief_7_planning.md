@@ -1,5 +1,8 @@
 # Brief 7 Planning — Semantic Security Protocol (SSP) v0.1
 
+> **Status: REFERENCE — CSCI-36〜40 complete.** The normative specification is
+> `docs/ssp_protocol.md`; this document retains design rationale.
+>
 > Brief 5(Vibe Coding Adapter + Repair Compiler、P2.5 entry)に続く Brief。
 > Issue #48(Semgrep を semantic-ci core に深く統合する提案)の audit と
 > 設計議論を経て、**core を汚さずに security sensor を束ねる別 protocol** として
@@ -337,6 +340,9 @@ spec 本体は Brief 7 着手時の最初の CSCI(CSCI-36)で `docs/ssp_protocol
 
 ### R1. SSP と core の責任境界が将来曖昧化する
 
+**Resolved:** core and SSP keep independent models and envelopes; the CLI only
+co-locates their entrypoints. Architecture and schema tests enforce the split.
+
 `§20.1` で SSP を suite と並列の 4 層目に置く設計だが、**実装上 `semantic-ci ssp`
 subcommand を core CLI に同居させる**ため、ユーザから見ると一体化して見える。
 core engine と SSP engine の **テスト / リリース / バージョニングを分けるか**は
@@ -355,11 +361,17 @@ db snapshot を使う**仕組みが必要(env var ピン or local cache)。こ�
 
 ### R4. Suite 層との将来的な aggregate
 
+**Resolved in Phase G:** `suite/` aggregates code and security verdicts while
+the SSP envelope remains independent.
+
 `semantic-ci-suite` が将来 core verdict + SSP verdict を**同一 envelope で
 集約**する案がある(§20.3 / §20.4)。Brief 7 では SSP envelope 単独で完結させ、
 集約は別 brief(suite Brief)で扱う。
 
 ### R5. 命名衝突への runtime 対応
+
+**Resolved:** `docs/ssp_protocol.md §1.3` names Semantic Security Protocol at
+first mention and explicitly records the accepted NIST naming collision.
 
 NIST System Security Plan との衝突は accept したが、READMEs / search engine 経由で
 ユーザが混乱する可能性。SSP doc 冒頭に **Why this name?** セクション(NIST SSP との

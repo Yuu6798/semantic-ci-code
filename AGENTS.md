@@ -122,7 +122,7 @@ Codex should stop and report a blocked Completion Summary when:
 Required reading **before drafting any new Task Brief** or **introducing
 a new architectural pattern**. Codifies the operating principle from
 2026-04 〜 2026-05 累計 28 sessions / 39 merged PRs. Compacted by
-`docs/doc_refactor_planning.md` Phase 3 (was 209 lines, now ~88; ≤ 80 target
+`docs/archive/doc_refactor_planning.md` Phase 3 (was 209 lines, now ~88; ≤ 80 target
 の残 cosmetic と §5.3 merge は Phase 3 の唯一の未了項目)。
 
 ### 5.1 Principle
@@ -181,7 +181,7 @@ maintenance practice を遵守しないと PR #84 の状態に戻る。
 
 各 rule は **肯定形 (Practice)** / **反例 (Anti-Pattern)** / **enforce 経路**
 の 3 軸で読む。 enforce 経路の `tests/discipline/` test は
-`docs/doc_refactor_planning.md` Phase 6 (完走) で出揃った。
+`docs/archive/doc_refactor_planning.md` Phase 6 (完走) で出揃った。
 
 | Practice | Anti-Pattern | Enforcement |
 |---|---|---|
@@ -203,7 +203,7 @@ maintenance practice を遵守しないと PR #84 の状態に戻る。
   + § Required Reading (Tier A/B/C/D)
 - `docs/brief_8_planning.md §15` (brief drafting checklist、 20 round 蒸留)
 - `docs/multi_agent_audit_case.md` (parallel agent 規律不在時の failure mode)
-- `docs/doc_refactor_planning.md` (本 framework 自己 refactor の dogfood
+- `docs/archive/doc_refactor_planning.md` (本 framework 自己 refactor の dogfood
   example、 Phase 6 完走で本 §5.5 Anti-Pattern を `tests/discipline/` に変換済)
 
 ## Forward Design Note: Brief 7 / SSP v0.1 (CSCI-36 着手時必読)
@@ -215,7 +215,7 @@ Brief 7 (Semantic Security Protocol v0.1) の設計申し送り (11 項目 + Bri
 → **[`docs/ssp_protocol_design_note.md`](docs/ssp_protocol_design_note.md)** —
 canonical 一次資料、 CSCI-36 Task Brief 起草・実装時の逐語参照対象。
 
-分離経緯: `docs/doc_refactor_planning.md` Phase 4 (2026-05-21 Session 2)、
+分離経緯: `docs/archive/doc_refactor_planning.md` Phase 4 (2026-05-21 Session 2)、
 AGENTS.md の handoff protocol body から ~220 lines の brief-specific
 context を別 doc に move out して Tier B 読み込み load を narrow した。
 旧 inline 版と等価な content を保持、 内部 section 番号も保持済。

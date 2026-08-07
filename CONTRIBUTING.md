@@ -43,7 +43,7 @@ repo-hygiene invariants.
 
 ## Good first issues
 
-Good entry points are the open D-class findings in the
-[Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md): **D6**
-(nested-function vacuous PASS) and **D7** (extract-method × cyclomatic authoring
-advice) are both scoped, low-risk, and well-documented.
+The D-class registry is closed. Use the remaining items in the
+[Extension Survey](docs/extension_survey_planning.md) to find scoped follow-up
+work, and confirm the live queue in [STATUS.md](.claude/memory/STATUS.md) before
+starting.

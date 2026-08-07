@@ -1,19 +1,19 @@
-# LLM Security Sensor Planning — Non-Deterministic Scout Layer (Phase H candidate)
+# LLM Security Sensor Planning — Non-Deterministic Scout Layer
 
 > **Status update (CSCI-54 landed): Phase H H-1 through H-5 are complete.**
 > The LLM scout layer remains advisory-only: recorded scout payloads may be
 > ingested singly or aggregated into `llm-ensemble`, but verdict ownership still
 > moves only through deterministic `target.yaml` authoring freeze.
 
-> Phase G (SSP core integration, G-1〜G-4b merged / G-5 残) が用意した
+> Phase G (SSP core integration, G-1〜G-5 complete) が用意した
 > SensorState・canonical_id・suite evaluator・suppression の機構の上に、
 > **非決定論センサー (LLM セキュリティオラクル)** を 1 種類の sensor adapter
 > として接続する設計 planning。Codex Security を first concrete adapter に置き、
 > 設計は特定ベンダーに依存しない LLM 一般のアダプタープロトコルとして起こす。
 >
-> **本 planning は Phase G-5 (CSCI-49) 完走を前提**とする (SensorState /
+> **本 planning は完走済み Phase G-5 (CSCI-49) を前提**とする (SensorState /
 > SecurityDelta / suite evaluator / `security:` namespace / suppression を
-> 全面再利用するため)。STATUS.md 次の発行順序への投入は Phase G 完走後に判断。
+> 全面再利用するため)。Phase H の CSCI-50〜54 も完走済み。
 
 ## 0. 経緯と問題認識
 
@@ -513,19 +513,17 @@ verdict ownership still requires authoring freeze into deterministic
 
 ## 6. Open Questions
 
-- **Q4 resolved (CSCI-54)**: cross-model provenance is aggregated by an explicit
-  pre-SensorState step into a single `llm-ensemble` sensor identity, with member
-  provenance preserved in advisory output for audit.
-- **Q1**: LLM finding は `SASTSecurityFinding` 相乗りか `LLMSecurityFinding`
-  新 category か (§2.2)。不在 anchor `(site, property)` の表現しやすさで判断
-- **Q2**: re-projection の「anchor が baseline コードに存在するか」の決定論的
-  判定を、どの core 機構 (api_surface / module_graph / 新規) で実装するか
-- **Q3**: advisory mute ledger は target.yaml に同居 (別 namespace) か、
-  別ファイル (`.semantic-ci/advisory_mutes.yaml`) か (Phase G D6 の案 A/B と同型)
-- **Q4**: クロスモデルアンサンブルで provenance をどう集約するか
-  (model ごとに別 sensor_id か、ensemble を 1 sensor_id 扱いか)
-- **Q5**: anchor 暫定レシピ (D6) の確定タイミング — どの実 finding 集合で
-  実装時較正するか (dogfooding pass が必要か)
+- **Q1 resolved (CSCI-50)**: LLM findings use the dedicated
+  `LLMSecurityFinding` category.
+- **Q2 resolved (CSCI-51)**: deterministic re-projection uses baseline
+  `CodeState.api_surface` plus rename mapping, with recall-first fallback.
+- **Q3 resolved (CSCI-53)**: advisory mutes live in the explicit separate
+  `.semantic-ci/advisory_mutes.yaml` ledger.
+- **Q4 resolved (CSCI-54)**: cross-model provenance is aggregated into one
+  `llm-ensemble` identity with member provenance retained for audit.
+- **Q5 resolved (CSCI-51)**: the anchor recipe was fixed in the protocol and
+  encoded by projection and re-projection tests; later calibration may extend
+  finding classes without changing the verdict boundary.
 
 ## 7. Required Reading (本 Phase brief 起草時)
 

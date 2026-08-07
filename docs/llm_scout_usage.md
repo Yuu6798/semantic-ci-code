@@ -68,6 +68,9 @@ Advisory mutes and security suppressions are different mechanisms:
 | Advisory mute ledger | `.semantic-ci/advisory_mutes.yaml` passed with `--advisory-mutes` | No | "We saw this scout candidate; stop surfacing it until expiry." |
 | Security suppression | `target.yaml security.suppressions` | Yes | "This deterministic sensor finding is accepted for gate evaluation until expiry." |
 
+This separation is intentional: merging the two mechanisms would let an
+advisory-only control cross into the verdict-bearing policy layer.
+
 Advisory mute entries use the LLM finding canonical identity. In ensemble mode,
 the canonical id changes because the finding is re-projected under
 `sensor_id="llm-ensemble"`. A mute written for a single `codex-security`
@@ -107,3 +110,8 @@ JSON output adds top-level `advisory`:
 `advisory` is additive and verdict-non-participating. `verdict`,
 `suite_verdict`, `repair_plan`, `summary`, and exit code are unchanged by scout
 findings, including `critical` findings and non-complete advisory sensor runs.
+
+For ensemble runs, `counts.scouted` is the number of findings after anchor
+deduplication, not the sum of findings reported by all members. When members
+report the same anchor with different severities, the ensemble uses both the
+severity and message from the deterministic maximum-severity member.

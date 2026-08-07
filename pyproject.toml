@@ -77,6 +77,7 @@ exclude = [
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.format]
+exclude = ["*.md"]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"

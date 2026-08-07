@@ -1,6 +1,9 @@
 # Brief — ResultStatus authoring/extraction split (working title: TBD)
 
-> Status: PLANNING (open). Sequencing: this brief sits between Brief 5 (P2.5 完走)
+> Status: REFERENCE (complete). The authoring/extraction split and validate-plan
+> v2 changes landed; the text below retains the original sequencing rationale.
+>
+> Sequencing: this brief sits between Brief 5 (P2.5 完走)
 > and Brief 7 (SSP v0.1) in the queue, or runs in parallel to Brief 7 entry —
 > exact brief number is decided when the first Task Brief lands.
 >
@@ -94,6 +97,10 @@ Outcome for S1: scope narrows to "extraction-cause + open_runtime" but is
 **not redundant**. S1 message text needs a one-line update once D1-4 lands.
 This brief's D1-4 PR description MUST call out the S1 text update as a
 follow-up for the Brief 8 CSCI-43 implementer.
+
+**Resolved:** D1-4 and Brief 8 are both complete. `ADVISORY-S1` remains scoped
+to runtime UNKNOWN routing; compile-time authoring errors no longer reach that
+branch.
 
 ### 1b.4 着地順序の選択(open question, user 判断)
 

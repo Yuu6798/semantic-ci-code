@@ -302,7 +302,7 @@ def test_check_multiple_advisory_sensors_use_ensemble_and_members(tmp_path: Path
     }
     assert advisory["surfaced"][0]["sensor_id"] == LLM_ENSEMBLE_SENSOR_ID
     assert advisory["surfaced"][0]["severity"] == "critical"
-    assert advisory["surfaced"][0]["message"] == "low confidence scout"
+    assert advisory["surfaced"][0]["message"] == "critical scout"
 
 
 def test_check_ensemble_advisory_mutes_match_ensemble_canonical_id(tmp_path: Path):

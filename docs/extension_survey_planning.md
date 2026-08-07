@@ -54,9 +54,9 @@ roadmap である。作成体制は `docs/model_delegation_policy.md` 本ルー�
 | **S3** | `compare` に sensor / suite security 経路なし (`check` のみ配線) | `cli/main.py` |
 | **S4** | suppression 二重機構: advisory mute (`sensor/mutes.py`) と verdict 側 `Suppression` (`framework/security_policy.py`) が別層・非統一 | 同左 |
 | **S5** | `init --recipe` 7 種 < catalog の全 template/operator 表面 | `authoring/` |
-| **S6** | `ROADMAP.md` と `README.md` の D-class 記述が **stale** (「5 of 7 resolved; D6/D7 open」等のまま。実際は 8/8 解決 2026-06-12) | ROADMAP.md:41 / README.md:28 |
-| **S7** | `docs/doc_refactor_planning.md` の self-archive 最終 step 未了 (Phase 0-6 完了済みなのに doc が `docs/` に残存、表 status も PLANNING のまま) | 同 doc §7 |
-| **S8** | planning doc の open questions に解決の追記がない (phase_g Q1-Q5 / brief_7 R1・R4・R5 / source_selection §10 再評価 / resultstatus §1b.3) — 実装は着地済みでも doc 上 open に見える。index 側も同罪: `CLAUDE.md` Design Documents 表の phase_g / llm_sensor 行が「実装 5 CSCI 未着手・active queue 主軸」「G-5 完走を前提・未投入」のまま、README planning list も同様 (両 Phase は完走済) | 各 planning doc / CLAUDE.md:192-193 / README.md:137-138 |
+| **S6** | survey 時点で `ROADMAP.md` と `README.md` の D-class 記述が stale。Wave 1 で tracker の 8/8 解決状態へ同期 | ROADMAP.md / README.md / tracker sync test |
+| **S7** | survey 時点で doc-refactor の self-archive が未了。Wave 1 で `docs/archive/doc_refactor_planning.md` へ移送し inbound links を同期 | 同 doc §7 |
+| **S8** | survey 時点で完了済み planning の open questions と index が stale。Wave 1 で resolution record と REFERENCE status を追記 | 各 planning doc / CLAUDE.md / README.md |
 
 ### 1.3 設計 doc 由来の deferred / frozen (再確認)
 

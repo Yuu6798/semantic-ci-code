@@ -825,6 +825,9 @@ CSCI acceptance の cross-test に対応。
       (例: `new_cases` は `code_state_delta._test_case_id()` の `path::name`
       形式、Python-style FQN との取り違えは compile pass / evaluator 永久
       fail category)
+- [ ] **外部 format 翻訳は resolver territory か先に判定**し、採用する場合は
+      syntax parse だけでなく marker / group / extras / local package / version
+      resolution semantics を実 fixture で grounding (CSCI-55 の教訓)
 
 ### 15.2 Authoring intent の保存
 
@@ -897,6 +900,9 @@ CSCI acceptance の cross-test に対応。
       brief 内に 1 つ決め、他は cross-ref。表を更新したら **対応する spec
       文字列を grep で全箇所検出**(§0 / §2 Goals / §3 Non-goals / §5 各
       CSCI Goal / §10 acceptance / §11 R 行)し同期更新
+- [ ] **survey 型 planning** は status index の陳腐化、template 合成後の挙動、
+      gate と根拠データの時点整合、repo-wide inbound links の 4 点を確認してから
+      finding と task plan を確定
 
 ### 15.8 同期更新の発火条件
 

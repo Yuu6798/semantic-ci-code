@@ -12,8 +12,8 @@ For anything authoritative:
   `json_schema.md`).
 - Live status / next-issue queue: see
   [`../../.claude/memory/STATUS.md`](../../.claude/memory/STATUS.md).
-- Open / in-progress brief: see [`../brief_7_planning.md`](../brief_7_planning.md)
-  (Brief 7 / SSP v0.1).
+- Open / in-progress work: see the live queue in `STATUS.md`; completed
+  planning records may remain in `docs/` when later phases still cite them.
 
 ## Contents
 
@@ -23,6 +23,7 @@ For anything authoritative:
 | `brief_4_planning.md` | REFERENCE (Brief 4 完走 2026-05-04) | Brief 4 (CLI / operational entrypoint) — CSCI-15〜19 全 PR merged で `semantic-ci` CLI 5 subcommand release 可能になった |
 | `brief_4b_planning.md` | REFERENCE (Brief 4b 完走 2026-05-05) | Brief 4b (CI integration outputs) — CSCI-28 で SARIF 2.1.0 / GitHub Actions annotation / `.pre-commit-hooks.yaml` manifest を 1 PR で完結 |
 | `brief_5_planning.md` | REFERENCE (Brief 5 完走 2026-05-07) | Brief 5 (Repair Compiler + Vibe Coding Adapters、P2.5 entry) — CSCI-31〜35 全 PR merged で `compile-repair` / `validate-plan` 2 subcommand + Claude Code / Cursor / Codex 3 adapter が release 可能 |
+| `doc_refactor_planning.md` | ARCHIVED (completed 2026-05-21) | 起動時 context compaction、archive infrastructure、discipline test 変換を完了し、self-archive 条件を充足 |
 
 ## When to read these
 

@@ -1,7 +1,7 @@
 # Forward Design Note: Brief 7 / SSP v0.1 (CSCI-36 着手時必読)
 
 Status: **DESIGN NOTE (Brief 7 implementer 用 一次資料)**。 2026-05-21
-Session 2 末尾の Phase 4 (`docs/doc_refactor_planning.md`) で
+Session 2 末尾の Phase 4 (`docs/archive/doc_refactor_planning.md`) で
 `AGENTS.md` inline から分離して本 doc に移送。 AGENTS.md は本 doc への
 pointer のみ残置。
 

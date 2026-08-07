@@ -81,8 +81,16 @@ def _members(states: Sequence[SensorState]) -> tuple[_Member, ...]:
     for state in states:
         for provenance in state.provenance_by_sensor.values():
             if not provenance.non_reproducible:
-                continue
+                raise ValueError("aggregate_advisory_states only accepts LLM advisory provenance")
             member = LLMSensorProvenance.model_validate(provenance.model_dump())
+            non_llm_findings = tuple(
+                finding
+                for finding in state.findings
+                if finding.sensor_id == member.sensor_id
+                and not isinstance(finding, LLMSecurityFinding)
+            )
+            if non_llm_findings:
+                raise ValueError("aggregate_advisory_states only accepts LLM advisory findings")
             findings = tuple(
                 finding
                 for finding in state.findings
@@ -196,6 +204,7 @@ def _group_from_findings(findings: Iterable[LLMSecurityFinding]) -> _AnchorGroup
 
 
 def _project_group(group: _AnchorGroup) -> LLMSecurityFinding:
+    representative = _max_severity_finding(group.findings)
     return project_to_canonical(
         RawLLMFinding(
             finding_class=group.finding_class,
@@ -204,23 +213,18 @@ def _project_group(group: _AnchorGroup) -> LLMSecurityFinding:
             anchor_kind=group.anchor_kind,
             expected_property=group.expected_property,
             ordinal=group.ordinal,
-            severity=_max_severity(group.findings),
-            message=_first_non_empty_message(group.findings),
+            severity=representative.severity,
+            message=representative.message,
             source_span=_first_source_span(group.findings),
         ),
         sensor_id=LLM_ENSEMBLE_SENSOR_ID,
     )
 
 
-def _max_severity(findings: tuple[LLMSecurityFinding, ...]) -> SecuritySeverity:
-    return max((finding.severity for finding in findings), key=lambda item: _SEVERITY_RANK[item])
-
-
-def _first_non_empty_message(findings: tuple[LLMSecurityFinding, ...]) -> str:
-    for finding in findings:
-        if finding.message:
-            return finding.message
-    return ""
+def _max_severity_finding(
+    findings: tuple[LLMSecurityFinding, ...],
+) -> LLMSecurityFinding:
+    return max(findings, key=lambda finding: _SEVERITY_RANK[finding.severity])
 
 
 def _first_source_span(findings: tuple[LLMSecurityFinding, ...]) -> SourceSpan | None:

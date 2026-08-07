@@ -25,7 +25,7 @@ See [`ROADMAP.md`](ROADMAP.md) for what must hold before a stable release, and
 the [Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md) for the
 honest record of what it has and has not caught (real-PR pass: 6 of 8 cases
 matched reviewer-relevant signal, with 1 vacuous PASS and 1 authoring mismatch;
-5 of 7 D-class findings resolved).
+all 8 D-class findings are now resolved).
 
 ## Install
 
@@ -130,17 +130,16 @@ Active references (current behavior):
 - [Repository Layout](docs/repository_layout.md) — full `src/` / `tests/` tree with per-module CSCI annotations (offloaded from CLAUDE.md to keep policy lean)
 - [CLAUDE.md](CLAUDE.md) — repository-level agent operating policy
 
-Planning (open):
+Planning and completed design records:
 
 - [Extension Survey & Task Planning](docs/extension_survey_planning.md) — post-D-class-closure roadmap: capability/asymmetry survey findings (S1〜S8) judged into three waves — hygiene sweep, ghost-facet advisory + output-format parity, then §19 spec-quality metrics + §10.3 round-trip log gated on Phase X-2 evidence
 - [PR Validation — Phase X-2 (code domain) external validation](docs/pr_validation_planning.md) — falsification experiment for the core thesis: collect N≥48 public PRs and correlate semantic-ci verdicts with human reviewer decisions. Y = review state (changes-requested=fail / approve=pass), diff fixed at the first substantive review's SHA, target A(generic) + B(intent-only from PR title/body/labels; bans both Y-leakage and candidate-tautology), primary metrics AUROC/MCC/F1/confusion matrix + bootstrap CI (ρ auxiliary), pre-registered. Measures "does it work?" beyond the existing "does it run?" dogfooding
-- [Phase G — SSP core integration](docs/phase_g_planning.md) — vertical-connect SSP v0.1 into core: SensorState parallel to CodeState, suite evaluator unifying code + security delta, FQN-translated findings, CSCI-45〜49 (active queue main axis)
-- [LLM Security Sensor — Non-Deterministic Scout Layer (Phase H candidate)](docs/llm_sensor_adapter_planning.md) — connect a non-deterministic LLM security oracle (Codex Security et al.) as one sensor adapter atop Phase G. Core thesis: **LLM is a scout, not a judge** (on-demand, advisory surface, never seats the verdict). Determinism preserved via frozen SensorState + one-run-plus-reprojection; §23.1 not weakened; LLM-general adapter protocol; promotion only via target.yaml authoring freeze (silence = consent). Gated on Phase G-5, CSCI-50〜54
+- [Phase G — SSP core integration](docs/phase_g_planning.md) — completed CSCI-45〜49 design record: SensorState parallel to CodeState, suite evaluator unifying code + security delta, and FQN-translated findings
+- [LLM Security Sensor — Non-Deterministic Scout Layer](docs/llm_sensor_adapter_planning.md) — completed CSCI-50〜54 design record for the advisory-only LLM scout path, deterministic re-projection, mutes, and ensemble aggregation
 - [Brief 8 — Target Authoring Surface](docs/brief_8_planning.md) — target.yaml generation paths (recipe / catalog / hand-written), surface isolation from evaluator, `candidate_code_used: false`; encoded into `tests/authoring/` + `tests/architecture/`
 - [Brief 7 — Semantic Security Protocol v0.1](docs/brief_7_planning.md) — SAST + SCA, Python only, independent envelope, Sensor Provenance Invariant
 - [ResultStatus authoring/extraction split](docs/brief_resultstatus_planning.md) — C+B (compile-time pushback + `unknown_cause` sibling field), 5 PR split, validate-plan v2 — boundary with Brief 8 (Authoring Surface) pinned in §1b
 - [Candidate / baseline source selection](docs/source_selection_planning.md) — `--candidate-source` / `--baseline-source` redesign, `--allow-dirty` removal, `pre-commit` subcommand migration; CLI-layer sourcing, engine §23.1 neutrality unchanged
-- [Doc Refactoring Plan (urgent, 2026-05-21)](docs/doc_refactor_planning.md) — startup attention budget 2,500 → 800 lines compaction, Tier A/B/C/D 階層化, archive infrastructure, test-enforced rule conversion, 8 phase / 4-6 day scope
 
 Reference / archived (completed briefs, retained for context — see [`docs/archive/README.md`](docs/archive/README.md)):
 
@@ -148,11 +147,12 @@ Reference / archived (completed briefs, retained for context — see [`docs/arch
 - [Brief 4b — CI integration outputs (SARIF + GH Actions + pre-commit manifest)](docs/archive/brief_4b_planning.md) — CSCI-28 merged 2026-05-05
 - [Brief 4 — CLI / operational entrypoint](docs/archive/brief_4_planning.md) — CSCI-15〜19 merged 2026-05-04
 - [Brief 3 — Pipeline integration (judgment layer)](docs/archive/brief_3_planning.md) — CSCI-10〜14 merged
+- [Doc Refactoring Plan](docs/archive/doc_refactor_planning.md) — completed startup-context compaction, archive infrastructure, and test-enforced discipline conversion
 
 Out-of-core observation (case studies and dogfooding):
 
 - [Dogfooding TC10 Report](docs/dogfooding_TC10_report.md) — 10 virtual-package cases through the CLI; FINDING-1 / D5 (set operator partial-dict semantics) resolved in PR #65
-- [Dogfooding Real-PR Complexity Report](docs/dogfooding_real_pr_complexity.md) — 8 real-PR cases under complexity constraints; surfaces D6 (nested-function vacuous PASS) and D7 (extract-method × cyclomatic authoring mismatch), both open
+- [Dogfooding Real-PR Complexity Report](docs/dogfooding_real_pr_complexity.md) — 8 real-PR cases that surfaced D6 and D7; both were later resolved in PRs #152 and #153
 - [Dogfooding Scale & Security Report](docs/dogfooding_scale_and_security.md) — 15 cases across litellm / langgraph / pdm: scale + large-function robustness (89-file / 514-symbol-delta / +5951 LOC inputs, 0 crashes, cache cold 103s → warm 11s) and SSP security observation (pip-audit SCA valid + positive-controlled; 2 real merged-then-fixed vulns established from git history; Semgrep SAST sub-pass network-blocked, HTTP 403 / 0 rules — not a valid SAST measurement); surfaces D8 (SCA pyproject/pdm.lock discovery gap) and F6 (pattern-SAST logic-vuln blindspot — untested-here hypothesis / Phase H motivation, not demonstrated this pass)
 - [Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md) — consolidated D-class status (D1〜D8) across all dogfooding passes
 - [Pre-Generation Validation Case](docs/pre_generation_validation_case.md) — observation that stub-only candidates are accepted by the engine input contract; reproduction in `experiments/pre_generation_validation/`

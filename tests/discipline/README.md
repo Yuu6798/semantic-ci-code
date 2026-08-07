@@ -14,6 +14,8 @@ These tests turn recurring discipline anti-patterns into CI failures:
 - `test_json_schema_version_sync.py`: every CLI envelope `schema_version`
   constant (the producer) must match its documented value in
   `docs/json_schema.md` (producer-output-shape grounding).
+- `test_d_class_status_sync.py`: public project-status documents must match the
+  canonical D-class tracker before claiming registry closure.
 - `test_dogfood_dual_case.py`: each registered case/verdict-matrix dogfood
   report must demonstrate both PASS and FAIL in its `Verdict` column (column
   parsed, not free prose), so a dogfooding pass cannot evidence detection
@@ -29,7 +31,7 @@ These tests turn recurring discipline anti-patterns into CI failures:
   procedure) is offloaded to `docs/repository_layout.md` and the wrap-up skill,
   leaving pointers in `CLAUDE.md`. Enforced via the wrap-up gate (step 8).
 
-Phase 6 closeout (`docs/doc_refactor_planning.md`): the schema-grep and
+Phase 6 closeout (`docs/archive/doc_refactor_planning.md`): the schema-grep and
 dual-case dogfood candidates landed as the two tests above. The
 round-count-to-encoding candidate was **retired** rather than encoded as a
 test -- review-round count exists only as hand-written prose, so any test is a

@@ -108,6 +108,11 @@ bump beyond the current CLI schema version.
 | `cache` | Cache stats for this invocation: `hit`, `miss`, `invalid`, `write_failed`, and `disabled`. |
 | `engine` | Python minor version, package version, optional source provenance, and optional extraction diagnostics. `check` includes `engine.baseline` and `engine.candidate` sub-objects with `{source, rev}`; `source` is `commit`, `working-tree`, or `staged-index`, and `rev` is a resolved commit SHA for commit-backed sources or `null` for volatile sources. When `check --extractor-timeout` causes one or more dimensions to fall back to schema defaults, `engine.timed_out_dimensions` is a sorted list of dimension names. Other verdict-producing subcommands may omit these sub-objects. |
 
+For `llm-ensemble` advisory output, `counts.scouted` counts findings after
+deterministic anchor deduplication. When duplicate anchors disagree, both the
+reported severity and message come from the deterministic maximum-severity
+member.
+
 `CodeState.api_surface[]` records include an additive `decorators: string[]`
 field. It is empty by default and contains syntactic decorator names such as
 `login_required`, `app.route`, or `auth.requires`; `api_surface[].signature`

@@ -131,7 +131,9 @@ mechanism. Cross-classified as sibling in `dogfooding_findings_tracker.md`.
   separate `ComplexityEntry` records. Breaks `api_surface` parity (and
   thus the documented invariant), needs a CSCI brief, schema impact.
 
-Tracked as **D6 (未解決)** in `docs/dogfooding_findings_tracker.md`.
+This report originally registered D6 as unresolved. It was resolved by PR #152;
+the current status and mitigation are maintained in
+`docs/dogfooding_findings_tracker.md`.
 
 ### FINDING-F2 — extract-method refactor structurally violates `complexity_delta.cyclomatic ≤ 0` (severity: low; scope: authoring guidance)
 
@@ -171,7 +173,8 @@ non-exclusive:
   functions in the touched file). Lower priority than D6 since this is
   authoring polish, not a CI integrity gap.
 
-Tracked as **D7 (未解決, low priority)** in
+This report originally registered D7 as unresolved. It was resolved by PR #153;
+the current status and mitigation are maintained in
 `docs/dogfooding_findings_tracker.md`.
 
 ### Observations without finding registration (F3 / F4 / F5)
@@ -278,5 +281,5 @@ status changes; do not re-tabulate D-class status inside this report.
 
 Quick links:
 
-- **D6** (FINDING-F1, nested-function vacuous PASS) — 未解決, sibling of D4
-- **D7** (FINDING-F2, extract-method × cyclomatic authoring mismatch) — 未解決, low priority
+- **D6** (FINDING-F1, nested-function vacuous PASS) — resolved in PR #152
+- **D7** (FINDING-F2, extract-method × cyclomatic authoring mismatch) — resolved in PR #153

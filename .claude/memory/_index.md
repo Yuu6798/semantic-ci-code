@@ -3,7 +3,7 @@
 1-2 line entry per session. Full narratives live in dated
 `YYYY-MM-DD.md` files; this file is the lightweight index for the
 Tier A reading load (see `CLAUDE.md` § Required Reading Before Editing).
-Restored to original spec by Phase 2 of `docs/doc_refactor_planning.md`.
+Restored to original spec by Phase 2 of `docs/archive/doc_refactor_planning.md`.
 
 | Date | PR / commit | Outcome | Detail |
 |---|---|---|---|

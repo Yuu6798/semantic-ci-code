@@ -348,16 +348,24 @@ subcommand を core CLI に同居させる**ため、ユーザから見ると一
 core engine と SSP engine の **テスト / リリース / バージョニングを分けるか**は
 Brief 7 中に判断必要。
 
-### R2. ruleset 配布戦略未確定
+### R2. ruleset distribution
 
-Semgrep ruleset を repo に vendoring するか、Semgrep registry の `p/python` を
-オンライン取得するかは Brief 7 着手時に決める。**vendoring 推奨**(audit B1/B2 で
-airgap 完走確認済みの前提を活かす)。
+**Resolved in CSCI-38:** the Semgrep adapter requires an explicit local ruleset
+path, hashes the file bytes into `ruleset_hash`, and passes that path to
+`semgrep --config`. Registry lookup is not an adapter-owned distribution path;
+callers vendor or otherwise materialize the ruleset before scanning. This keeps
+the scan contract compatible with the air-gapped B1/B2 audit assumption.
 
-### R3. SCA advisory database の更新頻度
+### R3. SCA advisory database parity
 
-pip-audit は OSV / PyPI advisory を fetch する。**baseline と candidate で同じ
-db snapshot を使う**仕組みが必要(env var ピン or local cache)。これも Brief 7 着手時。
+**Deferred beyond SSP v0.1:** the envelope reserves optional
+`advisory_db_hash`, but live `PipAuditAdapter.scan()` leaves it unset because
+pip-audit does not expose a stable database-snapshot identifier through this
+adapter. Baseline and candidate scans therefore do not have cryptographically
+enforced database parity in v0.1. Prebuilt callers may supply a known hash via
+`from_json()`, and the later suite policy can require matching hashes when both
+are available. A future adapter/provider integration must materialize one
+pinned snapshot for both endpoints before this guarantee can be claimed.
 
 ### R4. Suite 層との将来的な aggregate
 

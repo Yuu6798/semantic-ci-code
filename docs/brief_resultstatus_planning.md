@@ -3,9 +3,9 @@
 > Status: REFERENCE (complete). The authoring/extraction split and validate-plan
 > v2 changes landed; the text below retains the original sequencing rationale.
 >
-> Sequencing: this brief sits between Brief 5 (P2.5 完走)
-> and Brief 7 (SSP v0.1) in the queue, or runs in parallel to Brief 7 entry —
-> exact brief number is decided when the first Task Brief lands.
+> Completion record: the ResultStatus split landed first as PRs #76-#79;
+> Brief 8 implementation followed. The document never received a numbered
+> Brief slot and is retained under its descriptive title.
 >
 > **Working title note (2026-05-12)**: original draft proposed "Brief 8?" as
 > working title. Since draft, `docs/brief_8_planning.md` (Authoring Surface /
@@ -13,7 +13,7 @@
 > planning doc therefore stays without a fixed brief number until first
 > Task Brief lands. The boundary with Brief 8 is §1b below.
 >
-> Live status: `.claude/memory/STATUS.md` 次の発行順序 §E
+> This document is retained only as a historical decision record.
 
 ## 1. Why this brief exists
 
@@ -102,7 +102,7 @@ follow-up for the Brief 8 CSCI-43 implementer.
 to runtime UNKNOWN routing; compile-time authoring errors no longer reach that
 branch.
 
-### 1b.4 着地順序の選択(open question, user 判断)
+### 1b.4 Landing order (resolved)
 
 | Option | UX 上の効果 |
 |---|---|
@@ -110,8 +110,10 @@ branch.
 | **ResultStatus split 先 → Brief 8** | compile error が一時的に増えて authoring 体験が悪化、 後で `init --recipe` + `target-doctor` で救済される流れ。 authoring hazard と syntactic error が同時期に整理される利点 |
 | **並列** | INV-1 framing と S1 文言整合を双方の PR で守れば技術的に可能。 ただしレビューコストが上がる |
 
-決定は **first Task Brief 発行時** に user 判断。 並列にしない場合でも
-本 planning doc は Brief 8 と独立に維持できる構造になっている。
+**Resolution:** ResultStatus split landed first in strict D1-2 → D1-3 → D1-4
+→ D3 order as PRs #76-#79. Brief 8 implementation followed. The selected path
+was therefore **ResultStatus split first**, not the parallel option; the
+temporary authoring-UX gap was accepted and later closed by Brief 8.
 
 ## 2. Root direction (固定)
 
@@ -355,21 +357,23 @@ So the residual runtime UNKNOWN after C is bounded by:
 Everything else in the current ~24 emit-site catalog (`.claude/memory/2026-05-08.md`)
 moves to `CompileError` under Brief D1-2 / D1-3.
 
-### 4.6 Open implementation questions (carried to D1-2 / D1-3 briefs)
+### 4.6 Implementation decisions (resolved or explicitly deferred)
 
-1. **Where does the matrix live?** Likely `compiler/path_schema.py` extended,
-   or a sibling `compiler/operator_schema.py`. Decision deferred to D1-2.
-2. **Open-region escape hatch.** When target is `python_specific.*` (any
-   sub-path), should compile let *any* operator through? Probably yes — open
-   region is by definition not statically typed. Document explicitly.
-3. **`equals` against a record_collection observed.** `_canon` makes the set
-   comparison work, but compile cannot type-check the expected literal record
-   shape (it has no Match Schema for arbitrary user-provided fields). Keep
-   shallow: just verify `expected` is a non-empty list when observed category
-   is collection-typed.
-4. **Tolerance applicability.** `tolerance` is documented as numeric-only but
-   accepted on any constraint compile-side. Out of scope for this brief
-   unless a low-cost compile check fits.
+1. **Matrix location — resolved:** D1-2 added the sibling module
+   `compiler/operator_schema.py`; a synchronization test keeps its operator
+   classes aligned with the evaluator.
+2. **Open-region escape hatch — resolved:** observed-side category checks are
+   bypassed for `UNKNOWN_OPEN` targets and residual mismatches become
+   `open_runtime`. Expected-literal shape checks still run because they do not
+   depend on the observed schema.
+3. **Record-collection literals — resolved:** D1-3 intentionally performs a
+   shallow collection-shape check only. It requires a list/tuple for collection
+   operators and does not validate arbitrary record fields without a match
+   schema.
+4. **Tolerance applicability — deferred:** numeric-only tolerance validation
+   remained outside the ResultStatus split and is not enforced by the compiler.
+   This is a separate authoring-contract improvement, not unfinished D1-2 or
+   D1-3 work.
 
 ## 5. Brief split
 

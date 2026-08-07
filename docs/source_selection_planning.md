@@ -10,8 +10,8 @@
 > Phase 3b deletes the `pre-commit` subcommand and migrates its
 > `.pre-commit-hooks.yaml` entry to the unified `check` surface.
 >
-> Live status: `.claude/memory/STATUS.md` 次の発行順序 (post-Phase X-5
-> active queue)
+> Completion record: Phase 2 landed in PR #100, Phase 3a in PR #101, and
+> Phase 3b in PR #102. This document is retained only as a historical record.
 >
 > Trigger: PR #98 (`fix(check): preserve explicit --candidate-rev under
 > --allow-dirty (#97)`) landed a Phase 1 mitigation but exposed a design

@@ -27,7 +27,9 @@ def test_archive_index_describes_landed_discipline_tests_as_current():
     archive_index = CURRENT_MEMORY_ENTRY_POINTS[-1].read_text(encoding="utf-8")
 
     assert "これらが landed すると" not in archive_index
+    assert "wrap-up trigger の一部として自動実行される" not in archive_index
     assert "CI で mechanically enforce されている" in archive_index
+    assert "move と index 書換は operator が手動実行する" in archive_index
 
 
 def test_completed_planning_records_do_not_claim_active_or_open_status():

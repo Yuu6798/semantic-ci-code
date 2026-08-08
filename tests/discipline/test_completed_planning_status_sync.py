@@ -45,6 +45,7 @@ def test_archive_protocol_distinguishes_trigger_from_manual_transfer():
 
     for path in ARCHIVE_PROTOCOL_RECORDS:
         text = " ".join(path.read_text(encoding="utf-8").split())
+        assert "移送の要否確認は wrap-up trigger で自動起動する" in text, path
         assert "move と index 書換は operator が手動実行する" in text, path
         for marker in stale_markers:
             assert marker not in text, f"{path}: stale marker {marker!r}"

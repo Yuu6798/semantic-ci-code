@@ -182,8 +182,8 @@ Anti-Pattern-to-Test-Map / Cross-Ref)。
 ├── INDEX.md                  # archive 全体の索引 (Tier D 専用)
 ```
 
-Compaction policy (memory wrap-up 時に要否確認を自動起動し、file 物理 move と
-index 書換は operator が手動実行する):
+Compaction policy (archive 移送の要否確認は wrap-up trigger で自動起動する。
+file 物理 move と index 書換は operator が手動実行する):
 
 - 30 日経過 dated entry → `archive/YYYY-MM/` 移送
 - `_index.md` の該当行を 1 行に collapse + archive path 追記
@@ -237,8 +237,8 @@ dogfood を test 化、 round-count は CLAUDE.md wrap-up checklist に格下げ
 - CLAUDE.md / AGENTS.md への更新候補があればユーザーに提案
 ```
 
-**Acceptance**: 次回 wrap-up で移送要否確認が自動起動し、file 物理 move と
-index 書換は operator が手動実行する pattern が確立。
+**Acceptance**: archive 移送の要否確認は wrap-up trigger で自動起動する一方、
+file 物理 move と index 書換は operator が手動実行する pattern が確立。
 
 ---
 

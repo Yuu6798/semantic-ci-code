@@ -56,8 +56,8 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 
 ## 移送 protocol
 
-archive 移送の要否確認は **`CLAUDE.md § Session Memory → 終了時ルール`** で
-定義された wrap-up trigger の一部として自動的に起動する。実際の file 物理
+**`CLAUDE.md § Session Memory → 終了時ルール`** で定義された
+archive 移送の要否確認は wrap-up trigger で自動起動する。実際の file 物理
 move と index 書換は operator が手動実行する。該当 step:
 
 - **Step 3** (wrap-up checklist): 30 日以上前の dated entries を

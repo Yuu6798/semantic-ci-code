@@ -1,8 +1,9 @@
 # Doc Refactoring Planning (2026-05-21 起草)
 
-Status: **PLANNING (open)** — 緊急タスクとして 2026-05-21 Session 2 末尾に
-起草。 完了後は本 doc 自身を `.claude/memory/archive/` 移送 (self-referential
-test: 経験値外部化 framework 自身の dogfood example)。
+Status: **ARCHIVED (completed 2026-08-08)** — 2026-05-21 の主要 Phase 着地後、
+2026-08-08 の Phase 3 最終 closeout をもって全 Phase 完走とした履歴資料。
+`docs/archive/doc_refactor_planning.md` に移送済みであり、現在の作業状態は
+`.claude/memory/STATUS.md` を正本とする。
 
 ## 0. 背景と Goal
 
@@ -151,6 +152,11 @@ test: 経験値外部化 framework 自身の dogfood example)。
 (Principle / Envelope (data table) / Practice (combined) /
 Anti-Pattern-to-Test-Map / Cross-Ref)。
 
+**Phase 3 closeout (2026-08-08, PR #156)**: `AGENTS.md §5` を意味を保ったまま
+80 lines 以下へ圧縮した。§5.3 の artifact type 3-tier と `CLAUDE.md` の
+読み込み優先度 Tier A/B/C/D は直交軸であるため、統合せず並行利用する判断を
+確定した。これにより「統合するか」が未決定のまま残る状態も解消した。
+
 ### Phase 4: **Forward Design Note を分離** (PR、 半日)
 
 `AGENTS.md` Forward Design Note: Brief 7 / SSP v0.1 (現 ~220 lines) は
@@ -176,7 +182,8 @@ Anti-Pattern-to-Test-Map / Cross-Ref)。
 ├── INDEX.md                  # archive 全体の索引 (Tier D 専用)
 ```
 
-Compaction policy (memory wrap-up 時に自動実行):
+Compaction policy (archive 移送の要否確認は wrap-up trigger で自動起動する。
+file 物理 move と index 書換は operator が手動実行する):
 
 - 30 日経過 dated entry → `archive/YYYY-MM/` 移送
 - `_index.md` の該当行を 1 行に collapse + archive path 追記
@@ -224,13 +231,14 @@ dogfood を test 化、 round-count は CLAUDE.md wrap-up checklist に格下げ
 実行内容 (本 wrap-up):
 - 会話の振り返りサマリーを `.claude/memory/YYYY-MM-DD.md` に保存
 - `_index.md` に 1 行 (本来仕様、 2 行以内) サマリーを追記
-- 30 日以上前の dated entries を `archive/YYYY-MM/` 移送 (自動 compaction)
+- 30 日以上前の dated entries を自動抽出し、operator が
+  `archive/YYYY-MM/` へ手動移送
 - STATUS.md `## 直近 merged` で 5 entries 超過分を archive 移送
 - CLAUDE.md / AGENTS.md への更新候補があればユーザーに提案
 ```
 
-**Acceptance**: 次回 wrap-up で archive 移送が自動実行される pattern が
-確立。
+**Acceptance**: archive 移送の要否確認は wrap-up trigger で自動起動する一方、
+file 物理 move と index 書換は operator が手動実行する pattern が確立。
 
 ---
 
@@ -296,12 +304,11 @@ attention 過負荷、 専用 doc に分離後の方が context 局所化でき�
 
 ## 7. Self-referential note
 
-本 plan doc は完了後に `.claude/memory/archive/` 移送される。 これは
-「経験値外部化 framework が自分自身を refactor する」 dogfood example
-として記録に値する: 規律 infrastructure が自分自身に適用される
-self-referential test の最初の case。 完了 commit で本 doc を archive 移送
-した動作 trail 自体が、 経験値外部化 discipline の「圧縮 + 保存」 ループの
-実証となる。
+本 plan doc は完了後に `docs/archive/` へ移送済み。これは「経験値外部化
+framework が自分自身を refactor する」dogfood example であり、規律
+infrastructure を自身へ適用する self-referential test の最初の case となった。
+移送の動作 trail 自体が、経験値外部化 discipline の「圧縮 + 保存」ループを
+実証している。
 
 ---
 

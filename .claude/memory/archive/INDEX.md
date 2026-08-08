@@ -56,8 +56,9 @@ ratched 退避された履歴で、 **情報損失ゼロ** (原文保存) を in
 
 ## 移送 protocol
 
-archive 移送は **`CLAUDE.md § Session Memory → 終了時ルール`** で定義
-された wrap-up trigger の一部として自動実行される。 該当 step:
+**`CLAUDE.md § Session Memory → 終了時ルール`** で定義された
+archive 移送の要否確認は wrap-up trigger で自動起動する。実際の file 物理
+move と index 書換は operator が手動実行する。該当 step:
 
 - **Step 3** (wrap-up checklist): 30 日以上前の dated entries を
   `archive/YYYY-MM/` に移送、 `_index.md` 該当行を 1 行 summary +
@@ -80,8 +81,8 @@ archive 移送は **`CLAUDE.md § Session Memory → 終了時ルール`** で�
 
 ## Self-referential drift detection
 
-archive 移送 protocol 自体の遵守は将来 `tests/discipline/` (`docs/
-doc_refactor_planning.md` Phase 6) で test 化される予定:
+archive 移送 protocol 自体の遵守は `tests/discipline/`
+(`docs/archive/doc_refactor_planning.md` Phase 6) で test 化済み:
 
 - `tests/discipline/test_status_md_phase_single_paragraph.py` — Phase
   paragraph 重複検出
@@ -90,13 +91,13 @@ doc_refactor_planning.md` Phase 6) で test 化される予定:
 - `tests/discipline/test_index_md_entry_compactness.py` — essay 化
   regression 検出
 
-これらが landed すると、 archive policy の 一部 (sweep + compaction
-discipline) が CI で mechanically enforce される。 archive 移送 (file 物理
-move) 自体は wrap-up trigger 起動時の手作業 ritual で保持。
+これらにより、archive policy の一部 (sweep + compaction discipline) は
+CI で mechanically enforce されている。archive 移送 (file 物理 move) 自体は
+wrap-up trigger 起動時の手作業 ritual で保持。
 
 ## 由来
 
-- Phase 1 (`docs/doc_refactor_planning.md` 2026-05-21、 commit `0db925f`)
+- Phase 1 (`docs/archive/doc_refactor_planning.md` 2026-05-21、 commit `0db925f`)
   で `STATUS_MERGED_LOG.md` 初設置 (STATUS.md 831 → 505 lines 圧縮の
   destination)
 - Phase 2 (commit `4783728`) で `_index.md` 1-line index 復元、 archive

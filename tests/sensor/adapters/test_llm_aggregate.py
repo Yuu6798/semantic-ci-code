@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from semantic_ci_code.sensor.adapters.llm import (
     LLM_ENSEMBLE_ADAPTER_VERSION,
     LLM_ENSEMBLE_SENSOR_ID,
@@ -12,7 +14,12 @@ from semantic_ci_code.sensor.adapters.llm import (
     aggregate_advisory_states,
     project_to_canonical,
 )
-from semantic_ci_code.sensor.models import LLMSecurityFinding, SensorState, SourceSpan
+from semantic_ci_code.sensor.models import (
+    LLMSecurityFinding,
+    SensorProvenance,
+    SensorState,
+    SourceSpan,
+)
 
 AGGREGATE_SOURCE = (
     Path(__file__).parents[3]
@@ -84,6 +91,37 @@ def test_aggregate_conflict_resolution_uses_max_severity_and_member_order_tiebre
     assert finding.severity == "critical"
     assert finding.message == "a message"
     assert finding.source_span == a_finding.source_span
+
+
+def test_aggregate_rejects_non_llm_state_instead_of_silently_skipping_it():
+    llm_state = _state(
+        "codex-security",
+        model_id="codex",
+        finding=_finding("codex-security", severity="medium", message="codex"),
+    )
+    deterministic_state = SensorState(
+        provenance_by_sensor={
+            "semgrep": SensorProvenance(
+                sensor_id="semgrep",
+                sensor_version="semgrep-v1",
+            )
+        },
+        findings=(),
+    )
+
+    with pytest.raises(ValueError, match="only accepts LLM advisory provenance"):
+        aggregate_advisory_states((llm_state, deterministic_state))
+
+
+def test_aggregate_rejects_provenance_free_state_instead_of_silently_skipping_it():
+    llm_state = _state(
+        "codex-security",
+        model_id="codex",
+        finding=_finding("codex-security", severity="medium", message="codex"),
+    )
+
+    with pytest.raises(ValueError, match="only accepts LLM advisory provenance"):
+        aggregate_advisory_states((llm_state, SensorState()))
 
 
 def test_aggregate_is_input_order_invariant():

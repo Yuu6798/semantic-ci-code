@@ -41,7 +41,7 @@ def _assert_index_cells_are_compact(text: str, *, source: str) -> None:
     raise AssertionError(
         f"{source} has _index.md table cells longer than {MAX_CELL_CHARS} "
         f"chars:\n{details}\n"
-        "Suggested action: follow docs/doc_refactor_planning.md Phase 2; move "
+        "Suggested action: follow docs/archive/doc_refactor_planning.md Phase 2; move "
         "details to the dated session log and keep _index.md to a 1-2 line "
         "summary."
     )

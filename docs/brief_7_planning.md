@@ -1,5 +1,8 @@
 # Brief 7 Planning — Semantic Security Protocol (SSP) v0.1
 
+> **Status: REFERENCE — CSCI-36〜40 complete.** The normative specification is
+> `docs/ssp_protocol.md`; this document retains design rationale.
+>
 > Brief 5(Vibe Coding Adapter + Repair Compiler、P2.5 entry)に続く Brief。
 > Issue #48(Semgrep を semantic-ci core に深く統合する提案)の audit と
 > 設計議論を経て、**core を汚さずに security sensor を束ねる別 protocol** として
@@ -337,29 +340,46 @@ spec 本体は Brief 7 着手時の最初の CSCI(CSCI-36)で `docs/ssp_protocol
 
 ### R1. SSP と core の責任境界が将来曖昧化する
 
+**Resolved:** core and SSP keep independent models and envelopes; the CLI only
+co-locates their entrypoints. Architecture and schema tests enforce the split.
+
 `§20.1` で SSP を suite と並列の 4 層目に置く設計だが、**実装上 `semantic-ci ssp`
 subcommand を core CLI に同居させる**ため、ユーザから見ると一体化して見える。
 core engine と SSP engine の **テスト / リリース / バージョニングを分けるか**は
 Brief 7 中に判断必要。
 
-### R2. ruleset 配布戦略未確定
+### R2. ruleset distribution
 
-Semgrep ruleset を repo に vendoring するか、Semgrep registry の `p/python` を
-オンライン取得するかは Brief 7 着手時に決める。**vendoring 推奨**(audit B1/B2 で
-airgap 完走確認済みの前提を活かす)。
+**Resolved in CSCI-38:** the Semgrep adapter requires an explicit local ruleset
+path, hashes the file bytes into `ruleset_hash`, and passes that path to
+`semgrep --config`. Registry lookup is not an adapter-owned distribution path;
+callers vendor or otherwise materialize the ruleset before scanning. This keeps
+the scan contract compatible with the air-gapped B1/B2 audit assumption.
 
-### R3. SCA advisory database の更新頻度
+### R3. SCA advisory database parity
 
-pip-audit は OSV / PyPI advisory を fetch する。**baseline と candidate で同じ
-db snapshot を使う**仕組みが必要(env var ピン or local cache)。これも Brief 7 着手時。
+**Deferred beyond SSP v0.1:** the envelope reserves optional
+`advisory_db_hash`, but live `PipAuditAdapter.scan()` leaves it unset because
+pip-audit does not expose a stable database-snapshot identifier through this
+adapter. Baseline and candidate scans therefore do not have cryptographically
+enforced database parity in v0.1. Prebuilt callers may supply a known hash via
+`from_json()`, and the later suite policy can require matching hashes when both
+are available. A future adapter/provider integration must materialize one
+pinned snapshot for both endpoints before this guarantee can be claimed.
 
 ### R4. Suite 層との将来的な aggregate
+
+**Resolved in Phase G:** `suite/` aggregates code and security verdicts while
+the SSP envelope remains independent.
 
 `semantic-ci-suite` が将来 core verdict + SSP verdict を**同一 envelope で
 集約**する案がある(§20.3 / §20.4)。Brief 7 では SSP envelope 単独で完結させ、
 集約は別 brief(suite Brief)で扱う。
 
 ### R5. 命名衝突への runtime 対応
+
+**Resolved:** `docs/ssp_protocol.md §1.3` names Semantic Security Protocol at
+first mention and explicitly records the accepted NIST naming collision.
 
 NIST System Security Plan との衝突は accept したが、READMEs / search engine 経由で
 ユーザが混乱する可能性。SSP doc 冒頭に **Why this name?** セクション(NIST SSP との

@@ -1,14 +1,17 @@
 # Brief — Candidate / Baseline Source Selection (working title)
 
-> Status: PLANNING (open). Sequencing: 3 implementation PRs (Phase 2 →
+> Status: REFERENCE (complete). The 3 implementation phases landed in order:
+> Phase 2 → Phase 3a → Phase 3b. Historical plan:
+>
+> Sequencing: 3 implementation PRs (Phase 2 →
 > Phase 3a → Phase 3b), each its own Task Brief. Phase 2 lands the
 > minimal CLI surface change and removes `--allow-dirty`; Phase 3a
 > symmetrises baseline-side sourcing and adds staged-index;
 > Phase 3b deletes the `pre-commit` subcommand and migrates its
 > `.pre-commit-hooks.yaml` entry to the unified `check` surface.
 >
-> Live status: `.claude/memory/STATUS.md` 次の発行順序 (post-Phase X-5
-> active queue)
+> Completion record: Phase 2 landed in PR #100, Phase 3a in PR #101, and
+> Phase 3b in PR #102. This document is retained only as a historical record.
 >
 > Trigger: PR #98 (`fix(check): preserve explicit --candidate-rev under
 > --allow-dirty (#97)`) landed a Phase 1 mitigation but exposed a design
@@ -353,22 +356,16 @@ Required reading before drafting the Phase 2 Task Brief:
    Anti-Patterns 7 items.
 7. `docs/brief_8_planning.md §15` brief-drafting checklist.
 
-## 10. Open questions (deferred to specific Task Briefs)
+## 10. Resolution record
 
-- **schema_version exact value** — decided in Phase 2 brief after
-  cross-checking the running envelope schema number against
-  `docs/json_schema.md` HEAD.
-- **Verbose flag wiring for the working-tree "clean" note** — Phase
-  2 brief picks one of (a) reuse existing `--verbose`, (b) add it if
-  absent, (c) emit unconditionally.
-- **Whether `compare` / `observe` should grow the same source flags**
-  — explicitly deferred. `compare` already accepts arbitrary path
-  snapshots so it sits at the engine boundary; `observe` is a
-  single-state surface. Re-evaluate after Phase 3b lands if a
-  concrete use case appears.
-- **`pre-commit-hooks.yaml` smoke test runner** — Phase 3b brief
-  picks between using the real `pre-commit` package in a temp env
-  vs invoking the hook manually.
+- **schema_version** — resolved by the landed Phase 2 envelope update and kept
+  synchronized with `docs/json_schema.md`.
+- **Working-tree clean note** — resolved by the landed CLI implementation.
+- **`compare` / `observe` source flags** — re-evaluated after Phase 3b and
+  intentionally unchanged. `compare` already accepts arbitrary path snapshots;
+  `observe` remains a single-state surface.
+- **`pre-commit-hooks.yaml` smoke test** — resolved by the landed Phase 3b
+  discipline and CLI tests.
 
 ## 11. Acceptance criteria (cross-phase, for the closing PR of Phase 3b)
 

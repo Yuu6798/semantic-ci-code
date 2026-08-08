@@ -1,5 +1,8 @@
 # Phase G Planning — SSP Core Integration (Security Observation Layer)
 
+> **Status: REFERENCE — Phase G G-1 through G-5 (CSCI-45〜49) complete.**
+> The open questions in §6 record their landed resolutions.
+>
 > SSP v0.1 (Brief 7、2026-05-27 完走) を semantic-ci core と**縦接続**する
 > 設計 planning。SSP v0.1 は core の「横」に並列配置され、独自の delta
 > エンジン・envelope・verdict を持つ。本 Phase は SSP を core の「上」に
@@ -689,16 +692,15 @@ the current imports / effects / api-surface overlays alone.
 
 ## 6. Open Questions
 
-- **Q1**: suite evaluator は既存の evaluator と同じモジュールに置くか、
-  完全に別パッケージか
-- **Q2**: security constraint の DSL を target.yaml に統合するか、
-  `security.yaml` として分離するか
-- **Q3**: Phase G-5 のテンプレートは `target-catalog` に統合するか、
-  別コマンドにするか
-- **Q4**: SSP v0.1 の SARIF 出力は suite 層に移行するか、
-  独立出力として維持するか
-- **Q5**: SensorState の JSON schema は SSP v0.1 の `ssp-1` を拡張するか、
-  新 schema version (`suite-1`) を起こすか
+- **Q1 resolved**: suite evaluation lives in the separate `suite/` package.
+- **Q2 resolved**: verdict-bearing security policy uses the `target.yaml`
+  `security:` namespace.
+- **Q3 resolved**: Phase G-5 recipes are exposed through the existing authoring
+  registry and `target-catalog` surface.
+- **Q4 resolved**: SSP keeps its independent output path; suite-enabled `check`
+  adds security findings to its own renderers without replacing SSP.
+- **Q5 resolved**: SensorState is a typed input to the existing verdict envelope;
+  the independent SSP envelope remains `ssp-1` and no `suite-1` was introduced.
 
 ## 7. Required Reading (Phase G brief 起草時)
 

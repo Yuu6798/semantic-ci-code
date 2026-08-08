@@ -312,6 +312,10 @@ Recipe IDs:
 | `security:deny-dangerous-effects` | `generic` | Denies newly added `process`, `dynamic_code`, and `unsafe_deserialize` effects. |
 | `security:preserve-auth-guards` | `generic` | Denies removal of public API decorators whose leaf name is `login_required`, `requires_auth`, or `permission_required`. |
 
+Recipes are intentionally an opinionated subset, not a second catalog. Use
+`target-catalog` or a hand-written target for the full template and operator
+surface; recipe/catalog parity is not a design goal.
+
 `--doctor` runs target-doctor inline after writing the file and prints the human
 advisory output to stderr. `--package-root` is accepted only together with
 `--doctor`; it uses the same repo-relative resolution and symlink-escape guards
@@ -339,6 +343,10 @@ semantic-ci compare --baseline-dir base --candidate-dir candidate --strict-repai
 semantic-ci compare --baseline-dir base --candidate-dir candidate --format sarif --output semantic-ci.sarif
 semantic-ci compare --baseline-dir base --candidate-dir candidate --format gh-actions
 ```
+
+`compare` intentionally remains a lightweight local-directory code comparison
+surface and does not accept security sensor or advisory scout inputs. The full
+CI integration surface, including those inputs, belongs to `check`.
 
 ## `semantic-ci check`
 
@@ -519,6 +527,10 @@ plus `sensor.model_id` and `sensor.prompt_hash` to preserve informed-consent
 provenance. `--sensor-baseline` / `--sensor-candidate` and `--advisory-sensor`
 can be used together; the deterministic security verdict and advisory scout
 surface remain separate.
+
+For an ensemble, `counts.scouted` is the number of findings after deterministic
+anchor deduplication, not the sum of member findings. The selected finding
+message comes from the same maximum-severity member that supplies severity.
 
 **Migrated in Phase 3b**: `semantic-ci pre-commit [...]` became
 `semantic-ci check --candidate-source=staged-index [...]`. The evaluation

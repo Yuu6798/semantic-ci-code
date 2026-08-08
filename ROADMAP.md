@@ -38,8 +38,8 @@ We will tag a stable release only when all of the following hold:
   [docs/exit_codes.md](docs/exit_codes.md) is unchanged over the same window.
 - **Known-findings closure** — every D-class finding in the
   [Dogfooding Findings Tracker](docs/dogfooding_findings_tracker.md) is either
-  resolved or explicitly waived with a recorded rationale. (Currently 5 of 7
-  resolved; D6 and D7 open.)
+  resolved or explicitly waived with a recorded rationale. This criterion is
+  satisfied: all 8 D-class findings are resolved.
 
 ## Out of scope for now
 

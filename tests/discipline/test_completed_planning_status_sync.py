@@ -9,6 +9,10 @@ CURRENT_MEMORY_ENTRY_POINTS = (
     ROOT / ".claude" / "memory" / "STATUS.md",
     ROOT / ".claude" / "memory" / "archive" / "INDEX.md",
 )
+ARCHIVE_PROTOCOL_RECORDS = (
+    CURRENT_MEMORY_ENTRY_POINTS[-1],
+    ROOT / "docs" / "archive" / "doc_refactor_planning.md",
+)
 COMPLETED_PLANNING_FILES = (
     ROOT / "docs" / "brief_7_planning.md",
     ROOT / "docs" / "brief_resultstatus_planning.md",
@@ -30,6 +34,20 @@ def test_archive_index_describes_landed_discipline_tests_as_current():
     assert "wrap-up trigger の一部として自動実行される" not in archive_index
     assert "CI で mechanically enforce されている" in archive_index
     assert "move と index 書換は operator が手動実行する" in archive_index
+
+
+def test_archive_protocol_distinguishes_trigger_from_manual_transfer():
+    stale_markers = (
+        "memory wrap-up 時に自動実行",
+        "移送 (自動 compaction)",
+        "archive 移送が自動実行される",
+    )
+
+    for path in ARCHIVE_PROTOCOL_RECORDS:
+        text = " ".join(path.read_text(encoding="utf-8").split())
+        assert "move と index 書換は operator が手動実行する" in text, path
+        for marker in stale_markers:
+            assert marker not in text, f"{path}: stale marker {marker!r}"
 
 
 def test_completed_planning_records_do_not_claim_active_or_open_status():

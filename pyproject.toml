@@ -36,6 +36,20 @@ namespaces = false
 "semantic_ci_code.schemas" = ["*.json"]
 "semantic_ci_code.effects" = ["*.yaml"]
 
+[tool.uv]
+# Supply-chain cooldown: uv (lock resolution AND the PEP 517 build-backend
+# environment it creates during `uv sync`) ignores any release published in the
+# last 7 days, so a just-published malicious release cannot be picked up. Keep
+# in step with the Dependabot `cooldown: default-days` in .github/dependabot.yml.
+# pip ignores this table, so `pip install -e ".[dev]"` keeps working unchanged.
+exclude-newer = "7 days"
+# certifi 2026.10.19: PYSEC-2026-4320 / GHSA-6q48-6c7w-9gw2 の修正版が公開 7 日未満のため一時 waiver。期限は [tool.dependency-waivers]
+exclude-newer-package = { certifi = "2026-10-20T03:00:00Z" }
+
+# tests/test_dependency_policy.py が参照。値 = この日までに waiver を削除して `uv lock`（超過で CI 赤）。削除可能日 = 修正版 upload + 7 日
+[tool.dependency-waivers]
+certifi = 2026-11-04   # 削除可能: 2026-10-28 以降
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

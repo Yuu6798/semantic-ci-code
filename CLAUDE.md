@@ -209,7 +209,8 @@ When adding a new `docs/<topic>.md`, update this table (with status tag) and the
 ## Commands
 
 ```bash
-pip install -e ".[dev]"
+uv sync --locked --extra dev && source .venv/bin/activate   # uv >= 0.11, pins in uv.lock（activate せず各コマンドに `uv run` 接頭でも可）
+# alternative: pip install -e ".[dev]"
 ruff check .
 pytest -q
 python -m semantic_ci_code

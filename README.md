@@ -30,13 +30,18 @@ all 8 D-class findings are now resolved).
 ## Install
 
 ```bash
-pip install -e ".[dev]"
+uv sync --locked --extra dev   # recommended: exact pins from uv.lock (needs uv >= 0.11)
+source .venv/bin/activate      # or prefix each command with `uv run`
 semantic-ci --version
 ```
 
+Without uv: `pip install -e ".[dev]"` (unpinned; pip ignores `[tool.uv]`).
 The legacy `semantic-ci-code` entrypoint is still available and unchanged.
 
 ## Quick Start
+
+The bare `semantic-ci` commands below assume the venv is active (`source .venv/bin/activate`)
+or that each is prefixed with `uv run`.
 
 Create a minimal `target.yaml`:
 

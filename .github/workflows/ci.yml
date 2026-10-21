@@ -6,12 +6,23 @@ on:
   pull_request:
     branches: [main]
 
+# This workflow only reads the repository (checkout + local test/lint/audit);
+# it never writes back via the API, so the default token is narrowed to read.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
+    env:
+      # Make uv use the interpreter provisioned by actions/setup-python below
+      # and refuse to silently download a different one: a missing/mismatched
+      # interpreter fails loudly instead of testing the wrong Python.
+      UV_PYTHON: ${{ matrix.python-version }}
+      UV_PYTHON_DOWNLOADS: never
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,25 +31,75 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
+
+      - name: Set up uv
+        # Immutable full-tag pin (astral-sh/setup-uv publishes no floating
+        # major tags since v8). Dependabot's github-actions ecosystem bumps it.
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.11.32"
 
       - name: Install
-        run: python -m pip install -e ".[dev]"
+        # --locked: fail (instead of silently re-resolving) when uv.lock is out
+        # of date with pyproject.toml. Every later ``uv run`` uses --no-sync so
+        # nothing can re-lock or re-sync the environment behind this step.
+        run: uv sync --locked --extra dev
 
       - name: Lint
-        run: ruff check .
+        run: uv run --no-sync ruff check .
 
       - name: Format
-        run: ruff format --check .
+        run: uv run --no-sync ruff format --check .
 
       - name: Test
-        run: pytest -q --cov=src/semantic_ci_code --cov-report=term
+        run: uv run --no-sync pytest -q --cov=src/semantic_ci_code --cov-report=term
+
+  # The audit is its own job (not the last step of ``test``) so a lint/test
+  # failure can no longer skip it: a known advisory in uv.lock is reported on
+  # every run, independently of the test result.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    env:
+      # Same interpreter policy as the ``test`` job (see the comment there).
+      UV_PYTHON: ${{ matrix.python-version }}
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.11.32"
+
+      - name: Install
+        # --locked: fail when uv.lock is out of date with pyproject.toml.
+        # --no-install-project: the audit only needs pip-audit (dev extra) and
+        # the lock itself, not a build of this project.
+        run: uv sync --locked --extra dev --no-install-project
 
       - name: Security audit
-        # Audit the project's declared dependencies only (pip-audit resolves
-        # pyproject.toml in an isolated env), not the runner's active Python
-        # environment. The runner image's bundled tooling (pip, setuptools,
-        # wheel, etc.) varies by Python version and image refresh date and is
-        # outside this repo's responsibility, so a bare ``pip-audit`` would
-        # fail on host-system CVEs unrelated to our deps.
-        run: pip-audit --strict .
+        # Audit EVERY package pinned in uv.lock (all extras) against the
+        # advisory database, without installing it. ``uv sync --locked`` above
+        # already proved the lock is current, so ``--frozen`` here only skips a
+        # redundant re-check.
+        #   --no-deps --disable-pip: audit the exact pinned lines only. Plain
+        #     ``--no-deps`` alone still lets pip-audit build a temp venv and
+        #     resolve transitive dependencies, which would audit versions that
+        #     are NOT the locked ones.
+        #   --strict: fail the whole audit if any dependency cannot be checked.
+        # The runner's bundled tooling (pip, setuptools, wheel, ...) is out of
+        # scope: only the lock is audited, never the active environment.
+        run: |
+          uv export --frozen --all-extras --no-emit-project --no-hashes \
+            -o "$RUNNER_TEMP/audit-requirements.txt"
+          uv run --no-sync pip-audit --strict --no-deps --disable-pip \
+            -r "$RUNNER_TEMP/audit-requirements.txt"

@@ -1,0 +1,29 @@
+# Dependabot version updates.
+#
+# - uv: keeps uv.lock (and pyproject.toml bounds) current. uv.lock is the
+#   single source of truth that CI installs from (`uv sync --locked`) and
+#   audits (`pip-audit` over `uv export`), so lock bumps arrive as reviewable
+#   PRs instead of drifting silently.
+# - github-actions: bumps the tag-pinned actions used in .github/workflows/.
+#
+# `cooldown` makes Dependabot wait 7 days after a release is published before
+# proposing it, as a buffer against just-published malicious or yanked
+# releases. Keep it equal to `[tool.uv] exclude-newer` in pyproject.toml,
+# which applies the same 7-day window to uv's own resolution and build env.
+# Dependabot のセキュリティ更新は cooldown を飛ばすが、uv 側の exclude-newer (7 days) は効くため、
+# 公開 7 日未満の修正版は pyproject の exclude-newer-package waiver が必要（R2）
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7

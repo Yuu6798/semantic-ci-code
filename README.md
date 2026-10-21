@@ -30,10 +30,11 @@ all 8 D-class findings are now resolved).
 ## Install
 
 ```bash
-pip install -e ".[dev]"
-semantic-ci --version
+uv sync --locked --extra dev   # recommended: exact pins from uv.lock (needs uv >= 0.11)
+uv run semantic-ci --version
 ```
 
+Without uv: `pip install -e ".[dev]"` (unpinned; pip ignores `[tool.uv]`).
 The legacy `semantic-ci-code` entrypoint is still available and unchanged.
 
 ## Quick Start

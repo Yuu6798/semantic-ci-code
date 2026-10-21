@@ -30,6 +30,10 @@ These tests turn recurring discipline anti-patterns into CI failures:
   ~150-200 lines), so reference detail (the `src/` tree, the session-memory
   procedure) is offloaded to `docs/repository_layout.md` and the wrap-up skill,
   leaving pointers in `CLAUDE.md`. Enforced via the wrap-up gate (step 8).
+- `test_uv_waivers.py`: each `[tool.uv] exclude-newer-package` waiver in
+  `pyproject.toml` (an absolute UTC date that outlives the global 7-day
+  `exclude-newer` window and silently freezes that package) fails once it is
+  older than 14 days, so an expired waiver must be removed and re-locked.
 
 Phase 6 closeout (`docs/archive/doc_refactor_planning.md`): the schema-grep and
 dual-case dogfood candidates landed as the two tests above. The

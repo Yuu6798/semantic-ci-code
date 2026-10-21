@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # uv itself is pinned once here and referenced by every setup-uv step below.
+  # Dependabot (github-actions) bumps only the setup-uv action tag, never this
+  # value, so a uv release is adopted by editing this line by hand.
+  UV_VERSION: "0.11.32"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -37,7 +43,7 @@ jobs:
         # major tags since v8). Dependabot's github-actions ecosystem bumps it.
         uses: astral-sh/setup-uv@v10.3.0
         with:
-          version: "0.11.32"
+          version: ${{ env.UV_VERSION }}
 
       - name: Install
         # --locked: fail (instead of silently re-resolving) when uv.lock is out
@@ -57,14 +63,16 @@ jobs:
   # The audit is its own job (not the last step of ``test``) so a lint/test
   # failure can no longer skip it: a known advisory in uv.lock is reported on
   # every run, independently of the test result.
+  #
+  # Single interpreter on purpose: today the exported requirements carry no
+  # python_version marker (the only marker is the win32-only colorama pin), so
+  # every Python would audit the identical set. lock に python_version marker
+  # 付きの fork が現れたら matrix 化する.
   dependency-audit:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
     env:
       # Same interpreter policy as the ``test`` job (see the comment there).
-      UV_PYTHON: ${{ matrix.python-version }}
+      UV_PYTHON: "3.12"
       UV_PYTHON_DOWNLOADS: never
     steps:
       - name: Checkout
@@ -73,12 +81,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.3.0
         with:
-          version: "0.11.32"
+          version: ${{ env.UV_VERSION }}
 
       - name: Install
         # --locked: fail when uv.lock is out of date with pyproject.toml.
@@ -87,10 +95,14 @@ jobs:
         run: uv sync --locked --extra dev --no-install-project
 
       - name: Security audit
-        # Audit EVERY package pinned in uv.lock (all extras) against the
-        # advisory database, without installing it. ``uv sync --locked`` above
-        # already proved the lock is current, so ``--frozen`` here only skips a
-        # redundant re-check.
+        # 監査対象 = uv.lock のうち runner プラットフォーム該当行のみ（win32 限定
+        # colorama は対象外）。All extras are exported and audited without
+        # installing them. Lines carrying an environment marker are evaluated
+        # against this Linux runner by pip-audit and skipped when they do not
+        # match, so the win32-only colorama pin (dev/test-only, pulled in by
+        # pytest on Windows) is NOT audited here. ``uv sync --locked`` above
+        # already proved the lock is current, so ``--frozen`` on the export
+        # only skips a redundant re-check.
         #   --no-deps --disable-pip: audit the exact pinned lines only. Plain
         #     ``--no-deps`` alone still lets pip-audit build a temp venv and
         #     resolve transitive dependencies, which would audit versions that

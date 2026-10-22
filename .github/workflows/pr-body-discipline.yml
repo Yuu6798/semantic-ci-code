@@ -22,6 +22,8 @@ permissions:
 
 jobs:
   dogfooding-disclosure:
+    # Dependabot の自動生成本文には ## Dogfooding が無いため bot の PR は対象外（skipped は required check を満たす）
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Require dogfooding disclosure

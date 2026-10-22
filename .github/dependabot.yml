@@ -4,7 +4,7 @@
 #   single source of truth that CI installs from (`uv sync --locked`) and
 #   audits (`pip-audit` over `uv export`), so lock bumps arrive as reviewable
 #   PRs instead of drifting silently.
-# - github-actions: bumps the tag-pinned actions used in .github/workflows/.
+# - github-actions: bumps the SHA-pinned actions (with a "# vX" version comment) used in .github/workflows/.
 #
 # `cooldown` makes Dependabot wait 7 days after a release is published before
 # proposing it, as a buffer against just-published malicious or yanked

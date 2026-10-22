@@ -39,7 +39,8 @@ repo-hygiene invariants.
   [`AGENTS.md`](AGENTS.md) §2).
 - CI enforces a dogfooding disclosure in the PR body
   (`.github/workflows/pr-body-discipline.yml`): state whether you ran
-  `semantic-ci` on your own change and what it reported.
+  `semantic-ci` on your own change and what it reported. Dependabot
+  (`dependabot[bot]`) PRs are exempt (the job is skipped).
 
 ## Good first issues
 

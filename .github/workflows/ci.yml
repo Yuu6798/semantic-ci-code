@@ -15,7 +15,7 @@ env:
   # uv itself is pinned once here and referenced by every setup-uv step below.
   # Dependabot (github-actions) bumps only the setup-uv action tag, never this
   # value, so a uv release is adopted by editing this line by hand.
-  UV_VERSION: "0.11.32"
+  UV_VERSION: "0.13.5"
 
 jobs:
   test:
